@@ -78,8 +78,8 @@ else:
     enable_nccl_base_collectives = True
 
 try:
-    import oslo.torch.nn.parallel.data_parallel.ssd_offload as ssd_offload
-    from oslo.torch.nn.parallel.data_parallel.ssd_offload import SsdFlatParameter
+    import oslo.torch.nn.parallel.data_parallel._ssd_offload as ssd_offload
+    from oslo.torch.nn.parallel.data_parallel._ssd_offload import SsdFlatParameter
 
     import_ssd_offload = True
 except ImportError:
