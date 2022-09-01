@@ -1,11 +1,11 @@
-from typing import Optional
-
 import torch
 import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
-from oslo.torch.nn.parallel.utils import ParallelWrapper, get_parallel_context
+from oslo.torch.nn.parallel import add_wrapper
+from oslo.torch.nn.parallel.data_parallel.distributed_data_parallel import (
+    _DistributedDataParallel,
+)
 
 
 class _SequenceDataParallelState(object):
@@ -32,35 +32,36 @@ def _sequence_data_parallel_hook(
     return fut.then(lambda x: x.value()[0])
 
 
-class SequenceDataParallel(DistributedDataParallel, ParallelWrapper):
-    def __init__(
-        self,
+def SequenceDataParallel(
+    module,
+    parallel_context,
+    dim=0,
+    broadcast_buffers=True,
+    bucket_cap_mb=25,
+    find_unused_parameters=False,
+    check_reduction=False,
+    gradient_as_bucket_view=False,
+    static_graph=False,
+):
+    sp = _DistributedDataParallel(
         module,
-        parallel_context: Optional[ParallelContext] = None,
-        device_ids=None,
-        output_device=None,
-        dim=0,
-        broadcast_buffers=True,
-        bucket_cap_mb=25,
-        find_unused_parameters=False,
-        check_reduction=False,
-        gradient_as_bucket_view=False,
-    ):
-        self.parallel_context = get_parallel_context(module, parallel_context)
-        super(SequenceDataParallel, self).__init__(
-            module,
-            process_group=self.parallel_context.get_group(ParallelMode.SEQUENCE_DP),
-            device_ids=device_ids,
-            output_device=output_device,
-            dim=dim,
-            broadcast_buffers=broadcast_buffers,
-            bucket_cap_mb=bucket_cap_mb,
-            find_unused_parameters=find_unused_parameters,
-            check_reduction=check_reduction,
-            gradient_as_bucket_view=gradient_as_bucket_view,
-        )
+        device_ids=[torch.cuda.current_device()],
+        output_device=torch.cuda.current_device(),
+        dim=dim,
+        broadcast_buffers=broadcast_buffers,
+        process_group=parallel_context.get_group(ParallelMode.SEQUENCE_DP),
+        bucket_cap_mb=bucket_cap_mb,
+        find_unused_parameters=find_unused_parameters,
+        check_reduction=check_reduction,
+        gradient_as_bucket_view=gradient_as_bucket_view,
+        static_graph=static_graph,
+    )
+    sp.register_comm_hook(
+        state=_SequenceDataParallelState(parallel_context),
+        hook=_sequence_data_parallel_hook,
+    )
 
-        self.register_comm_hook(
-            state=_SequenceDataParallelState(self.parallel_context),
-            hook=_sequence_data_parallel_hook,
-        )
+    add_wrapper(module, ParallelMode.SEQUENCE_DP, sp)
+    setattr(module, "forward", sp.forward)
+    setattr(module, "train", sp.train)
+    return module

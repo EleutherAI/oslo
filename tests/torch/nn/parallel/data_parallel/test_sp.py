@@ -110,10 +110,9 @@ class TesterModel(nn.Module):
 
 
 parallel_context = ParallelContext.from_torch(
-    data_parallel_size=2,
+    data_parallel_size=1,
     pipeline_parallel_size=1,
-    tensor_parallel_size=2,
-    tensor_parallel_mode="sequence",
+    sequence_parallel_size=2,
 )
 
 d_model = 512
@@ -225,4 +224,5 @@ for i in range(1000):
         assert torch.allclose(torch_m.grad, oslo_m.grad, atol=5e-7)
 
 # clean up ?
+print("SUCCESS TEST ;)")
 torch.distributed.barrier()
