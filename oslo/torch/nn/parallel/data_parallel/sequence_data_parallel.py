@@ -2,10 +2,10 @@ import torch
 import torch.distributed as dist
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
-from oslo.torch.nn.parallel import add_wrapper
 from oslo.torch.nn.parallel.data_parallel.distributed_data_parallel import (
     _DistributedDataParallel,
 )
+from oslo.torch.nn.parallel.utils import add_wrapper
 
 
 class _SequenceDataParallelState(object):

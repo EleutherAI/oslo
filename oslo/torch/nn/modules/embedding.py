@@ -27,7 +27,6 @@ class VocabUtility:
         )
 
 
-
 class Embedding1D(nn.Embedding):
     def __init__(
         self,
