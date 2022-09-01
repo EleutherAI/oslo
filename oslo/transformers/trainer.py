@@ -25,7 +25,7 @@ from torch.distributed import rpc
 from transformers import PreTrainedTokenizerBase, PreTrainedModel
 
 from oslo.torch.nn.parallel.data_parallel import (
-    DistributedDataParallel,
+    _DistributedDataParallel,
     ShardedDataParallel,
     FullyShardedDataParallel,
 )
@@ -2163,7 +2163,7 @@ class Trainer:
             #     kwargs["find_unused_parameters"] = True
             # if self.args.ddp_bucket_cap_mb is not None:
             #     kwargs["bucket_cap_mb"] = self.args.ddp_bucket_cap_mb
-            model = DistributedDataParallel(
+            model = _DistributedDataParallel(
                 model,
                 device_ids=[self.args.local_rank] if self.args._n_gpu != 0 else None,
                 output_device=self.args.local_rank if self.args._n_gpu != 0 else None,

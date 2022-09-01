@@ -112,5 +112,12 @@ def zero_rank_log(txt):
 
     if dist.get_rank() == 0:
         print(txt)
-    # 모니터링 생성 대기
+
     dist.barrier()
+
+
+def add_wrapper(module, mode, wrapper):
+    if hasattr(module, "oslo_wrappers"):
+        module.oslo_wrappers[mode] = wrapper
+    else:
+        setattr(module, "oslo_wrappers", {mode: wrapper})
