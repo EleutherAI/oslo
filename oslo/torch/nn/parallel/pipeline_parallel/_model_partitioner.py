@@ -9,7 +9,7 @@ from oslo.torch.distributed import ParallelMode
 from oslo.torch.nn.parallel.pipeline_parallel._cost_estimator import (
     PartitioningCostEstimator,
 )
-from oslo.torch.nn.parallel.pipeline_parallel._utils import bfs, dfs
+from oslo.torch.nn.parallel.pipeline_parallel._utils import bfs, post_order_traverse
 
 
 class ModelPartitioner(object):
@@ -55,6 +55,25 @@ class ModelPartitioner(object):
         else:
             setattr(element, "oslo_pp_parent_rank", node.parent.device)
 
+        # TODO; tmp work
+        setattr(element, "oslo_pp_attr_set", True)
+
+    @staticmethod
+    def _set_attribute_without_param(element, node):
+        # TODO; dist.get_rank()
+        if hasattr(element, "oslo_parallel"):
+            element.oslo_parallel[ParallelMode.PIPELINE] = dist.get_rank()
+        else:
+            element.oslo_parallel = {ParallelMode.PIPELINE: dist.get_rank()}
+
+        if node.parent is None:
+            setattr(element, "oslo_pp_parent_rank", node.device)
+        else:
+            setattr(element, "oslo_pp_parent_rank", node.parent.device)
+
+        # TODO; tmp work
+        setattr(element, "oslo_pp_attr_set", True)
+
     def partition(self):
         # 1. construct tree
         self.root_node = Node(
@@ -79,14 +98,21 @@ class ModelPartitioner(object):
         self._tree_partitioning()
 
         # 4. set device to parameters and buffers
-        for node in dfs(self.root_node):
-            if all([not hasattr(child, "device") for child in node.children]):
-                module = node.modules[0]
-                self._set_attribute(module, node)
-                for param in node.parameters:
-                    self._set_attribute(param, node)
-                for buffer in module.buffers():
-                    self._set_attribute(buffer, node)
+        for node in post_order_traverse(self.root_node):
+            for module in node.modules:
+                if len(self._get_parameters(module)) == 0:
+                    # TODO; Huggingface uses shared activation
+                    #   need to make use own activation, rather
+                    #   than make an rpc
+                    self._set_attribute_without_param(module, node)
+                else:
+                    self._set_attribute(module, node)
+                    for param in node.parameters:
+                        if not hasattr(param, "oslo_pp_attr_set"):
+                            self._set_attribute(param, node)
+                    for buffer in module.buffers():
+                        if not hasattr(buffer, "oslo_pp_attr_set"):
+                            self._set_attribute(buffer, node)
 
     @staticmethod
     def _get_parameters(module, to_list=True):
@@ -97,6 +123,7 @@ class ModelPartitioner(object):
     def _construct_tree(self, node, parent_name):
         for module in node.modules:
             for name, child in module.named_children():
+
                 name = (
                     f"{parent_name}.{name}"
                     if parent_name != self.module.__class__.__qualname__
@@ -120,6 +147,16 @@ class ModelPartitioner(object):
                             tied=False,
                         )
                         self.visited[parameters] = child_node
+                    self._construct_tree(child_node, name)
+                # layers without parameters
+                elif isinstance(child, nn.Module):
+                    child_node = Node(
+                        name=name,
+                        parent=node,
+                        modules=[child],
+                        parameters=list(),
+                        tied=False,
+                    )
                     self._construct_tree(child_node, name)
 
     @staticmethod
