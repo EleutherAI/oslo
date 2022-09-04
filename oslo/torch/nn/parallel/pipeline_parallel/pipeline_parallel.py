@@ -86,7 +86,6 @@ class PipelineParallel(nn.Module):
         # set up worker for inputs
         self.producer = None
         if self.rank == 0:
-            world_size = self.parallel_context.get_world_size(ParallelMode.PIPELINE)
             self.producer = concurrent.futures.ThreadPoolExecutor()
 
     def forward(self, *args, **kwargs):
@@ -145,14 +144,10 @@ class PipelineParallel(nn.Module):
                     args=(i,),
                 )
 
-                # TODO; can't understand why this line make synchronization
-                #    need to figure out why
-                result
-                # print(f'{i=}, {result.loss=}, {dist.get_rank()=}')
-
                 yield result  # has no gradient
 
         # barrier ?
+        # TODO; check the reason why we need this code block
         for other in self.parallel_context.get_ranks_in_group(ParallelMode.PIPELINE):
             if other == self.rank:
                 increment_done()

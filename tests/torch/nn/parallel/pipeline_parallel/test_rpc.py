@@ -25,9 +25,7 @@ def get_worker_map(parallel_context):
     return {i: f"rpc_{i:02d}" for i in range(world_size)}
 
 
-def forward(tensor, shape, dtype, is_final_stage):
-    result = tensor
-
+def forward(shape, dtype, is_final_stage):
     if is_final_stage:
         return shape, dtype
     else:

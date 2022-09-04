@@ -88,7 +88,7 @@ class _PipeBackwardRedirection(torch.autograd.Function):
 
         # print(f'backward: {to=}, {unique_key=}')
 
-        fut = rpc.rpc_async(
+        rpc.rpc_async(
             to=to,
             func=launch_remote_backward,
             args=(unique_key, *grad_outputs),

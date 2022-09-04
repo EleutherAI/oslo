@@ -12,8 +12,8 @@ REQUEST_GENERATION = 0
 class Message:
     comm_type: str
     # 1. request or response
-    reqeust_from: Optional[str]
-    # 2. reqeust module id
+    request_from: Optional[str]
+    # 2. request module id
     exec_type: str
     # 3. forward or backward
     inputs: Optional[Any]
