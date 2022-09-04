@@ -12,6 +12,11 @@ from oslo.torch.distributed import ParallelContext
 from oslo.torch.nn.parallel import PipelineParallel
 from oslo.torch.nn.parallel.utils import allocate_params
 
+# TODO;
+from oslo.torch.nn.parallel.pipeline_parallel._server import (
+    reset_backward_notify, backward_done_notify, wait_backward_done,
+)
+
 from datasets import load_dataset
 from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel, set_seed
 
@@ -64,7 +69,7 @@ allocate_params(wrapper_pp, parallel_context)
 
 
 def run():
-    batch_size = 4 * num_micro_batches
+    batch_size = 8 * num_micro_batches
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.pad_token = tokenizer.eos_token
 
@@ -98,6 +103,8 @@ def run():
             optimizer_pp.zero_grad(set_to_none=True)
             optimizer_no_pp.zero_grad(set_to_none=True)
 
+            reset_backward_notify()
+
             cum_loss_pp = torch.zeros(1)
             futures = []
             for ind, out_pp in enumerate(wrapper_pp(**inputs, labels=inputs["input_ids"])):
@@ -113,7 +120,7 @@ def run():
                 print(f'{ind=}')
                 cum_loss_pp += loss_pp.detach().item()
 
-            time.sleep(1.5)
+            time.sleep(2.5)
 
             out_no_pp = model_no_pp(**inputs, labels=inputs["input_ids"])
             loss_no_pp = out_no_pp.loss
@@ -142,14 +149,6 @@ def run():
             no_pp_losses.append(loss_no_pp.item())
 
     torch.distributed.rpc.shutdown()
-
-    if dist.get_rank() == 0:
-        plt.figure(figsize=(32, 8))
-        plt.plot(pp_losses, label='PP')
-        plt.plot(no_pp_losses, label='no PP')
-        plt.legend()
-        plt.title('PP vs. no PP')
-        plt.savefig(f'pp_vs_no_pp.png')
 
 
 run()

@@ -1,4 +1,4 @@
-from oslo.torch.nn.modules.conv import Conv1D, LazyConv1D
+from oslo.torch.nn.modules.conv import Conv1D #, LazyConv1D
 from oslo.torch.nn.modules.dropout import (
     FusedBiasDropout,
 )
@@ -10,7 +10,7 @@ from oslo.torch.nn.modules.embedding import (
     Embedding2D,
     Embedding2p5D,
     Embedding3D,
-    LazyEmbedding,
+    # LazyEmbedding,
     VocabParallelEmbedding1D,
     VocabParallelEmbedding2D,
     VocabParallelEmbedding2p5D,
@@ -41,7 +41,7 @@ from oslo.torch.nn.modules.layer_norm import (
 )
 from oslo.torch.nn.modules.linear import (
     ColLinear1D,
-    LazyLinear,
+    # LazyLinear,
     Linear,
     Linear2D,
     Linear2p5D,
