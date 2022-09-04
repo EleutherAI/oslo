@@ -84,6 +84,10 @@ class PipelineParallel(nn.Module):
         # set forward counter to zero
         reset_forward_counter()
 
+        # to ensure optimizer's step is done for all processes
+        # TODO; barrier for only PP
+        torch.distributed.barrier()
+
         if self.rank == 0:
             # TODO;
             new_args = [list() for _ in range(self.num_micro_batches)]
@@ -158,6 +162,8 @@ class PipelineParallel(nn.Module):
 
         while len_forward_marker() != 0:
             time.sleep(0.)
+
+        torch.cuda.empty_cache()
 
     def _recursive_wrap(self, module, prefix):
         if not hasattr(module, "location"):     # prevent infinite loop
