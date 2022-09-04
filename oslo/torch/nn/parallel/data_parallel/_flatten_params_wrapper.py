@@ -31,7 +31,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from oslo.torch.experimental.nn.ssd_offload import SsdFlatParameter
+from oslo.torch.nn.parallel.data_parallel._ssd_offload import SsdFlatParameter
 from oslo.torch.nn.parallel.data_parallel._state_dict import replace_by_prefix_
 
 if TYPE_CHECKING:

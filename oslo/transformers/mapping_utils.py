@@ -72,6 +72,7 @@ class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
                 "sop_classifier.classifier",
                 "classifier",
                 "qa_outputs",
+                gather_output=True,
             ),
         ],
         "Bart": [
@@ -79,14 +80,26 @@ class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
             Column("classification_head.dense", gather_output=True),
             Row("out_proj", "fc2"),
             Update("embed_dim", "num_heads"),
-            Head("lm_head", "classification_head.out_proj", "qa_outputs"),
+            Head(
+                "lm_head",
+                "classification_head.out_proj",
+                "qa_outputs",
+                gather_output=True,
+            ),
         ],
         "Bert": [
             Column("query", "key", "value", "intermediate.dense"),
             Column("pooler.dense", gather_output=True),
             Row("output.dense"),
             Update("num_attention_heads", "all_head_size"),
-            Head("decoder", "seq_relationship", "classifier", "qa_outputs"),
+            Head("transform.dense", gather_output=False),
+            Head(
+                "decoder",
+                "seq_relationship",
+                "classifier",
+                "qa_outputs",
+                gather_output=True,
+            ),
         ],
         "Blenderbot": [
             Column("q_proj", "k_proj", "v_proj", "fc1"),
@@ -111,18 +124,24 @@ class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
             Column("c_fc", "q_attn", reversed=True),
             Row("c_proj", reversed=True),
             Update("embed_dim", "split_size", "num_heads"),
-            Head("lm_head", "score", "classifier", "summary"),
+            Head("lm_head", "score", "classifier", "summary", gather_output=True),
         ],
         "GPTNeo": [
             Column("q_proj", "k_proj", "v_proj", "c_fc"),
             Row("out_proj", "c_proj"),
             Update("embed_dim", "num_heads"),
-            Head("lm_head", "score", "qa_outputs"),
+            Head("lm_head", "score", "qa_outputs", gather_output=True),
         ],
         "GPTJ": [
             Column("q_proj", "k_proj", "v_proj", "fc_in"),
             Row("out_proj", "fc_out"),
             Update("embed_dim", "num_attention_heads"),
+            Head("lm_head", "score", gather_output=True),
+        ],
+        "OPT": [
+            Column("q_proj", "k_proj", "v_proj", "fc1"),
+            Row("out_proj", "fc2"),
+            Update("embed_dim", "num_heads"),
             Head("lm_head", "score"),
         ],
         "Electra": [
@@ -130,8 +149,8 @@ class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
             Column(
                 "electra.embeddings_project",
                 "classifier.dense",
-                "discriminator_predictions.dense",
                 "generator_predictions.dense",
+                "discriminator_predictions.dense",
                 gather_output=True,
             ),
             Row("output.dense"),
@@ -143,6 +162,7 @@ class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
                 "classifier",
                 "qa_outputs",
                 "summary",
+                gather_output=True,
             ),
         ],
         "Roberta": [
@@ -155,7 +175,14 @@ class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
             ),
             Row("output.dense"),
             Update("num_attention_heads", "all_head_size"),
-            Head("lm_head.decoder", "classifier.out_proj", "classifier", "qa_outputs"),
+            Head("lm_head.dense"),
+            Head(
+                "lm_head.decoder",
+                "classifier.out_proj",
+                "classifier",
+                "qa_outputs",
+                gather_output=True,
+            ),
         ],
     }
 
