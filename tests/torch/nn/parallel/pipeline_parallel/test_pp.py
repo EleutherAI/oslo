@@ -1,106 +1,52 @@
 import time
+from copy import deepcopy
 
 import torch
 import torch.nn as nn
 import torch.distributed as dist
+from torch.distributed import rpc
 from torch.optim import Adam
+from torch.utils.data import DataLoader
 
-from oslo.torch.distributed import ParallelContext, ParallelMode
+from oslo.torch.distributed import ParallelContext
 from oslo.torch.nn.parallel import PipelineParallel
 from oslo.torch.nn.parallel.utils import allocate_params
+
+from datasets import load_dataset
+from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel, set_seed
 
 import matplotlib
 import matplotlib.pyplot as plt
 
 matplotlib.use("Agg")
-
-_print = print
-
-
-def print(*args, **kw):
-    if dist.get_rank() == 0:
-        _print(*args, **kw)
-
-
 torch.autograd.set_detect_anomaly(True)
-
-torch.manual_seed(42)
+set_seed(42)
 
 parallel_context = ParallelContext.from_torch(
     data_parallel_size=1,
-    pipeline_parallel_size=4,
+    pipeline_parallel_size=2,
     tensor_parallel_size=1,
 )
 
 current_device = torch.cuda.current_device()
 
+model_name = "gpt2"
+num_micro_batches = 8
 
-n_steps = 1000
-batch_size = 16
-num_micro_batches = 2
-
-in_channels = 16
-hidden_channels = 8
-out_channels = 16
-
-
-class SmallModel(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-        self.fc1 = nn.Linear(in_channels, hidden_channels)
-
-        self.fcs = nn.ModuleList()
-        for _ in range(30):
-            self.fcs.append(
-                nn.Linear(hidden_channels, hidden_channels)
-            )
-
-        self.fc2 = nn.Linear(hidden_channels, out_channels)
-
-    def forward(self, x):
-        x = self.fc1(x)
-
-        for layer in self.fcs:
-            x = layer(x)
-
-        x = self.fc2(x)
-        return x
+config = GPT2Config.from_pretrained(model_name)
+config.resid_pdrop = 0.0
+config.embd_pdrop = 0.0
+config.attn_pdrop = 0.0
 
 
-class BigModel(nn.Module):
-    def __init__(self):
-        super().__init__()
+model = GPT2LMHeadModel(config)
 
-        self.sms = nn.ModuleList()
-        for _ in range(4):
-            self.sms.append(SmallModel())
+for n, m in model.named_modules():
+    if isinstance(m, nn.Dropout):
+        m.p = 0.
 
-    def forward(self, x):
-        for sm in self.sms:
-            x = sm(x)
-        return x
-
-
-# fc1 = nn.Linear(in_channels, hidden_channels)
-# fc2 = nn.Linear(hidden_channels, out_channels)
-# model = nn.Sequential(fc1, fc2)
-
-# fc1_no_pp = nn.Linear(in_channels, hidden_channels)
-# fc2_no_pp = nn.Linear(hidden_channels, out_channels)
-# model_no_pp = nn.Sequential(fc1_no_pp, fc2_no_pp)
-# model_no_pp.load_state_dict(model.state_dict())
-# model_no_pp.to(current_device)
-
-model = BigModel()
-model_no_pp = BigModel()
-model_no_pp.load_state_dict(model.state_dict())
-model_no_pp.to(current_device)
-
-# model = GPT2LMHeadModel.from_pretrained("gpt2")
-# model_no_pp = GPT2LMHeadModel.from_pretrained("gpt2")
-# model_no_pp.load_state_dict(model.state_dict())
-# model_no_pp.to(current_device)
+model_no_pp = deepcopy(model)
+model_no_pp.cuda()
 
 wrapper_pp = PipelineParallel(
     model,
@@ -111,126 +57,94 @@ wrapper_pp = PipelineParallel(
 
 wrapper_pp.train()
 
-# if parallel_context.get_global_rank() == 0:
-#     print(wrapper_pp.partitioner.module)
-
 optimizer_pp = Adam(wrapper_pp.parameters(), lr=3e-5)
 optimizer_no_pp = Adam(model_no_pp.parameters(), lr=3e-5)
 
 allocate_params(wrapper_pp, parallel_context)
 
 
-# def print_location(module, prefix):
-#     for n, m in module.named_children():
-#         new_prefix = f'{prefix}.{n}' if prefix != '' else n
-#         print(new_prefix, m.oslo_parallel[ParallelMode.PIPELINE])
-#         print_location(m, new_prefix)
-#
-#
-# print_location(wrapper_pp, '')
-
-
-# print(f"FC1 @ {model.fc1.weight.device}, FCS[-1] @ {model.fcs[-1].weight.device}")
-# print(f"FC1 @ {model.fc1.location}, FCS[-1] @ {model.fcs[-1].location}")
-# print(f"FC1 @ {wrapper_pp.module.fc1.weight.device}, FCS[-1] @ {wrapper_pp.module.fcs[-1].weight.device}")
-
-
-
-# def hook_fn(m, i, o):
-#     _print(f'backward hook!! {m.weight.device=} {m.location=}')
-#
-#
-# def get_all_layers(net):
-#     for name, layer in net.named_modules():
-#         # If it is a sequential, don't register a hook on it
-#         # but recursively register hook on all it's module children
-#         if isinstance(layer, nn.Sequential):
-#             get_all_layers(layer)
-#         elif isinstance(layer, nn.Linear):
-#             # it's a non sequential. Register a hook
-#             layer.register_backward_hook(hook_fn)
-#
-#
-# get_all_layers(wrapper_pp)
-
-
-"""
-for rank in range(dist.get_world_size()):
-    if dist.get_rank() == rank:
-        print(f"RANK: {rank}:")
-        num_params = 0
-        for name, param in wrapper_pp.named_parameters():
-            if param.device != torch.device("cpu"):
-                print(f"> {name}: {param.device}")
-                num_params += param.numel()
-            else:
-                print(f"> {name}: {param.device}")
-        print(f"RANK {rank} params: {num_params}")
-    dist.barrier()
-    print()
-"""
-
-
-
-sleep = 0.1
 def run():
+    batch_size = 4 * num_micro_batches
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer.pad_token = tokenizer.eos_token
+
+    datasets = load_dataset("squad").data["train"]["context"]
+    datasets = [str(sample) for sample in datasets[:5000]]
+    dataloader = DataLoader(datasets, batch_size=batch_size)
+
     pp_losses = []
     no_pp_losses = []
-    loss_fn = torch.nn.MSELoss()
 
-    for i in range(n_steps):
-        sample_input = torch.rand(batch_size, in_channels).cuda()
-        sample_output = torch.rand(batch_size, out_channels).cuda() * 10
+    with torch.enable_grad():
+    # with torch.no_grad():
+        for i, data in enumerate(dataloader):
+            for (n1, m1), (n2, m2) in zip(wrapper_pp.module.named_parameters(recurse=True),
+                                          model_no_pp.named_parameters(recurse=True)):
+                assert n1 == n2
+                if m1.is_cuda:
+                    assert torch.allclose(m1, m2, rtol=1e-2, atol=1e-5), f'{n1=}'
+                    # if not torch.allclose(m1, m2):
+                    #     print(f'{n1=}')
+            print('weights are same')
 
-        optimizer_pp.zero_grad(set_to_none=True)
-        optimizer_no_pp.zero_grad()
+            inputs = tokenizer(
+                data,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=512,
+            ).to("cuda")
 
-        sample_output_chunks = sample_output.chunk(num_micro_batches)
+            optimizer_pp.zero_grad(set_to_none=True)
+            optimizer_no_pp.zero_grad(set_to_none=True)
 
-        # wait for all forward pass
-        results = [result for result in wrapper_pp(sample_input)]
+            cum_loss_pp = torch.zeros(1)
+            futures = []
+            for ind, out_pp in enumerate(wrapper_pp(**inputs, labels=inputs["input_ids"])):
+                loss_pp = out_pp.loss
+                loss_pp = loss_pp / num_micro_batches
 
-        cum_loss_pp = torch.zeros(1)
-        for out_pp, target in zip(results, sample_output_chunks):
-            loss_pp = loss_fn(out_pp, target)
-            loss_pp.backward()
-            time.sleep(sleep)
-            cum_loss_pp += loss_pp.detach().item()
+                if dist.get_rank() == 0:
+                    rref = rpc.RRef(loss_pp)
+                    fut = rref.rpc_async().backward()
+                    futures.append(fut)
+                    # loss_pp.backward()
 
-        cum_loss_pp /= num_micro_batches
+                print(f'{ind=}')
+                cum_loss_pp += loss_pp.detach().item()
 
-        out_no_pp = model_no_pp(sample_input)
-        loss_no_pp = loss_fn(out_no_pp, sample_output)
+            time.sleep(1.5)
 
-        loss_no_pp.backward()
+            out_no_pp = model_no_pp(**inputs, labels=inputs["input_ids"])
+            loss_no_pp = out_no_pp.loss
+            loss_no_pp.backward()
 
-        pp_losses.append(cum_loss_pp.item())
-        no_pp_losses.append(loss_no_pp.item())
+            torch.distributed.barrier()
 
-        # grad print
-        # for n, p in wrapper_pp.named_parameters():
-        #     if p.grad is not None:
-        #         print(n, p.grad)
+            print(f'{dist.get_rank()=}, {cum_loss_pp=}, {loss_no_pp=}')
 
-        named_params1 = wrapper_pp.module.named_parameters()
-        named_params2 = model_no_pp.named_parameters()
+            for (n1, m1), (n2, m2) in zip(wrapper_pp.module.named_parameters(recurse=True),
+                                          model_no_pp.named_parameters(recurse=True)):
+                assert n1 == n2
+                if m1.is_cuda:
+                    assert m1.grad is not None, f'{dist.get_rank()=}, {n1=}'
+                    assert torch.allclose(m1.grad, m2.grad, rtol=1e-2, atol=1e-5), f'{dist.get_rank()=}, {n1=}, {m1.grad=}, {m2.grad=}'
+                    # if not torch.allclose(m1.grad, m2.grad):
+                    #     print(f'{n1=}')
 
-        for (n1, p1), (n2, p2) in zip(named_params1, named_params2):
-            assert n1 == n2
-            if p1.device == torch.cuda.current_device():
-                assert torch.allclose(p1.grad, p2.grad)
+            print(f'{i=}: gradients are same')
 
-        optimizer_pp.step()
-        optimizer_no_pp.step()
+            optimizer_pp.step()
+            optimizer_no_pp.step()
+            torch.distributed.barrier()
 
-        print(i)
-        time.sleep(sleep)
+            pp_losses.append(cum_loss_pp.item())
+            no_pp_losses.append(loss_no_pp.item())
 
-    time.sleep(sleep)
     torch.distributed.rpc.shutdown()
 
     if dist.get_rank() == 0:
-        plt.figure(figsize=(64, 16))
+        plt.figure(figsize=(32, 8))
         plt.plot(pp_losses, label='PP')
         plt.plot(no_pp_losses, label='no PP')
         plt.legend()

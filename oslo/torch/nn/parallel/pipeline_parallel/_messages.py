@@ -48,12 +48,13 @@ class TensorStub(object):
 
 
 @dataclass(init=False)
-class Request:
+class RemoteWorkRequest:
     src: torch.device
     dst: torch.device
     location: str
     tag: int
     caller: str
+    keys: tuple
 
     def __init__(self):
         global REQUEST_GENERATION
@@ -61,11 +62,67 @@ class Request:
         self.tag = REQUEST_GENERATION
 
 
-def generate_request(src, dst, location, caller):
-    req = Request()
+def generate_request(src, dst, location, caller, args, kwargs):
+    req = RemoteWorkRequest()
     req.src = src
     req.dst = dst
     req.location = location
     req.caller = caller
 
-    return req
+    # merge kwargs into args
+    keys, new_args = assemble_args(args, kwargs)
+    req.keys = keys
+
+    return req, new_args
+
+
+def assemble_args(args, kwargs):
+    new_args = []
+    keys = []
+    for v in args:
+        if torch.is_tensor(v):
+            v = v.contiguous()
+        new_args.append(v)
+        keys.append(None)
+
+    for k, v in kwargs.items():
+        if k is None:
+            raise ValueError("None cannot be used the key of kwargs.")
+        if torch.is_tensor(v):
+            v = v.contiguous()
+        new_args.append(v)
+        keys.append(k)
+
+    return tuple(keys), tuple(new_args)
+
+
+def disassemble_new_args(new_args, keys):
+    args = list()
+    kwargs = dict()
+
+    for k, v in zip(keys, new_args):
+        if k is None:
+            args.append(v)
+        else:
+            kwargs[k] = v
+
+    return tuple(args), kwargs
+
+
+def disassemble_result(result):
+    if isinstance(result, torch.Tensor):
+        args = (result, )
+        kwargs = dict()
+        wrapped = True
+    elif isinstance(result, dict):
+        args = tuple([])
+        kwargs = result
+        wrapped = False
+    elif isinstance(result, (list, tuple)):
+        args = tuple(result)
+        kwargs = dict()
+        wrapped = False
+    else:
+        raise NotImplementedError
+
+    return args, kwargs, wrapped
