@@ -111,7 +111,7 @@ def disassemble_new_args(new_args, keys):
 
 def disassemble_result(result):
     if isinstance(result, torch.Tensor):
-        args = (result, )
+        args = (result,)
         kwargs = dict()
         wrapped = True
     elif isinstance(result, dict):

@@ -874,10 +874,7 @@ class ParallelContext(object):
             for other in self.get_ranks_in_group(ParallelMode.PIPELINE):
                 if other == rank:
                     continue
-                options.set_device_map(
-                    f"PP_WORKER_{other}",
-                    {rank: other}
-                )
+                options.set_device_map(f"PP_WORKER_{other}", {rank: other})
 
             rpc.init_rpc(
                 name=self.pipeline_worker_map[rank],

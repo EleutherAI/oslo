@@ -33,7 +33,7 @@ _FORWARD_COUNTER = dict()
 
 def get_result(ind):
     while ind not in _RESULT_DICT:
-        time.sleep(0.)
+        time.sleep(0.0)
     return _RESULT_DICT[ind]
 
 
@@ -82,7 +82,7 @@ def backward_done_notify():
 def wait_backward_done():
     global _NOTIFY_BACKWARD_DONE
     while not _NOTIFY_BACKWARD_DONE:
-        time.sleep(0.)
+        time.sleep(0.0)
 
 
 def remote_module_forward(caller, location, unique_key, arg_keys, *args):
@@ -102,7 +102,7 @@ def remote_module_forward(caller, location, unique_key, arg_keys, *args):
 
 def wait_remote_work_result(request_message):
     tag = request_message.tag
-    assert tag in _RECEIVER, f'{tag=}'
+    assert tag in _RECEIVER, f"{tag=}"
     result = _RECEIVER[tag].get()
     torch.cuda.current_stream().synchronize()
 

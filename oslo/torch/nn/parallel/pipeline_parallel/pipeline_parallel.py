@@ -15,10 +15,19 @@ from oslo.torch.nn.parallel.utils import get_parallel_context
 from ._functional import apply_backward_redirection, len_forward_marker
 from ._messages import assemble_args
 from ._server import (
-    _ORIGINAL_FORWARDS, _MODULE_DEVICE_LOCATIONS,
+    _ORIGINAL_FORWARDS,
+    _MODULE_DEVICE_LOCATIONS,
     remote_module_forward,
-    _RESULT_DICT, get_result, reset_result, increment_done, get_done, reset_done,
-    _FORWARD_COUNTER, get_forward_counter, increment_forward_counter, reset_forward_counter,
+    _RESULT_DICT,
+    get_result,
+    reset_result,
+    increment_done,
+    get_done,
+    reset_done,
+    _FORWARD_COUNTER,
+    get_forward_counter,
+    increment_forward_counter,
+    reset_forward_counter,
 )
 from ._buffers import save_activation
 
@@ -133,7 +142,7 @@ class PipelineParallel(nn.Module):
                 result = rpc.rpc_sync(
                     to=rpc_dst,
                     func=get_result,
-                    args=(i, ),
+                    args=(i,),
                 )
 
                 # TODO; can't understand why this line make synchronization
@@ -141,7 +150,7 @@ class PipelineParallel(nn.Module):
                 result
                 # print(f'{i=}, {result.loss=}, {dist.get_rank()=}')
 
-                yield result    # has no gradient
+                yield result  # has no gradient
 
         # barrier ?
         for other in self.parallel_context.get_ranks_in_group(ParallelMode.PIPELINE):
@@ -155,24 +164,24 @@ class PipelineParallel(nn.Module):
                 )
 
         while get_done() < self.parallel_context.get_world_size(ParallelMode.PIPELINE):
-            time.sleep(0.)
+            time.sleep(0.0)
 
         reset_done()
         reset_result()
 
         while len_forward_marker() != 0:
-            time.sleep(0.)
+            time.sleep(0.0)
 
         torch.cuda.empty_cache()
 
     def _recursive_wrap(self, module, prefix):
-        if not hasattr(module, "location"):     # prevent infinite loop
+        if not hasattr(module, "location"):  # prevent infinite loop
             setattr(module, "location", prefix)
-            if prefix != "":    # wrapper's forward function should not be wrapped
+            if prefix != "":  # wrapper's forward function should not be wrapped
                 self._wrap_forward(module)
 
         for name, m in module.named_children():
-            new_prefix = f'{prefix}.{name}' if prefix != '' else name
+            new_prefix = f"{prefix}.{name}" if prefix != "" else name
             self._recursive_wrap(m, new_prefix)
 
     def _wrap_forward(self, module):
@@ -187,9 +196,9 @@ class PipelineParallel(nn.Module):
         def new_forward(*args, **kwargs):
             location = module.location
             module_device = _MODULE_DEVICE_LOCATIONS[location]
-            module_device = torch.device('cuda', module_device)
+            module_device = torch.device("cuda", module_device)
             current_device = self.parallel_context.get_local_rank(ParallelMode.PIPELINE)
-            current_device = torch.device('cuda', current_device)
+            current_device = torch.device("cuda", current_device)
             is_same = module_device == current_device
 
             if is_same:
@@ -204,8 +213,12 @@ class PipelineParallel(nn.Module):
                     unique_key = (location, cnt)
                     increment_forward_counter(location)
 
-                caller = self.parallel_context.get_pipeline_rpc_worker_name(current_device.index)
-                callee = self.parallel_context.get_pipeline_rpc_worker_name(module_device.index)
+                caller = self.parallel_context.get_pipeline_rpc_worker_name(
+                    current_device.index
+                )
+                callee = self.parallel_context.get_pipeline_rpc_worker_name(
+                    module_device.index
+                )
 
                 # prepare backward
                 save_activation(unique_key, new_args)

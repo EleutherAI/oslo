@@ -38,7 +38,7 @@ model = GPT2LMHeadModel(config)
 
 for n, m in model.named_modules():
     if isinstance(m, nn.Dropout):
-        m.p = 0.
+        m.p = 0.0
 
 model_no_pp = deepcopy(model)
 model_no_pp.cuda()
@@ -71,7 +71,7 @@ def run():
     no_pp_losses = []
 
     with torch.enable_grad():
-    # with torch.no_grad():
+        # with torch.no_grad():
         for i, data in enumerate(dataloader):
             inputs = tokenizer(
                 data,
@@ -85,21 +85,23 @@ def run():
             optimizer_no_pp.zero_grad(set_to_none=True)
 
             cum_loss_pp = torch.zeros(1)
-            for ind, out_pp in enumerate(wrapper_pp(**inputs, labels=inputs["input_ids"])):
+            for ind, out_pp in enumerate(
+                wrapper_pp(**inputs, labels=inputs["input_ids"])
+            ):
                 loss_pp = out_pp.loss
                 loss_pp = loss_pp / num_micro_batches
 
                 if dist.get_rank() == 0:
                     loss_pp.backward()
 
-                print(f'{ind=}')
+                print(f"{ind=}")
                 cum_loss_pp += loss_pp.detach().item()
 
             out_no_pp = model_no_pp(**inputs, labels=inputs["input_ids"])
             loss_no_pp = out_no_pp.loss
             loss_no_pp.backward()
 
-            print(f'{dist.get_rank()=}, {cum_loss_pp=}, {loss_no_pp=}')
+            print(f"{dist.get_rank()=}, {cum_loss_pp=}, {loss_no_pp=}")
 
             optimizer_pp.step()
             optimizer_no_pp.step()
@@ -111,12 +113,11 @@ def run():
 
     if dist.get_rank() == 0:
         plt.figure(figsize=(32, 8))
-        plt.plot(pp_losses, label='PP')
-        plt.plot(no_pp_losses, label='no PP')
+        plt.plot(pp_losses, label="PP")
+        plt.plot(no_pp_losses, label="no PP")
         plt.legend()
-        plt.title(f'{model_name}')
-        plt.savefig(f'{model_name} pp_vs_no_pp.png')
+        plt.title(f"{model_name}")
+        plt.savefig(f"{model_name} pp_vs_no_pp.png")
 
 
 run()
-

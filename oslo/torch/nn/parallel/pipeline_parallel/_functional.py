@@ -71,15 +71,11 @@ class _PipeBackwardRedirection(torch.autograd.Function):
     def forward(ctx, to, unique_key, *args):
         ctx.to = to
         ctx.unique_key = unique_key
-        ctx.num_nones = 2 + len(args)   # counting req
+        ctx.num_nones = 2 + len(args)  # counting req
 
         # mark
         # TODO; do this before remote_forward
-        rpc.rpc_sync(
-            to=to,
-            func=add_forward_marker,
-            args=(unique_key, )
-        )
+        rpc.rpc_sync(to=to, func=add_forward_marker, args=(unique_key,))
 
         return args
 
@@ -98,7 +94,7 @@ class _PipeBackwardRedirection(torch.autograd.Function):
             args=(unique_key, *grad_outputs),
         )
 
-        return (None, ) * ctx.num_nones
+        return (None,) * ctx.num_nones
 
 
 def apply_backward_redirection(to, unique_key, *args):
