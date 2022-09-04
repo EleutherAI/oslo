@@ -21,9 +21,6 @@ _JOB_QUEUE = PriorityQueue()
 # remote work result receiver
 _RECEIVER = dict()
 
-# queue for rref sync
-_RREF_SYNC_QUEUE = Queue()
-
 
 _RESULT_DICT = dict()
 
@@ -32,9 +29,6 @@ _DONE_CHECKER = 0
 
 
 _FORWARD_COUNTER = dict()
-
-
-_NOTIFY_BACKWARD_DONE = False
 
 
 def get_result(ind):

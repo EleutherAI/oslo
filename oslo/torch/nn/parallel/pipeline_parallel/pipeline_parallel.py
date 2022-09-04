@@ -12,7 +12,7 @@ from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn.parallel.pipeline_parallel._model_partitioner import ModelPartitioner
 from oslo.torch.nn.parallel.utils import get_parallel_context
 
-from ._functional import apply_backward_redirection
+from ._functional import apply_backward_redirection, len_forward_marker
 from ._messages import assemble_args
 from ._server import (
     _ORIGINAL_FORWARDS, _MODULE_DEVICE_LOCATIONS,
@@ -155,6 +155,9 @@ class PipelineParallel(nn.Module):
 
         reset_done()
         reset_result()
+
+        while len_forward_marker() != 0:
+            time.sleep(0.)
 
     def _recursive_wrap(self, module, prefix):
         if not hasattr(module, "location"):     # prevent infinite loop

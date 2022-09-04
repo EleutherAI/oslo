@@ -16,6 +16,7 @@ from oslo.torch.nn.parallel.utils import allocate_params
 from oslo.torch.nn.parallel.pipeline_parallel._server import (
     reset_backward_notify, backward_done_notify, wait_backward_done,
 )
+from oslo.torch.nn.parallel.pipeline_parallel._functional import len_forward_marker
 
 from datasets import load_dataset
 from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel, set_seed
@@ -36,7 +37,7 @@ parallel_context = ParallelContext.from_torch(
 current_device = torch.cuda.current_device()
 
 model_name = "gpt2"
-num_micro_batches = 8
+num_micro_batches = 2
 
 config = GPT2Config.from_pretrained(model_name)
 config.resid_pdrop = 0.0
@@ -83,14 +84,14 @@ def run():
     with torch.enable_grad():
     # with torch.no_grad():
         for i, data in enumerate(dataloader):
-            for (n1, m1), (n2, m2) in zip(wrapper_pp.module.named_parameters(recurse=True),
-                                          model_no_pp.named_parameters(recurse=True)):
-                assert n1 == n2
-                if m1.is_cuda:
-                    assert torch.allclose(m1, m2, rtol=1e-2, atol=1e-5), f'{n1=}'
-                    # if not torch.allclose(m1, m2):
-                    #     print(f'{n1=}')
-            print('weights are same')
+            # for (n1, m1), (n2, m2) in zip(wrapper_pp.module.named_parameters(recurse=True),
+            #                               model_no_pp.named_parameters(recurse=True)):
+            #     assert n1 == n2
+            #     if m1.is_cuda:
+            #         assert torch.allclose(m1, m2, rtol=5e-2, atol=1e-5), f'{dist.get_rank()=}, {n1=}'
+            #         # if not torch.allclose(m1, m2):
+            #         #     print(f'{n1=}')
+            # print('weights are same')
 
             inputs = tokenizer(
                 data,
@@ -112,15 +113,16 @@ def run():
                 loss_pp = loss_pp / num_micro_batches
 
                 if dist.get_rank() == 0:
-                    rref = rpc.RRef(loss_pp)
-                    fut = rref.rpc_async().backward()
-                    futures.append(fut)
-                    # loss_pp.backward()
+                    # rref = rpc.RRef(loss_pp)
+                    # fut = rref.rpc_async().backward()
+                    # futures.append(fut)
+                    loss_pp.backward()
 
                 print(f'{ind=}')
                 cum_loss_pp += loss_pp.detach().item()
 
-            time.sleep(2.5)
+            # while len_forward_marker() != 0:
+            #     time.sleep(0.)
 
             out_no_pp = model_no_pp(**inputs, labels=inputs["input_ids"])
             loss_no_pp = out_no_pp.loss
@@ -129,17 +131,18 @@ def run():
             torch.distributed.barrier()
 
             print(f'{dist.get_rank()=}, {cum_loss_pp=}, {loss_no_pp=}')
+            time.sleep(1.)
 
-            for (n1, m1), (n2, m2) in zip(wrapper_pp.module.named_parameters(recurse=True),
-                                          model_no_pp.named_parameters(recurse=True)):
-                assert n1 == n2
-                if m1.is_cuda:
-                    assert m1.grad is not None, f'{dist.get_rank()=}, {n1=}'
-                    assert torch.allclose(m1.grad, m2.grad, rtol=1e-2, atol=1e-5), f'{dist.get_rank()=}, {n1=}, {m1.grad=}, {m2.grad=}'
-                    # if not torch.allclose(m1.grad, m2.grad):
-                    #     print(f'{n1=}')
-
-            print(f'{i=}: gradients are same')
+            # for (n1, m1), (n2, m2) in zip(wrapper_pp.module.named_parameters(recurse=True),
+            #                               model_no_pp.named_parameters(recurse=True)):
+            #     assert n1 == n2
+            #     if m1.is_cuda:
+            #         assert m1.grad is not None, f'{dist.get_rank()=}, {n1=}'
+            #         assert torch.allclose(m1.grad, m2.grad, rtol=1e-2, atol=1e-5), f'{dist.get_rank()=}, {n1=}, {m1.grad=}, {m2.grad=}'
+            #         # if not torch.allclose(m1.grad, m2.grad):
+            #         #     print(f'{n1=}')
+            #
+            # print(f'{i=}: gradients are same')
 
             optimizer_pp.step()
             optimizer_no_pp.step()

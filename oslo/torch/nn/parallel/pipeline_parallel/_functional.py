@@ -1,8 +1,50 @@
+import time
+
+from threading import Lock
+
 import torch
+import torch.distributed as dist
 from torch.distributed import rpc
 from torch.cuda.amp import custom_fwd, custom_bwd
 
 from ._buffers import _ACTIVATIONS
+
+
+_FORWARD_MARKER = set()
+
+_LOCAL_BACKWARD_DONE = False
+
+_NUM_BACKWARD_DONE = 0
+
+LOCK = Lock()
+
+
+def add_forward_marker(mark):
+    _FORWARD_MARKER.add(mark)
+
+
+def remove_forward_marker(mark):
+    _FORWARD_MARKER.remove(mark)
+
+
+def len_forward_marker():
+    return len(_FORWARD_MARKER)
+
+
+def increase_num_backward_done():
+    global _NUM_BACKWARD_DONE
+    _NUM_BACKWARD_DONE += 1
+
+
+def get_num_backward_done():
+    global _NUM_BACKWARD_DONE
+    return _NUM_BACKWARD_DONE
+
+
+def reset_num_backward_done():
+    global _NUM_BACKWARD_DONE, _LOCAL_BACKWARD_DONE
+    _NUM_BACKWARD_DONE = 0
+    _LOCAL_BACKWARD_DONE = False
 
 
 def launch_remote_backward(unique_key, *grad_outputs):
@@ -16,13 +58,26 @@ def launch_remote_backward(unique_key, *grad_outputs):
         if act is not None and grad is not None and act.requires_grad:
             new_act.append(act)
             new_grad.append(grad)
+            # print(f'{act.device=}, {grad.device=}')
 
     # s = torch.cuda.Stream()
     # with torch.cuda.stream(s):
     #     torch.autograd.backward(tuple(new_act), tuple(new_grad))
     # torch.cuda.current_stream().wait_stream(s)
 
-    torch.autograd.backward(tuple(new_act), tuple(new_grad))
+    torch.autograd.backward(tuple(new_act), tuple(new_grad), retain_graph=True)
+
+    remove_forward_marker(unique_key)
+    # print(f'wait: {dist.get_rank()=}, {unique_key=}, {len_forward_marker()=}')
+    # while len_forward_marker() != 0:
+    #     time.sleep(0.)
+    #
+    # print(f're-run: {dist.get_rank()=}, {unique_key=}')
+    # global LOCK, _LOCAL_BACKWARD_DONE
+    # with LOCK:
+    #     if not _LOCAL_BACKWARD_DONE:
+    #         _LOCAL_BACKWARD_DONE = True
+    #         increase_num_backward_done()
 
     print(f'backward done: {unique_key}')
 
@@ -44,7 +99,12 @@ class _PipeBackwardRedirection(torch.autograd.Function):
         ctx.unique_key = unique_key
         ctx.num_nones = 2 + len(args)   # counting req
 
-        # print(f'forward: {to=}, {unique_key=}')
+        # mark
+        rpc.rpc_sync(
+            to=to,
+            func=add_forward_marker,
+            args=(unique_key, )
+        )
 
         return args
 
@@ -62,6 +122,8 @@ class _PipeBackwardRedirection(torch.autograd.Function):
             func=launch_remote_backward,
             args=(unique_key, *grad_outputs),
         )
+
+        # fut.wait()
         # TODO; check whether this usage is correct
         #  need to deal nested rpc:
         #   https://pytorch.org/tutorials/intermediate/rpc_async_execution.html
