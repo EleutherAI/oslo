@@ -12,9 +12,12 @@ from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn.parallel.pipeline_parallel._model_partitioner import ModelPartitioner
 from oslo.torch.nn.parallel.utils import get_parallel_context
 
-from ._functional import apply_backward_redirection, len_forward_marker
-from ._messages import assemble_args
-from ._server import (
+from oslo.torch.nn.parallel.pipeline_parallel._functional import (
+    apply_backward_redirection,
+    len_forward_marker,
+)
+from oslo.torch.nn.parallel.pipeline_parallel._messages import assemble_args
+from oslo.torch.nn.parallel.pipeline_parallel._server import (
     _ORIGINAL_FORWARDS,
     _MODULE_DEVICE_LOCATIONS,
     remote_module_forward,
@@ -29,7 +32,7 @@ from ._server import (
     increment_forward_counter,
     reset_forward_counter,
 )
-from ._buffers import save_activation
+from oslo.torch.nn.parallel.pipeline_parallel._buffers import save_activation
 
 
 class PipelineParallel(nn.Module):

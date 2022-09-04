@@ -3,9 +3,14 @@ from queue import PriorityQueue, Queue
 
 import torch
 
-from ._messages import disassemble_new_args
-from ._buffers import save_activation, pop_activation
-from ._functional import apply_backward_redirection
+from oslo.torch.nn.parallel.pipeline_parallel._messages import disassemble_new_args
+from oslo.torch.nn.parallel.pipeline_parallel._buffers import (
+    save_activation,
+    pop_activation,
+)
+from oslo.torch.nn.parallel.pipeline_parallel._functional import (
+    apply_backward_redirection,
+)
 
 
 # original forward dictionary
