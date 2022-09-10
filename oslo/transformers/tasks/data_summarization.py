@@ -3,7 +3,12 @@ import logging
 import warnings
 import torch
 from datasets.arrow_dataset import Batch
-from oslo.transformers.tasks.data_base import BaseProcessor, ParallelKeys, pad_labels
+from oslo.transformers.tasks.data_base import (
+    BaseProcessor,
+    ParallelKeys,
+    pad_labels,
+    SequenceParallelMixin,
+)
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
 
@@ -50,7 +55,7 @@ class ProcessorForSummarization(BaseProcessor):
         return dict_of_training_examples
 
 
-class DataCollatorForSummarization(DataCollatorForSeq2Seq):
+class DataCollatorForSummarization(DataCollatorForSeq2Seq, SequenceParallelMixin):
     """
     Processing training examples to mini-batch (summarization).
     """
@@ -79,7 +84,7 @@ class DataCollatorForSummarization(DataCollatorForSeq2Seq):
         self.padding = padding
         self.label_pad_token_id = label_pad_token_id
         self.pad_to_multiple_of = pad_to_multiple_of
-        self.local_world_size = 1
+        self.sequence_parallel_size = 1
         if parallel_context is not None:
             self._set_parallel_context(parallel_context)
 
@@ -88,8 +93,8 @@ class DataCollatorForSummarization(DataCollatorForSeq2Seq):
             features,
             padding=self.padding,
             return_attention_mask=True,
-            pad_to_multiple_of=self.local_world_size
-            if self.local_world_size > 1
+            pad_to_multiple_of=self.sequence_parallel_size
+            if self.sequence_parallel_size > 1
             else None,
             # Conversion to tensors will fail if we have labels as they are not of the same length yet.
             return_tensors=None,
@@ -99,8 +104,8 @@ class DataCollatorForSummarization(DataCollatorForSeq2Seq):
             [feature["labels"] for feature in features],
             self.tokenizer,
             label_pad_token_id=self.label_pad_token_id,
-            pad_to_multiple_of=self.local_world_size
-            if self.local_world_size > 1
+            pad_to_multiple_of=self.sequence_parallel_size
+            if self.sequence_parallel_size > 1
             else None,
         )
 
@@ -120,7 +125,7 @@ class DataCollatorForSummarization(DataCollatorForSeq2Seq):
                 torch.ones_like(decoder_input_ids),
             )
 
-        if self.local_world_size > 1:
+        if self.sequence_parallel_size > 1:
             sp_collate_fn = SequenceDataParallelCollator(
                 parallel_keys=ParallelKeys.SUMMARIZATION,
                 parallel_context=self.parallel_context,
@@ -128,7 +133,3 @@ class DataCollatorForSummarization(DataCollatorForSeq2Seq):
             return sp_collate_fn(**batch)
 
         return batch
-
-    def _set_parallel_context(self, parallel_context: ParallelContext):
-        self.parallel_context = parallel_context
-        self.local_world_size = parallel_context.get_world_size(ParallelMode.SEQUENCE)

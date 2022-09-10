@@ -4,7 +4,12 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import torch
 from datasets.arrow_dataset import Batch
-from oslo.transformers.tasks.data_base import BaseProcessor, ParallelKeys, pad_labels
+from oslo.transformers.tasks.data_base import (
+    BaseProcessor,
+    ParallelKeys,
+    pad_labels,
+    SequenceParallelMixin,
+)
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
 
@@ -126,7 +131,7 @@ class ProcessorForT5Pretraining(BaseProcessor):
         return tokens_length, targets_length
 
 
-class DataCollatorForT5Pretraining:
+class DataCollatorForT5Pretraining(SequenceParallelMixin):
     """
     Processing training examples to mini-batch for T5 baseline pretraining (replace spans).
     """
@@ -148,7 +153,7 @@ class DataCollatorForT5Pretraining:
         self.target_length = processor.target_chunk_size
         self.pad_token_id = self.tokenizer.pad_token_id
         self.label_pad_token_id = label_pad_token_id
-        self.local_world_size = 1
+        self.sequence_parallel_size = 1
         if parallel_context is not None:
             self._set_parallel_context(parallel_context)
 
@@ -191,7 +196,7 @@ class DataCollatorForT5Pretraining:
                 f" {self.target_length}."
             )
 
-        if self.local_world_size <= 1:
+        if self.sequence_parallel_size <= 1:
             batch = {key: torch.from_numpy(value) for key, value in batch.items()}
         else:
             labels = [label for label in batch["labels"]]
@@ -199,19 +204,19 @@ class DataCollatorForT5Pretraining:
                 {"input_ids": [input_ids for input_ids in batch["input_ids"]]},
                 return_attention_mask=True,
                 return_tensors="pt",
-                pad_to_multiple_of=self.local_world_size,
+                pad_to_multiple_of=self.sequence_parallel_size,
             )
 
             batch["labels"] = pad_labels(
                 labels,
                 self.tokenizer,
                 self.label_pad_token_id,
-                pad_to_multiple_of=self.local_world_size,
+                pad_to_multiple_of=self.sequence_parallel_size,
             )
 
         batch = self.prepare_decoder_inputs_from_labels(batch)
 
-        if self.local_world_size > 1:
+        if self.sequence_parallel_size > 1:
             sp_collate_fn = SequenceDataParallelCollator(
                 parallel_keys=ParallelKeys.T5,
                 parallel_context=self.parallel_context,
@@ -339,7 +344,3 @@ class DataCollatorForT5Pretraining:
             torch.ones_like(shifted_labels),
         )
         return batch
-
-    def _set_parallel_context(self, parallel_context: ParallelContext):
-        self.parallel_context = parallel_context
-        self.local_world_size = parallel_context.get_world_size(ParallelMode.SEQUENCE)
