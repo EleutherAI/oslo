@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 from datasets.arrow_dataset import Batch
 
+from oslo.torch.distributed import ParallelContext, ParallelMode
+
 try:
     from transformers import AutoTokenizer
 except ImportError:
@@ -47,6 +49,14 @@ class ParallelKeys:
         "decoder_input_ids",
         "decoder_attention_mask",
     ]
+
+
+class SequenceParallelMixin(object):
+    def _set_parallel_context(self, parallel_context: ParallelContext):
+        self.parallel_context = parallel_context
+        self.sequence_parallel_size = parallel_context.get_world_size(
+            ParallelMode.SEQUENCE
+        )
 
 
 def pad_labels(

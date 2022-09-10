@@ -2,7 +2,11 @@ import warnings
 import logging
 from typing import Dict, List, Optional, Any
 from datasets.arrow_dataset import Batch
-from oslo.transformers.tasks.data_base import BaseProcessor, ParallelKeys
+from oslo.transformers.tasks.data_base import (
+    BaseProcessor,
+    ParallelKeys,
+    SequenceParallelMixin,
+)
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
 
@@ -78,7 +82,7 @@ class ProcessorForMaskedLM(BaseProcessor):
         return dict_of_training_examples
 
 
-class DataCollatorForMaskedLM(DataCollatorForLanguageModeling):
+class DataCollatorForMaskedLM(DataCollatorForLanguageModeling, SequenceParallelMixin):
     """
     Processing training examples to mini-batch for Roberta (mlm).
     """
@@ -101,17 +105,17 @@ class DataCollatorForMaskedLM(DataCollatorForLanguageModeling):
         self.tokenizer = processor._tokenizer
         self.mlm_probability = mlm_probability
         self.label_pad_token_id = label_pad_token_id
-        self.local_world_size = 1
+        self.sequence_parallel_size = 1
         if parallel_context is not None:
             self._set_parallel_context(parallel_context)
 
     def __call__(self, examples: List[Dict[str, Any]]) -> Dict[str, Any]:
         batch = self.tokenizer.pad(
             examples,
-            return_attention_mask=True if self.local_world_size > 1 else False,
+            return_attention_mask=True if self.sequence_parallel_size > 1 else False,
             return_tensors="pt",
-            pad_to_multiple_of=self.local_world_size
-            if self.local_world_size > 1
+            pad_to_multiple_of=self.sequence_parallel_size
+            if self.sequence_parallel_size > 1
             else None,
         )
 
@@ -125,7 +129,7 @@ class DataCollatorForMaskedLM(DataCollatorForLanguageModeling):
                 batch["labels"] == -100, self.label_pad_token_id
             )
 
-        if self.local_world_size > 1:
+        if self.sequence_parallel_size > 1:
             sp_collate_fn = SequenceDataParallelCollator(
                 parallel_keys=ParallelKeys.MLM,
                 parallel_context=self.parallel_context,
@@ -133,7 +137,3 @@ class DataCollatorForMaskedLM(DataCollatorForLanguageModeling):
             return sp_collate_fn(**batch)
 
         return batch
-
-    def _set_parallel_context(self, parallel_context: ParallelContext):
-        self.parallel_context = parallel_context
-        self.local_world_size = parallel_context.get_world_size(ParallelMode.SEQUENCE)

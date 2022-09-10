@@ -5,7 +5,12 @@ from typing import Any, Dict, List, Optional
 import warnings
 import logging
 from datasets.arrow_dataset import Batch
-from oslo.transformers.tasks.data_base import BaseProcessor, ParallelKeys, pad_labels
+from oslo.transformers.tasks.data_base import (
+    BaseProcessor,
+    ParallelKeys,
+    pad_labels,
+    SequenceParallelMixin,
+)
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
 
@@ -65,7 +70,7 @@ class ProcessorForBartPretraining(BaseProcessor):
         return dict_of_training_examples
 
 
-class DataCollatorForBartPretraining:
+class DataCollatorForBartPretraining(SequenceParallelMixin):
     """
     Processing training examples to mini-batch for Bart (text_infilling, sentence_permutation).
     """
@@ -99,9 +104,10 @@ class DataCollatorForBartPretraining:
             if decoder_start_token_id
             else self.tokenizer.eos_token_id
         )
-        self.local_world_size = 1
+        self.sequence_parallel_size = 1
         if parallel_context is not None:
             self._set_parallel_context(parallel_context)
+
         self.get_start_indices = {
             max_idx: np.random.choice(max_idx, size=(max_idx,), replace=False)
             for max_idx in range(processor._chunk_size, 0, -1)
@@ -114,22 +120,22 @@ class DataCollatorForBartPretraining:
             examples,
             return_attention_mask=True,
             return_tensors="pt",
-            pad_to_multiple_of=self.local_world_size
-            if self.local_world_size > 1
+            pad_to_multiple_of=self.sequence_parallel_size
+            if self.sequence_parallel_size > 1
             else None,
         )
 
-        if self.local_world_size > 1:
+        if self.sequence_parallel_size > 1:
             batch["labels"] = pad_labels(
                 [example["labels"] for example in examples],
                 self.tokenizer,
                 self.label_pad_token_id,
-                pad_to_multiple_of=self.local_world_size,
+                pad_to_multiple_of=self.sequence_parallel_size,
             )
 
         batch = self._prepare_decoder_inputs_from_labels(batch)
 
-        if self.local_world_size > 1:
+        if self.sequence_parallel_size > 1:
             sp_collate_fn = SequenceDataParallelCollator(
                 parallel_keys=ParallelKeys.BART,
                 parallel_context=self.parallel_context,
@@ -249,7 +255,3 @@ class DataCollatorForBartPretraining:
             torch.ones_like(shifted_input_ids),
         )
         return batch
-
-    def _set_parallel_context(self, parallel_context: ParallelContext):
-        self.parallel_context = parallel_context
-        self.local_world_size = parallel_context.get_world_size(ParallelMode.SEQUENCE)

@@ -5,7 +5,12 @@ import torch
 from datasets import Dataset, DatasetDict
 from datasets.arrow_dataset import Batch
 from oslo.torch.distributed import ParallelContext, ParallelMode
-from oslo.transformers.tasks.data_base import BaseProcessor, ParallelKeys, pad_labels
+from oslo.transformers.tasks.data_base import (
+    BaseProcessor,
+    ParallelKeys,
+    pad_labels,
+    SequenceParallelMixin,
+)
 from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
 
 try:
@@ -160,7 +165,7 @@ class ProcessorForTokenClassification(BaseProcessor):
         return label_ids
 
 
-class DataCollatorForTokenClassification:
+class DataCollatorForTokenClassification(SequenceParallelMixin):
     """
     Data collator that will dynamically pad the inputs received, as well as the labels.
     """
@@ -187,7 +192,7 @@ class DataCollatorForTokenClassification:
         self.padding_side = padding_side
         self.label_pad_token_id = label_pad_token_id
         self.padding = padding
-        self.local_world_size = 1
+        self.sequence_parallel_size = 1
         if parallel_context is not None:
             self._set_parallel_context(parallel_context)
 
@@ -196,7 +201,7 @@ class DataCollatorForTokenClassification:
         labels = [feature[label_name] for feature in features]
         batch = self.pad(features, labels, label_name)
 
-        if self.local_world_size > 1:
+        if self.sequence_parallel_size > 1:
             sp_collate_fn = SequenceDataParallelCollator(
                 parallel_keys=ParallelKeys.TOKEN_CLS,
                 parallel_context=self.parallel_context,
@@ -210,8 +215,8 @@ class DataCollatorForTokenClassification:
             features,
             padding=self.padding,
             return_attention_mask=True,
-            pad_to_multiple_of=self.local_world_size
-            if self.local_world_size > 1
+            pad_to_multiple_of=self.sequence_parallel_size
+            if self.sequence_parallel_size > 1
             else None,
             # Conversion to tensors will fail if we have labels as they are not of the same length yet.
             return_tensors=None,
@@ -235,7 +240,3 @@ class DataCollatorForTokenClassification:
             batch[label_name] == self.tokenizer.pad_token_id, self.label_pad_token_id
         )
         return batch
-
-    def _set_parallel_context(self, parallel_context: ParallelContext):
-        self.parallel_context = parallel_context
-        self.local_world_size = parallel_context.get_world_size(ParallelMode.SEQUENCE)

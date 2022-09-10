@@ -2,7 +2,11 @@ from typing import Any, Dict, List, Optional
 import logging
 import warnings
 from datasets.arrow_dataset import Batch
-from oslo.transformers.tasks.data_base import BaseProcessor, ParallelKeys
+from oslo.transformers.tasks.data_base import (
+    BaseProcessor,
+    ParallelKeys,
+    SequenceParallelMixin,
+)
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
 
@@ -57,7 +61,7 @@ class ProcessorForSequenceClassification(BaseProcessor):
         return dict_of_training_examples
 
 
-class DataCollatorForSequenceClassification:
+class DataCollatorForSequenceClassification(SequenceParallelMixin):
     """
     Processing training examples to mini-batch for Sequence Classification.
     """
@@ -80,7 +84,7 @@ class DataCollatorForSequenceClassification:
 
         self.tokenizer = processor._tokenizer
         self.padding = padding
-        self.local_world_size = 1
+        self.sequence_parallel_size = 1
         if parallel_context is not None:
             self._set_parallel_context(parallel_context)
 
@@ -90,12 +94,12 @@ class DataCollatorForSequenceClassification:
             padding=self.padding,
             return_attention_mask=True,
             return_tensors="pt",
-            pad_to_multiple_of=self.local_world_size
-            if self.local_world_size > 1
+            pad_to_multiple_of=self.sequence_parallel_size
+            if self.sequence_parallel_size > 1
             else None,
         )
 
-        if self.local_world_size > 1:
+        if self.sequence_parallel_size > 1:
             sp_collate_fn = SequenceDataParallelCollator(
                 parallel_keys=ParallelKeys.SEQ_CLS,
                 parallel_context=self.parallel_context,
@@ -103,7 +107,3 @@ class DataCollatorForSequenceClassification:
             return sp_collate_fn(**batch)
 
         return batch
-
-    def _set_parallel_context(self, parallel_context: ParallelContext):
-        self.parallel_context = parallel_context
-        self.local_world_size = parallel_context.get_world_size(ParallelMode.SEQUENCE)

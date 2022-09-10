@@ -4,7 +4,12 @@ import warnings
 import logging
 from datasets.arrow_dataset import Batch
 
-from oslo.transformers.tasks.data_base import BaseProcessor, ParallelKeys, pad_labels
+from oslo.transformers.tasks.data_base import (
+    BaseProcessor,
+    ParallelKeys,
+    pad_labels,
+    SequenceParallelMixin,
+)
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
 
@@ -60,7 +65,9 @@ class ProcessorForBertPretraining(BaseProcessor):
         return dict_of_training_examples
 
 
-class DataCollatorForBertPretraining(DataCollatorForWholeWordMask):
+class DataCollatorForBertPretraining(
+    DataCollatorForWholeWordMask, SequenceParallelMixin
+):
     """
     Processing training examples to mini-batch for Bert (mlm+wwm+sop).
     """
@@ -84,7 +91,7 @@ class DataCollatorForBertPretraining(DataCollatorForWholeWordMask):
         self.pad_token_id = self.tokenizer.pad_token_id
         self.pad_token_type_id = self.tokenizer.pad_token_type_id
         self.label_pad_token_id = label_pad_token_id
-        self.local_world_size = 1
+        self.sequence_parallel_size = 1
         if parallel_context is not None:
             self._set_parallel_context(parallel_context)
 
@@ -94,8 +101,8 @@ class DataCollatorForBertPretraining(DataCollatorForWholeWordMask):
         batch = self.tokenizer.pad(
             examples,
             return_tensors="pt",
-            pad_to_multiple_of=self.local_world_size
-            if self.local_world_size > 1
+            pad_to_multiple_of=self.sequence_parallel_size
+            if self.sequence_parallel_size > 1
             else None,
         )
         del batch["mask_label"]
@@ -104,8 +111,8 @@ class DataCollatorForBertPretraining(DataCollatorForWholeWordMask):
             [example["mask_label"] for example in examples],
             self.tokenizer,
             label_pad_token_id=0,
-            pad_to_multiple_of=self.local_world_size
-            if self.local_world_size > 1
+            pad_to_multiple_of=self.sequence_parallel_size
+            if self.sequence_parallel_size > 1
             else None,
         )
 
@@ -117,7 +124,7 @@ class DataCollatorForBertPretraining(DataCollatorForWholeWordMask):
                 batch["labels"] == -100, self.label_pad_token_id
             )
 
-        if self.local_world_size > 1:
+        if self.sequence_parallel_size > 1:
             sp_collate_fn = SequenceDataParallelCollator(
                 parallel_keys=ParallelKeys.BERT,
                 parallel_context=self.parallel_context,
@@ -163,7 +170,3 @@ class DataCollatorForBertPretraining(DataCollatorForWholeWordMask):
                 }
             )
         return output_examples
-
-    def _set_parallel_context(self, parallel_context: ParallelContext):
-        self.parallel_context = parallel_context
-        self.local_world_size = parallel_context.get_world_size(ParallelMode.SEQUENCE)
