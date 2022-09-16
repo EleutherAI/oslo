@@ -729,7 +729,7 @@ class _DistributedDataParallel(Module, Joinable):
             -1 if self.output_device is None else self.output_device,
             self.broadcast_buffers,
             has_sync_bn,
-            self.static_graph
+            self.static_graph,
         )
 
         # passing a handle to torch.nn.SyncBatchNorm layer
