@@ -6,7 +6,4 @@
 #     GPT2ForTokenClassification,
 # )
 
-
-from oslo.transformers.training_args import TrainingArguments
-
 # from oslo.transformers.trainer import Trainer

@@ -1,7 +1,7 @@
 import torch
 
-from oslo.torch.nn import _NGramRepeatBlockFunction
 from oslo.torch.nn import FusedRMSNorm
+from oslo.torch.nn import _NGramRepeatBlockFunction
 
 
 def get_ngram_logit_processor(batch_size, num_beams):

@@ -6,8 +6,9 @@ This file is adapted from fused adam in NVIDIA/apex, commit a109f85
 """
 
 import torch
-from oslo.torch.utils.multi_tensor_apply import MultiTensorApply
+
 from oslo.torch._C import get_adam_kernel
+from oslo.torch.utils.multi_tensor_apply import MultiTensorApply
 
 multi_tensor_applier = MultiTensorApply(2048 * 32)
 

@@ -2,8 +2,10 @@
 Copyright 2020 The Microsoft DeepSpeed Team
 """
 
-import torch
 import logging
+
+import torch
+
 from oslo.torch._C import get_cpu_adagrad_kernel
 
 

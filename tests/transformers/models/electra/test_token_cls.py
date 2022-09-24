@@ -1,13 +1,15 @@
+import os
+
+import wandb
+from datasets import load_dataset
+
+from oslo.transformers.models.electra.modeling_electra import (
+    ElectraForTokenClassification,
+)
 from oslo.transformers.tasks.data_token_classification import (
     ProcessorForTokenClassification,
     DataCollatorForTokenClassification,
 )
-from oslo.transformers.models.electra.modeling_electra import (
-    ElectraForTokenClassification,
-)
-from datasets import load_dataset
-import os
-import wandb
 
 try:
     from transformers.models.electra.modeling_electra import (

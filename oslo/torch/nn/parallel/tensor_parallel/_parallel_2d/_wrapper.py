@@ -4,46 +4,38 @@ import torch
 import torch.nn as nn
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
+from oslo.torch.distributed.nn.functional import (
+    scatter,
+)
 from oslo.torch.nn.modules.embedding import (
     VocabParallelEmbedding2D,
     Embedding2D,
     VocabUtility,
 )
-from oslo.torch.nn.modules.linear import (
-    Linear,
-    Linear2D,
-)
 from oslo.torch.nn.modules.layer_norm import (
     LayerNorm2D,
+)
+from oslo.torch.nn.modules.linear import (
+    Linear2D,
 )
 from oslo.torch.nn.parallel.tensor_parallel._parallel_2d._ops import (
     gather_2d,
     gather_1d_twice,
 )
-from oslo.torch.distributed.nn.functional import (
-    scatter,
-)
 from oslo.torch.nn.parallel.tensor_parallel.mapping import (
     TensorParallelMapping,
 )
 from oslo.torch.nn.parallel.utils import (
-    ParallelWrapper,
     _update_module_arguments,
-    is_huggingface_model,
     is_oslo_model,
 )
+from oslo.transformers.constants import BATCH_DIMENSIONS
 from oslo.transformers.mapping_utils import (
     _TensorParallelMappingForHuggingFace,
 )
 
-from oslo.torch.nn.parallel.tensor_parallel._base_wrapper import (
-    BaseTensorParallelWrapper,
-)
 
-from oslo.transformers.constants import BATCH_DIMENSIONS
-
-
-class _TensorParallel2D(BaseTensorParallelWrapper):
+class _TensorParallel2D(nn.Module):
     """
     PyTorch module for 2D tensor parallelism
 
@@ -56,32 +48,16 @@ class _TensorParallel2D(BaseTensorParallelWrapper):
         self,
         module: nn.Module,
         parallel_context: ParallelContext,
-        mapping: dict = None,
-        module_args: dict = None,
     ):
-        super().__init__(module, parallel_context, mapping)
+        super().__init__()
         self.module = module
+        self.module_forward = copy.copy(module.forward)
         self.parallel_context = parallel_context
         self.device = torch.cuda.current_device()
 
-        if mapping is None:
-            if is_huggingface_model(module):
-                mapping = _TensorParallelMappingForHuggingFace().get_mapping(module)
-            else:
-                raise ValueError(
-                    "`mapping` must be input if the model is not huggingface model."
-                )
-
-        if module_args is None:
-            if is_huggingface_model(module):
-                module_args = module.config
-            else:
-                raise ValueError(
-                    "`config` must be input if the model is not huggingface model."
-                )
-
-        self.config = module_args
+        mapping = _TensorParallelMappingForHuggingFace().get_mapping(module)
         self.tensor_parallel_mapping = TensorParallelMapping(mapping)
+        self.config = module.config
         self._parallelize()
 
     def forward(self, *args, **kwargs):
@@ -102,7 +78,7 @@ class _TensorParallel2D(BaseTensorParallelWrapper):
                 else value
                 for key, value in kwargs.items()
             }
-        return self.module(*args, **kwargs)
+        return self.module_forward(*args, **kwargs)
 
     @torch.no_grad()
     def _parallelize(self):

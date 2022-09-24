@@ -1,9 +1,8 @@
 import torch
-from torch.distributed import rpc
 from torch.cuda.amp import custom_fwd, custom_bwd
+from torch.distributed import rpc
 
 from oslo.torch.nn.parallel.pipeline_parallel._buffers import _ACTIVATIONS
-
 
 _FORWARD_MARKER = set()
 

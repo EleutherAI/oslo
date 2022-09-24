@@ -1,9 +1,10 @@
-import torch
 import numpy as np
 import pytest
+import torch
 
 # import deepspeed
 from oslo.torch.optim.cpu_adagrad import CPUAdagrad
+
 
 # from deepspeed.ops.op_builder import CPUAdagradBuilder
 

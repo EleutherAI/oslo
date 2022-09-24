@@ -1,9 +1,8 @@
-from typing import Any, Callable, Dict, List, NewType, Optional, Tuple, Union
-
 from collections.abc import Mapping
 from dataclasses import dataclass
-from transformers import PreTrainedTokenizerBase
+from typing import Any, Callable, Dict, List, NewType, Optional, Union
 
+from transformers import PreTrainedTokenizerBase
 
 # from ..tokenization_utils_base import PreTrainedTokenizerBase
 from ..utils import PaddingStrategy

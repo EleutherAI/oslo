@@ -1,9 +1,9 @@
 import math
 from typing import Tuple
-from packaging import version
 
 import torch
 import torch.nn as nn
+from packaging import version
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
 import oslo.torch.nn as onn

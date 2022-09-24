@@ -1,14 +1,15 @@
+from copy import deepcopy
+
 import torch.nn as nn
 
-from oslo.torch.nn.parallel.tensor_parallel._parallel_2p5d._wrapper import (
-    _TensorParallel2p5D,
-)
-from oslo.torch.nn import Linear2p5D
 from oslo.torch.distributed import ParallelContext, ParallelMode
-from copy import deepcopy
+from oslo.torch.nn import Linear2p5D
 from oslo.torch.nn.parallel.tensor_parallel._parallel_2p5d._ops import (
     gather_1d,
     gather_2d,
+)
+from oslo.torch.nn.parallel.tensor_parallel._parallel_2p5d._wrapper import (
+    _TensorParallel2p5D,
 )
 
 tp_size = 8

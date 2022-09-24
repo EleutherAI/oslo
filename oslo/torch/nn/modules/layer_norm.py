@@ -1,17 +1,16 @@
-from typing import Optional
 import numbers
+from typing import Optional
 
 import torch
-import torch.nn as nn
 import torch.distributed as dist
+import torch.nn as nn
 from torch import Tensor
-from torch.nn import init
 from torch.nn import Parameter
 from torch.nn import functional as F
-
-from oslo.torch.distributed import ParallelContext, ParallelMode
+from torch.nn import init
 
 from oslo.torch import nn as onn
+from oslo.torch.distributed import ParallelContext, ParallelMode
 
 
 # Reference implementation from Huggingface

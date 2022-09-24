@@ -1,11 +1,12 @@
 import argparse
 from copy import deepcopy
+
 import torch
 import torch.distributed as dist
+
+from _utils import split_1d, gather_1d
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn import RowLinear1D
-from _utils import split_1d, gather_1d
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--memory_priority", action="store_true", default=False)

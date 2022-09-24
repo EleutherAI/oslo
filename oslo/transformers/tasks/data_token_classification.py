@@ -1,17 +1,18 @@
-from typing import Dict, List, Optional, Union, Any
 import logging
 import warnings
+from typing import Dict, List, Optional, Union, Any
+
 import torch
 from datasets import Dataset, DatasetDict
 from datasets.arrow_dataset import Batch
-from oslo.torch.distributed import ParallelContext, ParallelMode
+
+from oslo.torch.distributed import ParallelContext
+from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
 from oslo.transformers.tasks.data_base import (
     BaseProcessor,
     ParallelKeys,
-    pad_labels,
     SequenceParallelMixin,
 )
-from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
 
 try:
     from transformers import AutoTokenizer

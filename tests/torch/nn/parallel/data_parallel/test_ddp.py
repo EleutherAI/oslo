@@ -1,4 +1,3 @@
-import torch.cuda
 import torch.distributed as dist
 import wandb
 from datasets import load_dataset
@@ -7,9 +6,8 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel
 
 from oslo.torch.distributed import ParallelContext
-
 # parallel context 생성
-from oslo.torch.nn.parallel.data_parallel.distributed_data_parallel import (
+from oslo.torch.nn.parallel.data_parallel.data_parallel import (
     DistributedDataParallel,
 )
 

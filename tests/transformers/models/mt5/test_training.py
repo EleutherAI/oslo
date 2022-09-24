@@ -1,13 +1,15 @@
-from oslo.transformers.training_args import TrainingArguments as OTrainingArguments
+import os
+
+import torch
+from datasets import load_dataset
 from oslo.transformers.trainer import Trainer as OTrainer
+from oslo.transformers.training_args import TrainingArguments as OTrainingArguments
+
+from oslo.transformers.models.mt5.modeling_mt5 import MT5ForConditionalGeneration
 from oslo.transformers.tasks.data_t5_pretraining import (
     ProcessorForT5Pretraining,
     DataCollatorForT5Pretraining,
 )
-from oslo.transformers.models.mt5.modeling_mt5 import MT5ForConditionalGeneration
-from datasets import load_dataset
-import torch
-import os
 
 try:
     from transformers.models.mt5.modeling_mt5 import (

@@ -4,44 +4,39 @@ import torch
 import torch.nn as nn
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
+from oslo.torch.distributed.nn.functional import (
+    scatter,
+)
 from oslo.torch.nn.modules.embedding import (
     VocabParallelEmbedding3D,
     Embedding3D,
     VocabUtility,
 )
-from oslo.torch.nn.modules.linear import (
-    Linear3D,
-)
 from oslo.torch.nn.modules.layer_norm import (
     LayerNorm3D,
+)
+from oslo.torch.nn.modules.linear import (
+    Linear3D,
 )
 from oslo.torch.nn.parallel.tensor_parallel._parallel_3d._ops import (
     gather_3d,
     gather_2d,
     gather_1d,
 )
-from oslo.torch.distributed.nn.functional import (
-    scatter,
-)
 from oslo.torch.nn.parallel.tensor_parallel.mapping import (
     TensorParallelMapping,
 )
-from oslo.torch.nn.parallel.tensor_parallel._base_wrapper import (
-    BaseTensorParallelWrapper,
-)
 from oslo.torch.nn.parallel.utils import (
     _update_module_arguments,
-    is_huggingface_model,
     is_oslo_model,
 )
+from oslo.transformers.constants import BATCH_DIMENSIONS
 from oslo.transformers.mapping_utils import (
     _TensorParallelMappingForHuggingFace,
 )
 
-from oslo.transformers.constants import BATCH_DIMENSIONS
 
-
-class _TensorParallel3D(BaseTensorParallelWrapper):
+class _TensorParallel3D(nn.Module):
     """
     PyTorch module for 3D tensor parallelism
 
@@ -50,36 +45,16 @@ class _TensorParallel3D(BaseTensorParallelWrapper):
         parallel_context (ParallelContext): parallel context object
     """
 
-    def __init__(
-        self,
-        module: nn.Module,
-        parallel_context: ParallelContext,
-        mapping: dict = None,
-        module_args: dict = None,
-    ):
-        super().__init__(module, parallel_context, mapping)
+    def __init__(self, module: nn.Module, parallel_context: ParallelContext):
+        super().__init__()
         self.module = module
+        self.module_forward = module.forward
         self.parallel_context = parallel_context
         self.device = torch.cuda.current_device()
 
-        if mapping is None:
-            if is_huggingface_model(module):
-                mapping = _TensorParallelMappingForHuggingFace().get_mapping(module)
-            else:
-                raise ValueError(
-                    "`mapping` must be input if the model is not huggingface model."
-                )
-
-        if module_args is None:
-            if is_huggingface_model(module):
-                module_args = module.config
-            else:
-                raise ValueError(
-                    "`config` must be input if the model is not huggingface model."
-                )
-
-        self.config = module_args
+        mapping = _TensorParallelMappingForHuggingFace().get_mapping(module)
         self.tensor_parallel_mapping = TensorParallelMapping(mapping)
+        self.config = module.config
         self._parallelize()
 
     def forward(self, *args, **kwargs):

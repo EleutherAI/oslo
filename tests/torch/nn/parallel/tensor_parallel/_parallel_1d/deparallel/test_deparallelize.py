@@ -1,27 +1,23 @@
+import os
+import random
+import time
+
+import numpy as np
+import torch
 import torch.distributed as dist
 import wandb
 from datasets import load_dataset
-
-import torch
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 from transformers import (
     AutoTokenizer,
-    GPT2Config,
-    GPT2LMHeadModel,
     AutoModelForCausalLM,
     AutoConfig,
 )
-from transformers import AutoModelForMaskedLM
 
+from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel.tensor_parallel import TensorParallel
 from oslo.torch.nn.parallel.utils import allocate_params
-from oslo.torch.distributed import ParallelContext, ParallelMode
-
-import numpy as np
-import time
-import os
-import random
 
 
 def seed_all(seed: int = 1930):

@@ -1,16 +1,9 @@
-import imp
-from typing import Union, Optional, Callable
-
-import os
-import json
-from operator import xor
+import copy
 import warnings
+from typing import Optional
 
 import torch
 import torch.nn as nn
-import torch.distributed as dist
-
-from transformers import AutoConfig
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel.tensor_parallel._parallel_1d._wrapper import (
@@ -28,16 +21,12 @@ from oslo.torch.nn.parallel.tensor_parallel._parallel_3d._wrapper import (
 from oslo.torch.nn.parallel.tensor_parallel.mapping import (
     TensorParallelMapping,
 )
+from oslo.torch.nn.parallel.utils import (
+    get_parallel_context,
+    add_wrapper,
+)
 from oslo.transformers.mapping_utils import (
     _TensorParallelMappingForHuggingFace,
-)
-from oslo.torch.nn.parallel.utils import (
-    ParallelWrapper,
-    unwrap_parallel,
-    get_parallel_context,
-    is_huggingface_model,
-    allocate_params,
-    get_parameter_dtype,
 )
 
 
@@ -59,13 +48,29 @@ def get_divisible_by(parallel_context: ParallelContext):
     return divisible_by
 
 
-class TensorParallel(ParallelWrapper):
+def TensorParallel(
+    module: nn.Module,
+    parallel_context: Optional[ParallelContext] = None,
+    memory_priority: bool = False,
+):
+    tp = _TensorParallel(
+        module=module,
+        parallel_context=parallel_context,
+        memory_priority=memory_priority,
+    )
+    add_wrapper(module, ParallelMode.TENSOR, tp)
+    setattr(module, "forward", tp.forward)
+    return module
+
+
+class _TensorParallel(nn.Module):
     """
     Tensor parallel module
 
     Args:
         module (nn.Module): PyTorch module object
         parallel_context (ParallelContext): process context
+        memory_priority (bool): use tensor sequence parallel
 
     Notes:
         1. Similar design with `torch.nn.parallel.DistributedDataParallel`.
@@ -74,7 +79,7 @@ class TensorParallel(ParallelWrapper):
     Examples:
         >>> from oslo.torch.nn.parallel import TensorParallel
 
-        >>> model = AnyTransformerModel()
+        >>> model = TransformersModel()
         >>> optimizer = AnyOptimizer(model.parameters(), lr=3e-5)
         >>> tp_wrapper = TensorParallel(model, parallel_context=..., ...)
 
@@ -87,55 +92,46 @@ class TensorParallel(ParallelWrapper):
         self,
         module: nn.Module,
         parallel_context: Optional[ParallelContext] = None,
-        mapping: dict = None,
         memory_priority: bool = False,
-        module_args: dict = None,
     ):
         super().__init__()
         self.parallel_context = get_parallel_context(module, parallel_context)
+        self.memory_priority = memory_priority
         module = self._resize_vocab_size(module, self.parallel_context)
-        module = self._resize_num_classes(module, self.parallel_context, mapping)
+        module = self._resize_num_classes(module, self.parallel_context)
 
         if parallel_context.tensor_parallel_mode != ParallelMode.TENSOR_1D:
             if memory_priority and parallel_context.tensor_parallel_size > 1:
-                warnings.warn(
-                    "memory_priority is available only with 1D tensor parallel."
+                raise ValueError(
+                    "param `memory_priority` is available only with 1D tensor parallel."
                 )
 
         if self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_1D:
             self.module = _TensorParallel1D(
-                module, self.parallel_context, mapping, memory_priority, module_args
+                module, self.parallel_context, memory_priority
             )
         elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D:
-            self.module = _TensorParallel2D(
-                module, self.parallel_context, mapping, module_args
-            )
+            self.module = _TensorParallel2D(module, self.parallel_context)
         elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2P5D:
-            self.module = _TensorParallel2p5D(
-                module, self.parallel_context, mapping, module_args
-            )
+            self.module = _TensorParallel2p5D(module, self.parallel_context)
         elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D:
-            self.module = _TensorParallel3D(
-                module, self.parallel_context, mapping, module_args
-            )
+            self.module = _TensorParallel3D(module, self.parallel_context)
         else:
             raise ValueError(
                 "currently, only 1d, 2d, 2p5d tensor parallelism is supported."
             )
+        self.module_forward = copy.copy(self.module.forward)
 
     def forward(self, *args, **kwargs):
-        return self.module(*args, **kwargs)
+        return self.module_forward(*args, **kwargs)
 
     @staticmethod
     def _resize_vocab_size(model, parallel_context):
-        unwrapped_model = unwrap_parallel(model)
-
         assert hasattr(
-            unwrapped_model, "get_input_embeddings"
+            model, "get_input_embeddings"
         ), "model object must have `get_input_embeddings` method."
 
-        module = unwrapped_model.get_input_embeddings()
-
+        module = model.get_input_embeddings()
         vocab_size, embedding_dim = module.weight.size()
         new_vocab_size = vocab_size
 
@@ -158,42 +154,29 @@ class TensorParallel(ParallelWrapper):
             module.weight.data = new_embeddings
             module.num_embeddings = new_vocab_size
         setattr(module, "orig_num_classes", vocab_size)
-        setattr(unwrapped_model, "orig_vocab_size", vocab_size)
+        setattr(model, "orig_vocab_size", vocab_size)
         return model
 
     @staticmethod
-    def _resize_num_classes(model, parallel_context, mapping):
-        unwrapped_model = unwrap_parallel(model)
-        if mapping is None:
-            if is_huggingface_model(unwrapped_model):
-                mapping = _TensorParallelMappingForHuggingFace().get_mapping(
-                    unwrapped_model
-                )
-            else:
-                raise ValueError(
-                    "`mapping` must be input if the model is not huggingface model."
-                )
+    def _resize_num_classes(model, parallel_context):
+        mapping = _TensorParallelMappingForHuggingFace().get_mapping(model)
         tensor_parallel_mapping = TensorParallelMapping(mapping)
         divisible_by = get_divisible_by(parallel_context)
 
-        for param_name, module in unwrapped_model.named_modules():
-            if tensor_parallel_mapping.is_head(
-                unwrapped_model, param_name
-            ) and isinstance(module, nn.Linear):
-                if module.weight is unwrapped_model.get_input_embeddings().weight:
-                    module.out_features = (
-                        unwrapped_model.get_input_embeddings().num_embeddings
-                    )
+        for param_name, module in model.named_modules():
+            if tensor_parallel_mapping.is_head(model, param_name) and isinstance(
+                module, nn.Linear
+            ):
+                if module.weight is model.get_input_embeddings().weight:
+                    module.out_features = model.get_input_embeddings().num_embeddings
 
                     assert hasattr(
-                        unwrapped_model.get_input_embeddings(), "orig_num_classes"
+                        model.get_input_embeddings(), "orig_num_classes"
                     ), "call _resize_vocab before _resize_num_classes"
-                    out_features = (
-                        unwrapped_model.get_input_embeddings().orig_num_classes
-                    )
+                    out_features = model.get_input_embeddings().orig_num_classes
                     setattr(module, "orig_num_classes", out_features)
                     setattr(
-                        unwrapped_model,
+                        model,
                         f"orig_{param_name.split('.')[-1]}_num_classes",
                         out_features,
                     )
@@ -251,51 +234,11 @@ class TensorParallel(ParallelWrapper):
                         module.out_features = new_out_features
                         setattr(module, "orig_num_classes", out_features)
                         setattr(
-                            unwrapped_model,
+                            model,
                             f"orig_{param_name.split('.')[-1]}_num_classes",
                             out_features,
                         )
         return model
 
-    @torch.no_grad()
-    def save_parallelized(
-        self,
-        save_directory: Union[str, os.PathLike],
-        save_config: bool = True,
-        state_dict: Optional[dict] = None,
-        save_function: Callable = torch.save,
-        merge_checkpoints: bool = False,
-        mapping: Optional[dict] = None,
-        **kwargs,
-    ):
-        unwrapped_model = unwrap_parallel(self.module.module)
-        if is_huggingface_model(unwrapped_model):
-            new_module = unwrapped_model.__class__(self.module.config)
-        else:
-            new_module = unwrapped_model.__class__(**self.module.config)
-
-        new_module = self._resize_vocab_size(new_module, self.parallel_context)
-        new_module = self._resize_num_classes(
-            new_module, self.parallel_context, mapping
-        )
-
-        new_module = self.module.save_parallelized(
-            new_module,
-            save_directory,
-            save_config,
-            state_dict,
-            save_function,
-            merge_checkpoints,
-            mapping,
-            **kwargs,
-        )
-
-        return new_module
-
-    @staticmethod
-    def get_module_args(module):
-        state_dict = module.state_dict()
-        return {key: value.shape for key, value in state_dict.items()}
-
-    def from_parallelized(self, path):
-        return self.module.from_parallelized(path)
+    def deparallelize(self):
+        self.module.deparallelize()

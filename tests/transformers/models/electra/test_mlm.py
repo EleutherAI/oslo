@@ -1,12 +1,13 @@
+import os
+
+import wandb
+from datasets import load_dataset
+
+from oslo.transformers.models.electra.modeling_electra import ElectraForMaskedLM
 from oslo.transformers.tasks.data_masked_lm import (
     ProcessorForMaskedLM,
     DataCollatorForMaskedLM,
 )
-from oslo.transformers.models.electra.modeling_electra import ElectraForMaskedLM
-from datasets import load_dataset
-import os
-import wandb
-from torch.utils.data import DataLoader
 
 try:
     from transformers.models.electra.modeling_electra import (

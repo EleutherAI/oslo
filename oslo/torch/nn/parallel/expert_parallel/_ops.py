@@ -1,20 +1,9 @@
-import torch
-import torch.distributed as dist
-
-from torch import Tensor
 from typing import Any, Tuple, Optional
 
+import torch
+import torch.distributed as dist
+from torch import Tensor
 from torch.distributed import ProcessGroup
-from oslo.torch._C import ExpertParallelBinder
-
-OSLO_EP_KERNEL_FLAG = False
-try:
-    oslo_expert_parallel_cuda = ExpertParallelBinder().bind()
-    OSLO_EP_KERNEL_FLAG = True
-except ImportError:
-    print(
-        "If you want to activate cuda kernel for Expert Parallel, Please install with cuda_extension."
-    )
 
 
 class AllToAll(torch.autograd.Function):

@@ -1,4 +1,3 @@
-import torch
 import torch.distributed as dist
 
 from oslo.torch.distributed._seed.helper import moe_set_seed

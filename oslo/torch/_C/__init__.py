@@ -4,6 +4,7 @@ from pathlib import Path
 
 import torch
 from torch.utils import cpp_extension
+
 from oslo.torch.jit._utils import _set_jit_fusion_options
 
 _SOFTMAX_KERNEL = None
@@ -17,6 +18,9 @@ _CPU_ADAM_KERNEL = None
 _CPU_ADAGRAD_KERNEL = None
 _L2NORM_KERNEL = None
 _MIXED_PRECISION_L2NORM_KERNEL = None
+_LAYER_NORM_NORM_KERNEL = None
+_EXPERT_PARALLEL_KERNEL = None
+_NGRAM_REPEAT_BLOCK_KERNEL = None
 
 TORCH_MAJOR = int(torch.__version__.split(".")[0])
 TORCH_MINOR = int(torch.__version__.split(".")[1])
@@ -196,6 +200,54 @@ def get_cpu_adagrad_kernel():
         )
 
     return _CPU_ADAGRAD_KERNEL
+
+
+def get_layernorm_kernel():
+    global _LAYER_NORM_NORM_KERNEL
+
+    try:
+        if _LAYER_NORM_NORM_KERNEL is None:
+            _set_jit_fusion_options()
+            _LAYER_NORM_NORM_KERNEL = FusedLayerNormBinder().bind()
+    except Exception:
+        raise EnvironmentError(
+            "Failed compiling custom CUDA kernels. "
+            "please check your CUDA environment."
+        )
+
+    return _LAYER_NORM_NORM_KERNEL
+
+
+def get_expert_parallel_kernel():
+    global _EXPERT_PARALLEL_KERNEL
+
+    try:
+        if _EXPERT_PARALLEL_KERNEL is None:
+            _set_jit_fusion_options()
+            _EXPERT_PARALLEL_KERNEL = ExpertParallelBinder().bind()
+    except Exception:
+        raise EnvironmentError(
+            "Failed compiling custom CUDA kernels. "
+            "please check your CUDA environment."
+        )
+
+    return _EXPERT_PARALLEL_KERNEL
+
+
+def get_ngram_repeat_block_kernel():
+    global _NGRAM_REPEAT_BLOCK_KERNEL
+
+    try:
+        if _NGRAM_REPEAT_BLOCK_KERNEL is None:
+            _set_jit_fusion_options()
+            _NGRAM_REPEAT_BLOCK_KERNEL = NgramRepeatBlockBinder().bind()
+    except Exception:
+        raise EnvironmentError(
+            "Failed compiling custom CUDA kernels. "
+            "please check your CUDA environment."
+        )
+
+    return _NGRAM_REPEAT_BLOCK_KERNEL
 
 
 DEFAULT_TORCH_EXTENSION_PATH = os.path.join(
@@ -439,7 +491,10 @@ class FusedLayerNormBinder(Binder):
         return "oslo_fused_layer_norm"
 
     def sources(self):
-        return ["fused_layer_norm.cu", "FusedLayerNormBinder.cpp"]
+        return [
+            "fused_layer_norm.cu",
+            "FusedLayerNormBinder.cpp",
+        ]
 
 
 class FusedScaleMaskSoftmaxBinder(Binder):
@@ -458,10 +513,13 @@ class FusedScaleMaskSoftmaxBinder(Binder):
 class ExpertParallelBinder(Binder):
     @property
     def name(self):
-        return "oslo_expert_parallel_cuda"
+        return "oslo_expert_parallel"
 
     def sources(self):
-        return ["expert_parallel_cuda.cpp", "expert_parallel_cuda_kernel.cu"]
+        return [
+            "expert_parallel_cuda_kernel.cu",
+            "ExpertParallelBinder.cpp",
+        ]
 
 
 class FusedAdamBinder(Binder):

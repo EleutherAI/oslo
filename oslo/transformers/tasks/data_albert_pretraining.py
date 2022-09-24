@@ -1,16 +1,17 @@
-from typing import Any, Dict, List, Optional
+import logging
 import random
 import warnings
-import logging
+from typing import Any, Dict, List, Optional
+
 from datasets.arrow_dataset import Batch
 
+from oslo.torch.distributed import ParallelContext
+from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
 from oslo.transformers.tasks.data_base import (
     BaseProcessor,
     ParallelKeys,
     SequenceParallelMixin,
 )
-from oslo.torch.distributed import ParallelContext, ParallelMode
-from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
 
 try:
     from transformers import DataCollatorForLanguageModeling
