@@ -71,6 +71,7 @@ class _FullyShardedDataParallelMappingForHuggingFace(_ParallelMappingForHuggingF
         "T5": ["T5Block"],
         "GPT2": ["GPT2Block"],
         "GPTNeo": ["GPTNeoBlock"],
+        "GPTNeoX": ["GPTNeoXLayer"],
         "GPTJ": ["GPTJBlock"],
         "OPT": ["OPTDecoderLayer"],
         "Electra": ["ElectraLayer"],
@@ -155,18 +156,18 @@ class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
             Update("embed_dim", "num_heads"),
             Head("lm_head", "score", "qa_outputs", gather_output=True),
         ],
-        "GPTJ": [
-            Column("q_proj", "k_proj", "v_proj", "fc_in"),
-            Row("out_proj", "fc_out"),
-            Update("embed_dim", "num_attention_heads"),
-            Head("lm_head", "score", gather_output=True),
-        ],
         "GPTNeoX": [
             Column("query_key_value", combined_qkv=True),
             Column("dense_h_to_4h"),
             Row("dense", "dense_4h_to_h"),
             Update("hidden_size", "num_attention_heads"),
             Head("embed_out", gather_output=True),
+        ],
+        "GPTJ": [
+            Column("q_proj", "k_proj", "v_proj", "fc_in"),
+            Row("out_proj", "fc_out"),
+            Update("embed_dim", "num_attention_heads"),
+            Head("lm_head", "score", gather_output=True),
         ],
         "OPT": [
             Column("q_proj", "k_proj", "v_proj", "fc1"),
@@ -245,6 +246,7 @@ class _ExpertParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
             Behind("mlp.c_proj"),
         ],
         "GPTNeo": [Front("c_fc"), Behind("c_proj")],
+        "GPTNeoX": [Front("dense_h_to_4h"), Behind("dense_4h_to_h")],
         "GPTJ": [Front("fc_in"), Behind("fc_out")],
         "Electra": [
             Front("fc_in"),
