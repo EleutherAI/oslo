@@ -37,15 +37,15 @@ class ParallelKeys:
         "decoder_input_ids",
         "decoder_attention_mask",
     ]
-    BERT = ["input_ids", "token_type_ids", "attention_mask"]
-    ALBERT = ["input_ids", "token_type_ids", "attention_mask"]
-    BART = [
+    BERT_PRETRAINING = ["input_ids", "token_type_ids", "attention_mask"]
+    ALBERT_PRETRAINING = ["input_ids", "token_type_ids", "attention_mask"]
+    BART_PRETRAINING = [
         "input_ids",
         "attention_mask",
         "decoder_input_ids",
         "decoder_attention_mask",
     ]
-    T5 = [
+    T5_PRETRAINING = [
         "input_ids",
         "decoder_input_ids",
         "decoder_attention_mask",

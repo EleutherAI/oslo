@@ -59,16 +59,16 @@ from oslo.torch.nn.parallel.data_parallel.fsdp._utils import (
     _to_kwargs,
     _sync_params_and_buffers,
 )
-from oslo.torch.nn.parallel.data_parallel.fsdp.wrap import (
-    _recursive_wrap,
-    _wrap_batchnorm_individually,
-    _or_policy,
-)
 from oslo.torch.nn.parallel.data_parallel.fsdp.flatten_params_wrapper import (
     FLAT_PARAM,
     FPW_MODULE,
     FlatParameter,
     FlattenParamsWrapper,
+)
+from oslo.torch.nn.parallel.data_parallel.fsdp.wrap import (
+    _recursive_wrap,
+    _wrap_batchnorm_individually,
+    _or_policy,
 )
 
 if TYPE_CHECKING:
@@ -129,8 +129,6 @@ class ShardingStrategy(Enum):
     FULL_SHARD = auto()
     SHARD_GRAD_OP = auto()
     NO_SHARD = auto()
-    # TODO
-    # HYBRID_SHARD = auto()
 
 
 @dataclass

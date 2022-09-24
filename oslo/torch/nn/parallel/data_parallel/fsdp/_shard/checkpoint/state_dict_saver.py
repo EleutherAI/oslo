@@ -5,6 +5,9 @@ import torch
 import torch.distributed as dist
 from torch import Tensor
 
+from oslo.torch.nn.parallel.data_parallel.fsdp._shard.checkpoint.api import (
+    CheckpointException,
+)
 from oslo.torch.nn.parallel.data_parallel.fsdp._shard.checkpoint.metadata import (
     Metadata,
     BytesWriteRequest,
@@ -15,14 +18,11 @@ from oslo.torch.nn.parallel.data_parallel.fsdp._shard.checkpoint.resharding impo
     _prepare_tensor_write,
     _prepare_bytes_write,
 )
-from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharded_tensor import (
-    ShardedTensor,
-)
-from oslo.torch.nn.parallel.data_parallel.fsdp._shard.checkpoint.api import (
-    CheckpointException,
-)
 from oslo.torch.nn.parallel.data_parallel.fsdp._shard.checkpoint.storage import (
     StorageWriter,
+)
+from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharded_tensor import (
+    ShardedTensor,
 )
 
 

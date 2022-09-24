@@ -1,12 +1,11 @@
 import torch
 
-from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharding_spec import (
-    ChunkShardingSpec,
-)
-
 from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharded_tensor import (
     _sharded_op_impl,
     ShardedTensor,
+)
+from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharding_spec import (
+    ChunkShardingSpec,
 )
 
 

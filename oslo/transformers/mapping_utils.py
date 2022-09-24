@@ -1,10 +1,20 @@
 import importlib
-from oslo.torch.nn.parallel.tensor_parallel import Column, Row, Update, Head
+
 from oslo.torch.nn.parallel.expert_parallel.mapping import Front, Behind
+from oslo.torch.nn.parallel.tensor_parallel import Column, Row, Update, Head
 
 
 class _ParallelMappingForHuggingFace(object):
     __MAPPING__ = {}
+
+    def __init__(self):
+        cache_mapping = {}
+        for cls_name, mapping in self.__MAPPING__.items():
+            cls = self._load_hf_class_by_name(cls_name)
+            if cls is not None:
+                cache_mapping[cls] = mapping
+
+        self.__MAPPING__ = cache_mapping
 
     @staticmethod
     def _load_hf_class_by_name(model_name):
@@ -46,6 +56,26 @@ class _ParallelMappingForHuggingFace(object):
             f"The current supported models are {list(self.__MAPPING__.keys())}"
         )
         return mapping_by_model
+
+
+class _FullyShardedDataParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
+    __MAPPING__ = {
+        "Albert": ["AlbertLayer"],
+        "Bart": ["BartLayer"],
+        "Bert": ["BertLayer"],
+        "Blenderbot": ["BlenderbotEncoderLayer", "BlenderbotDecoderLayer"],
+        "BlenderbotSmall": [
+            "BlenderbotSmallEncoderLayer",
+            "BlenderbotSmallDecoderLayer",
+        ],
+        "T5": ["T5Block"],
+        "GPT2": ["GPT2Block"],
+        "GPTNeo": ["GPTNeoBlock"],
+        "GPTJ": ["GPTJBlock"],
+        "OPT": ["OPTDecoderLayer"],
+        "Electra": ["ElectraLayer"],
+        "Roberta": ["RobertaLayer"],
+    }
 
 
 class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
@@ -179,15 +209,6 @@ class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
         ],
     }
 
-    def __init__(self):
-        cache_mapping = {}
-        for cls_name, mapping in self.__MAPPING__.items():
-            cls = self._load_hf_class_by_name(cls_name)
-            if cls is not None:
-                cache_mapping[cls] = mapping
-
-        self.__MAPPING__ = cache_mapping
-
 
 class _ExpertParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
     __MAPPING__ = {
@@ -227,12 +248,3 @@ class _ExpertParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
             Behind("output.dense"),
         ],
     }
-
-    def __init__(self):
-        cache_mapping = {}
-        for cls_name, mapping in self.__MAPPING__.items():
-            cls = self._load_hf_class_by_name(cls_name)
-            if cls is not None:
-                cache_mapping[cls] = mapping
-
-        self.__MAPPING__ = cache_mapping

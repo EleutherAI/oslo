@@ -26,14 +26,6 @@ from torch.utils._pytree import tree_map
 
 import oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharding_spec as shard_spec
 from oslo.torch.nn.parallel.data_parallel.fsdp._shard.metadata import ShardMetadata
-from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharding_spec._internals import (
-    check_tensor,
-    validate_non_overlapping_shards_metadata,
-)
-from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharding_spec.api import (
-    _dispatch_custom_op,
-    _has_custom_op,
-)
 from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharded_tensor.metadata import (
     TensorProperties,
     ShardedTensorMetadata,
@@ -49,6 +41,14 @@ from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharded_tensor.utils impor
     _validate_output_tensor_for_gather,
     build_metadata_from_local_shards,
     build_global_metadata,
+)
+from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharding_spec._internals import (
+    check_tensor,
+    validate_non_overlapping_shards_metadata,
+)
+from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharding_spec.api import (
+    _dispatch_custom_op,
+    _has_custom_op,
 )
 
 # Tracking for sharded tensor objects.

@@ -4,11 +4,11 @@ from typing import Dict, List, Tuple, Union
 
 import torch
 
+from oslo.torch.nn.parallel.data_parallel.fsdp._shard.metadata import ShardMetadata
 from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharded_tensor.api import (
     ShardedTensor,
     ShardedTensorMetadata,
 )
-from oslo.torch.nn.parallel.data_parallel.fsdp._shard.metadata import ShardMetadata
 
 TENSOR_TYPE = Union[torch.Tensor, ShardedTensor]
 
