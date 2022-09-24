@@ -1,7 +1,8 @@
 import torch
 from torch.optim.optimizer import Optimizer, required
-from oslo.torch.utils.multi_tensor_apply import multi_tensor_applier
+
 from oslo.torch._C import get_sgd_kernel
+from oslo.torch.utils.multi_tensor_apply import multi_tensor_applier
 
 
 class FusedSGD(Optimizer):

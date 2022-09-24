@@ -1,12 +1,13 @@
-import unittest
 import os
+import unittest
+from itertools import product
 
 import torch
 from torch.optim import Optimizer
-from oslo.torch.optim import FusedLamb, FusedMixedPrecisionLamb
+
 from oslo.torch._C import get_lamb_kernel, get_l2norm_kernel
+from oslo.torch.optim import FusedLamb, FusedMixedPrecisionLamb
 from oslo.torch.utils.multi_tensor_apply import multi_tensor_applier
-from itertools import product
 
 
 class RefLAMB(Optimizer):

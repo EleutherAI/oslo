@@ -1,9 +1,11 @@
 from copy import deepcopy
+
 import torch
 import torch.distributed as dist
+
+from _utils import split_2d, split_embedding_2d, split_batch_2d, gather_2d
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn import Embedding2D
-from _utils import split_2d, split_embedding_2d, split_batch_2d, gather_2d
 
 tp_size = 4
 

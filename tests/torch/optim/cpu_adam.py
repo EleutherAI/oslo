@@ -1,8 +1,9 @@
-import torch
 import numpy as np
 import pytest
+import torch
 
 from oslo.torch.optim import FusedAdam
+
 
 # if not deepspeed.ops.__compatible_ops__[CPUAdamBuilder.NAME]:
 #     pytest.skip("cpu-adam is not compatible")

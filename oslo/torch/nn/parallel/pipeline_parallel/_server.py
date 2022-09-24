@@ -1,9 +1,8 @@
 import time
-from queue import PriorityQueue, Queue
+from queue import PriorityQueue
 
 import torch
 
-from oslo.torch.nn.parallel.pipeline_parallel._messages import disassemble_new_args
 from oslo.torch.nn.parallel.pipeline_parallel._buffers import (
     save_activation,
     pop_activation,
@@ -11,7 +10,7 @@ from oslo.torch.nn.parallel.pipeline_parallel._buffers import (
 from oslo.torch.nn.parallel.pipeline_parallel._functional import (
     apply_backward_redirection,
 )
-
+from oslo.torch.nn.parallel.pipeline_parallel._messages import disassemble_new_args
 
 # original forward dictionary
 _ORIGINAL_FORWARDS = dict()
@@ -107,7 +106,7 @@ def remote_module_forward(caller, location, unique_key, arg_keys, *args):
 
 def wait_remote_work_result(request_message):
     tag = request_message.tag
-    assert tag in _RECEIVER, f"{tag=}"
+    assert tag in _RECEIVER, f"{tag}"
     result = _RECEIVER[tag].get()
     torch.cuda.current_stream().synchronize()
 

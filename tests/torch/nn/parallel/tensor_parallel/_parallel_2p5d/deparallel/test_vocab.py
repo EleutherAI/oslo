@@ -1,18 +1,14 @@
+from copy import deepcopy
+
 import torch
 import torch.distributed as dist
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn import VocabParallelEmbedding2p5D
-from oslo.torch.nn.parallel import utils
-
 from oslo.torch.nn.parallel.tensor_parallel._parallel_2p5d._ops import (
     split_batch_2d,
     split_2d,
-    gather_2d,
 )
-
-from copy import deepcopy
-
 
 tp_size = 8
 tp_depth = 2
@@ -67,8 +63,7 @@ logits.backward()
 optimizer.step()
 
 if parallel_context.get_global_rank() == 0:
-    unwrapped_model = utils.unwrap_parallel(vocab_embedding_2p5d)
-    print(f"original vocab size: {unwrapped_model.orig_vocab_size}")
+    print(f"original vocab size: {vocab_embedding_2p5d.orig_vocab_size}")
 
 
 #

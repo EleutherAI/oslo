@@ -2,21 +2,9 @@ from typing import Tuple, List
 
 import torch
 import torch.nn as nn
-from oslo.torch.distributed import ParallelContext, ParallelMode
+
+from oslo.torch.distributed import ParallelContext
 from oslo.transformers.modeling_utils import OsloModel
-
-
-class ParallelWrapper(nn.Module):
-    """Marker interface"""
-
-
-def is_huggingface_model(model: nn.Module):
-    try:
-        import transformers
-
-        return isinstance(model, transformers.PreTrainedModel)
-    except ImportError:
-        return False
 
 
 def is_oslo_model(model: nn.Module):
@@ -27,22 +15,6 @@ def is_oslo_model(model: nn.Module):
         if isinstance(module, OsloModel):
             return True
     return False
-
-
-def is_wrapper(model: nn.Module):
-    if isinstance(model, ParallelWrapper):
-        return True
-
-    for module in model.modules():
-        if isinstance(module, ParallelWrapper):
-            return True
-    return False
-
-
-def unwrap_parallel(model: nn.Module):
-    while isinstance(model, ParallelWrapper):
-        model = model.module
-    return model
 
 
 def get_parameter_dtype(parameter: nn.Module):
@@ -73,6 +45,10 @@ def _remove_module_arguments(module: nn.Module, args: list):
 def allocate_params(model: nn.Module, parallel_context: ParallelContext):
     for name, parameter in model.named_parameters():
         if hasattr(parameter, "oslo_parallel"):
+            # sorting parallel groups to fix parallelization order
+            parameter.oslo_parallel = dict(
+                sorted(parameter.oslo_parallel, key=lambda x: x[0])
+            )
             device = parallel_context.ranks2device(parameter.oslo_parallel)
             if device is not None:
                 parameter.data = parameter.to(
@@ -83,6 +59,10 @@ def allocate_params(model: nn.Module, parallel_context: ParallelContext):
 
     for name, buffer in model.named_buffers():
         if hasattr(buffer, "oslo_parallel"):
+            # sorting parallel groups to fix parallelization order
+            buffer.oslo_parallel = dict(
+                sorted(buffer.oslo_parallel, key=lambda x: x[0])
+            )
             device = parallel_context.ranks2device(buffer.oslo_parallel)
             if device is not None:
                 buffer.data = buffer.to(

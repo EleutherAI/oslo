@@ -1,3 +1,5 @@
+import time
+
 import torch.distributed as dist
 import wandb
 from datasets import load_dataset
@@ -5,10 +7,9 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel
 
+from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel.tensor_parallel import TensorParallel
 from oslo.torch.nn.parallel.utils import allocate_params
-from oslo.torch.distributed import ParallelContext, ParallelMode
-import time
 
 
 def latency_trace(func):

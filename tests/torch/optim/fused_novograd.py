@@ -1,10 +1,11 @@
+import unittest
+from itertools import product
+
 import torch
 from torch.optim import Optimizer
-import unittest
-from oslo.torch.optim import FusedNovograd
 
+from oslo.torch.optim import FusedNovograd
 from tests.torch.optim.fused_optimizers import TestFusedOptimizer
-from itertools import product
 
 
 class Novograd(Optimizer):

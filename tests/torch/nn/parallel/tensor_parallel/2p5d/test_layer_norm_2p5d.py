@@ -1,9 +1,11 @@
 from copy import deepcopy
+
 import torch
 import torch.distributed as dist
+
+from _utils import split_2p5d, split_layernorm_2p5d, split_bias_2p5d, gather_2p5d
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn import LayerNorm2p5D
-from _utils import split_2p5d, split_layernorm_2p5d, split_bias_2p5d, gather_2p5d
 
 tp_size = 8
 tp_depth = 2

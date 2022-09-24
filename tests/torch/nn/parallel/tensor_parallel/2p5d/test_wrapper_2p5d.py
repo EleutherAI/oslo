@@ -1,21 +1,20 @@
 import time
-import wandb
+
 import torch
 import torch.distributed as dist
-from torch.optim import Adam
+import wandb
 from datasets import load_dataset
-
+from torch.optim import Adam
 from torch.utils.data import DataLoader
 from transformers import (
     AutoTokenizer,
     GPT2Config,
     GPT2LMHeadModel,
-    AutoModelForCausalLM,
 )
 
-from oslo.torch.nn.parallel.tensor_parallel import TensorParallel
-from oslo.torch.nn.parallel.utils import allocate_params
+import oslo
 from oslo.torch.distributed import ParallelContext, ParallelMode
+from oslo.torch.nn.parallel.tensor_parallel import TensorParallel
 
 
 def latency_trace(func):
@@ -66,9 +65,8 @@ tokenizer.pad_token = tokenizer.eos_token
 model_no_tp = GPT2LMHeadModel(GPT2Config.from_pretrained(model_name)).cuda()
 model_tp = GPT2LMHeadModel(GPT2Config.from_pretrained(model_name))
 wrapper_tp = TensorParallel(model_tp, parallel_context)
-allocate_params(wrapper_tp, parallel_context)
-# allocate_params 함수는 추후에 모든 페러렐 래퍼를 관장하는 클래스에서 처리될 예정
-# https://github.com/tunib-ai/oslo/blob/307131bbd5ed995ea8dca8ac541bfbce9bfec29b/oslo/pytorch/model_parallelism/model_parallel_engine.py
+
+oslo.ready(model_tp, parallel_context)
 
 if dist.get_rank() == 0:
     print(wrapper_tp)

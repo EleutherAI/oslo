@@ -5,7 +5,9 @@ Copyright NVIDIA/apex
 This file is adapted from NVIDIA/apex/optimizer/fused_adam and implements the LAMB optimizer
 """
 import types
+
 import torch
+
 from oslo.torch._C import get_lamb_kernel
 
 

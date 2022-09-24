@@ -6,6 +6,16 @@ from typing import List, Optional, Union
 import datasets
 from datasets import Dataset, DatasetDict, load_dataset, load_from_disk
 from numpy.random import choice
+
+from oslo.transformers.tasks.data_albert_pretraining import (
+    ProcessorForAlbertPretraining,
+)
+from oslo.transformers.tasks.data_bart_pretraining import (
+    ProcessorForBartPretraining,
+)
+from oslo.transformers.tasks.data_bert_pretraining import (
+    ProcessorForBertPretraining,
+)
 from oslo.transformers.tasks.data_causal_lm import (
     ProcessorForCausalLM,
 )
@@ -15,23 +25,14 @@ from oslo.transformers.tasks.data_masked_lm import (
 from oslo.transformers.tasks.data_sequence_classification import (
     ProcessorForSequenceClassification,
 )
-from oslo.transformers.tasks.data_token_classification import (
-    ProcessorForTokenClassification,
-)
 from oslo.transformers.tasks.data_summarization import (
     ProcessorForSummarization,
 )
-from oslo.transformers.tasks.data_bert_pretraining import (
-    ProcessorForBertPretraining,
-)
-from oslo.transformers.tasks.data_albert_pretraining import (
-    ProcessorForAlbertPretraining,
-)
-from oslo.transformers.tasks.data_bart_pretraining import (
-    ProcessorForBartPretraining,
-)
 from oslo.transformers.tasks.data_t5_pretraining import (
     ProcessorForT5Pretraining,
+)
+from oslo.transformers.tasks.data_token_classification import (
+    ProcessorForTokenClassification,
 )
 
 try:

@@ -1,5 +1,4 @@
 from math import sqrt
-from typing import Any, Dict
 
 import torch.distributed as dist
 import torch.nn as nn
@@ -19,7 +18,6 @@ class ModelPartitioner(object):
     Args:
         module (nn.Module): PyTorch module
         process_group (dist.ProcessGroup): process group object
-        tracing_inputs (Dict[str, Any]): tracing input dictionary, will be input as **kwargs to model.
         memory_computation_balance (float): memory computation balance factor
 
     References:
@@ -31,12 +29,10 @@ class ModelPartitioner(object):
         self,
         module: nn.Module,
         process_group: dist.ProcessGroup,
-        tracing_inputs: Dict[str, Any] = None,
         memory_computation_balance: float = 1.0,
     ):
         self.module = module
         self.process_group = process_group
-        self.tracing_inputs = tracing_inputs
         self.memory_computation_balance = memory_computation_balance
 
         self.visited = {}
@@ -90,7 +86,6 @@ class ModelPartitioner(object):
         cost_estimator = PartitioningCostEstimator(
             root_node=self.root_node,
             alpha=self.memory_computation_balance,
-            tracing_inputs=self.tracing_inputs,
         )
         cost_estimator.compute_cost()
 

@@ -1,7 +1,6 @@
 from transformers import (
     AutoTokenizer,
     AutoModelForSeq2SeqLM,
-    LogitsProcessorList,
 )
 
 from oslo.transformers.kernel_fusion_utils import fused_no_repeat_ngram_logits_processor

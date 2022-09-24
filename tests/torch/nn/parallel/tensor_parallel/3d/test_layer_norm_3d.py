@@ -1,9 +1,11 @@
 from copy import deepcopy
+
 import torch
 import torch.distributed as dist
+
+from _utils import split_input_3d, split_layernorm_3d, split_bias_3d, gather_output_3d
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn import LayerNorm3D
-from _utils import split_input_3d, split_layernorm_3d, split_bias_3d, gather_output_3d
 
 tp_size = 8
 

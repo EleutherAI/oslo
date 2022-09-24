@@ -6,7 +6,6 @@ import unittest
 import numpy as np
 import torch
 
-
 from oslo.torch.nn import NGramRepeatBlock
 
 DEFAULT_TEST_VOCAB_SIZE = 100

@@ -1,6 +1,7 @@
 import torch
-from oslo.torch.utils.multi_tensor_apply import multi_tensor_applier
+
 from oslo.torch._C import get_adagrad_kernel
+from oslo.torch.utils.multi_tensor_apply import multi_tensor_applier
 
 
 class FusedAdagrad(torch.optim.Optimizer):

@@ -1,21 +1,19 @@
 from copy import deepcopy
 
+import matplotlib
+import matplotlib.pyplot as plt
 import torch
-import torch.nn as nn
 import torch.distributed as dist
+import torch.nn as nn
+from datasets import load_dataset
 from torch.distributed import rpc
 from torch.optim import Adam
 from torch.utils.data import DataLoader
-
-from oslo.torch.distributed import ParallelContext
-from oslo.torch.nn.parallel import PipelineParallel
-from oslo.torch.nn.parallel.utils import allocate_params
-
-from datasets import load_dataset
 from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel, set_seed
 
-import matplotlib
-import matplotlib.pyplot as plt
+from oslo.torch.distributed import ParallelContext
+from oslo.torch.nn.parallel import _PipelineParallel
+from oslo.torch.nn.parallel.utils import allocate_params
 
 matplotlib.use("Agg")
 torch.autograd.set_detect_anomaly(True)
@@ -43,7 +41,7 @@ for n, m in model.named_modules():
 model_no_pp = deepcopy(model)
 model_no_pp.cuda()
 
-wrapper_pp = PipelineParallel(
+wrapper_pp = _PipelineParallel(
     model,
     parallel_context=parallel_context,
     memory_computation_balance=1.0,
@@ -94,14 +92,14 @@ def run():
                 if dist.get_rank() == 0:
                     loss_pp.backward()
 
-                print(f"{ind=}")
+                print(f"{ind}")
                 cum_loss_pp += loss_pp.detach().item()
 
             out_no_pp = model_no_pp(**inputs, labels=inputs["input_ids"])
             loss_no_pp = out_no_pp.loss
             loss_no_pp.backward()
 
-            print(f"{dist.get_rank()=}, {cum_loss_pp=}, {loss_no_pp=}")
+            print(f"{dist.get_rank()}, {cum_loss_pp}, {loss_no_pp}")
 
             optimizer_pp.step()
             optimizer_no_pp.step()

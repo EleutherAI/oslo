@@ -1,7 +1,9 @@
-import torch
+from collections import defaultdict, abc as container_abcs
 from copy import deepcopy
 from itertools import chain
-from collections import defaultdict, abc as container_abcs
+
+import torch
+
 from oslo.torch._C import get_lamb_mp_kernel, get_l2norm_mp_kernel
 from oslo.torch.utils.multi_tensor_apply import multi_tensor_applier
 

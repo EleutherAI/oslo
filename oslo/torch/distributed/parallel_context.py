@@ -1,12 +1,12 @@
 import os
 import random
-import warnings
 from typing import List, Optional
 
 import numpy as np
 import torch
 import torch.distributed as dist
 from torch.distributed import rpc
+
 from oslo.torch.distributed._initializers.initializer_data import (
     DataParallelGroupInitializer,
 )

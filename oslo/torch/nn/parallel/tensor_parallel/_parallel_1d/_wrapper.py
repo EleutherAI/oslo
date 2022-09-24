@@ -1,84 +1,63 @@
 import copy
 
 import torch
-import torch.nn as nn
 import torch.distributed as dist
+import torch.nn as nn
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
+from oslo.torch.distributed.nn.functional import (
+    scatter,
+)
 from oslo.torch.nn.modules.embedding import (
     VocabParallelEmbedding1D,
     Embedding1D,
     VocabUtility,
 )
-from oslo.torch.nn.modules.linear import (
-    ColLinear1D,
-    RowLinear1D,
-)
 from oslo.torch.nn.modules.layer_norm import (
     LayerNorm1D,
 )
-from oslo.torch.distributed.nn.functional import (
-    scatter,
+from oslo.torch.nn.modules.linear import (
+    ColLinear1D,
+    RowLinear1D,
 )
 from oslo.torch.nn.parallel.tensor_parallel.mapping import (
     TensorParallelMapping,
 )
 from oslo.torch.nn.parallel.utils import (
     _update_module_arguments,
-    is_huggingface_model,
     is_oslo_model,
 )
-from oslo.torch.nn.parallel.tensor_parallel._base_wrapper import (
-    BaseTensorParallelWrapper,
-)
+from oslo.transformers.constants import SEQ_DIMENSIONS
 from oslo.transformers.mapping_utils import (
     _TensorParallelMappingForHuggingFace,
 )
-from oslo.transformers.constants import SEQ_DIMENSIONS
 
 
-class _TensorParallel1D(BaseTensorParallelWrapper):
+class _TensorParallel1D(nn.Module):
     """
     PyTorch module for 1D tensor parallelism
 
     Args:
         module (nn.Module): model object
         parallel_context (ParallelContext): parallel context object
-        mapping (dict): custom tensor parallel mapping
+        memory_priority (bool): use tensor sequence parallel
     """
 
     def __init__(
         self,
         module: nn.Module,
         parallel_context: ParallelContext,
-        mapping: dict = None,
         memory_priority: bool = False,
-        module_args: dict = None,
     ):
-        super().__init__(module, parallel_context)
-
-        if module_args is None:
-            if is_huggingface_model(module):
-                module_args = module.config
-            else:
-                raise ValueError(
-                    "`config` must be input if the model is not huggingface model."
-                )
-
-        self.config = module_args
+        super().__init__()
+        self.config = module.config
         self.module = module
+        self.module_forward = copy.copy(module.forward)
         self.parallel_context = parallel_context
         self.memory_priority = memory_priority
         self.device = torch.cuda.current_device()
 
-        if mapping is None:
-            if is_huggingface_model(module):
-                mapping = _TensorParallelMappingForHuggingFace().get_mapping(module)
-            else:
-                raise ValueError(
-                    "`mapping` must be input if the model is not huggingface model."
-                )
-
+        mapping = _TensorParallelMappingForHuggingFace().get_mapping(module)
         self.tensor_parallel_mapping = TensorParallelMapping(mapping)
         self._parallelize()
 
@@ -107,7 +86,7 @@ class _TensorParallel1D(BaseTensorParallelWrapper):
                 else value
                 for key, value in kwargs.items()
             }
-        return self.module(*args, **kwargs)
+        return self.module_forward(*args, **kwargs)
 
     @torch.no_grad()
     def _parallelize(self):

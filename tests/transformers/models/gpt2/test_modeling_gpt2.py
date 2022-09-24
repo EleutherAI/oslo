@@ -1,4 +1,5 @@
 import torch
+
 from oslo.transformers.models.gpt2.modeling_gpt2 import (
     GPT2Model,
     GPT2LMHeadModel,

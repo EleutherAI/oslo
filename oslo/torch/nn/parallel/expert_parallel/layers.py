@@ -1,28 +1,27 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.distributed as dist
-from torch.distributed import ProcessGroup
-
 import math
 from typing import Callable, Optional
 
+import torch
+import torch.distributed as dist
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.distributed import ProcessGroup
+
 from oslo.torch.distributed import ParallelMode
 from oslo.torch.distributed._seed.helper import seed
-
 from oslo.torch.nn.parallel.expert_parallel._context import ExpertParallelContext
 from oslo.torch.nn.parallel.expert_parallel._ops import AllToAll, EPDispatch, EPCombine
 from oslo.torch.nn.parallel.expert_parallel.utils import (
-    get_current_device,
-    cum_sum_d0_minus_one,
+    UniformNoiseSampler,
+    NormalNoiseSampler,
 )
 from oslo.torch.nn.parallel.expert_parallel.utils import (
     _ForceFP32Parameter,
     auto_cast_softmax,
 )
 from oslo.torch.nn.parallel.expert_parallel.utils import (
-    UniformNoiseSampler,
-    NormalNoiseSampler,
+    get_current_device,
+    cum_sum_d0_minus_one,
 )
 
 

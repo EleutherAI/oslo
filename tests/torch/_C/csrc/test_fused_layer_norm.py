@@ -1,6 +1,7 @@
-import torch
-import unittest
 import itertools
+import unittest
+
+import torch
 
 import oslo.torch.nn as onn
 

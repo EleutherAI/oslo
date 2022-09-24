@@ -1,13 +1,11 @@
 import os
 from queue import Queue
-from threading import Thread
 
 import torch
 import torch.distributed as dist
 from torch.distributed import rpc
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
-
 
 MessageQueues = [Queue() for _ in range(2)]
 

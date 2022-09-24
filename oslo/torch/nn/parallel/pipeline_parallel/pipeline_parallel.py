@@ -9,14 +9,13 @@ from torch.distributed import rpc
 
 from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.distributed.parallel_mode import ParallelMode
-from oslo.torch.nn.parallel.pipeline_parallel._model_partitioner import ModelPartitioner
-from oslo.torch.nn.parallel.utils import get_parallel_context
-
+from oslo.torch.nn.parallel.pipeline_parallel._buffers import save_activation
 from oslo.torch.nn.parallel.pipeline_parallel._functional import (
     apply_backward_redirection,
     len_forward_marker,
 )
 from oslo.torch.nn.parallel.pipeline_parallel._messages import assemble_args
+from oslo.torch.nn.parallel.pipeline_parallel._model_partitioner import ModelPartitioner
 from oslo.torch.nn.parallel.pipeline_parallel._server import (
     _ORIGINAL_FORWARDS,
     _MODULE_DEVICE_LOCATIONS,
@@ -32,10 +31,21 @@ from oslo.torch.nn.parallel.pipeline_parallel._server import (
     increment_forward_counter,
     reset_forward_counter,
 )
-from oslo.torch.nn.parallel.pipeline_parallel._buffers import save_activation
+from oslo.torch.nn.parallel.utils import get_parallel_context
 
 
-class PipelineParallel(nn.Module):
+def PipelineParallel(
+    module: nn.Module,
+    parallel_context: ParallelContext,
+    memory_computation_balance: float = 1.0,
+    tracing_inputs: Dict[str, Any] = None,
+    num_micro_batches: int = 1,
+):
+    # TODO, @HG
+    pass
+
+
+class _PipelineParallel(nn.Module):
     """
     Pipeline parallel module
 
@@ -46,8 +56,7 @@ class PipelineParallel(nn.Module):
 
     Notes:
         1. Similar design with `torch.nn.parallel.DistributedDataParallel`.
-        2. Support multiple scheduling algorithms.
-        3. Support inter-module partitioning described in Sagemaker Model Parallelism.
+        2. Support inter-module partitioning described in Sagemaker Model Parallelism.
 
     Examples:
         >>> from oslo.torch.nn.parallel import PipelineParallel
@@ -66,7 +75,6 @@ class PipelineParallel(nn.Module):
         module: nn.Module,
         parallel_context: ParallelContext,
         memory_computation_balance: float = 1.0,
-        tracing_inputs: Dict[str, Any] = None,
         num_micro_batches: int = 1,
     ):
         super().__init__()
@@ -75,7 +83,6 @@ class PipelineParallel(nn.Module):
         self.partitioner = ModelPartitioner(
             module=module,
             process_group=parallel_context.get_group(ParallelMode.PIPELINE),
-            tracing_inputs=tracing_inputs,
             memory_computation_balance=memory_computation_balance,
         )
         self.partitioner.partition()

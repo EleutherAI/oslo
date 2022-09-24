@@ -5,7 +5,4 @@ from oslo.transformers.models.gpt2.modeling_gpt2 import (
     GPT2ForTokenClassification,
 )
 
-
-from oslo.transformers.training_args import TrainingArguments
-
 # from oslo.transformers.trainer import Trainer
