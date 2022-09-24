@@ -161,6 +161,13 @@ class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
             Update("embed_dim", "num_attention_heads"),
             Head("lm_head", "score", gather_output=True),
         ],
+        "GPTNeoX": [
+            Column("query_key_value", combined_qkv=True),
+            Column("dense_h_to_4h"),
+            Row("dense", "dense_4h_to_h"),
+            Update("hidden_size", "num_attention_heads"),
+            Head("embed_out", gather_output=True),
+        ],
         "OPT": [
             Column("q_proj", "k_proj", "v_proj", "fc1"),
             Row("out_proj", "fc2"),
