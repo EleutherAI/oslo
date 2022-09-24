@@ -198,7 +198,7 @@ def _prepare_sharded_tensor_read(
         sharded_tensor_out: The dest sharded tensor.
 
     Returns:
-        A list of class::`TensorReadRequest`. When fullfilled,
+        A list of class::`TensorReadRequest`. When fulfilled,
         `sharded_tensor_out`'s local shards load from the persisted sharded
         tensor.
     """

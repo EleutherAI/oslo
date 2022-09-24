@@ -282,7 +282,7 @@ class ShardedTensor(object):
 
     def _get_preferred_device(self) -> torch.device:
         """
-        Return the prefered device to be used when creating tensors for collectives.
+        Return the preferred device to be used when creating tensors for collectives.
         This method takes into account the associated process group
         """
         if dist.get_backend(self._process_group) == dist.Backend.NCCL:
@@ -390,7 +390,7 @@ class ShardedTensor(object):
 
         .. note:: When moving a ShardedTensor from GPU to CPU, the ShardedTensor might
             need to be managed by a different type of ProcessGroup(i.e. ProcessGroupGloo),
-            it is the user's responsiblity to explicitly pass in a new process_group that
+            it is the user's responsibility to explicitly pass in a new process_group that
             is compatible with CPU.
         """
         # TODO: make this a __torch_function__ op once ShardedTensor becomes a

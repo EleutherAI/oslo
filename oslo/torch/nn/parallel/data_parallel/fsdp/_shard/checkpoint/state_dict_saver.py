@@ -49,7 +49,7 @@ def _prepare(
 
         size_for_storage_keys: Dict[str, int]
             Key is the storage key name, value is the associated size
-            It can used to pre allocate the storage for parallel and non sequential writes.
+            It can be used to pre allocate the storage for parallel and non-sequential writes.
 
         bytes_write_requests: List[BytesWriteRequest]
             List of ByteIO write requests that should be performed by the writer.
@@ -115,7 +115,7 @@ def save_state_dict(
     If using the `process_group` argument, make sure that only its ranks
     call `save_state_dict` and that all data in state_dict belong to it.
 
-    This function can be used to save a state_dict with an intialized process
+    This function can be used to save a state_dict with an initialized process
     group by passing ``no_dist=True``. This can be used to produce a checkpoint
     that can consumed by load_state_dict is a SPMD fashion.
 

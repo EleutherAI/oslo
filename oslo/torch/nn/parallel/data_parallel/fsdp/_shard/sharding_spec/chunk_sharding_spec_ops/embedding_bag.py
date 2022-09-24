@@ -1,5 +1,3 @@
-# coding=utf-8
-
 from typing import List, cast
 
 import torch
@@ -190,11 +188,9 @@ def _validate_embedding_bag_param(args, kwargs):
     per_sample_weights = kwargs.get("per_sample_weights")
     mode = kwargs.get("mode")
     max_norm = kwargs.get("max_norm")
-    norm_type = kwargs.get("norm_type")
     scale_grad_by_freq = kwargs.get("scale_grad_by_freq")
     sparse = kwargs.get("sparse")
     include_last_offset = kwargs.get("include_last_offset")
-    padding_idx = kwargs.get("padding_idx")
 
     # Validate types
     if not isinstance(input, torch.Tensor):
@@ -532,7 +528,7 @@ def _input_split_sort(input, offsets, padding_idx):
     Return:
         input_split_sorted_list: list of ID positions sorted per interval.
         input_split_sorted_indices: sorted indices for per_sample_weights
-            rearrangments.
+            rearrangements.
         split_sizes_1d: size of each split for 1D input because it can be
             different in such scenario.
         split_sizes_1d_with_padding: size of each split for 1D input with
@@ -609,7 +605,7 @@ def _sorted_input_distribute_prepare(
     Args:
         input_split_sorted_list: list of ID positions sorted per interval.
         input_split_sorted_indices: sorted indices for per_sample_weights
-            rearrangments.
+            rearrangements.
         input: tensor to be applied op on.
         world_size: number of ranks.
         weight: shareded weight tensor.
@@ -773,7 +769,7 @@ def _distribute_input(
     input_combined = torch.remainder(input_combined, sharded_dim_size_max)
     input_combined_list = list(torch.split(input_combined, input_combined_split_sizes))
 
-    # Covert each offset list to a tensor and combine with the input
+    # Convert each offset list to a tensor and combine with the input
     # so we only perform one communication to each rank.
     input_tensor_list = []
     output_tensor_size_list = []

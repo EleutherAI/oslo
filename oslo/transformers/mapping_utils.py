@@ -1,10 +1,4 @@
 import importlib
-
-try:
-    import transformers
-except ImportError:
-    print("You have to install `transformers` to use `oslo.transformers` modules")
-
 from oslo.torch.nn.parallel.tensor_parallel import Column, Row, Update, Head
 from oslo.torch.nn.parallel.expert_parallel.mapping import Front, Behind
 

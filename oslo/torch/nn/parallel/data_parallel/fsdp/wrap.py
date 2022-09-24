@@ -41,7 +41,7 @@ def transformer_auto_wrap_policy(
     as a FSDP unit. Otherwise, all the other remainder submodules are wrapped
     by the outermost FSDP unit. Right now, FSDP requires submodules that share
     weights to be wrapped in the same FSDP unit, this auto wrap policy can
-    conviniently wrap the shared embeddings into the same FSDP unit for transformer
+    conveniently wrap the shared embeddings into the same FSDP unit for transformer
     models. In the near future, FSDP will support submodules that share weights
     to be wrapped in the separated FSDP units.
 
@@ -61,7 +61,7 @@ def transformer_auto_wrap_policy(
 
        transformer_layer_cls (int):
            Submodules with one of the `transformer_layer_cls` names
-           will be wrapped as seperated FSDP units
+           will be wrapped as separated FSDP units
     """
     if recurse:
         # always recurse

@@ -29,7 +29,7 @@ class ReplicatedTensor(torch.Tensor):
         ReplicatedTensor + ShardedTensor = ShardedTensor
         ReplicatedTensor + other type (i.e. Scalar) = other type
 
-    NOTE: We do not gurantee equal content of ReplicatedTensor across nodes after its
+    NOTE: We do not guarantee equal content of ReplicatedTensor across nodes after its
     construction. Although we defined proper inter-op rules to make sure ReplicatedTensor
     stays the same, there's no enforcement on it (i.e. if you manually modify content on
     some ranks, the modified value will not automatically get synced to other nodes). If
@@ -114,7 +114,7 @@ class ReplicatedTensor(torch.Tensor):
                 if redispatched:
                     return res
 
-        # We cann't do super().__torch_function__() as it implicitly convert the result
+        # We can't do super().__torch_function__() as it implicitly convert the result
         # back to tensor subclasses, where in our case, we need to control the output type
         # base on the inter-op rules we defined.
         with torch._C.DisableTorchFunction():

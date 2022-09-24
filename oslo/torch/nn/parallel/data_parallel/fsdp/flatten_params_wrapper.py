@@ -85,11 +85,11 @@ class ShardMetadata(NamedTuple):
 class FlatParameter(nn.Parameter):
     """
     A parameter that is initialized from a list of parameters. All the
-    parameters will be flattened and concatened to form the flat parameter.
+    parameters will be flattened and concatenated to form the flat parameter.
 
     Args:
         params (Sequence[nn.Parameter])
-            The parameters to be flattend and concatened.
+            The parameters to be flattened and concatenated.
         requires_grad (bool):
             Set to True if gradients need to be computed for this parameter,
             False otherwise.
@@ -335,7 +335,7 @@ class FlattenParamsWrapper(nn.Module):
 
     @property
     def module(self) -> Any:
-        """Support _fsdp_wrapped_module.module in case we are immitating DDP, which has .module
+        """Support _fsdp_wrapped_module.module in case we are imitating DDP, which has .module
         property to the underlying module.
         """
         return self._fpw_module

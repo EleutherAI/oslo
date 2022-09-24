@@ -203,7 +203,7 @@ class BackwardPrefetch(Enum):
     during backward pass.
     BACKWARD_PRE: prefetch right before current layer's backward computation
                   starts, this approach will increase backward communication
-                  and computation overalpping and potentialy improve training
+                  and computation overlapping and potentially improve training
                   performance, but it may increase the peak memory usage as
                   the prefetched full parameters will be kept in the GPU memory
                   until next layer's backward computation is done.
@@ -217,8 +217,7 @@ class BackwardPrefetch(Enum):
                    the reversed forward computation order, so this
                    approach may prefetch full parameters for layers ahead of next layer,
                    this 'ahead' all_gather could delay next layer's all_gather in the
-                   single NCCL stream and cause the next layer's computation delay. So it may
-                   cause some performance regession for some models.
+                   single NCCL stream and cause the next layer's computation delay.
     """
 
     BACKWARD_PRE = auto()
@@ -600,7 +599,7 @@ class _FullyShardedDataParallel(nn.Module):
             is not specified, otherwise we run ``param_init_fn`` to initialize the passed
             in ``nn.Module``. In particular, this means that if ``is_meta=True`` for any
             module parameters for modules that will be wrapped with FSDP and ``param_init_fn``
-            is not specified, we assume your module properly implements a ``reset_paramters()``
+            is not specified, we assume your module properly implements a ``reset_parameters()``
             and will throw errors if not. Note that additionally, we offer support for modules
             initialized with torchdistX's (https://github.com/pytorch/torchdistX)
             ``deferred_init`` API. In this case, deferred modules would be initialized
@@ -757,7 +756,7 @@ class _FullyShardedDataParallel(nn.Module):
                 raise ValueError(
                     f"Expected {param_init_fn} to be callable, but got {type(param_init_fn)}"
                 )
-            param_init_fn(module)
+            param_init_fn(module)  # noqa: F821
 
         if is_meta_module:
             if param_init_fn is not None:
@@ -1253,7 +1252,7 @@ class _FullyShardedDataParallel(nn.Module):
     @torch.no_grad()
     def _cast_param_shards_to_dtype(self):
         """
-        Allocates a mixed precision paramter shard and casts parameter shards to
+        Allocates a mixed precision parameter shard and casts parameter shards to
         reduced precision by copying into this mixed precision shard. Note that
         if we are CPU offloading, this also implicitly loads the parameter shard
         back to GPU.
@@ -1343,7 +1342,7 @@ class _FullyShardedDataParallel(nn.Module):
                     if name not in self._orig_buffer_dtypes:
                         self._orig_buffer_dtypes[name] = buf.dtype
                     # If given, cast buffer to the given dtype. This is used to
-                    # suppport mixed precision for buffers
+                    # support mixed precision for buffers
                     # (given by self.mixed_precision.buffer_dtype) and also used
                     # to restore the buffer dtype to the original precision for
                     # state_dict() calls.
@@ -1787,7 +1786,9 @@ class _FullyShardedDataParallel(nn.Module):
                 prev_state_dict_config = submodule._state_dict_config
             if prev_state_dict_type != submodule._state_dict_type:
                 raise RuntimeError("All FSDP module should the same state_dict_type.")
-            if type(prev_state_dict_config) != type(submodule._state_dict_config):
+            if type(prev_state_dict_config) != type(  # noqa: E721
+                submodule._state_dict_config
+            ):
                 raise RuntimeError(
                     "All FSDP modules should have the same type of state_dict_config."
                 )

@@ -46,7 +46,7 @@ class _ConsolidatedOptimState:
 
 class _PosDimTensorInfo(NamedTuple):
     """
-    Meatadata for positive-dimension tensors used internally for
+    Metadata for positive-dimension tensors used internally for
     :meth:`scatter_full_optim_state_dict`.
 
     Attributes:
@@ -676,7 +676,7 @@ def _process_pos_dim_tensor_state(
     """
     flat_osd = flat_optim_state_dict  # alias
     no_tensor_osd: Dict[str, Any] = {"state": {}}
-    cpu_device = torch.device("cpu")
+
     for param_id, param_state in flat_osd["state"].items():
         no_tensor_osd["state"][param_id] = {}
         for state_name, state_value in param_state.items():

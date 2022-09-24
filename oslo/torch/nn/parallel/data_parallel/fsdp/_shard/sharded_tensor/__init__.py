@@ -1,5 +1,3 @@
-# coding=utf-8
-
 import functools
 from typing import List
 
@@ -478,4 +476,4 @@ def _sharded_op_impl(func):
 
 
 # Import all builtin sharded ops
-from ._ops import *  # noqa: F403
+from ._ops import *  # noqa: F403 E402

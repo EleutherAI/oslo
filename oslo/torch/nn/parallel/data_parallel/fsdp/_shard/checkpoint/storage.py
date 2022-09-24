@@ -27,7 +27,7 @@ class StorageWriter(abc.ABC):
 
     There's a single process that executes methods that are called once globally.
     The writes from (3) and (4) are initiated before any waiting is done.
-    The last call to finish() has the semantics of commiting the checkpoint.
+    The last call to finish() has the semantics of committing the checkpoint.
 
 
     """
@@ -42,7 +42,7 @@ class StorageWriter(abc.ABC):
         in parallel.
 
         Returns:
-            Future to signal intialization is complete.
+            Future to signal initialization is complete.
         """
         pass
 
@@ -83,9 +83,9 @@ class StorageWriter(abc.ABC):
     @abc.abstractmethod
     def finish(self, metadata: Metadata) -> None:
         """
-        Writes the metadata and marks the current checkpoint as sucessfull.
+        Writes the metadata and marks the current checkpoint as successful.
 
-        This method is called once globally after all data was writen
+        This method is called once globally after all data was written
         and is used to write its metadata and commit the checkpoint.
 
         The `metadata` object includes a global view of the checkpoint
@@ -118,7 +118,7 @@ class StorageWriter(abc.ABC):
 
         Args:
             storage_writes (List[Union[TensorWriteRequest, BytesWriteRequest]]): A list of
-            all writes that will be submited.
+            all writes that will be submitted.
 
         Returns:
             None
