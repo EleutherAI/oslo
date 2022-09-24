@@ -10,9 +10,9 @@ from oslo.torch.nn.parallel.data_parallel.fsdp.fully_sharded_data_parallel impor
     LocalStateDictConfig,
 )
 from oslo.torch.nn.parallel.data_parallel.fsdp.fully_sharded_data_parallel import (
-    _FullyShardedDataParallel,
-)
-from oslo.torch.nn.parallel.data_parallel.fsdp.fully_sharded_data_parallel import (
     StateDictType,
     OptimStateKeyType,
+)
+from oslo.torch.nn.parallel.data_parallel.fsdp.fully_sharded_data_parallel import (
+    _FullyShardedDataParallel,
 )

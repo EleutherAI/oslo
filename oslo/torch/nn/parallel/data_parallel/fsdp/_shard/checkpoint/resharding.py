@@ -11,7 +11,6 @@ from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharded_tensor import (
 from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharding_spec._internals import (
     _check_shard_metadata_pair_overlap,
 )
-
 from .metadata import (
     BytesStorageMetadata,
     BytesWriteRequest,

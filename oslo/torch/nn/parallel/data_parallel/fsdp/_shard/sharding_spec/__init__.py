@@ -8,5 +8,3 @@ from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharding_spec.api import (
 from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharding_spec.chunk_sharding_spec import (
     ChunkShardingSpec,
 )
-
-from oslo.torch.nn.parallel.data_parallel.fsdp._shard.metadata import ShardMetadata

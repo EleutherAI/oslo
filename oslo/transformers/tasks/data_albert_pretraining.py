@@ -116,7 +116,7 @@ class DataCollatorForAlbertPretraining(
 
         if self.sequence_parallel_size > 1:
             sp_collate_fn = SequenceDataParallelCollator(
-                parallel_keys=ParallelKeys.ALBERT,
+                parallel_keys=ParallelKeys.ALBERT_PRETRAINING,
                 parallel_context=self.parallel_context,
             )
             return sp_collate_fn(**batch)

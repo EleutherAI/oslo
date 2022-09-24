@@ -139,7 +139,7 @@ class DataCollatorForBartPretraining(SequenceParallelMixin):
 
         if self.sequence_parallel_size > 1:
             sp_collate_fn = SequenceDataParallelCollator(
-                parallel_keys=ParallelKeys.BART,
+                parallel_keys=ParallelKeys.BART_PRETRAINING,
                 parallel_context=self.parallel_context,
             )
             return sp_collate_fn(**batch)
