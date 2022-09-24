@@ -8,9 +8,9 @@ def DataParallel(
     module,
     parallel_context: ParallelContext,
     zero_stage: int = 0,
+    cpu_offloading: bool = False,
 ):
     # TODO: Mingu Kang
-
     if zero_stage == 0:
         return DistributedDataParallel(module, parallel_context=parallel_context)
     elif zero_stage == 1:

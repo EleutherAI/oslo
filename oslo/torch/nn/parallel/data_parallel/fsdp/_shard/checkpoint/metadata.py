@@ -8,13 +8,14 @@ from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharded_tensor.api import 
     ShardedTensor,
     ShardedTensorMetadata,
 )
+from oslo.torch.nn.parallel.data_parallel.fsdp._shard.metadata import ShardMetadata
 
 TENSOR_TYPE = Union[torch.Tensor, ShardedTensor]
 
 
 @dataclass
 class ShardStorageMetadata:
-    shard_metadata: "ShardMetadata"
+    shard_metadata: ShardMetadata
     # storage key used for this particular Shard
     storage_key: str
     # Length in bytes for this shard

@@ -40,7 +40,7 @@ class FileSystemWriter(StorageWriter):
         Initialize the writer pointing to `path`
 
         Args:
-            path: diretory where the checkpoint will be writen to.
+            path: directory where the checkpoint will be written to.
         """
         super().__init__()
         self.path = Path(path)
@@ -117,8 +117,8 @@ class FileSystemReader(StorageReader):
 
             view_to_copy: Tensor = cast(Tensor, view_cached)
             # FileSystemWrite writes the tensor as is during save.
-            # During load time, we will load the Tensor (with it orignal view)
-            # narrow it along all dimemsions, and copy_ it to the
+            # During load time, we will load the Tensor (with it original view)
+            # narrow it along all dimensions, and copy_ it to the
             # target tensor, which will be the same size.
             for dim, (start, length) in enumerate(zip(req.offsets, req.lengths)):
                 view_to_copy = torch.narrow(view_to_copy, dim, start, length)
@@ -146,7 +146,7 @@ class FileSystemReader(StorageReader):
         fut.set_result(None)
         return fut
 
-    # Implementating the abstract function in StorageReader
+    # Implementation the abstract function in StorageReader
     def read_metadata(self) -> Metadata:
         with (self.path / ".metadata").open("rb") as metadata_file:
             return pickle.load(metadata_file)

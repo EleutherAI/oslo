@@ -1,5 +1,3 @@
-# coding=utf-8
-
 from typing import cast
 
 import torch
@@ -154,16 +152,15 @@ def _validate_embedding_param(args, kwargs):
     input = args[0]
     weight = args[1]
     max_norm = kwargs.get("max_norm")
-    norm_type = kwargs.get("norm_type")
     scale_grad_by_freq = kwargs.get("scale_grad_by_freq")
     sparse = kwargs.get("sparse")
-    padding_idx = kwargs.get("padding_idx")
 
     # Validate types
     if not isinstance(input, torch.Tensor):
         raise TypeError("input need to be torch.Tensor")
     if not isinstance(weight, ShardedTensor):
         raise TypeError("weight needs to be ShardedTensor")
+
     weight_size = cast(torch.Size, weight.size())
     if len(weight_size) != 2:
         raise ValueError("Weight needs to have exactly 2 dims")

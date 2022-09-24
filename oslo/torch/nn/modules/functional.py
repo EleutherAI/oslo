@@ -439,4 +439,3 @@ def fused_scale_mask_softmax(
         return _fused_scale_mask_softmax_cuda(input, scale, use_triang_mask, pad_mask)
     else:
         return _fused_scale_mask_softmax_torch(input, scale, softmax_in_fp32, pad_mask)
-

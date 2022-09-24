@@ -154,7 +154,7 @@ class _PartialTensor(torch.Tensor):
         2. Shard this tensor according to the provided spec.
 
         In reality, for the sake of performance, we consolidate all partial tensors
-        across multiple ranks and covert to a sharded tensor in one step.
+        across multiple ranks and cnovert to a sharded tensor in one step.
 
         Args:
             resharding_spec (:class:`torch.distributed._shard.sharding_spec.ShardingSpec`):

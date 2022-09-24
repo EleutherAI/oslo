@@ -99,7 +99,7 @@ def load_state_dict(
     Load a distributed state_dict in SPMD style.
 
     Each rank will try to read the least amount of data necessary
-    to fullfill the requested `state_dict`.
+    to fulfill the requested `state_dict`.
 
     When loading ShardedTensor instances, each rank only
     reads data for their local shards.
@@ -151,8 +151,6 @@ def load_state_dict(
         is the user's responsibility to ensure that this is set so that each rank
         has an individual GPU, via ``torch.cuda.set_device()``
     """
-    is_coordinator = no_dist or dist.get_rank(process_group) == coordinator_rank
-
     try:
         metadata = storage_reader.read_metadata()
         bytes_read_requests, tensor_read_requests = _reshard_and_prepare_read_request(
@@ -163,9 +161,9 @@ def load_state_dict(
 
         bytes_futures.wait()
 
-        # Addtional steps are required to convert the bytes to its original type
+        # Additional steps are required to convert the bytes to its original type
         # Note that this is NOT inplace,
-        # it creating a new object and replace what's in the state dict
+        # it's creating a new object and replace what's in the state dict
         for req in bytes_read_requests:
             # Ensure the BytesIO is rewound
             req.bytes.seek(0)

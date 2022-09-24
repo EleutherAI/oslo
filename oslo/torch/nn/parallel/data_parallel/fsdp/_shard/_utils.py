@@ -1,6 +1,7 @@
 import torch
 from oslo.torch.nn.parallel.data_parallel.fsdp._shard.metadata import ShardMetadata
 
+
 def narrow_tensor(tensor: torch.Tensor, metadata: ShardMetadata):
     """
     narrow the tensor according to the metadata
@@ -14,8 +15,6 @@ def narrow_tensor(tensor: torch.Tensor, metadata: ShardMetadata):
             # recording here for the narrow op and 'local_shard' should be a
             # leaf variable in the autograd graph.
             narrowed_tensor = narrowed_tensor.narrow(
-                idx,
-                shard_offsets[idx],
-                shard_sizes[idx]
+                idx, shard_offsets[idx], shard_sizes[idx]
             )
     return narrowed_tensor

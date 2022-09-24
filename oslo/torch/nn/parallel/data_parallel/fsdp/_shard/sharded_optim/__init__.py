@@ -2,7 +2,9 @@ from typing import Iterator, Tuple, Union
 
 import torch.nn as nn
 
-from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharded_tensor import ShardedTensor
+from oslo.torch.nn.parallel.data_parallel.fsdp._shard.sharded_tensor import (
+    ShardedTensor,
+)
 
 
 def named_params_with_sharded_tensor(
