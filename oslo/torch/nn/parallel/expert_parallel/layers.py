@@ -2,9 +2,9 @@ import math
 from typing import Callable, Dict, TYPE_CHECKING, Any, Optional, Tuple, Union, cast
 
 import torch
+import torch.distributed as dist
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.distributed as dist
 
 from torch import Tensor
 from torch.nn import Module, ModuleList
@@ -12,22 +12,21 @@ from torch.distributed import ProcessGroup
 
 from oslo.torch.distributed import ParallelMode
 from oslo.torch.distributed._seed.helper import seed
-
-from oslo.torch.nn.parallel.expert_parallel._context import ExpertParallelContext
+from oslo.torch.nn.parallel.expert_parallel.experts import Experts
 from oslo.torch.nn.parallel.expert_parallel._ops import AllToAll, EPDispatch, EPCombine
 from oslo.torch.nn.parallel.expert_parallel.utils import (
-    get_current_device,
-    cum_sum_d0_minus_one,
+    UniformNoiseSampler,
+    NormalNoiseSampler,
 )
-from oslo.torch.nn.parallel.expert_parallel.experts import Experts
 from oslo.torch.nn.parallel.expert_parallel.utils import (
     _ForceFP32Parameter,
     auto_cast_softmax,
 )
 from oslo.torch.nn.parallel.expert_parallel.utils import (
-    UniformNoiseSampler,
-    NormalNoiseSampler,
+    get_current_device,
+    cum_sum_d0_minus_one,
 )
+
 
 if TYPE_CHECKING:
     Base = Module[Tensor]

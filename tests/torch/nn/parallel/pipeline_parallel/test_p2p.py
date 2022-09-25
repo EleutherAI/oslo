@@ -1,6 +1,7 @@
+import torch.distributed as dist
+
 from oslo.torch.distributed import ParallelContext
 from oslo.torch.distributed.nn.functional import send, recv
-import torch.distributed as dist
 
 parallel_context = ParallelContext.from_torch(pipeline_parallel_size=2)
 

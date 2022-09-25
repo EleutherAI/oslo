@@ -3,8 +3,8 @@ from typing import Any
 import torch
 import torch.distributed as dist
 
-from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.distributed.parallel_context import ParallelContext
+from oslo.torch.distributed.parallel_mode import ParallelMode
 
 NoneType = type(None)
 

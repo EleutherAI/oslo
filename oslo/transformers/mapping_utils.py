@@ -1,17 +1,20 @@
 import importlib
 
-try:
-    import transformers
-except ImportError:
-    print("You have to install `transformers` to use `oslo.transformers` modules")
-
-import oslo
-from oslo.torch.nn.parallel.tensor_parallel import Column, Row, Update, Head
 from oslo.torch.nn.parallel.expert_parallel.mapping import Front, Behind
+from oslo.torch.nn.parallel.tensor_parallel import Column, Row, Update, Head
 
 
 class _ParallelMappingForHuggingFace(object):
     __MAPPING__ = {}
+
+    def __init__(self):
+        cache_mapping = {}
+        for cls_name, mapping in self.__MAPPING__.items():
+            cls = self._load_hf_class_by_name(cls_name)
+            if cls is not None:
+                cache_mapping[cls] = mapping
+
+        self.__MAPPING__ = cache_mapping
 
     @staticmethod
     def _load_hf_class_by_name(model_name):
@@ -55,6 +58,27 @@ class _ParallelMappingForHuggingFace(object):
         return mapping_by_model
 
 
+class _FullyShardedDataParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
+    __MAPPING__ = {
+        "Albert": ["AlbertLayer"],
+        "Bart": ["BartLayer"],
+        "Bert": ["BertLayer"],
+        "Blenderbot": ["BlenderbotEncoderLayer", "BlenderbotDecoderLayer"],
+        "BlenderbotSmall": [
+            "BlenderbotSmallEncoderLayer",
+            "BlenderbotSmallDecoderLayer",
+        ],
+        "T5": ["T5Block"],
+        "GPT2": ["GPT2Block"],
+        "GPTNeo": ["GPTNeoBlock"],
+        "GPTNeoX": ["GPTNeoXLayer"],
+        "GPTJ": ["GPTJBlock"],
+        "OPT": ["OPTDecoderLayer"],
+        "Electra": ["ElectraLayer"],
+        "Roberta": ["RobertaLayer"],
+    }
+
+
 class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
     __MAPPING__ = {
         "Albert": [
@@ -72,6 +96,7 @@ class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
                 "sop_classifier.classifier",
                 "classifier",
                 "qa_outputs",
+                gather_output=True,
             ),
         ],
         "Bart": [
@@ -79,14 +104,26 @@ class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
             Column("classification_head.dense", gather_output=True),
             Row("out_proj", "fc2"),
             Update("embed_dim", "num_heads"),
-            Head("lm_head", "classification_head.out_proj", "qa_outputs"),
+            Head(
+                "lm_head",
+                "classification_head.out_proj",
+                "qa_outputs",
+                gather_output=True,
+            ),
         ],
         "Bert": [
             Column("query", "key", "value", "intermediate.dense"),
             Column("pooler.dense", gather_output=True),
             Row("output.dense"),
             Update("num_attention_heads", "all_head_size"),
-            Head("decoder", "seq_relationship", "classifier", "qa_outputs"),
+            Head("transform.dense", gather_output=False),
+            Head(
+                "decoder",
+                "seq_relationship",
+                "classifier",
+                "qa_outputs",
+                gather_output=True,
+            ),
         ],
         "Blenderbot": [
             Column("q_proj", "k_proj", "v_proj", "fc1"),
@@ -111,18 +148,31 @@ class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
             Column("c_fc", "q_attn", reversed=True),
             Row("c_proj", reversed=True),
             Update("embed_dim", "split_size", "num_heads"),
-            Head("lm_head", "score", "classifier", "summary"),
+            Head("lm_head", "score", "classifier", "summary", gather_output=True),
         ],
         "GPTNeo": [
             Column("q_proj", "k_proj", "v_proj", "c_fc"),
             Row("out_proj", "c_proj"),
             Update("embed_dim", "num_heads"),
-            Head("lm_head", "score", "qa_outputs"),
+            Head("lm_head", "score", "qa_outputs", gather_output=True),
+        ],
+        "GPTNeoX": [
+            Column("query_key_value", combined_qkv=True),
+            Column("dense_h_to_4h"),
+            Row("dense", "dense_4h_to_h"),
+            Update("hidden_size", "num_attention_heads"),
+            Head("embed_out", gather_output=True),
         ],
         "GPTJ": [
             Column("q_proj", "k_proj", "v_proj", "fc_in"),
             Row("out_proj", "fc_out"),
             Update("embed_dim", "num_attention_heads"),
+            Head("lm_head", "score", gather_output=True),
+        ],
+        "OPT": [
+            Column("q_proj", "k_proj", "v_proj", "fc1"),
+            Row("out_proj", "fc2"),
+            Update("embed_dim", "num_heads"),
             Head("lm_head", "score"),
         ],
         "Electra": [
@@ -130,8 +180,8 @@ class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
             Column(
                 "electra.embeddings_project",
                 "classifier.dense",
-                "discriminator_predictions.dense",
                 "generator_predictions.dense",
+                "discriminator_predictions.dense",
                 gather_output=True,
             ),
             Row("output.dense"),
@@ -143,6 +193,7 @@ class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
                 "classifier",
                 "qa_outputs",
                 "summary",
+                gather_output=True,
             ),
         ],
         "Roberta": [
@@ -155,18 +206,16 @@ class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
             ),
             Row("output.dense"),
             Update("num_attention_heads", "all_head_size"),
-            Head("lm_head.decoder", "classifier.out_proj", "classifier", "qa_outputs"),
+            Head("lm_head.dense"),
+            Head(
+                "lm_head.decoder",
+                "classifier.out_proj",
+                "classifier",
+                "qa_outputs",
+                gather_output=True,
+            ),
         ],
     }
-
-    def __init__(self):
-        cache_mapping = {}
-        for cls_name, mapping in self.__MAPPING__.items():
-            cls = self._load_hf_class_by_name(cls_name)
-            if cls is not None:
-                cache_mapping[cls] = mapping
-
-        self.__MAPPING__ = cache_mapping
 
 
 class _ExpertParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
@@ -250,21 +299,3 @@ class _ExpertParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
             Behind("output.dense", layer="layer", enc_name="encoder"),
         ],
     }
-
-    def __init__(self):
-        cache_mapping = {}
-        for cls_name, mapping in self.__MAPPING__.items():
-            cls = self._load_hf_class_by_name(cls_name)
-            if cls is not None:
-                cache_mapping[cls] = mapping
-
-        self.__MAPPING__ = cache_mapping
-
-
-HF_TO_OSLO = {
-    transformers.GPT2Model: oslo.transformers.GPT2Model,
-    transformers.GPT2LMHeadModel: oslo.transformers.GPT2LMHeadModel,
-    transformers.GPT2DoubleHeadsModel: oslo.transformers.GPT2DoubleHeadModel,
-    transformers.GPT2ForSequenceClassification: oslo.transformers.GPT2ForSequenceClassification,
-    transformers.GPT2ForTokenClassification: oslo.transformers.GPT2ForTokenClassification,
-}

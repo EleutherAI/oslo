@@ -1,5 +1,6 @@
-from oslo.torch.nn import FusedScaleMaskSoftmax
 import torch
+
+from oslo.torch.nn import FusedScaleMaskSoftmax
 
 fused_softmax = FusedScaleMaskSoftmax(
     scale=1.0, use_triang_mask=False, softmax_in_fp32=False

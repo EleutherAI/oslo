@@ -1,11 +1,20 @@
+import logging
 import random
-import torch
-import numpy as np
-from typing import Any, Dict, List, Optional
 import warnings
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import torch
 from datasets.arrow_dataset import Batch
-from oslo.transformers.tasks.data_base import BaseProcessor
-from oslo.torch.distributed import ParallelContext, ParallelMode
+
+from oslo.torch.distributed import ParallelContext
+from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
+from oslo.transformers.tasks.data_base import (
+    BaseProcessor,
+    ParallelKeys,
+    pad_labels,
+    SequenceParallelMixin,
+)
 
 try:
     from transformers import (
@@ -14,6 +23,8 @@ try:
     )
 except ImportError:
     print("You have to install `transformers` to use `oslo.transformers` modules")
+
+logging.captureWarnings(True)
 
 
 class ProcessorForBartPretraining(BaseProcessor):
@@ -61,7 +72,7 @@ class ProcessorForBartPretraining(BaseProcessor):
         return dict_of_training_examples
 
 
-class DataCollatorForBartPretraining:
+class DataCollatorForBartPretraining(SequenceParallelMixin):
     """
     Processing training examples to mini-batch for Bart (text_infilling, sentence_permutation).
     """
@@ -71,74 +82,67 @@ class DataCollatorForBartPretraining:
         processor: ProcessorForBartPretraining,
         mlm_probability: float = 0.15,
         possion_lambda: float = 3.0,
-        pad_to_multiple_of: Optional[int] = None,
+        permute_sentence: bool = True,
+        label_pad_token_id: int = -100,
+        decoder_start_token_id: Optional[int] = None,
         parallel_context: Optional[ParallelContext] = None,
     ):
+        if mlm_probability >= 1.0:
+            warnings.warn("MLM Probability is greater than 1.0")
+
+        assert isinstance(
+            processor, ProcessorForBartPretraining
+        ), "DataCollatorForBartPretraining is only suitable for ProcessorForBartPretraining."
+
         self.tokenizer = processor._tokenizer
         self.mlm_probability = mlm_probability
         self.possion_lambda = possion_lambda
-        self.pad_to_multiple_of = pad_to_multiple_of
+        self.permute_sentence = permute_sentence
         self.pad_token_id = self.tokenizer.pad_token_id
         self.mask_token_id = processor._tokenizer.mask_token_id
-        self.parallel_context = parallel_context
+        self.label_pad_token_id = label_pad_token_id
+        self.decoder_start_token_id = (
+            decoder_start_token_id
+            if decoder_start_token_id
+            else self.tokenizer.eos_token_id
+        )
+        self.sequence_parallel_size = 1
         if parallel_context is not None:
-            self.local_rank = parallel_context.get_local_rank(ParallelMode.SEQUENCE)
-            self.local_world_size = parallel_context.get_world_size(
-                ParallelMode.SEQUENCE
-            )
+            self._set_parallel_context(parallel_context)
+
+        self.get_start_indices = {
+            max_idx: np.random.choice(max_idx, size=(max_idx,), replace=False)
+            for max_idx in range(processor._chunk_size, 0, -1)
+        }
 
     def __call__(self, examples: List[Dict[str, Any]]) -> Dict[str, Any]:
         examples = self._prepare_noise_text_from_examples(examples)
 
-        if self.parallel_context is None:
-            batch = self.tokenizer.pad(
-                examples,
-                return_tensors="pt",
-                pad_to_multiple_of=self.pad_to_multiple_of,
-            )
-            if self.pad_to_multiple_of:
-                batch_size, label_seq_length = batch["labels"].size()
-                if label_seq_length % self.pad_to_multiple_of != 0:
-                    label_required_length = (
-                        (label_seq_length // self.pad_to_multiple_of) + 1
-                    ) * self.pad_to_multiple_of
+        batch = self.tokenizer.pad(
+            examples,
+            return_attention_mask=True,
+            return_tensors="pt",
+            pad_to_multiple_of=self.sequence_parallel_size
+            if self.sequence_parallel_size > 1
+            else None,
+        )
 
-                    difference = label_required_length - label_seq_length
-                    label_pads = torch.full(
-                        (batch_size, difference),
-                        fill_value=self.pad_token_id,
-                        dtype=batch["labels"].dtype,
-                    )
-                    batch["labels"] = torch.cat([batch["labels"], label_pads], axis=1)
-        else:
-            batch = self.tokenizer.pad(
-                examples, return_tensors="pt", pad_to_multiple_of=self.local_world_size
+        if self.sequence_parallel_size > 1:
+            batch["labels"] = pad_labels(
+                [example["labels"] for example in examples],
+                self.tokenizer,
+                self.label_pad_token_id,
+                pad_to_multiple_of=self.sequence_parallel_size,
             )
 
-            batch_size, label_seq_length = batch["labels"].size()
-            if label_seq_length % self.local_world_size != 0:
-                label_required_length = (
-                    (label_seq_length // self.local_world_size) + 1
-                ) * self.local_world_size
+        batch = self._prepare_decoder_inputs_from_labels(batch)
 
-                difference = label_required_length - label_seq_length
-                label_pads = torch.full(
-                    (batch_size, difference),
-                    fill_value=self.pad_token_id,
-                    dtype=batch["labels"].dtype,
-                )
-                batch["labels"] = torch.cat([batch["labels"], label_pads], axis=1)
-
-            for key, value in batch.items():
-                value = value.chunk(
-                    self.local_world_size,
-                    dim=1,
-                )[self.local_rank]
-
-                if not value.is_contiguous():
-                    value = value.contiguous()
-
-                batch[key] = value
+        if self.sequence_parallel_size > 1:
+            sp_collate_fn = SequenceDataParallelCollator(
+                parallel_keys=ParallelKeys.BART_PRETRAINING,
+                parallel_context=self.parallel_context,
+            )
+            return sp_collate_fn(**batch)
 
         return batch
 
@@ -150,8 +154,9 @@ class DataCollatorForBartPretraining:
             chunk_ids = example["input_ids"]
             labels = chunk_ids[:]
 
-            chunk_ids = self.text_infilling(chunk_ids)
-            chunk_ids = self.sentence_permutation(chunk_ids)
+            chunk_ids = self._text_infilling(chunk_ids)
+            if self.permute_sentence:
+                chunk_ids = self._sentence_permutation(chunk_ids)
 
             chunk_ids = self.tokenizer.build_inputs_with_special_tokens(chunk_ids)
             labels = self.tokenizer.build_inputs_with_special_tokens(labels)[1:]
@@ -165,7 +170,7 @@ class DataCollatorForBartPretraining:
 
         return output_examples
 
-    def text_infilling(self, input_ids: list):
+    def _text_infilling(self, input_ids: List[int]) -> List[int]:
         length = len(input_ids)
         num_noise_tokens = int(np.round(length * self.mlm_probability))
 
@@ -178,6 +183,7 @@ class DataCollatorForBartPretraining:
 
             difference = sum(segment_lengths) - num_noise_tokens
             segment_lengths[-1] = segment_lengths[-1] - difference
+            segment_lengths.sort(reverse=True)
             return segment_lengths
 
         temp_ids = input_ids
@@ -187,23 +193,29 @@ class DataCollatorForBartPretraining:
 
             for noise_span_length in noise_span_lengths:
                 max_idx = len(temp_ids) - noise_span_length + 1
-                start_idx = np.random.choice(max_idx)
-                while (
-                    self.mask_token_id
-                    in temp_ids[start_idx : start_idx + noise_span_length]
-                ):
-                    start_idx = np.random.choice(max_idx)
-                temp_ids = (
-                    temp_ids[:start_idx]
-                    + [self.mask_token_id]
-                    + temp_ids[start_idx + noise_span_length :]
-                )
+                # get start index of mask span
+                start_indices = self.get_start_indices[max_idx]
+                for start_idx in start_indices:
+                    if (
+                        self.mask_token_id
+                        in temp_ids[start_idx : start_idx + noise_span_length]
+                    ):
+                        continue
+                    else:
+                        temp_ids = (
+                            temp_ids[:start_idx]
+                            + [self.mask_token_id]
+                            + temp_ids[start_idx + noise_span_length :]
+                        )
+                        # rotate start indices
+                        self.get_start_indices[max_idx] = np.roll(start_indices, 1)
+                        break
 
         input_ids = temp_ids
 
         return input_ids
 
-    def sentence_permutation(self, input_ids):
+    def _sentence_permutation(self, input_ids: List[int]) -> List[int]:
         ref_tokens = self.tokenizer.convert_ids_to_tokens(input_ids)
 
         split_sentences = []
@@ -226,3 +238,22 @@ class DataCollatorForBartPretraining:
                 input_ids.extend(split_sentence)
 
         return input_ids
+
+    def _prepare_decoder_inputs_from_labels(self, batch):
+        # Shift input ids one token to the right
+        shifted_input_ids = batch["labels"].new_zeros(batch["labels"].shape)
+        shifted_input_ids[:, 1:] = batch["labels"][:, :-1].clone()
+        shifted_input_ids[:, 0] = self.decoder_start_token_id
+
+        shifted_input_ids.masked_fill_(
+            shifted_input_ids == self.label_pad_token_id,
+            self.pad_token_id,
+        )
+
+        batch["decoder_input_ids"] = shifted_input_ids
+        batch["decoder_attention_mask"] = torch.where(
+            shifted_input_ids == self.pad_token_id,
+            0,
+            torch.ones_like(shifted_input_ids),
+        )
+        return batch

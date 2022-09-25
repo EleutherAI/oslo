@@ -1,5 +1,4 @@
 import time
-from typing import Any, Dict
 
 import psutil
 import torch
@@ -7,10 +6,7 @@ import torch.distributed as dist
 from anytree import Node
 
 from oslo.torch.nn.parallel.pipeline_parallel._utils import dfs
-from oslo.torch.nn.parallel.utils import (
-    get_parameter_dtype,
-    is_huggingface_model,
-)
+from oslo.torch.nn.parallel.utils import get_parameter_dtype
 
 
 class PartitioningCostEstimator(object):
@@ -20,7 +16,6 @@ class PartitioningCostEstimator(object):
     Args:
         root_node (Node): Root node of model
         alpha (float): memory computation balance factor
-        tracing_inputs (Dict[str, Any]): tracing input dictionary, will be input as **kwargs to model.
 
     Notes:
         1. computation cost: supports only the cpu time estimating in this version.
@@ -31,15 +26,9 @@ class PartitioningCostEstimator(object):
         https://arxiv.org/abs/2111.05972
     """
 
-    def __init__(
-        self,
-        root_node: Node,
-        alpha: float,
-        tracing_inputs: Dict[str, Any],
-    ):
+    def __init__(self, root_node: Node, alpha: float):
         self.root_node = root_node
         self.model = self.root_node.modules[0]
-        self.tracing_inputs = tracing_inputs
         self.alpha = alpha
         self.node_order = 0
         self.hooks = []
@@ -53,12 +42,7 @@ class PartitioningCostEstimator(object):
                 )
                 self.use_computation_cost = False
             else:
-                if tracing_inputs is None and not is_huggingface_model(self.model):
-                    raise ValueError(
-                        "`tracing_inputs` must not be None "
-                        "if the model is not Hugging Face Transformers model"
-                    )
-                self._trace_computation_cost(tracing_inputs)
+                self._trace_computation_cost()
 
     @staticmethod
     def _is_available_tracing(module):
@@ -86,12 +70,11 @@ class PartitioningCostEstimator(object):
 
         return {"pre_hook": pre_hook, "post_hook": post_hook}
 
-    def _trace_computation_cost(self, tracing_inputs):
+    def _trace_computation_cost(self):
         # 1. tracing the model
         with torch.no_grad():
-            if tracing_inputs is None:
-                tracing_inputs = self.model.dummy_inputs
-                tracing_inputs["use_cache"] = False
+            tracing_inputs = self.model.dummy_inputs
+            tracing_inputs["use_cache"] = False
 
             for node in dfs(self.root_node):
                 self.hooks.append(self._add_computation_cost_hooks(node))
@@ -111,7 +94,8 @@ class PartitioningCostEstimator(object):
             # 2. compute computation cost if available
             computation_cost = (
                 node.computation_cost if hasattr(node, "computation_cost") else 0.0
-            ) * 1000  # milliseconds (It is set arbitrarily because it is not mentioned in the paper.)
+            ) * 1000
+            # milliseconds (It is set arbitrarily because it is not mentioned in the paper.)
 
             # 3. compute total cost
             total_cost = (self.alpha * memory_cost) + (

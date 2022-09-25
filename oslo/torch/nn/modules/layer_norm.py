@@ -1,17 +1,16 @@
-from typing import Optional
 import numbers
+from typing import Optional
 
 import torch
-import torch.nn as nn
 import torch.distributed as dist
+import torch.nn as nn
 from torch import Tensor
-from torch.nn import init
 from torch.nn import Parameter
 from torch.nn import functional as F
-
-from oslo.torch.distributed import ParallelContext, ParallelMode
+from torch.nn import init
 
 from oslo.torch import nn as onn
+from oslo.torch.distributed import ParallelContext, ParallelMode
 
 
 # Reference implementation from Huggingface
@@ -81,6 +80,8 @@ class LayerNorm1D(LayerNorm):
         parallel_context: Optional[ParallelContext] = None,
     ):
         self.parallel_context = parallel_context
+        self.memory_priority = False
+
         super().__init__(
             normalized_shape=normalized_shape,
             partitioned_dim=normalized_shape,
@@ -88,6 +89,29 @@ class LayerNorm1D(LayerNorm):
             bias=bias,
             dtype=dtype,
         )
+
+    def forward(self, input: Tensor) -> Tensor:
+        from oslo.torch.nn.parallel.tensor_parallel._parallel_1d._ops import (
+            broadcast_tensor_1d,
+        )
+
+        weight = (
+            broadcast_tensor_1d(self.weight, parallel_context=self.parallel_context)
+            if self.memory_priority
+            else self.weight
+        )
+        bias = (
+            broadcast_tensor_1d(self.bias, parallel_context=self.parallel_context)
+            if self.memory_priority and self.bias is not None
+            else self.bias
+        )
+        normalized_shape = (
+            (self.normalized_shape,)
+            if isinstance(self.normalized_shape, int)
+            else self.normalized_shape
+        )
+        output = F.layer_norm(input, normalized_shape, weight, bias, self.eps)
+        return output
 
 
 class LayerNorm2D(LayerNorm):
@@ -105,7 +129,7 @@ class LayerNorm2D(LayerNorm):
         )
         assert (
             normalized_shape % (self.summa_dim**2) == 0
-        ), "normalized_shape must be divisible by summa dim^2."
+        ), "normalized_shape must be divisible by summa_dim^2 for LayerNorm2D."
 
         super().__init__(
             normalized_shape=normalized_shape,
@@ -153,7 +177,7 @@ class LayerNorm2D(LayerNorm):
             Var_i = Var_i - E_i * E_i
             Var_i = 1.0 / torch.sqrt(Var_i + self.eps)
 
-        output = layernorm_2d(
+        outputs = layernorm_2d(
             input,
             E_i,
             Var_i,
@@ -193,10 +217,10 @@ class LayerNorm2D(LayerNorm):
                 ParallelMode.TENSOR_2D_ROW,
                 ParallelMode.TENSOR_2D_COL,
             )
-            output = torch.addcmul(bias, scale, output)
+            outputs = torch.addcmul(bias, scale, outputs)
         else:
-            output = torch.mul(scale, output)
-        return output
+            outputs = torch.mul(scale, outputs)
+        return outputs
 
 
 class LayerNorm2p5D(LayerNorm):
@@ -214,7 +238,7 @@ class LayerNorm2p5D(LayerNorm):
         )
         assert (
             normalized_shape % self.tesseract_dim == 0
-        ), "normalized_shape must be divisible by tessract dim."
+        ), "normalized_shape must be divisible by tesseract_dim for LayerNorm2p5D."
 
         super().__init__(
             normalized_shape=normalized_shape,
@@ -272,7 +296,7 @@ class LayerNorm2p5D(LayerNorm):
             # this time 1/sqrt(Var_x + epsilon)
             Var_x = 1.0 / torch.sqrt(Var_x + self.eps)
 
-        output = layernorm_2p5d(
+        outputs = layernorm_2p5d(
             input,
             E_x,
             Var_x,
@@ -313,10 +337,10 @@ class LayerNorm2p5D(LayerNorm):
                 self.parallel_context,
                 ParallelMode.TENSOR_2P5D_COL,
             )
-            output = torch.addcmul(bias, scale, output)
+            outputs = torch.addcmul(bias, scale, outputs)
         else:
-            output = torch.mul(scale, output)
-        return output
+            outputs = torch.mul(scale, outputs)
+        return outputs
 
 
 class LayerNorm3D(LayerNorm):
@@ -328,13 +352,11 @@ class LayerNorm3D(LayerNorm):
         dtype: Optional[torch.dtype] = None,
         parallel_context: Optional[ParallelContext] = None,
     ):
-
-        super().__init__()
         self.parallel_context = parallel_context
         self.cubic_dim = parallel_context.get_world_size(ParallelMode.TENSOR_3D_INPUT)
         assert (
             normalized_shape % self.cubic_dim == 0
-        ), "normalized_shape must be divisible by cubic dim."
+        ), "normalized_shape must be divisible by cubic_dim for LayerNorm3D."
 
         super().__init__(
             normalized_shape=normalized_shape,
@@ -344,26 +366,23 @@ class LayerNorm3D(LayerNorm):
             dtype=dtype,
         )
 
-        self.input_parallel_mode = ParallelMode.TENSOR_3D_INPUT
-        self.weight_parallel_mode = ParallelMode.TENSOR_3D_WEIGHT
-        self.output_parallel_mode = ParallelMode.TENSOR_3D_OUTPUT
-
     def forward(self, input: Tensor) -> Tensor:
         from oslo.torch.nn.parallel.tensor_parallel._parallel_3d._ops import (
             layernorm_3d,
         )
 
-        return layernorm_3d(
+        outputs = layernorm_3d(
             input,
             self.weight,
             self.bias,
             self.normalized_shape,
             self.eps,
-            self.parallel_context,
-            self.input_parallel_mode,
-            self.weight_parallel_mode,
-            self.output_parallel_mode,
+            parallel_context=self.parallel_context,
+            input_parallel_mode=ParallelMode.TENSOR_3D_INPUT,
+            weight_parallel_mode=ParallelMode.TENSOR_3D_WEIGHT,
+            output_parallel_mode=ParallelMode.TENSOR_3D_OUTPUT,
         )
+        return outputs
 
 
 class FusedLayerNorm(nn.Module):

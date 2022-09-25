@@ -1,6 +1,3 @@
-import torch
-
-
 class MultiTensorApply(object):
     def __init__(self, chunk_size):
         self.chunk_size = chunk_size

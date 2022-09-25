@@ -1,20 +1,11 @@
-import torch
-import torch.distributed as dist
-
-from torch import Tensor
 from typing import Any, Tuple, Optional
 
+import torch
+import torch.distributed as dist
+from torch import Tensor
 from torch.distributed import ProcessGroup
-from oslo.torch._C import ExpertParallelBinder
 
-OSLO_EP_KERNEL_FLAG = False
-try:
-    oslo_expert_parallel_cuda = ExpertParallelBinder().bind()
-    OSLO_EP_KERNEL_FLAG = True
-except ImportError:
-    print(
-        "If you want to activate cuda kernel for Expert Parallel, Please install with cuda_extension."
-    )
+from oslo.torch._C import get_expert_parallel_kernel
 
 
 class AllToAll(torch.autograd.Function):
@@ -42,7 +33,7 @@ class EPDispatch(torch.autograd.Function):
         s = tokens.size(0)
         h = tokens.size(1)
 
-        expert_input = oslo_expert_parallel_cuda.dispatch_forward(
+        expert_input = get_expert_parallel_kernel().dispatch_forward(
             s, ec, h, tokens, mask, dest_idx
         )
         context.save_for_backward(mask, dest_idx)
@@ -53,7 +44,7 @@ class EPDispatch(torch.autograd.Function):
     @staticmethod
     def backward(context, output_grad):
         mask, dest_idx = context.saved_tensors
-        d_tokens = oslo_expert_parallel_cuda.dispatch_forward(
+        d_tokens = get_expert_parallel_kernel().dispatch_forward(
             context.s, context.ec, context.h, output_grad, mask, dest_idx
         )
 
@@ -72,7 +63,7 @@ class EPCombine(torch.autograd.Function):
 
         fp16_flag = expert_tokens.dtype == torch.float16
         combine_inp = expert_tokens.to(torch.float32) if fp16_flag else expert_tokens
-        ctokens = oslo_expert_parallel_cuda.combine_forward(
+        ctokens = get_expert_parallel_kernel().combine_forward(
             s, e, c, h, combine_inp, logits, mask, dest_idx
         )
         output = ctokens.to(torch.float16) if fp16_flag else ctokens
@@ -96,7 +87,7 @@ class EPCombine(torch.autograd.Function):
         combine_inp = (
             expert_tokens.to(torch.float32) if context.fp16_flag else expert_tokens
         )
-        d_expert, d_logits = oslo_expert_parallel_cuda.combine_backward(
+        d_expert, d_logits = get_expert_parallel_kernel().combine_backward(
             context.s,
             context.e,
             context.s,
