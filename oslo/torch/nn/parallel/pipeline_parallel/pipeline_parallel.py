@@ -1,7 +1,6 @@
 import concurrent.futures
 import time
 from threading import Lock
-from typing import Dict, Any
 
 import torch
 import torch.nn as nn
@@ -38,7 +37,6 @@ def PipelineParallel(
     module: nn.Module,
     parallel_context: ParallelContext,
     memory_computation_balance: float = 1.0,
-    tracing_inputs: Dict[str, Any] = None,
     num_micro_batches: int = 1,
 ):
     # TODO, @HG

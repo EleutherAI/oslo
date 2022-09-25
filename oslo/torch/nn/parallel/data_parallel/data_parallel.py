@@ -1,7 +1,8 @@
-from oslo import ParallelContext
 from oslo.torch.nn.parallel.data_parallel.ddp.distributed_data_parallel import (
     DistributedDataParallel,
 )
+
+from oslo import ParallelContext
 
 
 def DataParallel(
