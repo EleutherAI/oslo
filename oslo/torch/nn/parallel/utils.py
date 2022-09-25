@@ -1,8 +1,8 @@
+from collections import OrderedDict
 from typing import Tuple, List
 
 import torch
 import torch.nn as nn
-
 from oslo.torch.distributed import ParallelContext
 from oslo.transformers.modeling_utils import OsloModel
 
@@ -46,8 +46,8 @@ def allocate_params(model: nn.Module, parallel_context: ParallelContext):
     for name, parameter in model.named_parameters():
         if hasattr(parameter, "oslo_parallel"):
             # sorting parallel groups to fix parallelization order
-            parameter.oslo_parallel = dict(
-                sorted(parameter.oslo_parallel, key=lambda x: x[0])
+            parameter.oslo_parallel = OrderedDict(
+                sorted(parameter.oslo_parallel.items())
             )
             device = parallel_context.ranks2device(parameter.oslo_parallel)
             if device is not None:
@@ -60,9 +60,7 @@ def allocate_params(model: nn.Module, parallel_context: ParallelContext):
     for name, buffer in model.named_buffers():
         if hasattr(buffer, "oslo_parallel"):
             # sorting parallel groups to fix parallelization order
-            buffer.oslo_parallel = dict(
-                sorted(buffer.oslo_parallel, key=lambda x: x[0])
-            )
+            buffer.oslo_parallel = OrderedDict(sorted(buffer.oslo_parallel.items()))
             device = parallel_context.ranks2device(buffer.oslo_parallel)
             if device is not None:
                 buffer.data = buffer.to(
