@@ -1,17 +1,14 @@
+import os
 import random
 from functools import partial
-import os
 
 import numpy as np
-
 import torch
 import torch.multiprocessing as mp
-
 from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel
 
-from oslo.torch.nn.parallel.expert_parallel.expert_parallel import ExpertParallel
-
-from oslo.torch.distributed import ParallelContext, ParallelMode
+from oslo.torch.distributed import ParallelContext
+from oslo.torch.nn.parallel.expert_parallel.expert_parallel import _ExpertParallel
 
 torch.set_printoptions(threshold=10_000)
 
@@ -46,7 +43,7 @@ def run_test(rank, port):
     model_ep = GPT2LMHeadModel(GPT2Config.from_pretrained("gpt2"))
 
     # 5. Wrap Model
-    wrapper_ep = ExpertParallel(
+    wrapper_ep = _ExpertParallel(
         model_ep,
         parallel_context,
         num_experts=num_experts,
@@ -70,8 +67,6 @@ def run_test(rank, port):
                 f"Worker #{rank} - param_name : {param_name}, param_size : {module.size()}"
             )
             print(f"Worker #{rank} - param  : {module}")
-
-    return
 
 
 def test_expert_parallel_block():

@@ -1,6 +1,7 @@
 from typing import Optional
+
 from torch.utils.data import DataLoader
-import torch
+from tqdm.auto import tqdm
 
 
 class TestDataBinarization:
@@ -26,9 +27,7 @@ class TestDataBinarization:
             for key, value in batch.items():
                 if key == "input_ids":
                     print(f"input_ids decode: \n{self.tokenizer.decode(value[idx])}\n")
-                elif key == "labels" and value.dim() != 1:
-                    if torch.any(value[idx] < 0):
-                        continue
+                elif key == "labels" and value.dim() != 1 and (-100 not in value[idx]):
                     print(f"labels decode: \n{self.tokenizer.decode(value[idx])}\n")
 
             if check_token:
@@ -41,10 +40,10 @@ class TestDataBinarization:
         dataloader,
         key,
         max_length,
-        pad_to_multiple_of: Optional[int],
+        pad_to_multiple_of: Optional[int] = None,
         must_be_equal_to_max_length: bool = False,
     ):
-        for batch in dataloader:
+        for batch in tqdm(dataloader):
             seq_length = batch[key].size(1)
             if must_be_equal_to_max_length:
                 if pad_to_multiple_of is None:
@@ -101,9 +100,10 @@ class TestDataBinarization:
             seq_length = batch["input_ids"].size(1)
             sq_seq_length = sp_batch["input_ids"].size(1)
 
-            sp_desired_length = (seq_length // local_world_size) + 1
-            assert (
-                sp_desired_length == sq_seq_length
-            ), f"Required length for SP({sp_desired_length} doesn't equal to SP sequence length({sq_seq_length}))"
+            if seq_length % sq_seq_length:
+                sp_desired_length = (seq_length // local_world_size) + 1
+                assert (
+                    sp_desired_length == sq_seq_length
+                ), f"Required length for SP({sp_desired_length}) doesn't equal to SP sequence length({sq_seq_length})"
 
         print("---- SP collator test pass ----\n")

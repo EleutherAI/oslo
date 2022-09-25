@@ -15,7 +15,6 @@ setup(
     name="oslo-core",
     description="OSLO: Open Source framework for Large-scale transformer Optimization",
     version=VERSION["version"],
-    long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/tunib-ai/oslo",
     author="TUNiB OSLO Team",

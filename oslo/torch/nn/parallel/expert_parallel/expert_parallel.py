@@ -3,31 +3,29 @@ import math
 from typing import Union
 
 import torch
-import torch.nn as nn
-
 import torch.distributed as dist
+import torch.nn as nn
 
 from oslo.torch.distributed import ParallelMode
 
+from oslo.torch.distributed._seed.helper import seed
 from oslo.torch.distributed.parallel_context import ParallelContext
-from oslo.torch.nn.parallel.utils import ParallelWrapper
-from oslo.torch.nn.parallel.utils import is_huggingface_model, _update_module_arguments
-
+from oslo.torch.nn.parallel.expert_parallel._context import ExpertParallelContext
+from oslo.torch.nn.parallel.expert_parallel.experts import Experts
+from oslo.torch.nn.parallel.expert_parallel.layers import ExpertParallelBehindBlock
+from oslo.torch.nn.parallel.expert_parallel.layers import ExpertParallelFrontBlock
+from oslo.torch.nn.parallel.expert_parallel.layers import TopKGate
+from oslo.torch.nn.parallel.expert_parallel._ops import OSLO_EP_KERNEL_FLAG, AllReduce
+from oslo.torch.nn.parallel.expert_parallel.mapping import ExpertParallelMapping
+from oslo.torch.nn.parallel.expert_parallel.utils import (
+    UniformNoiseSampler,
+    NormalNoiseSampler,
+)
+from oslo.torch.nn.parallel.utils import _update_module_arguments
 from oslo.transformers.mapping_utils import _ExpertParallelMappingForHuggingFace
 
-from oslo.torch.nn.parallel.expert_parallel.mapping import ExpertParallelMapping
 
-from oslo.torch.nn.parallel.expert_parallel.experts import Experts
-from oslo.torch.nn.parallel.expert_parallel.layers import (
-    ExpertParallelFrontBlock,
-    ExpertParallelBehindBlock,
-    TopKGate,
-)
-
-from oslo.torch.nn.parallel.expert_parallel._ops import OSLO_EP_KERNEL_FLAG, AllReduce
-
-
-class ExpertParallel(ParallelWrapper):
+class _ExpertParallel(nn.Module):
     """
     A class to wrap the given model for expert parallelization
 
@@ -45,7 +43,6 @@ class ExpertParallel(ParallelWrapper):
         drop_tks: flag to drop tokens in the case that the number of dispatched tokens is larger than capacity
         use_residual: flag to use residual network proposed by
                       DeepSpeed-MoE: Advancing Mixture-of-Experts Inference and Training to Power Next-Generation AI Scale
-        mapping: mapping for each module to expert-parallelize
 
     Notes:
         1. Similar design with `torch.nn.parallel.DistributedDataParallel`
@@ -54,7 +51,7 @@ class ExpertParallel(ParallelWrapper):
     Examples:
         >>> from oslo.torch.nn.parallel.expert_parallel.expert_parallel import ExpertParallel
 
-        >>> model = AnyTransformerModel()
+        >>> model = TransformersModel()
         >>> ep_wrapper = ExpertParallel(model, parallel_context=..., ...)
         >>> optimizer = AnyOptimizer(ep_wrapper.parameters(), lr=3e-5)
 
@@ -79,15 +76,11 @@ class ExpertParallel(ParallelWrapper):
         use_rts: bool = True,
         drop_tokens: bool = True,
         use_residual: bool = None,
-        mapping: object = None,
     ):
         super().__init__()
 
         self.model = model
-
-        use_kernel_optim = OSLO_EP_KERNEL_FLAG and use_kernel_optim
         self.parallel_context = parallel_context
-
         self.device = torch.cuda.current_device()
 
         self.use_residual = use_residual
@@ -105,16 +98,8 @@ class ExpertParallel(ParallelWrapper):
         self.use_rts = use_rts
         self.drop_tokens = drop_tokens
 
-        if is_huggingface_model(model):
-            mapping = _ExpertParallelMappingForHuggingFace().get_mapping(model)
-        else:
-            assert (
-                mapping is not None
-            ), "`mapping` must be input if the model is not huggingface model."
-            mapping = mapping.get_mapping(model)
-
+        mapping = _ExpertParallelMappingForHuggingFace().get_mapping(model)
         self.expert_parallel_mapping = ExpertParallelMapping(mapping)
-
         self.link_info = dict()
 
         self.enc_layer_ids, self.dec_layer_ids = self._get_architecture_info()
@@ -128,7 +113,6 @@ class ExpertParallel(ParallelWrapper):
         )
 
         self._sanity_check()
-
         self._parallelize()
 
     def forward(self, *args, **kwargs):

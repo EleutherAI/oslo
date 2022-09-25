@@ -1,39 +1,75 @@
+import copy
 from typing import Optional
 
 import torch
 import torch.nn as nn
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
-from oslo.torch.nn.parallel.tensor_parallel._parallel_1d._wrapper import (
+from oslo.torch.nn.parallel.tensor_parallel._1d._wrapper import (
     _TensorParallel1D,
 )
-from oslo.torch.nn.parallel.tensor_parallel._parallel_2d._wrapper import (
+from oslo.torch.nn.parallel.tensor_parallel._2d._wrapper import (
     _TensorParallel2D,
 )
-from oslo.torch.nn.parallel.tensor_parallel._parallel_2p5d._wrapper import (
+from oslo.torch.nn.parallel.tensor_parallel._2p5d._wrapper import (
     _TensorParallel2p5D,
+)
+from oslo.torch.nn.parallel.tensor_parallel._3d._wrapper import (
+    _TensorParallel3D,
 )
 from oslo.torch.nn.parallel.tensor_parallel.mapping import (
     TensorParallelMapping,
 )
+from oslo.torch.nn.parallel.utils import (
+    get_parallel_context,
+    add_wrapper,
+)
 from oslo.transformers.mapping_utils import (
     _TensorParallelMappingForHuggingFace,
 )
-from oslo.torch.nn.parallel.utils import (
-    ParallelWrapper,
-    unwrap_parallel,
-    get_parallel_context,
-    is_huggingface_model,
-)
 
 
-class TensorParallel(ParallelWrapper):
+def get_divisible_by(parallel_context: ParallelContext):
+    if parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_1D:
+        divisible_by = parallel_context.get_world_size(ParallelMode.TENSOR_1D)
+    elif parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D:
+        divisible_by = parallel_context.get_world_size(ParallelMode.TENSOR_2D_COL) ** 2
+    elif parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2P5D:
+        divisible_by = parallel_context.get_world_size(ParallelMode.TENSOR_2P5D_COL)
+    elif parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D:
+        divisible_by = (
+            parallel_context.get_world_size(ParallelMode.TENSOR_3D_INPUT) ** 2
+        )
+    else:
+        raise ValueError(
+            "currently, only 1D, 2D, 2.5D tensor parallelism is supported."
+        )
+    return divisible_by
+
+
+def TensorParallel(
+    module: nn.Module,
+    parallel_context: Optional[ParallelContext] = None,
+    memory_priority: bool = False,
+):
+    tp = _TensorParallel(
+        module=module,
+        parallel_context=parallel_context,
+        memory_priority=memory_priority,
+    )
+    add_wrapper(module, ParallelMode.TENSOR, tp)
+    setattr(module, "forward", tp.forward)
+    return module
+
+
+class _TensorParallel(nn.Module):
     """
     Tensor parallel module
 
     Args:
         module (nn.Module): PyTorch module object
         parallel_context (ParallelContext): process context
+        memory_priority (bool): use tensor sequence parallel
 
     Notes:
         1. Similar design with `torch.nn.parallel.DistributedDataParallel`.
@@ -42,7 +78,7 @@ class TensorParallel(ParallelWrapper):
     Examples:
         >>> from oslo.torch.nn.parallel import TensorParallel
 
-        >>> model = AnyTransformerModel()
+        >>> model = TransformersModel()
         >>> optimizer = AnyOptimizer(model.parameters(), lr=3e-5)
         >>> tp_wrapper = TensorParallel(model, parallel_context=..., ...)
 
@@ -55,41 +91,51 @@ class TensorParallel(ParallelWrapper):
         self,
         module: nn.Module,
         parallel_context: Optional[ParallelContext] = None,
-        mapping: dict = None,
+        memory_priority: bool = False,
     ):
         super().__init__()
         self.parallel_context = get_parallel_context(module, parallel_context)
+        self.memory_priority = memory_priority
         module = self._resize_vocab_size(module, self.parallel_context)
-        module = self._resize_num_classes(module, self.parallel_context, mapping)
+        module = self._resize_num_classes(module, self.parallel_context)
+
+        if parallel_context.tensor_parallel_mode != ParallelMode.TENSOR_1D:
+            if memory_priority and parallel_context.tensor_parallel_size > 1:
+                raise ValueError(
+                    "param `memory_priority` is available only with 1D tensor parallel."
+                )
+
         if self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_1D:
-            self.module = _TensorParallel1D(module, self.parallel_context, mapping)
+            self.module = _TensorParallel1D(
+                module, self.parallel_context, memory_priority
+            )
         elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D:
-            self.module = _TensorParallel2D(module, self.parallel_context, mapping)
+            self.module = _TensorParallel2D(module, self.parallel_context)
         elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2P5D:
-            self.module = _TensorParallel2p5D(module, self.parallel_context, mapping)
+            self.module = _TensorParallel2p5D(module, self.parallel_context)
+        elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D:
+            self.module = _TensorParallel3D(module, self.parallel_context)
         else:
             raise ValueError(
                 "currently, only 1d, 2d, 2p5d tensor parallelism is supported."
             )
+        self.module_forward = copy.copy(self.module.forward)
 
     def forward(self, *args, **kwargs):
-        return self.module(*args, **kwargs)
+        return self.module_forward(*args, **kwargs)
 
     @staticmethod
     def _resize_vocab_size(model, parallel_context):
-        unwrapped_model = unwrap_parallel(model)
-
         assert hasattr(
-            unwrapped_model, "get_input_embeddings"
+            model, "get_input_embeddings"
         ), "model object must have `get_input_embeddings` method."
 
-        module = unwrapped_model.get_input_embeddings()
-
+        module = model.get_input_embeddings()
         vocab_size, embedding_dim = module.weight.size()
         new_vocab_size = vocab_size
 
-        world_size = parallel_context.get_world_size(ParallelMode.TENSOR)
-        while new_vocab_size % world_size != 0:
+        divisible_by = get_divisible_by(parallel_context)
+        while new_vocab_size % divisible_by != 0:
             new_vocab_size += 1
 
         if new_vocab_size != vocab_size:
@@ -106,37 +152,57 @@ class TensorParallel(ParallelWrapper):
 
             module.weight.data = new_embeddings
             module.num_embeddings = new_vocab_size
-            setattr(unwrapped_model, "orig_vocab_size", vocab_size)
+        setattr(module, "orig_num_classes", vocab_size)
+        setattr(model, "orig_vocab_size", vocab_size)
         return model
 
     @staticmethod
-    def _resize_num_classes(model, parallel_context, mapping):
-        unwrapped_model = unwrap_parallel(model)
-        if mapping is None:
-            if is_huggingface_model(unwrapped_model):
-                mapping = _TensorParallelMappingForHuggingFace().get_mapping(
-                    unwrapped_model
-                )
-            else:
-                raise ValueError(
-                    "`mapping` must be input if the model is not huggingface model."
-                )
+    def _resize_num_classes(model, parallel_context):
+        mapping = _TensorParallelMappingForHuggingFace().get_mapping(model)
         tensor_parallel_mapping = TensorParallelMapping(mapping)
-        world_size = parallel_context.get_world_size(ParallelMode.TENSOR)
+        divisible_by = get_divisible_by(parallel_context)
 
-        for param_name, module in unwrapped_model.named_modules():
-            if tensor_parallel_mapping.is_head(
-                unwrapped_model, param_name
-            ) and isinstance(module, nn.Linear):
-                if module.weight is unwrapped_model.get_input_embeddings().weight:
-                    module.out_features = (
-                        unwrapped_model.get_input_embeddings().num_embeddings
+        for param_name, module in model.named_modules():
+            if tensor_parallel_mapping.is_head(model, param_name) and isinstance(
+                module, nn.Linear
+            ):
+                if module.weight is model.get_input_embeddings().weight:
+                    module.out_features = model.get_input_embeddings().num_embeddings
+
+                    assert hasattr(
+                        model.get_input_embeddings(), "orig_num_classes"
+                    ), "call _resize_vocab before _resize_num_classes"
+                    out_features = model.get_input_embeddings().orig_num_classes
+                    setattr(module, "orig_num_classes", out_features)
+                    setattr(
+                        model,
+                        f"orig_{param_name.split('.')[-1]}_num_classes",
+                        out_features,
                     )
+
+                    if hasattr(module, "bias") and module.bias is not None:
+                        out_features = module.bias.size()[0]
+                        new_out_features = out_features
+
+                        while new_out_features % divisible_by != 0:
+                            new_out_features += 1
+
+                        if new_out_features != out_features:
+                            padding = torch.zeros(
+                                new_out_features - out_features,
+                                dtype=module.bias.dtype,
+                                device=module.bias.device,
+                            )
+                            new_bias = torch.cat(
+                                tensors=[module.bias.data, padding],
+                                dim=0,
+                            )
+                            module.bias.data = new_bias
                 else:
                     out_features, in_features = module.weight.size()
                     new_out_features = out_features
 
-                    while new_out_features % world_size != 0:
+                    while new_out_features % divisible_by != 0:
                         new_out_features += 1
 
                     if new_out_features != out_features:
@@ -165,15 +231,13 @@ class TensorParallel(ParallelWrapper):
 
                         module.weight.data = new_weight
                         module.out_features = new_out_features
-
+                        setattr(module, "orig_num_classes", out_features)
                         setattr(
-                            unwrapped_model,
+                            model,
                             f"orig_{param_name.split('.')[-1]}_num_classes",
                             out_features,
                         )
-                        if hasattr(unwrapped_model, "num_labels"):
-                            unwrapped_model.num_labels = new_out_features
         return model
 
-    def _remove_embeddings(self, model, parallel_context):
-        pass
+    def deparallelize(self):
+        self.module.deparallelize()

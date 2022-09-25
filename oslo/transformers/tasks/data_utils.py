@@ -7,9 +7,29 @@ import datasets
 from datasets import Dataset, DatasetDict, load_dataset, load_from_disk
 from numpy.random import choice
 
-from oslo.transformers.tasks.data_causal_lm import ProcessorForCausalLM
+from oslo.transformers.tasks.data_albert_pretraining import (
+    ProcessorForAlbertPretraining,
+)
+from oslo.transformers.tasks.data_bart_pretraining import (
+    ProcessorForBartPretraining,
+)
+from oslo.transformers.tasks.data_bert_pretraining import (
+    ProcessorForBertPretraining,
+)
+from oslo.transformers.tasks.data_causal_lm import (
+    ProcessorForCausalLM,
+)
+from oslo.transformers.tasks.data_masked_lm import (
+    ProcessorForMaskedLM,
+)
 from oslo.transformers.tasks.data_sequence_classification import (
     ProcessorForSequenceClassification,
+)
+from oslo.transformers.tasks.data_summarization import (
+    ProcessorForSummarization,
+)
+from oslo.transformers.tasks.data_t5_pretraining import (
+    ProcessorForT5Pretraining,
 )
 from oslo.transformers.tasks.data_token_classification import (
     ProcessorForTokenClassification,
@@ -145,6 +165,8 @@ def serialize_corpora(
     corpora_dir: str,
     corpus_type: CorpusType,
     max_length: int,
+    mlm_probability: Optional[float] = 0.15,
+    mean_noise_span_length: Optional[float] = 3.0,
     save_dir: Optional[str] = None,
     batched: bool = True,
     num_proc: Optional[int] = os.cpu_count(),
@@ -160,12 +182,16 @@ def serialize_corpora(
         "causal_lm": ProcessorForCausalLM,
         "sequence_classification": ProcessorForSequenceClassification,
         "token_classification": ProcessorForTokenClassification,
+        "summarization": ProcessorForSummarization,
+        "bert_pretraining": ProcessorForBertPretraining,
+        "albert_pretraining": ProcessorForAlbertPretraining,
+        "roberta_pretraining": ProcessorForMaskedLM,
+        "bart_pretraining": ProcessorForBartPretraining,
+        "t5_pretraining": ProcessorForT5Pretraining,
     }
 
     if task_type not in task_type_to_processor:
-        raise ValueError(
-            f"{task_type} must be one of ['causal_lm', 'sequence_classification', 'token_classification']"
-        )
+        raise ValueError(f"{task_type} must be one of {task_type_to_processor.keys()}")
 
     if corpus_type == "dataset":
         corpora = load_from_disk(corpora_dir)["train"]
@@ -182,11 +208,18 @@ def serialize_corpora(
         data_processor = task_type_to_processor[task_type](
             tokenizer_dir, max_length, corpora
         )
+    elif task_type == "t5_pretraining":
+        data_processor = task_type_to_processor[task_type](
+            tokenizer_dir,
+            max_length,
+            mlm_probability,
+            mean_noise_span_length,
+        )
     else:
         data_processor = task_type_to_processor[task_type](tokenizer_dir, max_length)
 
     dataset = corpora.map(
-        lambda examples: data_processor(examples),
+        data_processor,
         batched=batched,
         num_proc=num_proc,
         batch_size=batch_size,

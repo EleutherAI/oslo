@@ -1,17 +1,19 @@
 import logging
-import torch
+import warnings
 from typing import Dict, List, Optional
+
 from datasets.arrow_dataset import Batch
-from oslo.transformers.tasks.data_base import BaseProcessor
-from oslo.torch.distributed import ParallelContext, ParallelMode
 
-try:
-    from transformers.data.data_collator import _torch_collate_batch
-except ImportError:
-    print("You have to install `transformers` to use `oslo.transformers` modules")
-
+from oslo.torch.distributed import ParallelContext
+from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
+from oslo.transformers.tasks.data_base import (
+    BaseProcessor,
+    ParallelKeys,
+    SequenceParallelMixin,
+)
 
 logger = logging.getLogger(__name__)
+logging.captureWarnings(True)
 
 
 class ProcessorForCausalLM(BaseProcessor):
@@ -62,72 +64,53 @@ class ProcessorForCausalLM(BaseProcessor):
         return dict_of_training_examples
 
 
-class DataCollatorForCausalLM:
+class DataCollatorForCausalLM(SequenceParallelMixin):
     """
     Processing training examples to mini-batch for Gpt2 (clm).
     """
 
     def __init__(
         self,
-        tokenizer: ProcessorForCausalLM,
-        pad_to_multiple_of: Optional[int] = None,
+        processor: ProcessorForCausalLM,
         parallel_context: Optional[ParallelContext] = None,
+        label_pad_token_id: int = -100,
     ):
-        self.tokenizer = tokenizer._tokenizer
-        self.pad_to_multiple_of = pad_to_multiple_of
-        self.parallel_context = parallel_context
-        if parallel_context is not None:
-            self.local_rank = parallel_context.get_local_rank(ParallelMode.SEQUENCE)
-            self.local_world_size = parallel_context.get_world_size(
-                ParallelMode.SEQUENCE
+        if not isinstance(processor, ProcessorForCausalLM):
+            warnings.warn(
+                "DataCollatorForCausalLM is suitable for ProcessorForCausalLM."
             )
+
+        if processor._tokenizer.pad_token is None:
+            warnings.warn(
+                "If pad token doesn't exist in the processor._tokenizer, it can be a problem when applying padding."
+            )
+
+        self.tokenizer = processor._tokenizer
+        self.label_pad_token_id = label_pad_token_id
+        self.sequence_parallel_size = 1
+        if parallel_context is not None:
+            self._set_parallel_context(parallel_context)
 
     def __call__(self, examples):
-        if self.parallel_context is None:
-            if self.pad_to_multiple_of is None:
-                examples = [example["input_ids"] for example in examples]
-                batch = {
-                    "input_ids": _torch_collate_batch(
-                        examples,
-                        tokenizer=self.tokenizer,
-                        pad_to_multiple_of=self.pad_to_multiple_of,
-                    )
-                }
-                batch["labels"] = batch["input_ids"].clone()
-                return batch
-            else:
-                if self.tokenizer.pad_token is None:
-                    logger.warning(
-                        "If pad token doesn't exist in the processor._tokenizer, it can be a problem when applying Padding."
-                    )
+        batch = self.tokenizer.pad(
+            examples,
+            return_attention_mask=True if self.sequence_parallel_size > 1 else False,
+            return_tensors="pt",
+            pad_to_multiple_of=self.sequence_parallel_size
+            if self.sequence_parallel_size > 1
+            else None,
+        )
 
-                batch = self.tokenizer.pad(
-                    examples,
-                    return_tensors="pt",
-                    pad_to_multiple_of=self.pad_to_multiple_of,
-                )
-                labels = batch["input_ids"].clone()
-                labels[labels == self.tokenizer.pad_token_id] = -100
-                batch["labels"] = labels
-                return batch
-        else:
-            if self.tokenizer.pad_token is None:
-                logger.warning(
-                    "If pad token doesn't exist in the processor._tokenizer, it can be a problem when applying the SP."
-                )
+        batch["labels"] = batch["input_ids"].clone()
 
-            batch = self.tokenizer.pad(
-                examples, return_tensors="pt", pad_to_multiple_of=self.local_world_size
+        if self.sequence_parallel_size > 1:
+            batch["labels"].masked_fill_(
+                batch["labels"] == self.tokenizer.pad_token_id, self.label_pad_token_id
             )
-            labels = batch["input_ids"].clone()
-            labels[labels == self.tokenizer.pad_token_id] = -100
-            batch["labels"] = labels
+            sp_collate_fn = SequenceDataParallelCollator(
+                parallel_keys=ParallelKeys.CLM,
+                parallel_context=self.parallel_context,
+            )
+            return sp_collate_fn(**batch)
 
-            for key, value in batch.items():
-                value = value.chunk(self.local_world_size, dim=1)[self.local_rank]
-
-                if not value.is_contiguous():
-                    value = value.contiguous()
-
-                batch[key] = value
-            return batch
+        return batch

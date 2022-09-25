@@ -1,17 +1,14 @@
+import os
 import random
 from functools import partial
-import os
 
 import numpy as np
-
 import torch
 import torch.multiprocessing as mp
 
-from oslo.torch.nn.parallel.expert_parallel._context import ExpertParallelContext
-
-from oslo.torch.distributed._seed.helper import _SEED_MANAGER, seed
-
 from oslo.torch.distributed import ParallelContext, ParallelMode
+from oslo.torch.distributed._seed.helper import _SEED_MANAGER, seed
+from oslo.torch.nn.parallel.expert_parallel._context import ExpertParallelContext
 
 torch.set_printoptions(threshold=10_000)
 
