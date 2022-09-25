@@ -57,8 +57,8 @@ def save_pretrained(
         model_to_save.load_state_dict(state_dict)
         allocate_params(model_to_save, self.parallel_context)
 
-        if hasattr(self, "oslo_wrappers"):
-            for parallel_mode, wrapper in self.oslo_wrappers.items():
+        if hasattr(model_to_save, "oslo_wrappers"):
+            for parallel_mode, wrapper in model_to_save.oslo_wrappers.items():
                 if hasattr(wrapper, "deparallelize"):
                     wrapper.deparallelize()
                     # TODO: De-Parallelization, Kevin-ai
