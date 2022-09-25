@@ -4,11 +4,11 @@ import torch.nn as nn
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn import Linear2D
-from oslo.torch.nn.parallel.tensor_parallel._parallel_2d._ops import (
+from oslo.torch.nn.parallel.tensor_parallel._2d._ops import (
     gather_1d,
     gather_2d,
 )
-from oslo.torch.nn.parallel.tensor_parallel._parallel_2d._wrapper import (
+from oslo.torch.nn.parallel.tensor_parallel._2d._wrapper import (
     _TensorParallel2D,
 )
 

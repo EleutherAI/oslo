@@ -50,7 +50,7 @@ class Embedding1D(nn.Embedding):
         )
 
     def forward(self, input: Tensor) -> Tensor:
-        from oslo.torch.nn.parallel.tensor_parallel._parallel_1d._ops import (
+        from oslo.torch.nn.parallel.tensor_parallel._1d._ops import (
             gather_tensor_1d,
             scatter_tensor_1d,
         )
@@ -118,7 +118,7 @@ class VocabParallelEmbedding1D(nn.Embedding):
         )
 
     def forward(self, input: Tensor) -> Tensor:
-        from oslo.torch.nn.parallel.tensor_parallel._parallel_1d._ops import (
+        from oslo.torch.nn.parallel.tensor_parallel._1d._ops import (
             reduce_tensor_1d,
             scatter_tensor_1d,
         )
@@ -188,7 +188,7 @@ class Embedding2D(nn.Embedding):
         )
 
     def forward(self, input: Tensor) -> Tensor:
-        from oslo.torch.nn.parallel.tensor_parallel._parallel_2d._ops import (
+        from oslo.torch.nn.parallel.tensor_parallel._2d._ops import (
             all_gather_tensor_2d,
         )
 
@@ -245,7 +245,7 @@ class VocabParallelEmbedding2D(nn.Embedding):
         )
 
     def forward(self, input: Tensor) -> Tensor:
-        from oslo.torch.nn.parallel.tensor_parallel._parallel_2d._ops import (
+        from oslo.torch.nn.parallel.tensor_parallel._2d._ops import (
             gather_batch_2d,
             reduce_scatter_tensor_2d,
         )
@@ -307,7 +307,7 @@ class Embedding2p5D(nn.Embedding):
         )
 
     def forward(self, input: Tensor) -> Tensor:
-        from oslo.torch.nn.parallel.tensor_parallel._parallel_2p5d._ops import (
+        from oslo.torch.nn.parallel.tensor_parallel._2p5d._ops import (
             all_gather_tensor_2p5d,
         )
 
@@ -367,7 +367,7 @@ class VocabParallelEmbedding2p5D(nn.Embedding):
         )
 
     def forward(self, x: Tensor) -> Tensor:
-        from oslo.torch.nn.parallel.tensor_parallel._parallel_2p5d._ops import (
+        from oslo.torch.nn.parallel.tensor_parallel._2p5d._ops import (
             reduce_scatter_tensor_2p5d,
             gather_batch_2p5d,
         )
@@ -430,7 +430,7 @@ class Embedding3D(nn.Embedding):
         )
 
     def forward(self, input: Tensor) -> Tensor:
-        from oslo.torch.nn.parallel.tensor_parallel._parallel_3d._ops import (
+        from oslo.torch.nn.parallel.tensor_parallel._3d._ops import (
             broadcast_weight_3d_from_diagonal,
         )
 
@@ -490,7 +490,7 @@ class VocabParallelEmbedding3D(nn.Embedding):
         )
 
     def forward(self, input: Tensor) -> Tensor:
-        from oslo.torch.nn.parallel.tensor_parallel._parallel_3d._ops import (
+        from oslo.torch.nn.parallel.tensor_parallel._3d._ops import (
             gather_batch_3d,
             all_gather_tensor_3d,
             reduce_scatter_tensor_3d,

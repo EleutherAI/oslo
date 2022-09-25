@@ -5,16 +5,16 @@ import torch
 import torch.nn as nn
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
-from oslo.torch.nn.parallel.tensor_parallel._parallel_1d._wrapper import (
+from oslo.torch.nn.parallel.tensor_parallel._1d._wrapper import (
     _TensorParallel1D,
 )
-from oslo.torch.nn.parallel.tensor_parallel._parallel_2d._wrapper import (
+from oslo.torch.nn.parallel.tensor_parallel._2d._wrapper import (
     _TensorParallel2D,
 )
-from oslo.torch.nn.parallel.tensor_parallel._parallel_2p5d._wrapper import (
+from oslo.torch.nn.parallel.tensor_parallel._2p5d._wrapper import (
     _TensorParallel2p5D,
 )
-from oslo.torch.nn.parallel.tensor_parallel._parallel_3d._wrapper import (
+from oslo.torch.nn.parallel.tensor_parallel._3d._wrapper import (
     _TensorParallel3D,
 )
 from oslo.torch.nn.parallel.tensor_parallel.mapping import (

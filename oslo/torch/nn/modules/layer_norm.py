@@ -91,7 +91,7 @@ class LayerNorm1D(LayerNorm):
         )
 
     def forward(self, input: Tensor) -> Tensor:
-        from oslo.torch.nn.parallel.tensor_parallel._parallel_1d._ops import (
+        from oslo.torch.nn.parallel.tensor_parallel._1d._ops import (
             broadcast_tensor_1d,
         )
 
@@ -156,7 +156,7 @@ class LayerNorm2D(LayerNorm):
         )
 
     def forward(self, input: Tensor) -> Tensor:
-        from oslo.torch.nn.parallel.tensor_parallel._parallel_2d._ops import (
+        from oslo.torch.nn.parallel.tensor_parallel._2d._ops import (
             add_bias_2d,
             layernorm_2d,
         )
@@ -272,7 +272,7 @@ class LayerNorm2p5D(LayerNorm):
         )
 
     def forward(self, input: Tensor) -> torch.Tensor:
-        from oslo.torch.nn.parallel.tensor_parallel._parallel_2p5d._ops import (
+        from oslo.torch.nn.parallel.tensor_parallel._2p5d._ops import (
             layernorm_2p5d,
             add_bias_2p5d,
         )
@@ -367,7 +367,7 @@ class LayerNorm3D(LayerNorm):
         )
 
     def forward(self, input: Tensor) -> Tensor:
-        from oslo.torch.nn.parallel.tensor_parallel._parallel_3d._ops import (
+        from oslo.torch.nn.parallel.tensor_parallel._3d._ops import (
             layernorm_3d,
         )
 

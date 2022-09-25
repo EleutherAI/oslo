@@ -18,7 +18,7 @@ from oslo.torch.nn.modules.layer_norm import (
 from oslo.torch.nn.modules.linear import (
     Linear3D,
 )
-from oslo.torch.nn.parallel.tensor_parallel._parallel_3d._ops import (
+from oslo.torch.nn.parallel.tensor_parallel._3d._ops import (
     gather_3d,
     gather_2d,
     gather_1d,

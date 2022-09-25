@@ -4,8 +4,8 @@ import torch.nn as nn
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn import RowParallelLinear
-from oslo.torch.nn.parallel.tensor_parallel._parallel_1d._ops import gather_1d
-from oslo.torch.nn.parallel.tensor_parallel._parallel_1d._wrapper import (
+from oslo.torch.nn.parallel.tensor_parallel._1d._ops import gather_1d
+from oslo.torch.nn.parallel.tensor_parallel._1d._wrapper import (
     _TensorParallel1D,
 )
 

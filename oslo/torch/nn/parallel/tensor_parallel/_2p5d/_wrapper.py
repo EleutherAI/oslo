@@ -14,7 +14,7 @@ from oslo.torch.nn.modules.embedding import (
 )
 from oslo.torch.nn.modules.layer_norm import LayerNorm2p5D
 from oslo.torch.nn.modules.linear import Linear2p5D
-from oslo.torch.nn.parallel.tensor_parallel._parallel_2p5d._ops import (
+from oslo.torch.nn.parallel.tensor_parallel._2p5d._ops import (
     gather_2d,
     gather_1d,
 )

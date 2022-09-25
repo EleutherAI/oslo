@@ -71,7 +71,7 @@ class ColLinear1D(Linear):
         )
 
     def forward(self, input: Tensor) -> Union[Tensor, Tuple[Tensor, Tensor]]:
-        from oslo.torch.nn.parallel.tensor_parallel._parallel_1d._ops import (
+        from oslo.torch.nn.parallel.tensor_parallel._1d._ops import (
             gather_tensor_1d,
             broadcast_tensor_1d,
             scatter_tensor_1d,
@@ -146,7 +146,7 @@ class RowLinear1D(Linear):
         )
 
     def forward(self, input: Tensor) -> Union[Tensor, Tuple[Tensor, Tensor]]:
-        from oslo.torch.nn.parallel.tensor_parallel._parallel_1d._ops import (
+        from oslo.torch.nn.parallel.tensor_parallel._1d._ops import (
             reduce_tensor_1d,
             scatter_tensor_1d,
             reduce_scatter_tensor_1d,
@@ -249,7 +249,7 @@ class Linear2D(Linear):
         )
 
     def forward(self, input: Tensor) -> Union[Tensor, Tuple[Tensor, Tensor]]:
-        from oslo.torch.nn.parallel.tensor_parallel._parallel_2d._ops import (
+        from oslo.torch.nn.parallel.tensor_parallel._2d._ops import (
             Matmul_ABT_2D,
             add_bias_2d,
             all_gather_tensor_2d,
@@ -392,7 +392,7 @@ class Linear2p5D(Linear):
         )
 
     def forward(self, input: Tensor) -> Union[Tensor, Tuple[Tensor, Tensor]]:
-        from oslo.torch.nn.parallel.tensor_parallel._parallel_2p5d._ops import (
+        from oslo.torch.nn.parallel.tensor_parallel._2p5d._ops import (
             Matmul_ABT_2p5D,
             add_bias_2p5d,
             all_gather_tensor_2p5d,
@@ -516,7 +516,7 @@ class Linear3D(Linear):
             self.reset_parameters()
 
     def forward(self, input: Tensor) -> Tensor:
-        from oslo.torch.nn.parallel.tensor_parallel._parallel_3d._ops import (
+        from oslo.torch.nn.parallel.tensor_parallel._3d._ops import (
             Matmul_ABT_3D,
             all_gather_tensor_3d,
         )
