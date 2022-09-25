@@ -9,6 +9,12 @@ from torch.distributed import ProcessGroup
 from torch.nn import Module, ModuleList
 from torch import Tensor
 
+import torch
+import torch.distributed as dist
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.distributed import ProcessGroup
+
 from oslo.torch.distributed import ParallelMode
 from oslo.torch.distributed._seed.helper import seed
 from oslo.torch.nn.parallel.expert_parallel._context import ExpertParallelContext
