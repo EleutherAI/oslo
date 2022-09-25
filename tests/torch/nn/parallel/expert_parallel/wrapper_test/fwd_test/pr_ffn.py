@@ -8,12 +8,17 @@ import torch
 import torch.nn as nn
 import torch.multiprocessing as mp
 
+from oslo.torch.nn.parallel.data_parallel.distributed_data_parallel import (
+    DistributedDataParallel,
+)
 from oslo.torch.nn.parallel.expert_parallel.expert_parallel import ExpertParallel
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel.expert_parallel.mapping import Front, Behind
 
 from fwd_utils import TestFFNBlock, fix_seed, sequence_dataloader
+
+from oslo.torch.nn.parallel.expert_parallel._ops import AllReduce
 
 torch.set_printoptions(threshold=10_000)
 
@@ -54,15 +59,17 @@ class SimplePRMoEModel(torch.nn.Module):
     def __init__(self, linear, moe):
         super().__init__()
 
-        self.linear = linear
+        # self.linear = linear
         self.moe = moe
         self.cross_entropy_loss = torch.nn.CrossEntropyLoss()
 
     def forward(self, x, y):
-        linear_out = self.linear(x)
-        moe_out = self.moe(linear_out)
+        # linear_out = self.linear(x)
+        # moe_out = self.moe(linear_out)
+        moe_out = self.moe(x)
 
-        resid_out = linear_out + moe_out
+        # resid_out = linear_out + moe_out
+        resid_out = x + moe_out
         sent_emb = resid_out.mean(1)
 
         return self.cross_entropy_loss(sent_emb, y)
@@ -117,7 +124,6 @@ def run_test(rank, port):
         tensor_parallel_size=1,
         expert_parallel_size=world_size // 2,
     )
-    import datetime
 
     # if rank in [0, 1]:
     #    dist.new_group([0, 1], backend="gloo", timeout=datetime.timedelta(seconds=1))
@@ -128,12 +134,29 @@ def run_test(rank, port):
 
     fix_seed(rank)
 
-    linear = torch.nn.Linear(in_features, in_features)
+    linear = torch.nn.Linear(in_features, in_features).to(rank)
+    ep_group = parallel_context.get_group(ParallelMode.EXPERT)
+    src_rank = parallel_context.get_ranks_in_group(ParallelMode.EXPERT)[0]
+    torch.distributed.broadcast(linear.weight, src_rank, group=ep_group)
+    torch.distributed.broadcast(linear.bias, src_rank, group=ep_group)
 
     mapping = ExpertParallelMappingForTest()
     ffns = [TestFFNBlock(in_features, out_features) for i in range(n_layers)]
-    resid_mix_w1 = torch.nn.Linear(in_features, in_features)
-    resid_mix_w2 = torch.nn.Linear(in_features, in_features)
+    resid_mix_w1 = torch.nn.Linear(in_features, in_features).to(rank)
+    resid_mix_w2 = torch.nn.Linear(in_features, in_features).to(rank)
+    torch.distributed.broadcast(resid_mix_w1.weight, src_rank, group=ep_group)
+    torch.distributed.broadcast(resid_mix_w1.bias, src_rank, group=ep_group)
+    torch.distributed.broadcast(resid_mix_w2.weight, src_rank, group=ep_group)
+    torch.distributed.broadcast(resid_mix_w2.bias, src_rank, group=ep_group)
+    data_loader = sequence_dataloader(
+        batch_size,
+        total_samples,
+        hidden_dim=hidden_dim,
+        device=rank,
+        seq_len=sent_len,
+        dtype=torch.float32,
+    )
+    batches = [(n, batch) for n, batch in enumerate(data_loader)]
     moe = TestMoE(ffns)
     moe = ExpertParallel(
         moe,
@@ -143,7 +166,22 @@ def run_test(rank, port):
         use_kernel_optim=False,
         use_residual=use_residual,
         mapping=mapping,
+        noisy_policy="Not Use",
         use_rts=False,
+    )
+
+    ep_group = parallel_context.get_group(ParallelMode.EXPERT)
+    resid_mix_w1.weight.register_hook(
+        AllReduce(ep_group, world_size // 2, "expert_parallel_residual_mix")
+    )
+    resid_mix_w1.bias.register_hook(
+        AllReduce(ep_group, world_size // 2, "expert_parallel_residual_mix")
+    )
+    resid_mix_w2.weight.register_hook(
+        AllReduce(ep_group, world_size // 2, "expert_parallel_residual_mix")
+    )
+    resid_mix_w2.bias.register_hook(
+        AllReduce(ep_group, world_size // 2, "expert_parallel_residual_mix")
     )
 
     moe.model.ffns[0].fc1.expert_parallel_residual_mix = resid_mix_w1
@@ -151,27 +189,32 @@ def run_test(rank, port):
 
     model_ep = SimplePRMoEModel(linear, moe).to(rank)
 
+    model_ep = DistributedDataParallel(model_ep, parallel_context)
+
     # 6. Forward Propagation
     optimizer = torch.optim.AdamW(params=model_ep.parameters())
 
-    data_loader = sequence_dataloader(
-        batch_size,
-        total_samples,
-        hidden_dim=hidden_dim,
-        device=rank,
-        seq_len=sent_len,
-        dtype=torch.float32,
-    )
+    # dp_group_ranks = parallel_context.get_ranks_in_group(ParallelMode.DATA)
+    # ep_group_ranks = parallel_context.get_ranks_in_group(ParallelMode.EXPERT)
+    # print(f'Data Parallel Process Group : {dp_group_ranks}')
+    # print(f'Expert Parallel Process Group : {ep_group_ranks}')
     # for param_name, module in model_ep.named_parameters():
-    #    print(
-    #        f"Worker #{rank} - param_name : {param_name}, param_size : {module.size()}"
-    #    )
-    #    print(f"Worker #{rank} - param  : {module}")
+    #   print(
+    #       f"Worker #{rank} - param_name : {param_name}, param_size : {module.size()}"
+    #   )
+    #   print(f"Worker #{rank} - param  : {module}")
+    # return
 
-    for n, batch in enumerate(data_loader):
+    # for n, batch in enumerate(data_loader):
+    for n, batch in batches:
         loss = model_ep(batch[0], batch[1])
         print(f"Worker # {rank} Instance #{n} loss : {loss}")
         loss.backward()
+        # for param_name, module in model_ep.named_parameters():
+        #    print(
+        #        f"Worker #{rank} - param_name : {param_name}, param_size : {module.size()}"
+        #    )
+        #    print(f"Worker #{rank} - grad  : {module.grad}")
         optimizer.step()
 
     return
@@ -184,6 +227,7 @@ def test_expert_parallel_block():
 
 if __name__ == "__main__":
     # Set Random Seed for Reproducibility
+    # fix_seed(0)
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)

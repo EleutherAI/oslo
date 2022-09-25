@@ -5,11 +5,9 @@ from typing import Union
 import torch
 import torch.nn as nn
 
-# import torch.distributed as dist
+import torch.distributed as dist
 
 from oslo.torch.distributed import ParallelMode
-
-# from oslo.torch.distributed._seed.helper import seed
 
 from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.nn.parallel.utils import ParallelWrapper
@@ -17,7 +15,6 @@ from oslo.torch.nn.parallel.utils import is_huggingface_model, _update_module_ar
 
 from oslo.transformers.mapping_utils import _ExpertParallelMappingForHuggingFace
 
-# from oslo.torch.nn.parallel.expert_parallel._context import ExpertParallelContext
 from oslo.torch.nn.parallel.expert_parallel.mapping import ExpertParallelMapping
 
 from oslo.torch.nn.parallel.expert_parallel.experts import Experts
@@ -27,7 +24,7 @@ from oslo.torch.nn.parallel.expert_parallel.layers import (
     TopKGate,
 )
 
-from oslo.torch.nn.parallel.expert_parallel._ops import OSLO_EP_KERNEL_FLAG
+from oslo.torch.nn.parallel.expert_parallel._ops import OSLO_EP_KERNEL_FLAG, AllReduce
 
 
 class ExpertParallel(ParallelWrapper):
@@ -90,9 +87,6 @@ class ExpertParallel(ParallelWrapper):
 
         use_kernel_optim = OSLO_EP_KERNEL_FLAG and use_kernel_optim
         self.parallel_context = parallel_context
-        # self.ep_context = ExpertParallelContext(parallel_context, use_kernel_optim)
-        # self.ep_context.setup(parallel_context.seed)
-        # self.ep_context.reset_loss()
 
         self.device = torch.cuda.current_device()
 
@@ -140,7 +134,6 @@ class ExpertParallel(ParallelWrapper):
     def forward(self, *args, **kwargs):
         return self.model(*args, **kwargs)
 
-    # TODO : Need to Test
     def _sanity_check(self):
         if isinstance(self.parallel_context.expert_parallel_size, int):
             return
@@ -171,6 +164,8 @@ class ExpertParallel(ParallelWrapper):
     def _parallelize(self):
         self._parallelize_module()
         self.to(self.device)
+        self._synchronize_non_expert_params()
+        self._add_allreduce_hook_for_non_expert_params()
 
     def _parallelize_module(self):
         to_parallelize = [
@@ -287,8 +282,6 @@ class ExpertParallel(ParallelWrapper):
         layer_id = self._extract_layer_id(module_name)
         role = self._get_module_role(module_name)
 
-        print(f"NUM EXPERTS : {self.num_experts}")
-        print(f"LAYER ID : {layer_id}")
         num_experts = self.num_experts[role][layer_id]
         if isinstance(self.parallel_context.expert_parallel_size, int):
             ep_size = self.parallel_context.expert_parallel_size
@@ -339,6 +332,10 @@ class ExpertParallel(ParallelWrapper):
             expert_parallel_residual_mix=expert_parallel_residual_mix,
         )
 
+        delattr(module, "weight")
+        if getattr(module, "bias", None) is not None:
+            delattr(module, "bias")
+
     def _wrap_behind(self, module, module_name: str, reversed: bool):
         out_features, in_features = module.weight.size()
         if reversed:
@@ -381,3 +378,39 @@ class ExpertParallel(ParallelWrapper):
             use_residual=self.use_residual,
             expert_parallel_residual=expert_parallel_residual,
         )
+
+        delattr(module, "weight")
+        if getattr(module, "bias", None) is not None:
+            delattr(module, "bias")
+
+    def _synchronize_non_expert_params(self):
+        ep_group = self.parallel_context.get_group(ParallelMode.EXPERT)
+        src_rank = self.parallel_context.get_ranks_in_group(ParallelMode.EXPERT)[0]
+
+        for para_name, param in self.model.named_parameters():
+            conditions = [
+                "front_expert" not in para_name,
+                "behind_expert" not in para_name,
+            ]
+
+            # Broadcast Non Expert Parameter
+            if all(conditions):
+                dist.broadcast(param, src_rank, group=ep_group)
+
+    def _add_allreduce_hook_for_non_expert_params(self):
+        ep_group = self.parallel_context.get_group(ParallelMode.EXPERT)
+
+        for para_name, param in self.model.named_parameters():
+            conditions = [
+                "front_expert" not in para_name,
+                "behind_expert" not in para_name,
+            ]
+            if isinstance(self.parallel_context.expert_parallel_size, int):
+                ep_size = self.parallel_context.expert_parallel_size
+            else:
+                role = self._get_module_role(para_name)
+                layer_id = self._extract_layer_id(para_name)
+                ep_size = self.parallel_context.expert_parallel_size[role][layer_id]
+
+            if all(conditions) and param.requires_grad:
+                param.register_hook(AllReduce(ep_group, ep_size, para_name))

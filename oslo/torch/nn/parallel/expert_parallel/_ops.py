@@ -110,3 +110,16 @@ class EPCombine(torch.autograd.Function):
         d_expert = d_expert.to(torch.float16) if context.fp16_flag else d_expert
 
         return d_expert, d_logits, None, None, None
+
+
+class AllReduce:
+    def __init__(self, ep_group, ep_size, para_name):
+        self.ep_group = ep_group
+        self.ep_size = ep_size
+        self.para_name = para_name
+
+    def __call__(self, grad):
+        grad.mul_(1.0 / self.ep_size)
+        dist.all_reduce(grad, group=self.ep_group)
+
+        return grad

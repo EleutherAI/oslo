@@ -16,24 +16,24 @@ import deepspeed
 from deepspeed.utils import groups
 from deepspeed.moe.layer import MoE
 
-from fwd_utils import TestFFNBlock, fix_seed, sequence_dataloader
+from fwd_utils import TestFFNBlock, fix_seed, sequence_dataloader, args_from_dict
 
 torch.set_printoptions(threshold=10_000)
 
+total_samples = 50
 
 batch_size = 2
-total_samples = 50
 sent_len = 4
 
 hidden_dim = 2
 in_features = hidden_dim
 out_features = 4
 
-world_size = 2
+world_size = 4
 num_experts = world_size
 top_k = 1
 
-ep_size = world_size
+ep_size = world_size // 2
 
 use_residual = True
 
@@ -42,17 +42,18 @@ class SimplePRMoEModel(torch.nn.Module):
     def __init__(self, linear, moe1, moe2):
         super().__init__()
 
-        self.linear = linear
+        # self.linear = linear
         self.moe1 = moe1
         self.moe2 = moe2
         self.cross_entropy_loss = torch.nn.CrossEntropyLoss()
 
     def forward(self, x, y):
-        linear_out = self.linear(x)
-        moe_out, _, _ = self.moe1(linear_out)
+        # linear_out = self.linear(x)
+        # moe_out, _, _ = self.moe1(linear_out)
+        moe_out, _, _ = self.moe1(x)
         moe_out, _, _ = self.moe2(moe_out)
 
-        resid_out = linear_out + moe_out
+        resid_out = x + moe_out
         sent_emb = resid_out.mean(1)
 
         return self.cross_entropy_loss(sent_emb, y)
@@ -70,11 +71,20 @@ def run_test(rank, port):
 
     fix_seed(rank)
 
-    linear = torch.nn.Linear(in_features, in_features)
+    linear = torch.nn.Linear(in_features, in_features).to(rank)
     ffn1 = TestFFNBlock(in_features, out_features)
     ffn2 = TestFFNBlock(in_features, out_features)
     coef1 = torch.nn.Linear(in_features, in_features)
     coef2 = torch.nn.Linear(in_features, in_features)
+    data_loader = sequence_dataloader(
+        batch_size,
+        total_samples,
+        hidden_dim=hidden_dim,
+        device=rank,
+        seq_len=sent_len,
+        dtype=torch.float32,
+    )
+    batches = [(n, batch) for n, batch in enumerate(data_loader)]
     moe1 = MoE(
         in_features,
         expert=ffn1,
@@ -83,6 +93,7 @@ def run_test(rank, port):
         num_experts=num_experts,
         k=top_k,
         use_rts=False,
+        noisy_gate_policy=None,
     )
     moe2 = MoE(
         in_features,
@@ -92,6 +103,7 @@ def run_test(rank, port):
         num_experts=num_experts * 2,
         k=top_k,
         use_rts=False,
+        noisy_gate_policy=None,
     )
     moe1.coefficient = coef1
     moe2.coefficient = coef2
@@ -99,25 +111,36 @@ def run_test(rank, port):
 
     optimizer = torch.optim.AdamW(params=model.parameters())
 
-    data_loader = sequence_dataloader(
-        batch_size,
-        total_samples,
-        hidden_dim=hidden_dim,
-        device=rank,
-        seq_len=sent_len,
-        dtype=torch.float32,
+    config_dict = {
+        "train_batch_size": 8,
+        "steps_per_print": 1,
+        "fp16": {"enabled": False},
+    }
+    tmpdir = "."
+    args = args_from_dict(tmpdir, config_dict)
+
+    model, _, _, _ = deepspeed.initialize(
+        args=args, model=model, optimizer=optimizer, dist_init_required=False
     )
+
     # for param_name, module in model.named_parameters():
     #    print(
     #        f"Worker #{rank} - param_name : {param_name}, param_size : {module.size()}"
     #    )
     #    print(f"Worker #{rank} - param  : {module}")
+    # return
 
-    for n, batch in enumerate(data_loader):
+    # for n, batch in enumerate(data_loader):
+    for n, batch in batches:
         loss = model(batch[0], batch[1])
         print(f"Worker # {rank} Instance #{n} loss : {loss}")
-        loss.backward()
-        optimizer.step()
+        model.backward(loss)
+        # for param_name, module in model.named_parameters():
+        #            print(
+        #                f"Worker #{rank} - param_name : {param_name}, param_size : {module.size()}"
+        #            )
+        #            print(f"Worker #{rank} - grad  : {module.grad}")
+        model.step()
 
 
 def test_expert_parallel_block():
@@ -126,4 +149,10 @@ def test_expert_parallel_block():
 
 
 if __name__ == "__main__":
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
     test_expert_parallel_block()

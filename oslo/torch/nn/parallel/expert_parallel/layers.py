@@ -466,8 +466,8 @@ class ExpertParallelFrontBlock(Module):
         # |residual_inter| = (sent_len, batch_size, out_features)
 
         residual_weight = self.expert_parallel_residual_mix(inputs)
-        # residual_weight = F.softmax(residual_weight, dim=-1)
-        residual_weight = F.softmax(residual_weight, dim=1)
+        residual_weight = F.softmax(residual_weight, dim=-1)
+        # residual_weight = F.softmax(residual_weight, dim=1)
         # |residual_weight| = (sent_len, batch_size, 2)
 
         return residual_inter, residual_weight
