@@ -46,7 +46,9 @@ def allocate_params(model: nn.Module, parallel_context: ParallelContext):
     for name, parameter in model.named_parameters():
         if hasattr(parameter, "oslo_parallel"):
             # sorting parallel groups to fix parallelization order
-            parameter.oslo_parallel = OrderedDict(sorted(parameter.oslo_parallel.items()))
+            parameter.oslo_parallel = OrderedDict(
+                sorted(parameter.oslo_parallel.items())
+            )
             device = parallel_context.ranks2device(parameter.oslo_parallel)
             if device is not None:
                 parameter.data = parameter.to(
