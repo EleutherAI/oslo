@@ -4,8 +4,7 @@ from typing import List, Union, TYPE_CHECKING
 import torch
 import torch.distributed as dist
 
-import \
-    oslo.torch.nn.parallel.data_parallel._fsdp._shard.sharded_tensor.metadata as sharded_tensor_meta
+import oslo.torch.nn.parallel.data_parallel._fsdp._shard.sharded_tensor.metadata as sharded_tensor_meta
 from oslo.torch.nn.parallel.data_parallel._fsdp._shard._utils import narrow_tensor
 from oslo.torch.nn.parallel.data_parallel._fsdp._shard.metadata import ShardMetadata
 from oslo.torch.nn.parallel.data_parallel._fsdp._shard.sharded_tensor.shard import Shard

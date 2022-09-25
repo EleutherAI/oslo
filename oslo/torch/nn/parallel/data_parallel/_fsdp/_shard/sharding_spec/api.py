@@ -5,8 +5,7 @@ from typing import Callable, Dict, List, TYPE_CHECKING
 
 import torch
 
-import \
-    oslo.torch.nn.parallel.data_parallel._fsdp._shard.sharded_tensor.metadata as sharded_tensor_meta
+import oslo.torch.nn.parallel.data_parallel._fsdp._shard.sharded_tensor.metadata as sharded_tensor_meta
 from oslo.torch.nn.parallel.data_parallel._fsdp._shard.metadata import ShardMetadata
 from oslo.torch.nn.parallel.data_parallel._fsdp._shard.op_registry_utils import (
     _decorator_func,
