@@ -43,11 +43,11 @@ def _remove_module_arguments(module: nn.Module, args: list):
 
 
 def allocate_params(model: nn.Module, parallel_context: ParallelContext):
-    for name, parameter in model.named_parameters():
+    for parameter in model.parameters():
         if hasattr(parameter, "oslo_parallel"):
             # sorting parallel groups to fix parallelization order
             parameter.oslo_parallel = OrderedDict(
-                sorted(parameter.oslo_parallel.items())
+                sorted(parameter.oslo_parallel.items(), key=lambda item: str(item[0]))
             )
             device = parallel_context.ranks2device(parameter.oslo_parallel)
             if device is not None:
@@ -57,10 +57,12 @@ def allocate_params(model: nn.Module, parallel_context: ParallelContext):
         else:
             parameter.data = parameter.to(torch.cuda.current_device())
 
-    for name, buffer in model.named_buffers():
+    for buffer in model.buffers():
         if hasattr(buffer, "oslo_parallel"):
             # sorting parallel groups to fix parallelization order
-            buffer.oslo_parallel = OrderedDict(sorted(buffer.oslo_parallel.items()))
+            buffer.oslo_parallel = OrderedDict(
+                sorted(buffer.oslo_parallel.items(), key=lambda item: str(item[0]))
+            )
             device = parallel_context.ranks2device(buffer.oslo_parallel)
             if device is not None:
                 buffer.data = buffer.to(
