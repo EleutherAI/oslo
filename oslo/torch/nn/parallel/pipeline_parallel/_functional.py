@@ -14,13 +14,16 @@ _NUM_BACKWARD_DONE = 0
 
 def add_forward_marker(mark):
     _FORWARD_MARKER.add(mark)
+    # print(f'ADD MARKER: {torch.distributed.get_rank()=}, {_FORWARD_MARKER=}')
 
 
 def remove_forward_marker(mark):
     _FORWARD_MARKER.remove(mark)
+    # print(f'REMOVE MARKER: {torch.distributed.get_rank()=}, {_FORWARD_MARKER=}')
 
 
 def len_forward_marker():
+    # print(f'{torch.distributed.get_rank()=}, {_FORWARD_MARKER=}')
     return len(_FORWARD_MARKER)
 
 
@@ -41,7 +44,17 @@ def reset_num_backward_done():
 
 
 def launch_remote_backward(unique_key, *grad_outputs):
-    activation = _ACTIVATIONS.pop(unique_key)
+    activation = _ACTIVATIONS.pop(unique_key, [])   # TODO; is this safe?
+
+    # TODO; HF output...
+    if isinstance(activation, dict):
+        activation = tuple(activation.values())
+
+    # TODO; some activations are not tuple... WHY?
+    if not isinstance(activation, tuple):
+        activation = (activation, )
+
+    # print(f'{unique_key=}, {type(activation)=}, {len(activation)=}, {len(grad_outputs)=}')
 
     # TODO; some output contains tuple of tuple..
     #   better way to deal with this?
@@ -74,7 +87,8 @@ class _PipeBackwardRedirection(torch.autograd.Function):
         ctx.num_nones = 2 + len(args)  # counting req
 
         # mark
-        # TODO; do this before remote_forward
+        # TODO; can we do this before remote_forward
+        #  without rpc call?
         rpc.rpc_sync(to=to, func=add_forward_marker, args=(unique_key,))
 
         return args
@@ -85,8 +99,6 @@ class _PipeBackwardRedirection(torch.autograd.Function):
     def backward(ctx, *grad_outputs):
         to = ctx.to
         unique_key = ctx.unique_key
-
-        # print(f'backward: {to=}, {unique_key=}')
 
         rpc.rpc_async(
             to=to,

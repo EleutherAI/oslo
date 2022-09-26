@@ -19,6 +19,7 @@ from oslo.torch.nn.parallel.pipeline_parallel._functional import (
 from oslo.torch.nn.parallel.pipeline_parallel._messages import assemble_args
 from oslo.torch.nn.parallel.pipeline_parallel._server import (
     _ORIGINAL_FORWARDS,
+    _WRAPPED_FORWARDS,
     _MODULE_DEVICE_LOCATIONS,
     remote_module_forward,
     _RESULT_DICT,
@@ -204,12 +205,27 @@ class PipelineParallel(nn.Module):
                 result = forward_fn(*args, **kwargs)
 
             else:
-                arg_keys, new_args = assemble_args(args, kwargs)
+                arg_keys, new_args, requires_grads = assemble_args(args, kwargs)
 
+                print(f'{new_args=}')
+
+                need_activation_save = any(requires_grads)
                 with self._lock:
                     cnt = get_forward_counter(location)
-                    unique_key = (location, cnt)
+                    unique_key = (location, cnt, self.rank)
                     increment_forward_counter(location)
+
+                if need_activation_save:
+                    # prepare backward
+                    save_activation(unique_key, new_args)
+
+                # with self._lock:
+                #     cnt = get_forward_counter(location)
+                #     unique_key = (location, cnt)
+                #     increment_forward_counter(location)
+                #
+                # # prepare backward
+                # save_activation(unique_key, new_args)
 
                 caller = self.parallel_context.get_pipeline_rpc_worker_name(
                     current_device.index
@@ -218,24 +234,59 @@ class PipelineParallel(nn.Module):
                     module_device.index
                 )
 
-                # prepare backward
-                save_activation(unique_key, new_args)
-
                 # request forward
                 fut = rpc.rpc_async(
                     to=callee,
                     func=remote_module_forward,
-                    args=(caller, location, unique_key, arg_keys) + new_args,
+                    args=(caller, location, unique_key, arg_keys, need_activation_save) + new_args,
                 )
                 result = fut.wait()
 
-                # TODO; does result always be an args?
-                result = apply_backward_redirection(
-                    callee,
-                    unique_key,
-                    *result,
-                )
+                # TODO; does result always be an args? what if dict?
+                #  HF output is OrderedDict!!
+                #  need to deal with recursive case...
+                is_dict = False
+                orig_result = None
+                if isinstance(result, dict):
+                    is_dict = True
+                    orig_result = result
+
+                    # print(f'{result.keys()=}')
+                    # print(f'{len(result)=}')
+
+                    result = tuple(result.values())
+
+                    # print(f'{len(result)=}')
+
+                wrapped = False
+                if not isinstance(result, tuple):
+                    wrapped = True
+                    result = (result, )
+
+                # re-check
+                requires_redirection = False
+                for x in result:
+                    if torch.is_tensor(x):
+                        if x.requires_grad:
+                            requires_redirection = True
+                            break
+
+                if requires_redirection:
+                    result = apply_backward_redirection(
+                        callee,
+                        unique_key,
+                        *result,
+                    )
+
+                if wrapped:
+                    result = result[0]
+
+                if is_dict:
+                    for i, k in enumerate(orig_result.keys()):
+                        orig_result[k] = result[i]
+                    result = orig_result
 
             return result
 
         module.forward = new_forward
+        _WRAPPED_FORWARDS[loc] = new_forward
