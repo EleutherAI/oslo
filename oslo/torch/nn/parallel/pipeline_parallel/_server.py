@@ -15,6 +15,8 @@ from oslo.torch.nn.parallel.pipeline_parallel._messages import disassemble_new_a
 # original forward dictionary
 _ORIGINAL_FORWARDS = dict()
 
+_WRAPPED_FORWARDS = dict()
+
 # module device locations
 _MODULE_DEVICE_LOCATIONS = dict()
 
@@ -89,17 +91,21 @@ def wait_backward_done():
         time.sleep(0.0)
 
 
-def remote_module_forward(caller, location, unique_key, arg_keys, *args):
-    # prepare backward redirection to caller
-    args = apply_backward_redirection(
-        caller,
-        unique_key,
-        *args,
-    )
+def remote_module_forward(caller, location, unique_key, arg_keys, requires_redirection, *args):
+    if requires_redirection:
+        # prepare backward redirection to caller
+        args = apply_backward_redirection(
+            caller,
+            unique_key,
+            *args,
+        )
 
     args, kwargs = disassemble_new_args(args, arg_keys)
+
     forward_fn = _ORIGINAL_FORWARDS[location]
+    # forward_fn = _WRAPPED_FORWARDS[location]
     result = forward_fn(*args, **kwargs)
+    # TODO; check whether activation need to be saved
     save_activation(unique_key, result)
     return result
 

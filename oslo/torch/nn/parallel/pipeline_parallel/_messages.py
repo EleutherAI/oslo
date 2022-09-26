@@ -79,21 +79,32 @@ def generate_request(src, dst, location, caller, args, kwargs):
 def assemble_args(args, kwargs):
     new_args = []
     keys = []
+    requires_grads = []
     for v in args:
+        requires_grad = False
+
         if torch.is_tensor(v):
             v = v.contiguous()
+            requires_grad = v.requires_grad
+
         new_args.append(v)
         keys.append(None)
+        requires_grads.append(requires_grad)
 
     for k, v in kwargs.items():
         if k is None:
             raise ValueError("None cannot be used the key of kwargs.")
+        requires_grad = False
+
         if torch.is_tensor(v):
             v = v.contiguous()
+            requires_grad = v.requires_grad
+
         new_args.append(v)
         keys.append(k)
+        requires_grads.append(requires_grad)
 
-    return tuple(keys), tuple(new_args)
+    return tuple(keys), tuple(new_args), tuple(requires_grads)
 
 
 def disassemble_new_args(new_args, keys):
