@@ -13,11 +13,10 @@ from oslo.torch.nn.parallel.pipeline_parallel._functional import (
     apply_backward_redirection,
     len_forward_marker,
 )
-from oslo.torch.nn.parallel.pipeline_parallel._messages import assemble_args
+from oslo.torch.nn.parallel.pipeline_parallel._messages import pack_tensor_stub, unpack_tensor_stub
 from oslo.torch.nn.parallel.pipeline_parallel._model_partitioner import ModelPartitioner
 from oslo.torch.nn.parallel.pipeline_parallel._server import (
     _ORIGINAL_FORWARDS,
-    _WRAPPED_FORWARDS,
     _MODULE_DEVICE_LOCATIONS,
     remote_module_forward,
     _RESULT_DICT,
@@ -41,7 +40,12 @@ def PipelineParallel(
     num_micro_batches: int = 1,
 ):
     # TODO, @HG
-    pass
+    return _PipelineParallel(
+        module=module,
+        parallel_context=parallel_context,
+        memory_computation_balance=memory_computation_balance,
+        num_micro_batches=num_micro_batches
+    )
 
 
 class _PipelineParallel(nn.Module):
@@ -210,11 +214,10 @@ class _PipelineParallel(nn.Module):
                 result = forward_fn(*args, **kwargs)
 
             else:
-                arg_keys, new_args, requires_grads = assemble_args(args, kwargs)
+                (args_stub, kwargs_stub), tensors = pack_tensor_stub([args, kwargs], [])
+                tensors = tuple(tensors)
 
-                print(f'{new_args=}')
-
-                need_activation_save = any(requires_grads)
+                need_activation_save = any([t.requires_grad for t in tensors])
                 with self._lock:
                     cnt = get_forward_counter(location)
                     unique_key = (location, cnt, self.rank)
@@ -222,15 +225,7 @@ class _PipelineParallel(nn.Module):
 
                 if need_activation_save:
                     # prepare backward
-                    save_activation(unique_key, new_args)
-
-                # with self._lock:
-                #     cnt = get_forward_counter(location)
-                #     unique_key = (location, cnt)
-                #     increment_forward_counter(location)
-                #
-                # # prepare backward
-                # save_activation(unique_key, new_args)
+                    save_activation(unique_key, tensors)
 
                 caller = self.parallel_context.get_pipeline_rpc_worker_name(
                     current_device.index
@@ -243,55 +238,20 @@ class _PipelineParallel(nn.Module):
                 fut = rpc.rpc_async(
                     to=callee,
                     func=remote_module_forward,
-                    args=(caller, location, unique_key, arg_keys, need_activation_save) + new_args,
+                    args=(caller, location, unique_key, args_stub, kwargs_stub, need_activation_save) + tensors,
                 )
-                result = fut.wait()
-
-                # TODO; does result always be an args? what if dict?
-                #  HF output is OrderedDict!!
-                #  need to deal with recursive case...
-                is_dict = False
-                orig_result = None
-                if isinstance(result, dict):
-                    is_dict = True
-                    orig_result = result
-
-                    # print(f'{result.keys()=}')
-                    # print(f'{len(result)=}')
-
-                    result = tuple(result.values())
-
-                    # print(f'{len(result)=}')
-
-                wrapped = False
-                if not isinstance(result, tuple):
-                    wrapped = True
-                    result = (result, )
-
-                # re-check
-                requires_redirection = False
-                for x in result:
-                    if torch.is_tensor(x):
-                        if x.requires_grad:
-                            requires_redirection = True
-                            break
+                # receive result as stub
+                result_stub, tensors, requires_redirection = fut.wait()
 
                 if requires_redirection:
-                    result = apply_backward_redirection(
+                    tensors = apply_backward_redirection(
                         callee,
                         unique_key,
-                        *result,
+                        *tensors,
                     )
 
-                if wrapped:
-                    result = result[0]
-
-                if is_dict:
-                    for i, k in enumerate(orig_result.keys()):
-                        orig_result[k] = result[i]
-                    result = orig_result
+                result, _ = unpack_tensor_stub(result_stub, tensors)
 
             return result
 
         module.forward = new_forward
-        _WRAPPED_FORWARDS[loc] = new_forward

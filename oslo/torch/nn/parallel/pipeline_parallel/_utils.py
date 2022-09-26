@@ -27,10 +27,17 @@ def post_order_traverse(node):
     yield node
 
 
-def is_iterable(data):
-    try:
-        iter(data)
-    except TypeError:
-        return False
-    else:
-        return True
+# from https://github.com/pytorch/pytorch/blob/master/torch/nn/parallel/scatter_gather.py#L12
+def _is_namedtuple(obj):
+    # Check if type was created from collections.namedtuple or a typing.NamedTuple.
+    return (
+        isinstance(obj, tuple) and hasattr(obj, "_asdict") and hasattr(obj, "_fields")
+    )
+
+
+def _is_primitive(obj):
+    return not hasattr(obj, '__dict__')
+
+
+def _is_private(attr):
+    return attr.startswith('__')

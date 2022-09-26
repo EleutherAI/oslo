@@ -162,22 +162,22 @@ parallel_context = ParallelContext.from_torch(
 )
 
 current_device = torch.cuda.current_device()
-num_micro_batches = 8
+num_micro_batches = 1
 
 # model_name = "gpt2"
 # config = GPT2Config.from_pretrained(model_name)
 # model = GPT2LMHeadModel(config)
 
-# model_name = "t5-small"
-# config = T5Config.from_pretrained(model_name)
-# config.dropout_rate = 0.
-# model = T5ForConditionalGeneration(config)
+model_name = "t5-small"
+config = T5Config.from_pretrained(model_name)
+config.dropout_rate = 0.
+model = T5ForConditionalGeneration(config)
 # model = T5Debug(config)
 
-model_name = "facebook/bart-base"
-config = BartConfig.from_pretrained(model_name)
-config.dropout_rate = 0.
-model = BartForConditionalGeneration(config)
+# model_name = "facebook/bart-base"
+# config = BartConfig.from_pretrained(model_name)
+# config.dropout_rate = 0.
+# model = BartForConditionalGeneration(config)
 
 
 for n, m in model.named_modules():

@@ -13,12 +13,12 @@ _NUM_BACKWARD_DONE = 0
 
 def add_forward_marker(mark):
     _FORWARD_MARKER.add(mark)
-    # print(f'ADD MARKER: {torch.distributed.get_rank()=}, {_FORWARD_MARKER=}')
+    print(f'ADD MARKER: {torch.distributed.get_rank()=}, {_FORWARD_MARKER=}')
 
 
 def remove_forward_marker(mark):
     _FORWARD_MARKER.remove(mark)
-    # print(f'REMOVE MARKER: {torch.distributed.get_rank()=}, {_FORWARD_MARKER=}')
+    print(f'REMOVE MARKER: {torch.distributed.get_rank()=}, {_FORWARD_MARKER=}')
 
 
 def len_forward_marker():
@@ -43,17 +43,9 @@ def reset_num_backward_done():
 
 
 def launch_remote_backward(unique_key, *grad_outputs):
-    activation = _ACTIVATIONS.pop(unique_key, [])   # TODO; is this safe?
+    activation = _ACTIVATIONS.pop(unique_key)
 
-    # TODO; HF output...
-    if isinstance(activation, dict):
-        activation = tuple(activation.values())
-
-    # TODO; some activations are not tuple... WHY?
-    if not isinstance(activation, tuple):
-        activation = (activation, )
-
-    # print(f'{unique_key=}, {type(activation)=}, {len(activation)=}, {len(grad_outputs)=}')
+    print(f'{unique_key=}, {type(activation)=}, {len(activation)=}, {len(grad_outputs)=}')
 
     # TODO; some output contains tuple of tuple..
     #   better way to deal with this?
