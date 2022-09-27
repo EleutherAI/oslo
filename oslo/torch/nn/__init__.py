@@ -17,7 +17,6 @@ from oslo.torch.nn.modules.functional import (
     fused_bias_dropout,
     fused_bias_gelu,
     fused_gelu,
-    multi_head_attention_forward,
     fused_scale_mask_softmax,
     fused_rms_norm_affine,
     fused_layer_norm,
