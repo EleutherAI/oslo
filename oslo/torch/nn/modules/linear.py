@@ -17,12 +17,13 @@ class Linear(nn.Linear):
         bias: bool = True,
         dtype: Optional[torch.dtype] = None,
         skip_bias_add: bool = False,
+        device: torch.device = None,
     ):
         super(Linear, self).__init__(
             in_features=in_features,
             out_features=out_features,
             bias=bias,
-            device=torch.device(torch.cuda.current_device()),
+            device=device,
             dtype=dtype,
         )
         self.skip_bias_add = skip_bias_add
