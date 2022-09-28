@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from oslo.torch.distributed import ParallelContext
 from oslo.torch.nn.parallel import PipelineParallel
 from oslo.torch.nn.parallel.utils import allocate_params
-from oslo.torch.nn.parallel.pipeline_parallel._server import _MODULE_DEVICE_LOCATIONS
+from oslo.torch.nn.parallel.pipeline_parallel._buffers import _MODULE_DEVICE_LOCATIONS
 
 from datasets import load_dataset
 from transformers import (
@@ -157,12 +157,12 @@ set_seed(42)
 
 parallel_context = ParallelContext.from_torch(
     data_parallel_size=1,
-    pipeline_parallel_size=2,
+    pipeline_parallel_size=4,
     tensor_parallel_size=1,
 )
 
 current_device = torch.cuda.current_device()
-num_micro_batches = 1
+num_micro_batches = 8
 
 # model_name = "gpt2"
 # config = GPT2Config.from_pretrained(model_name)
@@ -196,8 +196,8 @@ wrapper_pp = PipelineParallel(
 
 wrapper_pp.train()
 
-optimizer_pp = Adam(wrapper_pp.parameters(), lr=3e-5)
-optimizer_no_pp = Adam(model_no_pp.parameters(), lr=3e-5)
+optimizer_pp = Adam(wrapper_pp.parameters(), lr=3e-2)
+optimizer_no_pp = Adam(model_no_pp.parameters(), lr=3e-2)
 
 allocate_params(wrapper_pp, parallel_context)
 
@@ -250,18 +250,16 @@ def run():
             ):
                 loss_pp = out_pp.loss
                 loss_pp = loss_pp / num_micro_batches
+                loss_pp.backward()
 
-                if dist.get_rank() == 0:
-                    loss_pp.backward()
-
-                print(f"{ind=}")
                 cum_loss_pp += loss_pp.detach().item()
 
             out_no_pp = model_no_pp(**inputs, labels=inputs["input_ids"])
             loss_no_pp = out_no_pp.loss
             loss_no_pp.backward()
 
-            print(f"{dist.get_rank()=}, {cum_loss_pp=}, {loss_no_pp=}")
+            if dist.get_rank() == 0:
+                print(f"{dist.get_rank()=}, {cum_loss_pp=}, {loss_no_pp=}")
 
             optimizer_pp.step()
             optimizer_no_pp.step()

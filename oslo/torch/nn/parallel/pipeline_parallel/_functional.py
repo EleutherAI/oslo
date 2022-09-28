@@ -2,53 +2,43 @@ import torch
 from torch.cuda.amp import custom_fwd, custom_bwd
 from torch.distributed import rpc
 
-from oslo.torch.nn.parallel.pipeline_parallel._buffers import _ACTIVATIONS
-
-_FORWARD_MARKER = set()
-
-_LOCAL_BACKWARD_DONE = False
-
-_NUM_BACKWARD_DONE = 0
-
-
-def add_forward_marker(mark):
-    _FORWARD_MARKER.add(mark)
-    print(f'ADD MARKER: {torch.distributed.get_rank()=}, {_FORWARD_MARKER=}')
+from oslo.torch.nn.parallel.pipeline_parallel._buffers import (
+    get_original_forward_function,
+    save_activation,
+    pop_activation,
+)
+from oslo.torch.nn.parallel.pipeline_parallel._sync import (
+    register_job_requires_backward,
+    notify_backward_job_done,
+)
+from oslo.torch.nn.parallel.pipeline_parallel._messages import pack_tensor_stub, unpack_tensor_stub
 
 
-def remove_forward_marker(mark):
-    _FORWARD_MARKER.remove(mark)
-    print(f'REMOVE MARKER: {torch.distributed.get_rank()=}, {_FORWARD_MARKER=}')
+def remote_module_forward(caller, location, unique_key, args_stub, kwargs_stub, requires_redirection, *tensors):
+    if requires_redirection:
+        # prepare backward redirection to caller
+        tensors = apply_backward_redirection(
+            caller,
+            unique_key,
+            *tensors,
+        )
 
+    (args, kwargs), _ = unpack_tensor_stub([args_stub, kwargs_stub], tensors)
 
-def len_forward_marker():
-    # print(f'{torch.distributed.get_rank()=}, {_FORWARD_MARKER=}')
-    return len(_FORWARD_MARKER)
+    forward_fn = get_original_forward_function(location)
+    result = forward_fn(*args, **kwargs)
 
+    result_stub, tensors = pack_tensor_stub(result, [])
+    need_activation_save = any([t.requires_grad for t in tensors])
+    if need_activation_save:
+        save_activation(unique_key, tensors)
 
-def increase_num_backward_done():
-    global _NUM_BACKWARD_DONE
-    _NUM_BACKWARD_DONE += 1
-
-
-def get_num_backward_done():
-    global _NUM_BACKWARD_DONE
-    return _NUM_BACKWARD_DONE
-
-
-def reset_num_backward_done():
-    global _NUM_BACKWARD_DONE, _LOCAL_BACKWARD_DONE
-    _NUM_BACKWARD_DONE = 0
-    _LOCAL_BACKWARD_DONE = False
+    return result_stub, tensors, need_activation_save
 
 
 def launch_remote_backward(unique_key, *grad_outputs):
-    activation = _ACTIVATIONS.pop(unique_key)
+    activation = pop_activation(unique_key)
 
-    print(f'{unique_key=}, {type(activation)=}, {len(activation)=}, {len(grad_outputs)=}')
-
-    # TODO; some output contains tuple of tuple..
-    #   better way to deal with this?
     new_act = []
     new_grad = []
     for act, grad in zip(activation, grad_outputs):
@@ -56,18 +46,20 @@ def launch_remote_backward(unique_key, *grad_outputs):
             new_act.append(act)
             new_grad.append(grad)
 
-    torch.autograd.backward(tuple(new_act), tuple(new_grad))
-    remove_forward_marker(unique_key)
+    if len(new_act) > 0 and len(new_grad) > 0:
+        torch.autograd.backward(tuple(new_act), tuple(new_grad))
+        notify_backward_job_done(unique_key)
 
 
-# TODO; why
+# why
 #  forward(ctx, req, *args, **kwargs)
 #  ...
 #  return args, kwargs
 #  does not work???
-#  ->
+#
 #  because that is the design of Pytorch
 #  see: github.com/pytorch/pytorch/issues/16940
+#
 # based on https://github.com/facebookresearch/fairscale/blob/main/fairscale/nn/pipe/rpc.py#L53
 class _PipeBackwardRedirection(torch.autograd.Function):
     @staticmethod
@@ -75,18 +67,17 @@ class _PipeBackwardRedirection(torch.autograd.Function):
     def forward(ctx, to, unique_key, *args):
         ctx.to = to
         ctx.unique_key = unique_key
-        ctx.num_nones = 2 + len(args)  # counting req
+        ctx.num_nones = 2 + len(args)
 
         # mark
         # TODO; can we do this before remote_forward
         #  without rpc call?
-        rpc.rpc_sync(to=to, func=add_forward_marker, args=(unique_key,))
+        rpc.rpc_sync(to=to, func=register_job_requires_backward, args=(unique_key,))
 
         return args
 
     @staticmethod
     @custom_bwd
-    @rpc.functions.async_execution
     def backward(ctx, *grad_outputs):
         to = ctx.to
         unique_key = ctx.unique_key
