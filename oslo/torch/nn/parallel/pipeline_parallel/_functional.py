@@ -20,6 +20,7 @@ def remote_module_forward(
     requires_redirection,
     is_training,
     is_grad_enabled,
+    autocast_information,
     *tensors
 ):
     if requires_redirection and is_training and is_grad_enabled:
@@ -33,7 +34,15 @@ def remote_module_forward(
     (args, kwargs), _ = unpack_tensor_stub([args_stub, kwargs_stub], tensors)
 
     forward_fn = get_original_forward_function(location)
-    with torch.set_grad_enabled(is_grad_enabled):
+
+    is_autocast_enabled, is_autocast_cache_enabled, prev_fastdtype = autocast_information
+    autocast = torch.cuda.amp.autocast(
+        enabled=is_autocast_enabled,
+        dtype=prev_fastdtype,
+        cache_enabled=is_autocast_cache_enabled,
+    )
+
+    with torch.set_grad_enabled(is_grad_enabled), autocast:
         result = forward_fn(*args, **kwargs)
 
     result_stub, tensors = pack_tensor_stub(result, [])
