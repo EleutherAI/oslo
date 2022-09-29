@@ -17,10 +17,12 @@ from oslo.torch.nn.parallel.pipeline_parallel._messages import pack_tensor_stub,
 def remote_module_forward(
     caller, location, unique_key,
     args_stub, kwargs_stub,
-    requires_redirection, training,
+    requires_redirection,
+    is_training,
+    is_grad_enabled,
     *tensors
 ):
-    if requires_redirection:
+    if requires_redirection and is_training and is_grad_enabled:
         # prepare backward redirection to caller
         tensors = apply_backward_redirection(
             caller,
@@ -31,10 +33,11 @@ def remote_module_forward(
     (args, kwargs), _ = unpack_tensor_stub([args_stub, kwargs_stub], tensors)
 
     forward_fn = get_original_forward_function(location)
-    result = forward_fn(*args, **kwargs)
+    with torch.set_grad_enabled(is_grad_enabled):
+        result = forward_fn(*args, **kwargs)
 
     result_stub, tensors = pack_tensor_stub(result, [])
-    need_activation_save = any([t.requires_grad for t in tensors]) and training
+    need_activation_save = any([t.requires_grad for t in tensors]) and is_training and is_grad_enabled
     if need_activation_save:
         save_activation(unique_key, tensors)
 

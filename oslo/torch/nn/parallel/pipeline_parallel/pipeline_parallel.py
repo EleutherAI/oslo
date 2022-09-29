@@ -1,5 +1,4 @@
 import concurrent.futures
-import time
 from threading import Lock
 
 import torch
@@ -40,6 +39,15 @@ def PipelineParallel(
         memory_computation_balance=memory_computation_balance,
         num_micro_batches=num_micro_batches
     )
+
+
+# function to launch self.module. needs this
+# function because torch.set_grad_enabled() is
+# thread local.
+def launch(fn, is_grad_enabled, *args, **kwargs):
+    with torch.set_grad_enabled(is_grad_enabled):
+        result = fn(*args, **kwargs)
+    return result
 
 
 class _PipelineParallel(nn.Module):
@@ -129,8 +137,9 @@ class _PipelineParallel(nn.Module):
             #     futures.append(future)
             #     ind += 1
 
+            is_grad_enabled = torch.is_grad_enabled()
             for ind, (args_, kwargs_) in enumerate(zip(new_args, new_kwargs)):
-                future = self.producer.submit(self.module, *args_, **kwargs_)
+                future = self.producer.submit(launch, self.module, is_grad_enabled, *args_, **kwargs_)
                 futures.append(future)
 
             for i, done in enumerate(concurrent.futures.as_completed(futures)):
@@ -166,6 +175,7 @@ class _PipelineParallel(nn.Module):
         # barrier; wait for all rank
         wait_other_ranks(self.rank, self.parallel_context)
 
+        # TODO; seems like this is not necessary?
         torch.cuda.empty_cache()
 
     def _recursive_wrap(self, module, prefix):
@@ -202,11 +212,13 @@ class _PipelineParallel(nn.Module):
                 tensors = tuple(tensors)
 
                 # does not save activation if the module is in eval mode
-                need_activation_save = any([t.requires_grad for t in tensors]) and self.training
+                is_grad_enabled = torch.is_grad_enabled()
+                is_training = self.training
+                need_activation_save = any([t.requires_grad for t in tensors])
                 with self._lock:
                     unique_key = make_unique_key(location, self.rank)
 
-                if need_activation_save:
+                if need_activation_save and is_training and is_grad_enabled:
                     # prepare backward
                     save_activation(unique_key, tensors)
 
@@ -224,13 +236,15 @@ class _PipelineParallel(nn.Module):
                     args=(
                             caller, location, unique_key,
                             args_stub, kwargs_stub,
-                            need_activation_save, self.training
+                            need_activation_save,
+                            is_training,
+                            is_grad_enabled,
                          ) + tensors,
                 )
                 # receive result as stub
                 result_stub, tensors, requires_redirection = fut.wait()
 
-                if requires_redirection and self.training:
+                if requires_redirection and is_training and is_grad_enabled:
                     tensors = apply_backward_redirection(
                         callee,
                         unique_key,
