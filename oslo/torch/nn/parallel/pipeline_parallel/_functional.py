@@ -14,7 +14,12 @@ from oslo.torch.nn.parallel.pipeline_parallel._sync import (
 from oslo.torch.nn.parallel.pipeline_parallel._messages import pack_tensor_stub, unpack_tensor_stub
 
 
-def remote_module_forward(caller, location, unique_key, args_stub, kwargs_stub, requires_redirection, *tensors):
+def remote_module_forward(
+    caller, location, unique_key,
+    args_stub, kwargs_stub,
+    requires_redirection, training,
+    *tensors
+):
     if requires_redirection:
         # prepare backward redirection to caller
         tensors = apply_backward_redirection(
@@ -29,7 +34,7 @@ def remote_module_forward(caller, location, unique_key, args_stub, kwargs_stub, 
     result = forward_fn(*args, **kwargs)
 
     result_stub, tensors = pack_tensor_stub(result, [])
-    need_activation_save = any([t.requires_grad for t in tensors])
+    need_activation_save = any([t.requires_grad for t in tensors]) and training
     if need_activation_save:
         save_activation(unique_key, tensors)
 

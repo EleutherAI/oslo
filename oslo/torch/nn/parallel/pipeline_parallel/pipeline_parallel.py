@@ -201,7 +201,8 @@ class _PipelineParallel(nn.Module):
                 (args_stub, kwargs_stub), tensors = pack_tensor_stub([args, kwargs], [])
                 tensors = tuple(tensors)
 
-                need_activation_save = any([t.requires_grad for t in tensors])
+                # does not save activation if the module is in eval mode
+                need_activation_save = any([t.requires_grad for t in tensors]) and self.training
                 with self._lock:
                     unique_key = make_unique_key(location, self.rank)
 
@@ -220,12 +221,16 @@ class _PipelineParallel(nn.Module):
                 fut = rpc.rpc_async(
                     to=callee,
                     func=remote_module_forward,
-                    args=(caller, location, unique_key, args_stub, kwargs_stub, need_activation_save) + tensors,
+                    args=(
+                            caller, location, unique_key,
+                            args_stub, kwargs_stub,
+                            need_activation_save, self.training
+                         ) + tensors,
                 )
                 # receive result as stub
                 result_stub, tensors, requires_redirection = fut.wait()
 
-                if requires_redirection:
+                if requires_redirection and self.training:
                     tensors = apply_backward_redirection(
                         callee,
                         unique_key,
