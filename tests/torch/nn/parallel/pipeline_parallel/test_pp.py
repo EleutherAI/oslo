@@ -230,7 +230,7 @@ if torch.distributed.get_rank() == 1:
 
 
 def run():
-    batch_size = 8 * num_micro_batches
+    batch_size = 2 * num_micro_batches
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.pad_token = tokenizer.eos_token
 
@@ -270,7 +270,7 @@ def run():
             loss_no_pp.backward()
 
             if dist.get_rank() == 0:
-                print(f"{dist.get_rank()=}, {cum_loss_pp=}, {loss_no_pp=}")
+                print(f"{dist.get_rank()}, {cum_loss_pp}, {loss_no_pp}")
 
             optimizer_pp.step()
             optimizer_no_pp.step()
