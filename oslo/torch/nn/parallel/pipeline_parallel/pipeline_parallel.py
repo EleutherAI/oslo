@@ -1,5 +1,4 @@
 import concurrent.futures
-import time
 from threading import Lock
 
 import torch
@@ -8,29 +7,29 @@ from torch.distributed import rpc
 
 from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.distributed.parallel_mode import ParallelMode
-from oslo.torch.nn.parallel.pipeline_parallel._buffers import save_activation
-from oslo.torch.nn.parallel.pipeline_parallel._functional import (
-    apply_backward_redirection,
-    len_forward_marker,
-)
-from oslo.torch.nn.parallel.pipeline_parallel._messages import assemble_args
-from oslo.torch.nn.parallel.pipeline_parallel._model_partitioner import ModelPartitioner
-from oslo.torch.nn.parallel.pipeline_parallel._server import (
-    _ORIGINAL_FORWARDS,
-    _MODULE_DEVICE_LOCATIONS,
-    remote_module_forward,
-    _RESULT_DICT,
-    get_result,
-    reset_result,
-    increment_done,
-    get_done,
-    reset_done,
-    _FORWARD_COUNTER,
-    get_forward_counter,
-    increment_forward_counter,
-    reset_forward_counter,
-)
 from oslo.torch.nn.parallel.utils import get_parallel_context
+from oslo.torch.nn.parallel.pipeline_parallel._buffers import (
+    register_original_forward_function,
+    get_original_forward_function,
+    get_module_device_location,
+    save_activation,
+)
+from oslo.torch.nn.parallel.pipeline_parallel._functional import (
+    remote_module_forward,
+    apply_backward_redirection,
+)
+from oslo.torch.nn.parallel.pipeline_parallel._sync import (
+    wait_other_ranks,
+    make_unique_key,
+    reset_forward_used_counter,
+    set_result,
+    get_result,
+)
+from oslo.torch.nn.parallel.pipeline_parallel._messages import (
+    pack_tensor_stub,
+    unpack_tensor_stub,
+)
+from oslo.torch.nn.parallel.pipeline_parallel._model_partitioner import ModelPartitioner
 
 
 def PipelineParallel(
@@ -40,7 +39,21 @@ def PipelineParallel(
     num_micro_batches: int = 1,
 ):
     # TODO, @HG
-    pass
+    return _PipelineParallel(
+        module=module,
+        parallel_context=parallel_context,
+        memory_computation_balance=memory_computation_balance,
+        num_micro_batches=num_micro_batches,
+    )
+
+
+# function to launch self.module. needs this
+# function because torch.set_grad_enabled() is
+# thread local.
+def launch(fn, is_grad_enabled, *args, **kwargs):
+    with torch.set_grad_enabled(is_grad_enabled):
+        result = fn(*args, **kwargs)
+    return result
 
 
 class _PipelineParallel(nn.Module):
@@ -98,11 +111,12 @@ class _PipelineParallel(nn.Module):
 
     def forward(self, *args, **kwargs):
         # set forward counter to zero
-        reset_forward_counter()
+        reset_forward_used_counter()
 
         # to ensure optimizer's step is done for all processes
-        # TODO; barrier for only PP
-        torch.distributed.barrier()
+        torch.distributed.barrier(
+            self.parallel_context.get_group(ParallelMode.PIPELINE)
+        )
 
         if self.rank == 0:
             # TODO;
@@ -129,22 +143,26 @@ class _PipelineParallel(nn.Module):
             #     futures.append(future)
             #     ind += 1
 
+            is_grad_enabled = torch.is_grad_enabled()
             for ind, (args_, kwargs_) in enumerate(zip(new_args, new_kwargs)):
-                future = self.producer.submit(self.module, *args_, **kwargs_)
+                future = self.producer.submit(
+                    launch, self.module, is_grad_enabled, *args_, **kwargs_
+                )
                 futures.append(future)
 
             for i, done in enumerate(concurrent.futures.as_completed(futures)):
                 result = done.result()
-                _RESULT_DICT[i] = result
-
-                # print(f'{i=}, {result.loss=}, {dist.get_rank()=}')
+                set_result(i, result)
 
                 yield result
 
         else:
+            # TODO; the code block below does not make
+            #  same number with rank 0. However, since
+            #  this result is a dummy, it does not cause
+            #  an error.
             # forward pass end, wait results from master
             for i in range(self.num_micro_batches):
-                # result = FINAL_RESULT_QUEUE.get()
                 rpc_dst = self.parallel_context.get_pipeline_rpc_worker_name(0)
                 result = rpc.rpc_sync(
                     to=rpc_dst,
@@ -152,29 +170,20 @@ class _PipelineParallel(nn.Module):
                     args=(i,),
                 )
 
-                yield result  # has no gradient
+                # remove gradient of non-master result.
+                # without this, the users need to consider rank
+                # when calling loss.backward()
+                result, tensors = pack_tensor_stub(result, [])
+                for i_tensor in range(len(tensors)):
+                    tensors[i_tensor].grad = None
+                result, _ = unpack_tensor_stub(result, tensors)
 
-        # barrier ?
-        # TODO; check the reason why we need this code block
-        for other in self.parallel_context.get_ranks_in_group(ParallelMode.PIPELINE):
-            if other == self.rank:
-                increment_done()
-            else:
-                rpc_dst = self.parallel_context.get_pipeline_rpc_worker_name(other)
-                rpc.rpc_sync(
-                    to=rpc_dst,
-                    func=increment_done,
-                )
+                yield result
 
-        while get_done() < self.parallel_context.get_world_size(ParallelMode.PIPELINE):
-            time.sleep(0.0)
+        # barrier; wait for all rank
+        wait_other_ranks(self.rank, self.parallel_context)
 
-        reset_done()
-        reset_result()
-
-        while len_forward_marker() != 0:
-            time.sleep(0.0)
-
+        # TODO; seems like this is not necessary?
         torch.cuda.empty_cache()
 
     def _recursive_wrap(self, module, prefix):
@@ -192,29 +201,34 @@ class _PipelineParallel(nn.Module):
         loc = module.location
         device = module.oslo_parallel[ParallelMode.PIPELINE]
 
-        _ORIGINAL_FORWARDS[loc] = orig_forward
-        _MODULE_DEVICE_LOCATIONS[loc] = device
-        _FORWARD_COUNTER[loc] = 0
+        register_original_forward_function(loc, orig_forward, device)
 
         def new_forward(*args, **kwargs):
             location = module.location
-            module_device = _MODULE_DEVICE_LOCATIONS[location]
+            module_device = get_module_device_location(location)
             module_device = torch.device("cuda", module_device)
             current_device = self.parallel_context.get_local_rank(ParallelMode.PIPELINE)
             current_device = torch.device("cuda", current_device)
             is_same = module_device == current_device
 
             if is_same:
-                forward_fn = _ORIGINAL_FORWARDS[location]
+                forward_fn = get_original_forward_function(location)
                 result = forward_fn(*args, **kwargs)
 
             else:
-                arg_keys, new_args = assemble_args(args, kwargs)
+                (args_stub, kwargs_stub), tensors = pack_tensor_stub([args, kwargs], [])
+                tensors = tuple(tensors)
 
+                # does not save activation if the module is in eval mode
+                is_grad_enabled = torch.is_grad_enabled()
+                is_training = self.training
+                need_activation_save = any([t.requires_grad for t in tensors])
                 with self._lock:
-                    cnt = get_forward_counter(location)
-                    unique_key = (location, cnt)
-                    increment_forward_counter(location)
+                    unique_key = make_unique_key(location, self.rank)
+
+                if need_activation_save and is_training and is_grad_enabled:
+                    # prepare backward
+                    save_activation(unique_key, tensors)
 
                 caller = self.parallel_context.get_pipeline_rpc_worker_name(
                     current_device.index
@@ -223,23 +237,33 @@ class _PipelineParallel(nn.Module):
                     module_device.index
                 )
 
-                # prepare backward
-                save_activation(unique_key, new_args)
-
                 # request forward
                 fut = rpc.rpc_async(
                     to=callee,
                     func=remote_module_forward,
-                    args=(caller, location, unique_key, arg_keys) + new_args,
+                    args=(
+                        caller,
+                        location,
+                        unique_key,
+                        args_stub,
+                        kwargs_stub,
+                        need_activation_save,
+                        is_training,
+                        is_grad_enabled,
+                    )
+                    + tensors,
                 )
-                result = fut.wait()
+                # receive result as stub
+                result_stub, tensors, requires_redirection = fut.wait()
 
-                # TODO; does result always be an args?
-                result = apply_backward_redirection(
-                    callee,
-                    unique_key,
-                    *result,
-                )
+                if requires_redirection and is_training and is_grad_enabled:
+                    tensors = apply_backward_redirection(
+                        callee,
+                        unique_key,
+                        *tensors,
+                    )
+
+                result, _ = unpack_tensor_stub(result_stub, tensors)
 
             return result
 

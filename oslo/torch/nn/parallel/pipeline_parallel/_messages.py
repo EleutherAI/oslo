@@ -1,128 +1,135 @@
 from dataclasses import dataclass
-from typing import Optional, Any
-from typing import Tuple, List, Union
 
 import torch
 
-MESSAGE_GENERATION = 0
-REQUEST_GENERATION = 0
-
-
-@dataclass(init=False)
-class Message:
-    comm_type: str
-    # 1. request or response
-    request_from: Optional[str]
-    # 2. request module id
-    exec_type: str
-    # 3. forward or backward
-    inputs: Optional[Any]
-    # 4. input data for module execution
-    outputs: Optional[Any]
-    # 5. output data from module execution
-    src_rank: int
-    # 6. source pp rank
-    dst_rank: int
-    # 7. destination pp rank
-    location: int
-    # 8. The location of the module within the module graph
-    in_autocast_context: bool
-    # 9. Whether the requester is currently in a autocast context
-    in_grad_related_context: bool
-    # 10. Whether the requester is currently in a no grad/enable grad context
-    use_activation_checkpointing: bool
-    # 11. Whether activation checkpointing is enabled for the current module
-
-    def __init__(self):
-        global MESSAGE_GENERATION
-        MESSAGE_GENERATION += 1
-        self.tag = MESSAGE_GENERATION
+from oslo.torch.nn.parallel.pipeline_parallel._utils import (
+    _is_namedtuple,
+    _is_private,
+    _is_primitive,
+)
 
 
 @dataclass
 class TensorStub(object):
-    id: str
-    dtype: torch.dtype
-    shape: Union[List, Tuple]
-    requires_grad: bool
+    id: int
 
 
-@dataclass(init=False)
-class RemoteWorkRequest:
-    src: torch.device
-    dst: torch.device
-    location: str
-    tag: int
-    caller: str
-    keys: tuple
+def pack_tensor_stub(obj, args_list):
+    """
+    Recursively replace Tensor member variables to TensorStub.
+    Inspiration: https://github.com/pytorch/pytorch/blob/master/torch/distributed/utils.py#L48
+    """
+    if torch.is_tensor(obj):
+        id_ = len(args_list)
+        tensor_sub = TensorStub(id_)
+        args_list.append(obj)
+        obj = tensor_sub
 
-    def __init__(self):
-        global REQUEST_GENERATION
-        REQUEST_GENERATION += 1
-        self.tag = REQUEST_GENERATION
+        return obj, args_list
+
+    elif _is_namedtuple(obj):
+        obj_list = list(obj)
+        for i in range(len(obj_list)):
+            obj_list_i, args_list = pack_tensor_stub(obj_list[i], args_list)
+            obj_list_i[i] = obj_list_i
+        obj = obj.__class__._make(obj_list)  # use namedtuple's method
+
+        return obj, args_list
+
+    elif isinstance(obj, tuple):
+        obj = list(obj)
+        for i in range(len(obj)):
+            obj_i, args_list = pack_tensor_stub(obj[i], args_list)
+            obj[i] = obj_i
+
+        obj = tuple(obj)
+        return obj, args_list
+
+    elif isinstance(obj, list):
+        for i in range(len(obj)):
+            obj_i, args_list = pack_tensor_stub(obj[i], args_list)
+            obj[i] = obj_i
+
+        return obj, args_list
+
+    elif isinstance(obj, dict):
+        for k in obj.keys():
+            obj_k, args_list = pack_tensor_stub(obj[k], args_list)
+            obj[k] = obj_k
+
+        return obj, args_list
+
+    elif _is_primitive(obj):
+        return obj, args_list
+
+    else:  # other kinds of object
+        members = [
+            attr
+            for attr in dir(obj)
+            if not callable(getattr(obj, attr)) and not _is_private(attr)
+        ]
+        for m in members:
+            obj_m = getattr(obj, m)
+            obj_m, args_list = pack_tensor_stub(obj_m, args_list)
+            setattr(obj, m, obj_m)
+
+        return obj, args_list
 
 
-def generate_request(src, dst, location, caller, args, kwargs):
-    req = RemoteWorkRequest()
-    req.src = src
-    req.dst = dst
-    req.location = location
-    req.caller = caller
+def unpack_tensor_stub(obj, args_list):
+    """
+    Recursively replace TensorStub to original Tensor.
+    Inspiration: https://github.com/pytorch/pytorch/blob/master/torch/distributed/utils.py#L48
+    """
+    if isinstance(obj, TensorStub):
+        id_ = obj.id
+        tensor = args_list[id_]
+        return tensor, args_list
 
-    # merge kwargs into args
-    keys, new_args = assemble_args(args, kwargs)
-    req.keys = keys
+    elif _is_namedtuple(obj):
+        obj_list = list(obj)
+        for i in range(len(obj_list)):
+            obj_list_i, args_list = unpack_tensor_stub(obj_list[i], args_list)
+            obj_list_i[i] = obj_list_i
+        obj = obj.__class__._make(obj_list)  # use namedtuple's method
 
-    return req, new_args
+        return obj, args_list
 
+    elif isinstance(obj, tuple):
+        obj = list(obj)
+        for i in range(len(obj)):
+            obj_i, args_list = unpack_tensor_stub(obj[i], args_list)
+            obj[i] = obj_i
 
-def assemble_args(args, kwargs):
-    new_args = []
-    keys = []
-    for v in args:
-        if torch.is_tensor(v):
-            v = v.contiguous()
-        new_args.append(v)
-        keys.append(None)
+        obj = tuple(obj)
+        return obj, args_list
 
-    for k, v in kwargs.items():
-        if k is None:
-            raise ValueError("None cannot be used the key of kwargs.")
-        if torch.is_tensor(v):
-            v = v.contiguous()
-        new_args.append(v)
-        keys.append(k)
+    elif isinstance(obj, list):
+        for i in range(len(obj)):
+            obj_i, args_list = unpack_tensor_stub(obj[i], args_list)
+            obj[i] = obj_i
 
-    return tuple(keys), tuple(new_args)
+        return obj, args_list
 
+    elif isinstance(obj, dict):
+        for k in obj.keys():
+            obj_k, args_list = unpack_tensor_stub(obj[k], args_list)
+            obj[k] = obj_k
 
-def disassemble_new_args(new_args, keys):
-    args = list()
-    kwargs = dict()
+        return obj, args_list
 
-    for k, v in zip(keys, new_args):
-        if k is None:
-            args.append(v)
-        else:
-            kwargs[k] = v
+    elif _is_primitive(obj):
+        return obj, args_list
 
-    return tuple(args), kwargs
+    else:  # other kinds of object
+        members = [
+            attr
+            for attr in dir(obj)
+            if not callable(getattr(obj, attr)) and not _is_private(attr)
+        ]
+        for m in members:
+            obj_m = getattr(obj, m)
+            obj_m, args_list = unpack_tensor_stub(obj_m, args_list)
+            setattr(obj, m, obj_m)
 
-
-def disassemble_result(result):
-    if isinstance(result, torch.Tensor):
-        args = (result,)
-        kwargs = dict()
-        wrapped = True
-    elif isinstance(result, dict):
-        args = tuple([])
-        kwargs = result
-        wrapped = False
-    elif isinstance(result, (list, tuple)):
-        args = tuple(result)
-        kwargs = dict()
-        wrapped = False
-    else:
-        raise NotImplementedError
-
-    return args, kwargs, wrapped
+        return obj, args_list
