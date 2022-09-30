@@ -3,7 +3,9 @@ from dataclasses import dataclass
 import torch
 
 from oslo.torch.nn.parallel.pipeline_parallel._utils import (
-    _is_namedtuple, _is_private, _is_primitive
+    _is_namedtuple,
+    _is_private,
+    _is_primitive,
 )
 
 
@@ -30,7 +32,7 @@ def pack_tensor_stub(obj, args_list):
         for i in range(len(obj_list)):
             obj_list_i, args_list = pack_tensor_stub(obj_list[i], args_list)
             obj_list_i[i] = obj_list_i
-        obj = obj.__class__._make(obj_list)     # use namedtuple's method
+        obj = obj.__class__._make(obj_list)  # use namedtuple's method
 
         return obj, args_list
 
@@ -60,9 +62,10 @@ def pack_tensor_stub(obj, args_list):
     elif _is_primitive(obj):
         return obj, args_list
 
-    else:   # other kinds of object
+    else:  # other kinds of object
         members = [
-            attr for attr in dir(obj)
+            attr
+            for attr in dir(obj)
             if not callable(getattr(obj, attr)) and not _is_private(attr)
         ]
         for m in members:
@@ -120,7 +123,8 @@ def unpack_tensor_stub(obj, args_list):
 
     else:  # other kinds of object
         members = [
-            attr for attr in dir(obj)
+            attr
+            for attr in dir(obj)
             if not callable(getattr(obj, attr)) and not _is_private(attr)
         ]
         for m in members:

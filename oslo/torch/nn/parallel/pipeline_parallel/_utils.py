@@ -36,8 +36,8 @@ def _is_namedtuple(obj):
 
 
 def _is_primitive(obj):
-    return not hasattr(obj, '__dict__')
+    return not hasattr(obj, "__dict__")
 
 
 def _is_private(attr):
-    return attr.startswith('__')
+    return attr.startswith("__")

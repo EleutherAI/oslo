@@ -15,9 +15,12 @@ from oslo.torch.nn.parallel.pipeline_parallel._buffers import _MODULE_DEVICE_LOC
 from datasets import load_dataset
 from transformers import (
     AutoTokenizer,
-    GPT2Config, GPT2LMHeadModel,
-    T5Config, T5ForConditionalGeneration,
-    BartConfig, BartForConditionalGeneration,
+    GPT2Config,
+    GPT2LMHeadModel,
+    T5Config,
+    T5ForConditionalGeneration,
+    BartConfig,
+    BartForConditionalGeneration,
     set_seed,
 )
 
@@ -56,7 +59,9 @@ class T5Debug(T5ForConditionalGeneration):
     ) -> Union[Tuple[torch.FloatTensor], Seq2SeqLMOutput]:
 
         use_cache = use_cache if use_cache is not None else self.config.use_cache
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         # Encode if needed (training, first prediction pass)
         if encoder_outputs is None:
@@ -82,7 +87,11 @@ class T5Debug(T5ForConditionalGeneration):
         if self.model_parallel:
             torch.cuda.set_device(self.decoder.first_device)
 
-        if labels is not None and decoder_input_ids is None and decoder_inputs_embeds is None:
+        if (
+            labels is not None
+            and decoder_input_ids is None
+            and decoder_inputs_embeds is None
+        ):
             # get decoder inputs from shifting lm labels to the right
             decoder_input_ids = self._shift_right(labels)
 
@@ -95,7 +104,9 @@ class T5Debug(T5ForConditionalGeneration):
             if attention_mask is not None:
                 attention_mask = attention_mask.to(self.decoder.first_device)
             if decoder_attention_mask is not None:
-                decoder_attention_mask = decoder_attention_mask.to(self.decoder.first_device)
+                decoder_attention_mask = decoder_attention_mask.to(
+                    self.decoder.first_device
+                )
 
         # Decode
         decoder_outputs = self.decoder(
@@ -170,7 +181,7 @@ num_micro_batches = 8
 
 model_name = "t5-small"
 config = T5Config.from_pretrained(model_name)
-config.dropout_rate = 0.
+config.dropout_rate = 0.0
 model = T5ForConditionalGeneration(config)
 # model = T5Debug(config)
 
@@ -215,7 +226,7 @@ allocate_params(wrapper_pp, parallel_context)
 #
 if torch.distributed.get_rank() == 1:
     for k, v in _MODULE_DEVICE_LOCATIONS.items():
-        print(f'{k}: {v}')
+        print(f"{k}: {v}")
 
 
 def run():

@@ -1,4 +1,6 @@
-from oslo.torch.nn.parallel.pipeline_parallel._sync import register_location_for_forward_counter
+from oslo.torch.nn.parallel.pipeline_parallel._sync import (
+    register_location_for_forward_counter,
+)
 
 
 # original forward dictionary
@@ -31,4 +33,4 @@ def save_activation(key, activation):
 
 
 def pop_activation(key):
-    return _ACTIVATIONS.pop(key, [])    # TODO; okay?
+    return _ACTIVATIONS.pop(key, [])  # TODO; okay?

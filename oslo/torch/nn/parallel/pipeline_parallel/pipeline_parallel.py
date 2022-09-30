@@ -14,7 +14,10 @@ from oslo.torch.nn.parallel.pipeline_parallel._buffers import (
     get_module_device_location,
     save_activation,
 )
-from oslo.torch.nn.parallel.pipeline_parallel._functional import remote_module_forward, apply_backward_redirection
+from oslo.torch.nn.parallel.pipeline_parallel._functional import (
+    remote_module_forward,
+    apply_backward_redirection,
+)
 from oslo.torch.nn.parallel.pipeline_parallel._sync import (
     wait_other_ranks,
     make_unique_key,
@@ -22,7 +25,10 @@ from oslo.torch.nn.parallel.pipeline_parallel._sync import (
     set_result,
     get_result,
 )
-from oslo.torch.nn.parallel.pipeline_parallel._messages import pack_tensor_stub, unpack_tensor_stub
+from oslo.torch.nn.parallel.pipeline_parallel._messages import (
+    pack_tensor_stub,
+    unpack_tensor_stub,
+)
 from oslo.torch.nn.parallel.pipeline_parallel._model_partitioner import ModelPartitioner
 
 
@@ -37,7 +43,7 @@ def PipelineParallel(
         module=module,
         parallel_context=parallel_context,
         memory_computation_balance=memory_computation_balance,
-        num_micro_batches=num_micro_batches
+        num_micro_batches=num_micro_batches,
     )
 
 
@@ -139,7 +145,9 @@ class _PipelineParallel(nn.Module):
 
             is_grad_enabled = torch.is_grad_enabled()
             for ind, (args_, kwargs_) in enumerate(zip(new_args, new_kwargs)):
-                future = self.producer.submit(launch, self.module, is_grad_enabled, *args_, **kwargs_)
+                future = self.producer.submit(
+                    launch, self.module, is_grad_enabled, *args_, **kwargs_
+                )
                 futures.append(future)
 
             for i, done in enumerate(concurrent.futures.as_completed(futures)):
@@ -234,12 +242,16 @@ class _PipelineParallel(nn.Module):
                     to=callee,
                     func=remote_module_forward,
                     args=(
-                            caller, location, unique_key,
-                            args_stub, kwargs_stub,
-                            need_activation_save,
-                            is_training,
-                            is_grad_enabled,
-                         ) + tensors,
+                        caller,
+                        location,
+                        unique_key,
+                        args_stub,
+                        kwargs_stub,
+                        need_activation_save,
+                        is_training,
+                        is_grad_enabled,
+                    )
+                    + tensors,
                 )
                 # receive result as stub
                 result_stub, tensors, requires_redirection = fut.wait()
