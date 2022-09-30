@@ -1,4 +1,5 @@
 import concurrent.futures
+import copy
 import time
 from threading import Lock
 
@@ -30,7 +31,7 @@ from oslo.torch.nn.parallel.pipeline_parallel._server import (
     increment_forward_counter,
     reset_forward_counter,
 )
-from oslo.torch.nn.parallel.utils import get_parallel_context
+from oslo.torch.nn.parallel.utils import get_parallel_context, add_wrapper
 
 
 def PipelineParallel(
@@ -39,8 +40,15 @@ def PipelineParallel(
     memory_computation_balance: float = 1.0,
     num_micro_batches: int = 1,
 ):
-    # TODO, @HG
-    pass
+    pp = _PipelineParallel(
+        module=module,
+        parallel_context=parallel_context,
+        memory_computation_balance=memory_computation_balance,
+        num_micro_batches=num_micro_batches,
+    )
+    add_wrapper(module, ParallelMode.PIPELINE, pp)
+    setattr(module, "forward", pp.forward)
+    return module
 
 
 class _PipelineParallel(nn.Module):
@@ -59,7 +67,7 @@ class _PipelineParallel(nn.Module):
     Examples:
         >>> from oslo.torch.nn.parallel import PipelineParallel
         >>>
-        >>> model = AnyPytorchModel()
+        >>> model = TransformersModel()
         >>> optimizer = AnyOptimizer(model.parameters(), lr=3e-5)
         >>> pp_wrapper = PipelineParallel(model, ...)
 
@@ -77,6 +85,7 @@ class _PipelineParallel(nn.Module):
     ):
         super().__init__()
         self.module = module
+        self.module_forward = copy.copy(module.forward)
         self.parallel_context = get_parallel_context(module, parallel_context)
         self.partitioner = ModelPartitioner(
             module=module,
@@ -130,7 +139,7 @@ class _PipelineParallel(nn.Module):
             #     ind += 1
 
             for ind, (args_, kwargs_) in enumerate(zip(new_args, new_kwargs)):
-                future = self.producer.submit(self.module, *args_, **kwargs_)
+                future = self.producer.submit(self.module_forward, *args_, **kwargs_)
                 futures.append(future)
 
             for i, done in enumerate(concurrent.futures.as_completed(futures)):
@@ -178,8 +187,8 @@ class _PipelineParallel(nn.Module):
         torch.cuda.empty_cache()
 
     def _recursive_wrap(self, module, prefix):
-        if not hasattr(module, "location"):  # prevent infinite loop
-            setattr(module, "location", prefix)
+        if not hasattr(module, "oslo_pp_location"):  # prevent infinite loop
+            setattr(module, "oslo_pp_location", prefix)
             if prefix != "":  # wrapper's forward function should not be wrapped
                 self._wrap_forward(module)
 
@@ -188,8 +197,11 @@ class _PipelineParallel(nn.Module):
             self._recursive_wrap(m, new_prefix)
 
     def _wrap_forward(self, module):
-        orig_forward = module.forward
-        loc = module.location
+        if module is self.module:
+            orig_forward = self.module_forward
+        else:
+            orig_forward = module.forward
+        loc = module.oslo_pp_location
         device = module.oslo_parallel[ParallelMode.PIPELINE]
 
         _ORIGINAL_FORWARDS[loc] = orig_forward
@@ -197,7 +209,7 @@ class _PipelineParallel(nn.Module):
         _FORWARD_COUNTER[loc] = 0
 
         def new_forward(*args, **kwargs):
-            location = module.location
+            location = module.oslo_pp_location
             module_device = _MODULE_DEVICE_LOCATIONS[location]
             module_device = torch.device("cuda", module_device)
             current_device = self.parallel_context.get_local_rank(ParallelMode.PIPELINE)
@@ -225,6 +237,7 @@ class _PipelineParallel(nn.Module):
 
                 # prepare backward
                 save_activation(unique_key, new_args)
+                forward_fn = _ORIGINAL_FORWARDS[location]
 
                 # request forward
                 fut = rpc.rpc_async(

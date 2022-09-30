@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel, set_seed
 
 from oslo.torch.distributed import ParallelContext
-from oslo.torch.nn.parallel import _PipelineParallel
+from oslo.torch.nn.parallel import PipelineParallel
 from oslo.torch.nn.parallel.utils import allocate_params
 
 matplotlib.use("Agg")
@@ -41,7 +41,7 @@ for n, m in model.named_modules():
 model_no_pp = deepcopy(model)
 model_no_pp.cuda()
 
-wrapper_pp = _PipelineParallel(
+wrapper_pp = PipelineParallel(
     model,
     parallel_context=parallel_context,
     memory_computation_balance=1.0,
