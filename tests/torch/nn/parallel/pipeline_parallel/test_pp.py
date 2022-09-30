@@ -3,8 +3,6 @@ from copy import deepcopy
 import torch
 import torch.nn as nn
 import torch.distributed as dist
-from torch.cuda.amp import autocast
-from torch.distributed.fsdp.sharded_grad_scaler import ShardedGradScaler
 from torch.distributed import rpc
 from torch.optim import Adam
 from torch.utils.data import DataLoader
@@ -159,7 +157,7 @@ set_seed(42)
 
 parallel_context = ParallelContext.from_torch(
     data_parallel_size=1,
-    pipeline_parallel_size=8,
+    pipeline_parallel_size=4,
     tensor_parallel_size=1,
 )
 
@@ -201,10 +199,6 @@ wrapper_pp.train()
 optimizer_pp = Adam(wrapper_pp.parameters(), lr=3e-2)
 optimizer_no_pp = Adam(model_no_pp.parameters(), lr=3e-2)
 
-# TODO; specify group
-scaler_pp = ShardedGradScaler()
-scaler_no_pp = ShardedGradScaler()
-
 allocate_params(wrapper_pp, parallel_context)
 
 #
@@ -230,17 +224,14 @@ def run():
     tokenizer.pad_token = tokenizer.eos_token
 
     datasets = load_dataset("squad").data["train"]["context"]
-    datasets = [str(sample) for sample in datasets[:50000]]
+    datasets = [str(sample) for sample in datasets[:5000]]
     dataloader = DataLoader(datasets, batch_size=batch_size)
 
     pp_losses = []
     no_pp_losses = []
 
-    # wrapper_pp.eval()
-    # model_no_pp.eval()
-
     with torch.enable_grad():
-    # with torch.no_grad():
+        # with torch.no_grad():
         for i, data in enumerate(dataloader):
             inputs = tokenizer(
                 data,
@@ -253,33 +244,25 @@ def run():
             optimizer_pp.zero_grad(set_to_none=True)
             optimizer_no_pp.zero_grad(set_to_none=True)
 
-            def result_generator(inputs):
-                with autocast():
-                    yield from wrapper_pp(**inputs, labels=inputs["input_ids"])
-
             cum_loss_pp = torch.zeros(1)
-            for ind, out_pp in enumerate(result_generator(inputs)):
+            for ind, out_pp in enumerate(
+                wrapper_pp(**inputs, labels=inputs["input_ids"])
+            ):
                 loss_pp = out_pp.loss
                 loss_pp = loss_pp / num_micro_batches
-                scaler_pp.scale(loss_pp).backward()
+                loss_pp.backward()
 
                 cum_loss_pp += loss_pp.detach().item()
 
-            with autocast():
-                out_no_pp = model_no_pp(**inputs, labels=inputs["input_ids"])
+            out_no_pp = model_no_pp(**inputs, labels=inputs["input_ids"])
             loss_no_pp = out_no_pp.loss
-            scaler_no_pp.scale(loss_no_pp).backward()
+            loss_no_pp.backward()
 
             if dist.get_rank() == 0:
                 print(f"{dist.get_rank()=}, {cum_loss_pp=}, {loss_no_pp=}")
 
-            # optimizer_pp.step()
-            # optimizer_no_pp.step()
-
-            scaler_pp.step(optimizer_pp)
-            scaler_no_pp.step(optimizer_no_pp)
-            scaler_pp.update()
-            scaler_no_pp.update()
+            optimizer_pp.step()
+            optimizer_no_pp.step()
 
             pp_losses.append(cum_loss_pp.item())
             no_pp_losses.append(loss_no_pp.item())

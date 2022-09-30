@@ -44,14 +44,8 @@ def PipelineParallel(
 # function to launch self.module. needs this
 # function because torch.set_grad_enabled() is
 # thread local.
-def launch(fn, is_grad_enabled, autocast_information, *args, **kwargs):
-    is_autocast_enabled, is_autocast_cache_enabled, prev_fastdtype = autocast_information
-    autocast = torch.cuda.amp.autocast(
-        enabled=is_autocast_enabled,
-        dtype=prev_fastdtype,
-        cache_enabled=is_autocast_cache_enabled,
-    )
-    with torch.set_grad_enabled(is_grad_enabled), autocast:
+def launch(fn, is_grad_enabled, *args, **kwargs):
+    with torch.set_grad_enabled(is_grad_enabled):
         result = fn(*args, **kwargs)
     return result
 
@@ -144,23 +138,8 @@ class _PipelineParallel(nn.Module):
             #     ind += 1
 
             is_grad_enabled = torch.is_grad_enabled()
-            is_autocast_enabled = torch.is_autocast_enabled()
-            is_autocast_cache_enabled = torch.is_autocast_cache_enabled()
-            prev_fastdtype = torch.get_autocast_gpu_dtype()
-            autocast_information = (
-                is_autocast_enabled,
-                is_autocast_cache_enabled,
-                prev_fastdtype,
-            )
             for ind, (args_, kwargs_) in enumerate(zip(new_args, new_kwargs)):
-                future = self.producer.submit(
-                    launch,
-                    self.module,
-                    is_grad_enabled,
-                    autocast_information,
-                    *args_,
-                    **kwargs_
-                )
+                future = self.producer.submit(launch, self.module, is_grad_enabled, *args_, **kwargs_)
                 futures.append(future)
 
             for i, done in enumerate(concurrent.futures.as_completed(futures)):
@@ -250,15 +229,6 @@ class _PipelineParallel(nn.Module):
                     module_device.index
                 )
 
-                is_autocast_enabled = torch.is_autocast_enabled()
-                is_autocast_cache_enabled = torch.is_autocast_cache_enabled()
-                prev_fastdtype = torch.get_autocast_gpu_dtype()
-                autocast_information = (
-                    is_autocast_enabled,
-                    is_autocast_cache_enabled,
-                    prev_fastdtype,
-                )
-
                 # request forward
                 fut = rpc.rpc_async(
                     to=callee,
@@ -269,7 +239,6 @@ class _PipelineParallel(nn.Module):
                             need_activation_save,
                             is_training,
                             is_grad_enabled,
-                            autocast_information,
                          ) + tensors,
                 )
                 # receive result as stub
