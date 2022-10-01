@@ -542,7 +542,7 @@ class _DistributedDataParallel(Module, Joinable):
             )
 
         # Kevin, Dongsung:
-        # We removed 
+        # We removed
         # 1. checking devices of parameters because we could use multiple parallel wrappers.
         # 2. _passing_sync_batchnorm_handle function which is not used for transformer model
         # 3. Verify model equivalence : dist._verify_params_across_processes(self.process_group, parameters)
@@ -603,7 +603,6 @@ class _DistributedDataParallel(Module, Joinable):
 
         # Build parameters for reducer.
         parameters, expect_sparse_gradient = self._build_params_for_reducer()
-
         # In debug mode, build a mapping of parameter index -> parameter.
         if dist.get_debug_level() != dist.DebugLevel.OFF:
             param_to_name_mapping = self._build_param_to_name_mapping(parameters)
