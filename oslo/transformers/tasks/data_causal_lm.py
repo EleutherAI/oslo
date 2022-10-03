@@ -1,16 +1,10 @@
 import logging
 import warnings
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from datasets.arrow_dataset import Batch
 
-from oslo.torch.distributed import ParallelContext
-from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
-from oslo.transformers.tasks.data_base import (
-    BaseProcessor,
-    ParallelKeys,
-    SequenceParallelMixin,
-)
+from oslo.transformers.tasks.data_base import BaseProcessor
 
 logger = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -64,17 +58,12 @@ class ProcessorForCausalLM(BaseProcessor):
         return dict_of_training_examples
 
 
-class DataCollatorForCausalLM(SequenceParallelMixin):
+class DataCollatorForCausalLM(object):
     """
     Processing training examples to mini-batch for Gpt2 (clm).
     """
 
-    def __init__(
-        self,
-        processor: ProcessorForCausalLM,
-        parallel_context: Optional[ParallelContext] = None,
-        label_pad_token_id: int = -100,
-    ):
+    def __init__(self, processor: ProcessorForCausalLM, label_pad_token_id: int = -100):
         if not isinstance(processor, ProcessorForCausalLM):
             warnings.warn(
                 "DataCollatorForCausalLM is suitable for ProcessorForCausalLM."
@@ -87,30 +76,10 @@ class DataCollatorForCausalLM(SequenceParallelMixin):
 
         self.tokenizer = processor._tokenizer
         self.label_pad_token_id = label_pad_token_id
-        self.sequence_parallel_size = 1
-        if parallel_context is not None:
-            self._set_parallel_context(parallel_context)
 
     def __call__(self, examples):
         batch = self.tokenizer.pad(
-            examples,
-            return_attention_mask=True if self.sequence_parallel_size > 1 else False,
-            return_tensors="pt",
-            pad_to_multiple_of=self.sequence_parallel_size
-            if self.sequence_parallel_size > 1
-            else None,
+            examples, return_attention_mask=False, return_tensors="pt"
         )
-
         batch["labels"] = batch["input_ids"].clone()
-
-        if self.sequence_parallel_size > 1:
-            batch["labels"].masked_fill_(
-                batch["labels"] == self.tokenizer.pad_token_id, self.label_pad_token_id
-            )
-            sp_collate_fn = SequenceDataParallelCollator(
-                parallel_keys=ParallelKeys.CLM,
-                parallel_context=self.parallel_context,
-            )
-            return sp_collate_fn(**batch)
-
         return batch

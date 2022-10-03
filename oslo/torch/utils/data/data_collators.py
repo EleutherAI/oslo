@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 
 import torch
 
@@ -19,7 +19,7 @@ class SequenceDataParallelCollator:
         self.local_rank = parallel_context.get_local_rank(ParallelMode.SEQUENCE)
         self.local_world_size = parallel_context.get_world_size(ParallelMode.SEQUENCE)
 
-    def __call__(self, **features):
+    def __call__(self, features: Dict[str, Any]):
         for key in self.parallel_keys:
             assert (
                 key in features

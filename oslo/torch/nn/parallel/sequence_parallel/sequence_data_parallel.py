@@ -1,3 +1,5 @@
+from functools import partial
+
 import torch
 import torch.distributed as dist
 
@@ -6,6 +8,15 @@ from oslo.torch.nn.parallel.data_parallel._ddp.distributed_data_parallel import 
     _DistributedDataParallel,
 )
 from oslo.torch.nn.parallel.utils import add_wrapper
+from oslo.torch.utils.data import SequenceDataParallelCollator
+
+SEQUENCE_PARALLEL_KEYS = [
+    "input_ids",
+    "attention_mask",
+    "decoder_input_ids",
+    "decoder_attention_mask",
+    "token_type_ids",
+]
 
 
 class _SequenceDataParallelState(object):
@@ -35,7 +46,8 @@ def _sequence_data_parallel_hook(
 def SequenceDataParallel(
     module,
     parallel_context,
-    dim=0,
+    pad_token_id=None,
+    dim=1,
     broadcast_buffers=True,
     bucket_cap_mb=25,
     find_unused_parameters=False,
@@ -62,6 +74,37 @@ def SequenceDataParallel(
     )
 
     add_wrapper(module, ParallelMode.SEQUENCE_DP, sp)
-    setattr(module, "forward", sp.forward)
+
+    if (
+        hasattr(module.config, "pad_token_id")
+        and module.config.pad_token_id is not None
+    ):
+        pad_token_id = module.config.pad_token_id
+
+    if pad_token_id is None:
+        raise ValueError(
+            "param `pad_token_id` must not be None. "
+            "please define `pad_token_id` in your model config or input the pad token id."
+        )
+
+    def forward(self, *args, **kwargs):
+        if len(args) > 0:
+            raise ValueError(
+                "You can not use non-keyword arguments for sequence parallelism. "
+                "For example, if you coded like `model(input_ids, attention_mask)`, "
+                "please rewrite your code like "
+                "`model(input_ids=input_ids, attention_mask=attention_mask)`."
+            )
+
+        collator = SequenceDataParallelCollator(
+            parallel_keys=[key for key in kwargs if key in SEQUENCE_PARALLEL_KEYS],
+            dim=dim,
+            parallel_context=parallel_context,
+            pad_token_id=pad_token_id,
+        )
+
+        return self.forward(*args, **collator(kwargs))
+
+    setattr(module, "forward", partial(forward, self=sp))
     setattr(module, "train", sp.train)
     return module

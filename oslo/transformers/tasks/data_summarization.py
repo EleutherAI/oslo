@@ -1,18 +1,11 @@
 import logging
 import warnings
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 import torch
 from datasets.arrow_dataset import Batch
 
-from oslo.torch.distributed import ParallelContext
-from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
-from oslo.transformers.tasks.data_base import (
-    BaseProcessor,
-    ParallelKeys,
-    pad_labels,
-    SequenceParallelMixin,
-)
+from oslo.transformers.tasks.data_base import BaseProcessor, pad_labels
 
 try:
     from transformers import DataCollatorForSeq2Seq
@@ -57,7 +50,7 @@ class ProcessorForSummarization(BaseProcessor):
         return dict_of_training_examples
 
 
-class DataCollatorForSummarization(DataCollatorForSeq2Seq, SequenceParallelMixin):
+class DataCollatorForSummarization(DataCollatorForSeq2Seq):
     """
     Processing training examples to mini-batch (summarization).
     """
@@ -65,10 +58,7 @@ class DataCollatorForSummarization(DataCollatorForSeq2Seq, SequenceParallelMixin
     def __init__(
         self,
         processor: ProcessorForSummarization,
-        pad_to_multiple_of: Optional[int] = None,
-        parallel_context: Optional[ParallelContext] = None,
         model: Optional[Any] = None,
-        padding: Union[bool, str, PaddingStrategy] = "longest",
         label_pad_token_id: int = -100,
     ):
         if not isinstance(processor, ProcessorForSummarization):
@@ -83,22 +73,12 @@ class DataCollatorForSummarization(DataCollatorForSeq2Seq, SequenceParallelMixin
 
         self.tokenizer = processor._tokenizer
         self.model = model
-        self.padding = padding
         self.label_pad_token_id = label_pad_token_id
-        self.pad_to_multiple_of = pad_to_multiple_of
-        self.sequence_parallel_size = 1
-        if parallel_context is not None:
-            self._set_parallel_context(parallel_context)
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
         batch = self.tokenizer.pad(
             features,
-            padding=self.padding,
             return_attention_mask=True,
-            pad_to_multiple_of=self.sequence_parallel_size
-            if self.sequence_parallel_size > 1
-            else None,
-            # Conversion to tensors will fail if we have labels as they are not of the same length yet.
             return_tensors=None,
         )
 
@@ -106,9 +86,6 @@ class DataCollatorForSummarization(DataCollatorForSeq2Seq, SequenceParallelMixin
             [feature["labels"] for feature in features],
             self.tokenizer,
             label_pad_token_id=self.label_pad_token_id,
-            pad_to_multiple_of=self.sequence_parallel_size
-            if self.sequence_parallel_size > 1
-            else None,
         )
 
         batch = {k: torch.tensor(v, dtype=torch.int64) for k, v in batch.items()}
@@ -126,12 +103,5 @@ class DataCollatorForSummarization(DataCollatorForSeq2Seq, SequenceParallelMixin
                 0,
                 torch.ones_like(decoder_input_ids),
             )
-
-        if self.sequence_parallel_size > 1:
-            sp_collate_fn = SequenceDataParallelCollator(
-                parallel_keys=ParallelKeys.SUMMARIZATION,
-                parallel_context=self.parallel_context,
-            )
-            return sp_collate_fn(**batch)
 
         return batch

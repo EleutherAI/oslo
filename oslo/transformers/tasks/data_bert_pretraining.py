@@ -1,18 +1,11 @@
 import logging
 import random
 import warnings
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from datasets.arrow_dataset import Batch
 
-from oslo.torch.distributed import ParallelContext
-from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
-from oslo.transformers.tasks.data_base import (
-    BaseProcessor,
-    ParallelKeys,
-    pad_labels,
-    SequenceParallelMixin,
-)
+from oslo.transformers.tasks.data_base import BaseProcessor, pad_labels
 
 try:
     from transformers import DataCollatorForWholeWordMask
@@ -66,9 +59,7 @@ class ProcessorForBertPretraining(BaseProcessor):
         return dict_of_training_examples
 
 
-class DataCollatorForBertPretraining(
-    DataCollatorForWholeWordMask, SequenceParallelMixin
-):
+class DataCollatorForBertPretraining(DataCollatorForWholeWordMask):
     """
     Processing training examples to mini-batch for Bert (mlm+wwm+sop).
     """
@@ -78,7 +69,6 @@ class DataCollatorForBertPretraining(
         processor: ProcessorForBertPretraining,
         mlm_probability: float = 0.15,
         label_pad_token_id: int = -100,
-        parallel_context: Optional[ParallelContext] = None,
     ):
         if mlm_probability >= 1.0:
             warnings.warn("MLM Probability is greater than 1.0")
@@ -92,29 +82,17 @@ class DataCollatorForBertPretraining(
         self.pad_token_id = self.tokenizer.pad_token_id
         self.pad_token_type_id = self.tokenizer.pad_token_type_id
         self.label_pad_token_id = label_pad_token_id
-        self.sequence_parallel_size = 1
-        if parallel_context is not None:
-            self._set_parallel_context(parallel_context)
 
     def __call__(self, examples: List[Dict[str, Any]]) -> Dict[str, Any]:
         examples = self._prepare_wwm_and_sop_from_examples(examples)
 
-        batch = self.tokenizer.pad(
-            examples,
-            return_tensors="pt",
-            pad_to_multiple_of=self.sequence_parallel_size
-            if self.sequence_parallel_size > 1
-            else None,
-        )
+        batch = self.tokenizer.pad(examples, return_tensors="pt")
         del batch["mask_label"]
 
         batch_mask = pad_labels(
             [example["mask_label"] for example in examples],
             self.tokenizer,
             label_pad_token_id=0,
-            pad_to_multiple_of=self.sequence_parallel_size
-            if self.sequence_parallel_size > 1
-            else None,
         )
 
         batch["input_ids"], batch["labels"] = self.torch_mask_tokens(
@@ -124,13 +102,6 @@ class DataCollatorForBertPretraining(
             batch["labels"].masked_fill_(
                 batch["labels"] == -100, self.label_pad_token_id
             )
-
-        if self.sequence_parallel_size > 1:
-            sp_collate_fn = SequenceDataParallelCollator(
-                parallel_keys=ParallelKeys.BERT_PRETRAINING,
-                parallel_context=self.parallel_context,
-            )
-            return sp_collate_fn(**batch)
 
         return batch
 

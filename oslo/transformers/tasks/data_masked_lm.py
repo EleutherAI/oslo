@@ -1,16 +1,10 @@
 import logging
 import warnings
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Any
 
 from datasets.arrow_dataset import Batch
 
-from oslo.torch.distributed import ParallelContext
-from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
-from oslo.transformers.tasks.data_base import (
-    BaseProcessor,
-    ParallelKeys,
-    SequenceParallelMixin,
-)
+from oslo.transformers.tasks.data_base import BaseProcessor
 
 try:
     from transformers import DataCollatorForLanguageModeling
@@ -84,7 +78,7 @@ class ProcessorForMaskedLM(BaseProcessor):
         return dict_of_training_examples
 
 
-class DataCollatorForMaskedLM(DataCollatorForLanguageModeling, SequenceParallelMixin):
+class DataCollatorForMaskedLM(DataCollatorForLanguageModeling):
     """
     Processing training examples to mini-batch for Roberta (mlm).
     """
@@ -94,7 +88,6 @@ class DataCollatorForMaskedLM(DataCollatorForLanguageModeling, SequenceParallelM
         processor: ProcessorForMaskedLM,
         mlm_probability: float = 0.15,
         label_pad_token_id: int = -100,
-        parallel_context: Optional[ParallelContext] = None,
     ) -> None:
         if mlm_probability >= 1.0:
             warnings.warn("MLM Probability is greater than 1.0")
@@ -107,20 +100,11 @@ class DataCollatorForMaskedLM(DataCollatorForLanguageModeling, SequenceParallelM
         self.tokenizer = processor._tokenizer
         self.mlm_probability = mlm_probability
         self.label_pad_token_id = label_pad_token_id
-        self.sequence_parallel_size = 1
-        if parallel_context is not None:
-            self._set_parallel_context(parallel_context)
 
     def __call__(self, examples: List[Dict[str, Any]]) -> Dict[str, Any]:
         batch = self.tokenizer.pad(
-            examples,
-            return_attention_mask=True if self.sequence_parallel_size > 1 else False,
-            return_tensors="pt",
-            pad_to_multiple_of=self.sequence_parallel_size
-            if self.sequence_parallel_size > 1
-            else None,
+            examples, return_attention_mask=False, return_tensors="pt"
         )
-
         # If special token mask has been preprocessed, pop it from the dict.
         special_tokens_mask = batch.pop("special_tokens_mask", None)
         batch["input_ids"], batch["labels"] = self.torch_mask_tokens(
@@ -130,12 +114,4 @@ class DataCollatorForMaskedLM(DataCollatorForLanguageModeling, SequenceParallelM
             batch["labels"].masked_fill_(
                 batch["labels"] == -100, self.label_pad_token_id
             )
-
-        if self.sequence_parallel_size > 1:
-            sp_collate_fn = SequenceDataParallelCollator(
-                parallel_keys=ParallelKeys.MLM,
-                parallel_context=self.parallel_context,
-            )
-            return sp_collate_fn(**batch)
-
         return batch

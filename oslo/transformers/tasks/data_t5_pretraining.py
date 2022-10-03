@@ -1,18 +1,13 @@
 import logging
 import warnings
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import numpy as np
 import torch
 from datasets.arrow_dataset import Batch
 
-from oslo.torch.distributed import ParallelContext
-from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
 from oslo.transformers.tasks.data_base import (
     BaseProcessor,
-    ParallelKeys,
-    pad_labels,
-    SequenceParallelMixin,
 )
 
 try:
@@ -133,16 +128,13 @@ class ProcessorForT5Pretraining(BaseProcessor):
         return tokens_length, targets_length
 
 
-class DataCollatorForT5Pretraining(SequenceParallelMixin):
+class DataCollatorForT5Pretraining(object):
     """
     Processing training examples to mini-batch for T5 baseline pretraining (replace spans).
     """
 
     def __init__(
-        self,
-        processor: ProcessorForT5Pretraining,
-        label_pad_token_id: int = -100,
-        parallel_context: Optional[ParallelContext] = None,
+        self, processor: ProcessorForT5Pretraining, label_pad_token_id: int = -100
     ):
         assert isinstance(
             processor, ProcessorForT5Pretraining
@@ -155,9 +147,6 @@ class DataCollatorForT5Pretraining(SequenceParallelMixin):
         self.target_length = processor.target_chunk_size
         self.pad_token_id = self.tokenizer.pad_token_id
         self.label_pad_token_id = label_pad_token_id
-        self.sequence_parallel_size = 1
-        if parallel_context is not None:
-            self._set_parallel_context(parallel_context)
 
     def __call__(self, examples: List[Dict[str, Any]]) -> Dict[str, torch.tensor]:
 
@@ -170,12 +159,12 @@ class DataCollatorForT5Pretraining(SequenceParallelMixin):
         )
 
         input_ids = batch["input_ids"]
-        batch_size, expandend_input_length = input_ids.shape
+        batch_size, expand_input_length = input_ids.shape
 
         mask_indices = np.asarray(
             [
-                self.random_spans_noise_mask(expandend_input_length)
-                for i in range(batch_size)
+                self.random_spans_noise_mask(expand_input_length)
+                for _ in range(batch_size)
             ]
         )
         labels_mask = ~mask_indices
@@ -198,33 +187,8 @@ class DataCollatorForT5Pretraining(SequenceParallelMixin):
                 f" {self.target_length}."
             )
 
-        if self.sequence_parallel_size <= 1:
-            batch = {key: torch.from_numpy(value) for key, value in batch.items()}
-        else:
-            labels = [label for label in batch["labels"]]
-            batch = self.tokenizer.pad(
-                {"input_ids": [input_ids for input_ids in batch["input_ids"]]},
-                return_attention_mask=True,
-                return_tensors="pt",
-                pad_to_multiple_of=self.sequence_parallel_size,
-            )
-
-            batch["labels"] = pad_labels(
-                labels,
-                self.tokenizer,
-                self.label_pad_token_id,
-                pad_to_multiple_of=self.sequence_parallel_size,
-            )
-
+        batch = {key: torch.from_numpy(value) for key, value in batch.items()}
         batch = self.prepare_decoder_inputs_from_labels(batch)
-
-        if self.sequence_parallel_size > 1:
-            sp_collate_fn = SequenceDataParallelCollator(
-                parallel_keys=ParallelKeys.T5_PRETRAINING,
-                parallel_context=self.parallel_context,
-            )
-            return sp_collate_fn(**batch)
-
         return batch
 
     def create_sentinel_ids(self, mask_indices):

@@ -7,14 +7,7 @@ import numpy as np
 import torch
 from datasets.arrow_dataset import Batch
 
-from oslo.torch.distributed import ParallelContext
-from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
-from oslo.transformers.tasks.data_base import (
-    BaseProcessor,
-    ParallelKeys,
-    pad_labels,
-    SequenceParallelMixin,
-)
+from oslo.transformers.tasks.data_base import BaseProcessor
 
 try:
     from transformers import (
@@ -72,7 +65,7 @@ class ProcessorForBartPretraining(BaseProcessor):
         return dict_of_training_examples
 
 
-class DataCollatorForBartPretraining(SequenceParallelMixin):
+class DataCollatorForBartPretraining(object):
     """
     Processing training examples to mini-batch for Bart (text_infilling, sentence_permutation).
     """
@@ -85,7 +78,6 @@ class DataCollatorForBartPretraining(SequenceParallelMixin):
         permute_sentence: bool = True,
         label_pad_token_id: int = -100,
         decoder_start_token_id: Optional[int] = None,
-        parallel_context: Optional[ParallelContext] = None,
     ):
         if mlm_probability >= 1.0:
             warnings.warn("MLM Probability is greater than 1.0")
@@ -106,9 +98,6 @@ class DataCollatorForBartPretraining(SequenceParallelMixin):
             if decoder_start_token_id
             else self.tokenizer.eos_token_id
         )
-        self.sequence_parallel_size = 1
-        if parallel_context is not None:
-            self._set_parallel_context(parallel_context)
 
         self.get_start_indices = {
             max_idx: np.random.choice(max_idx, size=(max_idx,), replace=False)
@@ -117,34 +106,12 @@ class DataCollatorForBartPretraining(SequenceParallelMixin):
 
     def __call__(self, examples: List[Dict[str, Any]]) -> Dict[str, Any]:
         examples = self._prepare_noise_text_from_examples(examples)
-
         batch = self.tokenizer.pad(
             examples,
             return_attention_mask=True,
             return_tensors="pt",
-            pad_to_multiple_of=self.sequence_parallel_size
-            if self.sequence_parallel_size > 1
-            else None,
         )
-
-        if self.sequence_parallel_size > 1:
-            batch["labels"] = pad_labels(
-                [example["labels"] for example in examples],
-                self.tokenizer,
-                self.label_pad_token_id,
-                pad_to_multiple_of=self.sequence_parallel_size,
-            )
-
-        batch = self._prepare_decoder_inputs_from_labels(batch)
-
-        if self.sequence_parallel_size > 1:
-            sp_collate_fn = SequenceDataParallelCollator(
-                parallel_keys=ParallelKeys.BART_PRETRAINING,
-                parallel_context=self.parallel_context,
-            )
-            return sp_collate_fn(**batch)
-
-        return batch
+        return self._prepare_decoder_inputs_from_labels(batch)
 
     def _prepare_noise_text_from_examples(
         self, examples: List[Dict[str, Any]]
