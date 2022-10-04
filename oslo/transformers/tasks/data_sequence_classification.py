@@ -1,16 +1,10 @@
 import logging
 import warnings
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from datasets.arrow_dataset import Batch
 
-from oslo.torch.distributed import ParallelContext
-from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
-from oslo.transformers.tasks.data_base import (
-    BaseProcessor,
-    ParallelKeys,
-    SequenceParallelMixin,
-)
+from oslo.transformers.tasks.data_base import BaseProcessor
 
 try:
     from transformers.file_utils import PaddingStrategy
@@ -63,17 +57,12 @@ class ProcessorForSequenceClassification(BaseProcessor):
         return dict_of_training_examples
 
 
-class DataCollatorForSequenceClassification(SequenceParallelMixin):
+class DataCollatorForSequenceClassification(object):
     """
     Processing training examples to mini-batch for Sequence Classification.
     """
 
-    def __init__(
-        self,
-        processor: ProcessorForSequenceClassification,
-        padding: PaddingStrategy = "longest",
-        parallel_context: Optional[ParallelContext] = None,
-    ):
+    def __init__(self, processor: ProcessorForSequenceClassification):
         if not isinstance(processor, ProcessorForSequenceClassification):
             warnings.warn(
                 "DataCollatorForSequenceClassification is suitable for ProcessorForSequenceClassification."
@@ -85,27 +74,10 @@ class DataCollatorForSequenceClassification(SequenceParallelMixin):
             )
 
         self.tokenizer = processor._tokenizer
-        self.padding = padding
-        self.sequence_parallel_size = 1
-        if parallel_context is not None:
-            self._set_parallel_context(parallel_context)
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
-        batch = self.tokenizer.pad(
+        return self.tokenizer.pad(
             features,
-            padding=self.padding,
             return_attention_mask=True,
             return_tensors="pt",
-            pad_to_multiple_of=self.sequence_parallel_size
-            if self.sequence_parallel_size > 1
-            else None,
         )
-
-        if self.sequence_parallel_size > 1:
-            sp_collate_fn = SequenceDataParallelCollator(
-                parallel_keys=ParallelKeys.SEQ_CLS,
-                parallel_context=self.parallel_context,
-            )
-            return sp_collate_fn(**batch)
-
-        return batch

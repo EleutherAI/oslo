@@ -1,18 +1,12 @@
 import logging
 import warnings
-from typing import Dict, List, Optional, Union, Any
+from typing import Dict, List, Union, Any
 
 import torch
 from datasets import Dataset, DatasetDict
 from datasets.arrow_dataset import Batch
 
-from oslo.torch.distributed import ParallelContext
-from oslo.torch.utils.data.data_collators import SequenceDataParallelCollator
-from oslo.transformers.tasks.data_base import (
-    BaseProcessor,
-    ParallelKeys,
-    SequenceParallelMixin,
-)
+from oslo.transformers.tasks.data_base import BaseProcessor
 
 try:
     from transformers import AutoTokenizer
@@ -166,7 +160,7 @@ class ProcessorForTokenClassification(BaseProcessor):
         return label_ids
 
 
-class DataCollatorForTokenClassification(SequenceParallelMixin):
+class DataCollatorForTokenClassification(object):
     """
     Data collator that will dynamically pad the inputs received, as well as the labels.
     """
@@ -174,10 +168,8 @@ class DataCollatorForTokenClassification(SequenceParallelMixin):
     def __init__(
         self,
         processor: ProcessorForTokenClassification,
-        padding: Union[bool, str, PaddingStrategy] = "longest",
         padding_side: str = "right",
         label_pad_token_id: int = -100,
-        parallel_context: Optional[ParallelContext] = None,
     ):
         if not isinstance(processor, ProcessorForTokenClassification):
             warnings.warn(
@@ -192,34 +184,16 @@ class DataCollatorForTokenClassification(SequenceParallelMixin):
         self.tokenizer = processor._tokenizer
         self.padding_side = padding_side
         self.label_pad_token_id = label_pad_token_id
-        self.padding = padding
-        self.sequence_parallel_size = 1
-        if parallel_context is not None:
-            self._set_parallel_context(parallel_context)
 
     def __call__(self, features: List[Dict[str, Any]]):
         label_name = "labels"
         labels = [feature[label_name] for feature in features]
-        batch = self.pad(features, labels, label_name)
-
-        if self.sequence_parallel_size > 1:
-            sp_collate_fn = SequenceDataParallelCollator(
-                parallel_keys=ParallelKeys.TOKEN_CLS,
-                parallel_context=self.parallel_context,
-            )
-            return sp_collate_fn(**batch)
-
-        return batch
+        return self.pad(features, labels, label_name)
 
     def pad(self, features, labels, label_name):
         batch = self.tokenizer.pad(
             features,
-            padding=self.padding,
             return_attention_mask=True,
-            pad_to_multiple_of=self.sequence_parallel_size
-            if self.sequence_parallel_size > 1
-            else None,
-            # Conversion to tensors will fail if we have labels as they are not of the same length yet.
             return_tensors=None,
         )
 
