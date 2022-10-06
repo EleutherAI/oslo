@@ -286,21 +286,22 @@ class BertSelfAttention(nn.Module):
                     + relative_position_scores_key
                 )
 
-        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
+        scale = 1 / math.sqrt(self.attention_head_size)
 
         if F._is_fused_scale_mask_softmax_available(
             input=attention_scores,
-            scale=1.0,
+            scale=scale,
             use_triang_mask=False,
-            softmax_in_fp32=False,
+            softmax_in_fp32=True,
         ):
             attention_probs = F._fused_scale_mask_softmax_cuda(
                 input=attention_scores,
-                scale=1.0,
+                scale=scale,
                 use_triang_mask=False,
                 pad_mask=attention_mask,
             )
         else:
+            attention_scores = attention_scores * scale
             if attention_mask is not None:
                 # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
                 attention_scores = attention_scores + attention_mask
