@@ -34,6 +34,9 @@ from oslo.torch.distributed._initializers.initializer_tensor_2p5d import (
 from oslo.torch.distributed._initializers.initializer_tensor_3d import (
     TensorParallel3DGroupInitializer,
 )
+from oslo.torch.distributed._initializers.initializer_expert import (
+    ExpertParallelGroupInitializer,
+)
 from oslo.torch.distributed._seed.helper import add_seed, set_mode
 from oslo.torch.distributed.parallel_mode import ParallelMode
 
@@ -382,20 +385,15 @@ class ParallelContext(object):
                 "So if you set sequence parallel size > 1, tensor parallel size must be 1."
             )
 
-        if expert_parallel_size > 1:
-            assert tensor_parallel_size == 1, (
-                "Expert parallelism is not compatible with tensor model parallelism. "
-                "So if you set expert parallel size > 1, tensor parallel size must be 1."
-            )
+        if expert_parallel_size != 1:
+            assert not isinstance(expert_parallel_size, int) or not isinstance(
+                expert_parallel_size, dict
+            ), "expert_parallel_size must be int(normal moe) or dictionary(pyramid moe)."
 
         if tensor_parallel_size > 1:
             assert sequence_parallel_size == 1, (
                 "Tensor model parallelism is not compatible with sequence data parallelism. "
                 "So if you set tensor parallel size > 1, sequence parallel size must be 1."
-            )
-            assert expert_parallel_size == 1, (
-                "Tensor model parallelism is not compatible with expert parallelism. "
-                "So if you set tensor parallel size > 1, expert parallel size must be 1."
             )
 
             assert tensor_parallel_mode is not None, (
@@ -414,20 +412,23 @@ class ParallelContext(object):
                 "if param `tensor_parallel_mode` is `ParallelMode.TENSOR_2P5D`."
             )
 
-        assert (
-            world_size
-            == data_parallel_size
-            * pipeline_parallel_size
-            * tensor_parallel_size
-            * sequence_parallel_size
-            * expert_parallel_size
-        ), (
-            f"Expected the world size {world_size} to be equal to data"
-            f" parallel size ({data_parallel_size}) * pipeline parallel size "
-            f"({pipeline_parallel_size}) * tensor parallel size ({tensor_parallel_size}) "
-            f"* sequence parallel size ({sequence_parallel_size}) * "
-            f"expert parallel size ({expert_parallel_size})."
-        )
+        if isinstance(expert_parallel_size, int):
+            assert (
+                world_size
+                == data_parallel_size
+                * pipeline_parallel_size
+                * tensor_parallel_size
+                * sequence_parallel_size
+                * expert_parallel_size
+            ), (
+                f"Expected the world size {world_size} to be equal to data"
+                f" parallel size ({data_parallel_size}) * pipeline parallel size "
+                f"({pipeline_parallel_size}) * tensor parallel size ({tensor_parallel_size}) "
+                f"* sequence parallel size ({sequence_parallel_size}) * "
+                f"expert parallel size ({expert_parallel_size})."
+            )
+        elif isinstance(expert_parallel_size, dict):
+            raise NotImplementedError
 
         self._global_ranks = {}
         self._local_ranks = {}
@@ -829,6 +830,7 @@ class ParallelContext(object):
             "sequence_parallel_size": self.sequence_parallel_size,
             "pipeline_parallel_size": self.pipeline_parallel_size,
             "tensor_parallel_size": self.tensor_parallel_size,
+            "expert_parallel_size": self.expert_parallel_size,
         }
 
         initializer_results = [
@@ -837,6 +839,7 @@ class ParallelContext(object):
             TensorParallelGroupInitializer(**initializer_param).init_dist_group(),
             PipelineParallelGroupInitializer(**initializer_param).init_dist_group(),
             SequenceParallelGroupInitializer(**initializer_param).init_dist_group(),
+            ExpertParallelGroupInitializer(**initializer_param).init_dist_group(),
         ]
 
         tensor_parallel_initializer_cls = TENSOR_PARALLEL_GROUP_INITIALIZERS_BY_MODE[
