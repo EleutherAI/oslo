@@ -870,9 +870,6 @@ class ParallelContext(object):
 
     def init_pipeline_rpc_workers(self):
         if self.pipeline_parallel_size > 1:
-            # rank = self.get_local_rank(ParallelMode.PIPELINE)
-            # world_size = self.get_world_size(ParallelMode.PIPELINE)
-
             rank = self.get_global_rank()
             world_size = self.get_world_size(ParallelMode.GLOBAL)
 
@@ -889,6 +886,11 @@ class ParallelContext(object):
                 rpc_backend_options=options,
             )
 
+            # Since rpc requires global rank, need to
+            # save the global rank of model partition
+            # tree. As partitioning algorithm uses
+            # 0-th entry of device candidates, min(ranks)
+            # will give the rank of root node's device.
             self.pipeline_local_master_rank = min(
                 self.get_ranks_in_group(ParallelMode.PIPELINE)
             )

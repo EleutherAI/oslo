@@ -54,13 +54,11 @@ class ModelPartitioner(object):
         else:
             setattr(element, "oslo_pp_parent_rank", node.parent.device)
 
-        # TODO; tmp work
         setattr(element, "oslo_actual_pp_rank", node.oslo_actual_pp_rank)
         setattr(element, "oslo_pp_attr_set", True)
 
     @staticmethod
     def _set_attribute_without_param(element, node):
-        # TODO; dist.get_rank()
         if hasattr(element, "oslo_parallel"):
             element.oslo_parallel[ParallelMode.PIPELINE] = dist.get_rank()
         else:
@@ -71,7 +69,6 @@ class ModelPartitioner(object):
         else:
             setattr(element, "oslo_pp_parent_rank", node.parent.device)
 
-        # TODO; tmp work
         setattr(element, "oslo_actual_pp_rank", node.oslo_actual_pp_rank)
         setattr(element, "oslo_pp_attr_set", True)
 
