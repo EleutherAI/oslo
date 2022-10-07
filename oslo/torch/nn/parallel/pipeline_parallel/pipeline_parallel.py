@@ -99,7 +99,6 @@ class _PipelineParallel(nn.Module):
         self.partitioner = ModelPartitioner(
             module=module,
             process_group=parallel_context.get_group(ParallelMode.PIPELINE),
-            actual_ranks=parallel_context.get_ranks_in_group(ParallelMode.PIPELINE),
             memory_computation_balance=memory_computation_balance,
         )
         self.partitioner.partition()
@@ -169,9 +168,7 @@ class _PipelineParallel(nn.Module):
             #  an error.
             # forward pass end, wait results from master
             for i in range(self.num_micro_batches):
-                rpc_dst = self.parallel_context.get_pipeline_rpc_worker_name(
-                    self.parallel_context.pipeline_local_master_rank
-                )
+                rpc_dst = self.parallel_context.get_pipeline_rpc_worker_name(0)
                 result = rpc.rpc_sync(
                     to=rpc_dst,
                     func=get_result,
@@ -207,8 +204,7 @@ class _PipelineParallel(nn.Module):
     def _wrap_forward(self, module):
         orig_forward = module.forward
         loc = module.oslo_pp_location
-        # device = module.oslo_parallel[ParallelMode.PIPELINE]
-        device = module.oslo_actual_pp_rank
+        device = module.oslo_parallel[ParallelMode.PIPELINE]
 
         register_original_forward_function(loc, orig_forward, device)
 
@@ -216,7 +212,7 @@ class _PipelineParallel(nn.Module):
             location = module.oslo_pp_location
             module_device = get_module_device_location(location)
             module_device = torch.device("cuda", module_device)
-            current_device = self.parallel_context.get_local_rank(ParallelMode.GLOBAL)
+            current_device = self.parallel_context.get_local_rank(ParallelMode.PIPELINE)
             current_device = torch.device("cuda", current_device)
             is_same = module_device == current_device
 

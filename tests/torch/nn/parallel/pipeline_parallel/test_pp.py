@@ -7,15 +7,10 @@ from torch.distributed import rpc
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
-# from torch.nn.parallel import DistributedDataParallel
-
 from oslo.torch.distributed import ParallelContext
-from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn.parallel import PipelineParallel
 from oslo.torch.nn.parallel.utils import allocate_params
 from oslo.torch.nn.parallel.pipeline_parallel._buffers import _MODULE_DEVICE_LOCATIONS
-
-from oslo.torch.nn.parallel.data_parallel.data_parallel import DistributedDataParallel
 
 from datasets import load_dataset
 from transformers import (
@@ -171,9 +166,8 @@ matplotlib.use("Agg")
 torch.autograd.set_detect_anomaly(True)
 set_seed(42)
 
-data_parallel_size = 2
 parallel_context = ParallelContext.from_torch(
-    data_parallel_size=data_parallel_size,
+    data_parallel_size=1,
     pipeline_parallel_size=4,
     tensor_parallel_size=1,
 )
@@ -205,9 +199,7 @@ model_no_pp = deepcopy(model)
 model_no_pp.cuda()
 
 wrapper_pp = PipelineParallel(
-    DistributedDataParallel(model, parallel_context=parallel_context),
-    # DistributedDataParallel(model, process_group=parallel_context.get_group(ParallelMode.DATA)),
-    # model,
+    model,
     parallel_context=parallel_context,
     memory_computation_balance=1.0,
     num_micro_batches=num_micro_batches,
@@ -232,18 +224,18 @@ allocate_params(wrapper_pp, parallel_context)
 #         m.register_full_backward_hook(print_location_backward_hook)
 #
 #
-if torch.distributed.get_rank() == 7:
+if torch.distributed.get_rank() == 1:
     for k, v in _MODULE_DEVICE_LOCATIONS.items():
         print(f"{k}: {v}")
 
 
 def run():
-    batch_size = 8 * num_micro_batches
+    batch_size = 2 * num_micro_batches
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.pad_token = tokenizer.eos_token
 
     datasets = load_dataset("squad").data["train"]["context"]
-    datasets = [str(sample) for sample in datasets[:8192]]
+    datasets = [str(sample) for sample in datasets[:5000]]
     dataloader = DataLoader(datasets, batch_size=batch_size)
 
     pp_losses = []
@@ -272,9 +264,9 @@ def run():
             optimizer_pp.zero_grad(set_to_none=True)
             optimizer_no_pp.zero_grad(set_to_none=True)
 
-            cum_loss_pp = torch.zeros(1).cuda()
+            cum_loss_pp = torch.zeros(1)
             for ind, out_pp in enumerate(
-                wrapper_pp(**pp_inputs, labels=pp_inputs["input_ids"])
+                wrapper_pp(**inputs, labels=inputs["input_ids"])
             ):
                 loss_pp = out_pp.loss
                 loss_pp = loss_pp / num_micro_batches

@@ -1,4 +1,3 @@
-from typing import List
 from math import sqrt
 
 import torch.distributed as dist
@@ -30,12 +29,10 @@ class ModelPartitioner(object):
         self,
         module: nn.Module,
         process_group: dist.ProcessGroup,
-        actual_ranks: List[int],
         memory_computation_balance: float = 1.0,
     ):
         self.module = module
         self.process_group = process_group
-        self.actual_ranks = actual_ranks
         self.memory_computation_balance = memory_computation_balance
 
         self.visited = {}
@@ -55,7 +52,6 @@ class ModelPartitioner(object):
             setattr(element, "oslo_pp_parent_rank", node.parent.device)
 
         # TODO; tmp work
-        setattr(element, "oslo_actual_pp_rank", node.oslo_actual_pp_rank)
         setattr(element, "oslo_pp_attr_set", True)
 
     @staticmethod
@@ -72,7 +68,6 @@ class ModelPartitioner(object):
             setattr(element, "oslo_pp_parent_rank", node.parent.device)
 
         # TODO; tmp work
-        setattr(element, "oslo_actual_pp_rank", node.oslo_actual_pp_rank)
         setattr(element, "oslo_pp_attr_set", True)
 
     def partition(self):
@@ -193,15 +188,10 @@ class ModelPartitioner(object):
         setattr(self.root_node, "device_cands", initial_partition)
         # d(n)
         setattr(self.root_node, "device", self.root_node.device_cands[0])
-        # need for PP
-        actual_rank = self.actual_ranks[self.root_node.device_cands[0]]
-        setattr(self.root_node, "oslo_actual_pp_rank", actual_rank)
 
         for node in bfs(self.root_node, self.bfs):
             p_n = node.device_cands
             setattr(node, "device", p_n[0])  # d(n)
-            actual_rank = self.actual_ranks[p_n[0]]
-            setattr(node, "oslo_actual_pp_rank", actual_rank)
 
             q_n = node.children
             if len(q_n) > 0:
