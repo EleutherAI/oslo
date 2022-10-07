@@ -62,7 +62,6 @@ def DistributedDataParallel(
 
     add_wrapper(module, ParallelMode.DATA, ddp)
     setattr(module, "forward", ddp.forward)
-    # setattr(module, "train", ddp.train)
     return module
 
 
@@ -1056,10 +1055,6 @@ class _DistributedDataParallel(Module, Joinable):
 
     def gather(self, outputs, output_device):
         return gather(outputs, output_device, dim=self.dim)
-
-    def train(self, mode=True):
-        super(_DistributedDataParallel, self).train(mode)
-        return self
 
     # When running in join mode, schedules an allreduce to match the one in the
     # forward pass to determine the no. of currently active processes and whether
