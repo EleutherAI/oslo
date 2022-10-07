@@ -62,7 +62,7 @@ def DistributedDataParallel(
 
     add_wrapper(module, ParallelMode.DATA, ddp)
     setattr(module, "forward", ddp.forward)
-    # setattr(module, "train", ddp.train)
+    setattr(module, "train", ddp.train)
     return module
 
 
@@ -541,18 +541,46 @@ class _DistributedDataParallel(Module, Joinable):
                 ValueError, "device_ids can only be None or contain a single element."
             )
 
-        # Kevin, Dongsung:
-        # We removed
-        # 1. checking devices of parameters because we could use multiple parallel wrappers.
-        # 2. _passing_sync_batchnorm_handle function which is not used for transformer model
-        # 3. Verify model equivalence : dist._verify_params_across_processes(self.process_group, parameters)
-        # 4. Sync params and buffers. Ensures all DDP models start off at the same value : self._sync_params_and_buffers(authoritative_rank=0)
-        self.device_ids = [_get_device_index(x, True) for x in device_ids]
+        self.is_multi_device_module = len({p.device for p in module.parameters()}) > 1
+        distinct_device_types = {p.device.type for p in module.parameters()}
+        if len(distinct_device_types) != 1:
+            self._log_and_throw(
+                ValueError,
+                "DistributedDataParallel's input module must be on "
+                "the same type of devices, but input module parameters locate in {}.".format(
+                    distinct_device_types
+                ),
+            )
 
-        if output_device is None:
-            output_device = device_ids[0]
+        self.device_type = list(distinct_device_types)[0]
 
-        self.output_device = _get_device_index(output_device, True)
+        if (
+            device_ids is None
+            or len(device_ids) == 0  # For backward compatibility.
+            or self.device_type == "cpu"
+            or self.is_multi_device_module
+        ):
+            if device_ids or output_device:
+                self._log_and_throw(
+                    ValueError,
+                    "DistributedDataParallel device_ids and output_device arguments "
+                    "only work with single-device/multiple-device GPU modules or CPU modules, "
+                    "but got device_ids {}, output_device {}, and module parameters {}.".format(
+                        device_ids,
+                        output_device,
+                        {p.device for p in module.parameters()},
+                    ),
+                )
+
+            self.device_ids = None
+            self.output_device = None
+        else:
+            self.device_ids = [_get_device_index(x, True) for x in device_ids]
+
+            if output_device is None:
+                output_device = device_ids[0]
+
+            self.output_device = _get_device_index(output_device, True)
 
         if process_group is None:
             self.process_group = _get_default_group()
@@ -603,6 +631,10 @@ class _DistributedDataParallel(Module, Joinable):
 
         # Build parameters for reducer.
         parameters, expect_sparse_gradient = self._build_params_for_reducer()
+        # Verify model equivalence.
+        dist._verify_params_across_processes(self.process_group, parameters)
+        # Sync params and buffers. Ensures all DDP models start off at the same value.
+        self._sync_params_and_buffers(authoritative_rank=0)
         # In debug mode, build a mapping of parameter index -> parameter.
         if dist.get_debug_level() != dist.DebugLevel.OFF:
             param_to_name_mapping = self._build_param_to_name_mapping(parameters)
@@ -697,8 +729,10 @@ class _DistributedDataParallel(Module, Joinable):
             -1 if self.output_device is None else self.output_device,
             self.broadcast_buffers,
             has_sync_bn,
-            self.static_graph,
         )
+
+        # passing a handle to torch.nn.SyncBatchNorm layer
+        self._passing_sync_batchnorm_handle(self.module)
 
     def __getstate__(self):
         self._check_default_group()
@@ -1545,6 +1579,14 @@ class _DistributedDataParallel(Module, Joinable):
             bucket_size = self.broadcast_bucket_size
 
         self._distributed_broadcast_coalesced(bufs, bucket_size, authoritative_rank)
+
+    def _passing_sync_batchnorm_handle(self, module):
+        for layer in module.modules():
+            if isinstance(layer, torch.nn.modules.SyncBatchNorm):
+                if self.device_type == "cpu":
+                    self._log_and_throw(
+                        ValueError, "SyncBatchNorm layers only work with GPU modules"
+                    )
 
     def _check_comm_hook(self, hook):
         if not callable(hook):

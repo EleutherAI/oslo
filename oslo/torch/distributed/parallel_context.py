@@ -444,10 +444,6 @@ class ParallelContext(object):
         self.tensor_parallel_size = tensor_parallel_size
         self.tensor_parallel_mode = tensor_parallel_mode
         self.pipeline_parallel_size = pipeline_parallel_size
-        self.pipeline_worker_map = {
-            pp_rank: f"PP_WORKER_{pp_rank}"
-            for pp_rank in range(self.pipeline_parallel_size)
-        }
 
         # tensor parallel depth for 2.5d parallelism
         self.tensor_parallel_depth = tensor_parallel_depth
@@ -464,6 +460,13 @@ class ParallelContext(object):
         self.set_seed(seed)
         self.seed = seed
         self.make_ranks_to_devices()
+
+        self.pipeline_worker_map = {
+            pp_rank: f"PP_WORKER_{pp_rank}"
+            for pp_rank in self.get_ranks_in_group(ParallelMode.PIPELINE)
+        }
+        # TODO; is this naming okay?
+        self.pipeline_local_master_rank = None
         self.init_pipeline_rpc_workers()
 
     # sanity check
@@ -867,8 +870,11 @@ class ParallelContext(object):
 
     def init_pipeline_rpc_workers(self):
         if self.pipeline_parallel_size > 1:
-            rank = self.get_local_rank(ParallelMode.PIPELINE)
-            world_size = self.get_world_size(ParallelMode.PIPELINE)
+            # rank = self.get_local_rank(ParallelMode.PIPELINE)
+            # world_size = self.get_world_size(ParallelMode.PIPELINE)
+
+            rank = self.get_global_rank()
+            world_size = self.get_world_size(ParallelMode.GLOBAL)
 
             options = rpc.TensorPipeRpcBackendOptions()
             for other in self.get_ranks_in_group(ParallelMode.PIPELINE):
@@ -881,6 +887,10 @@ class ParallelContext(object):
                 rank=rank,
                 world_size=world_size,
                 rpc_backend_options=options,
+            )
+
+            self.pipeline_local_master_rank = min(
+                self.get_ranks_in_group(ParallelMode.PIPELINE)
             )
 
     def make_ranks_to_devices(self):
