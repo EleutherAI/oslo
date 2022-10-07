@@ -242,13 +242,9 @@ class _PipelineParallel(nn.Module):
                 caller = self.parallel_context.get_pipeline_rpc_worker_name(
                     current_device.index
                 )
-                try:
-                    callee = self.parallel_context.get_pipeline_rpc_worker_name(
-                        module_device.index
-                    )
-                except:
-                    print(f'{self.parallel_context.pipeline_worker_map=}, {caller=}, {module_device.index=}')
-                    exit()
+                callee = self.parallel_context.get_pipeline_rpc_worker_name(
+                    module_device.index
+                )
 
                 # request forward
                 fut = rpc.rpc_async(
