@@ -261,7 +261,7 @@ def run():
             if data_parallel_size > 1:
                 dp_rank = parallel_context.get_local_rank(ParallelMode.DATA)
                 new_inputs = dict()
-                for key, value in inputs.items():     # assumes HF
+                for key, value in inputs.items():  # assumes HF
                     new_inputs[key] = value.chunk(data_parallel_size)[dp_rank]
                 pp_inputs = new_inputs
             else:
@@ -285,12 +285,12 @@ def run():
             loss_no_pp.backward()
 
             if data_parallel_size > 1:
-                if dist.get_rank() == 4:    # TODO;
+                if dist.get_rank() == 4:  # TODO;
                     dist.send(cum_loss_pp, 0)
                 elif dist.get_rank() == 0:
                     cum_loss_pp_from_4 = torch.zeros(1).cuda()
                     dist.recv(cum_loss_pp_from_4, 4)
-                    cum_loss_pp = (cum_loss_pp + cum_loss_pp_from_4) / 2.
+                    cum_loss_pp = (cum_loss_pp + cum_loss_pp_from_4) / 2.0
                     print(f"{dist.get_rank()}, {cum_loss_pp}, {loss_no_pp}")
             else:
                 if dist.get_rank() == 0:
