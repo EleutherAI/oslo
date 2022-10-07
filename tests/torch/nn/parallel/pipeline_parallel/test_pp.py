@@ -8,9 +8,12 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 
 from oslo.torch.distributed import ParallelContext
+from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn.parallel import PipelineParallel
 from oslo.torch.nn.parallel.utils import allocate_params
 from oslo.torch.nn.parallel.pipeline_parallel._buffers import _MODULE_DEVICE_LOCATIONS
+
+from oslo.torch.nn.parallel.data_parallel.data_parallel import DistributedDataParallel
 
 from datasets import load_dataset
 from transformers import (
@@ -166,8 +169,9 @@ matplotlib.use("Agg")
 torch.autograd.set_detect_anomaly(True)
 set_seed(42)
 
+data_parallel_size = 2
 parallel_context = ParallelContext.from_torch(
-    data_parallel_size=1,
+    data_parallel_size=data_parallel_size,
     pipeline_parallel_size=4,
     tensor_parallel_size=1,
 )
@@ -199,7 +203,9 @@ model_no_pp = deepcopy(model)
 model_no_pp.cuda()
 
 wrapper_pp = PipelineParallel(
-    model,
+    DistributedDataParallel(model, parallel_context=parallel_context),
+    # DistributedDataParallel(model, process_group=parallel_context.get_group(ParallelMode.DATA)),
+    # model,
     parallel_context=parallel_context,
     memory_computation_balance=1.0,
     num_micro_batches=num_micro_batches,
@@ -224,18 +230,18 @@ allocate_params(wrapper_pp, parallel_context)
 #         m.register_full_backward_hook(print_location_backward_hook)
 #
 #
-if torch.distributed.get_rank() == 1:
+if torch.distributed.get_rank() == 7:
     for k, v in _MODULE_DEVICE_LOCATIONS.items():
         print(f"{k}: {v}")
 
 
 def run():
-    batch_size = 2 * num_micro_batches
+    batch_size = 8 * num_micro_batches
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.pad_token = tokenizer.eos_token
 
     datasets = load_dataset("squad").data["train"]["context"]
-    datasets = [str(sample) for sample in datasets[:5000]]
+    datasets = [str(sample) for sample in datasets[:8192]]
     dataloader = DataLoader(datasets, batch_size=batch_size)
 
     pp_losses = []
@@ -252,12 +258,21 @@ def run():
                 max_length=512,
             ).to("cuda")
 
+            if data_parallel_size > 1:
+                dp_rank = parallel_context.get_local_rank(ParallelMode.DATA)
+                new_inputs = dict()
+                for key, value in inputs.items():  # assumes HF
+                    new_inputs[key] = value.chunk(data_parallel_size)[dp_rank]
+                pp_inputs = new_inputs
+            else:
+                pp_inputs = inputs
+
             optimizer_pp.zero_grad(set_to_none=True)
             optimizer_no_pp.zero_grad(set_to_none=True)
 
-            cum_loss_pp = torch.zeros(1)
+            cum_loss_pp = torch.zeros(1).cuda()
             for ind, out_pp in enumerate(
-                wrapper_pp(**inputs, labels=inputs["input_ids"])
+                wrapper_pp(**pp_inputs, labels=pp_inputs["input_ids"])
             ):
                 loss_pp = out_pp.loss
                 loss_pp = loss_pp / num_micro_batches
@@ -269,8 +284,17 @@ def run():
             loss_no_pp = out_no_pp.loss
             loss_no_pp.backward()
 
-            if dist.get_rank() == 0:
-                print(f"{dist.get_rank()}, {cum_loss_pp}, {loss_no_pp}")
+            if data_parallel_size > 1:
+                if dist.get_rank() == 4:  # TODO;
+                    dist.send(cum_loss_pp, 0)
+                elif dist.get_rank() == 0:
+                    cum_loss_pp_from_4 = torch.zeros(1).cuda()
+                    dist.recv(cum_loss_pp_from_4, 4)
+                    cum_loss_pp = (cum_loss_pp + cum_loss_pp_from_4) / 2.0
+                    print(f"{dist.get_rank()}, {cum_loss_pp}, {loss_no_pp}")
+            else:
+                if dist.get_rank() == 0:
+                    print(f"{dist.get_rank()}, {cum_loss_pp}, {loss_no_pp}")
 
             optimizer_pp.step()
             optimizer_no_pp.step()
