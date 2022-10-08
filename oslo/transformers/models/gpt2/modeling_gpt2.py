@@ -136,7 +136,7 @@ class GPT2Attention(nn.Module):
         self.resid_dropout = onn.FusedBiasDropout(config.resid_pdrop)
 
         self.pruned_heads = set()
-        if not hasattr(config, 'softmax_in_fp32'): 
+        if not hasattr(config, "softmax_in_fp32"):
             self.softmax_in_fp32 = True
         else:
             self.softmax_in_fp32 = config.softmax_in_fp32
