@@ -136,6 +136,10 @@ class GPT2Attention(nn.Module):
         self.resid_dropout = onn.FusedBiasDropout(config.resid_pdrop)
 
         self.pruned_heads = set()
+        if not hasattr(config, 'softmax_in_fp32'): 
+            self.softmax_in_fp32 = True
+        else:
+            self.softmax_in_fp32 = config.softmax_in_fp32
 
     def prune_heads(self, heads):
         if len(heads) == 0:
@@ -168,21 +172,20 @@ class GPT2Attention(nn.Module):
         if self.scale_attn_by_inverse_layer_idx:
             scale_factor /= float(self.layer_idx + 1)
 
-        attn_weights *= scale_factor
-
         if F._is_fused_scale_mask_softmax_available(
             input=attn_weights,
-            scale=1.0,
+            scale=scale_factor,
             use_triang_mask=self.use_triang_mask,
-            softmax_in_fp32=False,
+            softmax_in_fp32=self.softmax_in_fp32,
         ):
             attn_weights = F._fused_scale_mask_softmax_cuda(
                 input=attn_weights,
-                scale=1.0,
+                scale=scale_factor,
                 use_triang_mask=self.use_triang_mask,
                 pad_mask=attention_mask,
             )
         else:
+            attn_weights *= scale_factor
             if not self.is_cross_attention:
                 # if only "normal" attention layer implements causal mask
                 query_length, key_length = query.size(-2), key.size(-2)

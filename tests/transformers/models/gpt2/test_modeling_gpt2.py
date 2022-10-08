@@ -94,3 +94,9 @@ if __name__ == "__main__":
     oslo_model = GPT2Model.from_pretrained("gpt2", config=config)
     orig_model = TransformersGPT2Model.from_pretrained("gpt2", config=config)
     gradient_check(oslo_model, orig_model, return_logits=False)
+
+    config = AutoConfig.from_pretrained("gpt2")
+    config.softmax_in_fp32 = False  # default is True
+    oslo_model = GPT2Model.from_pretrained("gpt2", config=config)
+    orig_model = TransformersGPT2Model.from_pretrained("gpt2", config=config)
+    gradient_check(oslo_model, orig_model, return_logits=False)
