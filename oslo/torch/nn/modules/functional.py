@@ -350,6 +350,7 @@ def _fused_scale_mask_softmax_sanity_check(input, scale, softmax_in_fp32):
     assert scale is not None, "scale must not be None."
     # assert scale == 1.0 or softmax_in_fp32, "softmax should be in fp32 when scaled"
 
+
 def _is_fused_scale_mask_softmax_available(
     input, scale, softmax_in_fp32, use_triang_mask
 ):
