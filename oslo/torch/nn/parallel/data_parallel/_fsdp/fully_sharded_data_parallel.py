@@ -71,6 +71,13 @@ from oslo.torch.nn.parallel.data_parallel._fsdp.wrap import (
     _or_policy,
 )
 
+from oslo.torch.distributed import ParallelMode
+from oslo.torch.nn.parallel.utils import add_wrapper
+
+from torch.distributed.fsdp.wrap import (
+    transformer_auto_wrap_policy,
+)
+
 if TYPE_CHECKING:
     from collections import OrderedDict  # noqa: F401
 
@@ -432,21 +439,72 @@ class _ExecOrderData:
             self.warn_status = _ExecOrderWarnStatus.WARNED
 
 
+def get_default_mixed_precision():
+    if (
+        torch.version.cuda
+        and torch.cuda.is_bf16_supported()
+        and torch.version.cuda >= "11.0"
+        and dist.is_nccl_available()
+        and torch.cuda.nccl.version() >= (2, 10)
+    ):
+        mixed_precision = MixedPrecision(
+            param_dtype=torch.bfloat16,
+            # Gradient communication precision.
+            reduce_dtype=torch.bfloat16,
+            # Buffer precision.
+            buffer_dtype=torch.bfloat16,
+        )
+    else:
+        mixed_precision = MixedPrecision(
+            param_dtype=torch.float16,
+            # Gradient communication precision.
+            reduce_dtype=torch.float16,
+            # Buffer precision.
+            buffer_dtype=torch.float16,
+        )
+    return mixed_precision
+
+
 def FullyShardedDataParallel(
-    module: nn.Module,
-    process_group: Optional[ProcessGroup] = None,
+    module,
+    parallel_context,
     sharding_strategy: Optional[ShardingStrategy] = None,
-    cpu_offload: Optional[CPUOffload] = None,
     auto_wrap_policy: Optional[Callable] = None,
-    backward_prefetch: Optional[BackwardPrefetch] = None,
+    backward_prefetch: Optional[BackwardPrefetch] = BackwardPrefetch.BACKWARD_PRE,
     mixed_precision: Optional[MixedPrecision] = None,
-    ignored_modules: Optional[Iterable[torch.nn.Module]] = None,
-    param_init_fn: Optional[Callable[[nn.Module], None]] = None,
-    device_id: Optional[Union[int, torch.device]] = None,
-    sync_module_states: bool = False,
+    cpu_offload: Optional[CPUOffload] = None,
 ):
-    pass
-    # TODO: Mingu Kang
+
+    if mixed_precision is None:
+        mixed_precision = get_default_mixed_precision()
+
+    """
+    TODO: Mingu Kang
+    wrapping transformer layer
+    """
+    if auto_wrap_policy is None:
+        auto_wrap_policy = functools.partial(
+            transformer_auto_wrap_policy,
+            transformer_layer_cls={
+                nn.MultiheadAttention,
+            },
+        )
+
+    fsdp = _FullyShardedDataParallel(
+        module,
+        process_group=parallel_context.get_group(ParallelMode.DATA),
+        sharding_strategy=sharding_strategy,
+        auto_wrap_policy=auto_wrap_policy,
+        cpu_offload=cpu_offload,
+        backward_prefetch=backward_prefetch,
+        mixed_precision=mixed_precision,
+        device_id=torch.cuda.current_device(),
+    )
+
+    add_wrapper(module, ParallelMode.DATA, fsdp)
+    setattr(module, "forward", fsdp.forward)
+    setattr(module, "train", fsdp.train)
+    return module
 
 
 class _FullyShardedDataParallel(nn.Module):
