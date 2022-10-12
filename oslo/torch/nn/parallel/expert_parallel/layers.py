@@ -117,7 +117,6 @@ def _one_hot_to_float(x, num_classes):
     return F.one_hot(x, num_classes=num_classes).float()
 
 
-# TODO : Change the code based on tutel to code based on cuda-kernel
 def top1_gating(
     logits: Tensor,
     capacity_factor: float,
@@ -242,7 +241,6 @@ def top2_gating(
     # |indices1_s| = (token_num, )
     # |mask1| = (token_num, num_experts)
 
-    # TODO : Analyze the following code
     # Create a mask for 2nd's expert per token using Gumbel-max trick
     # https://timvieira.github.io/blog/post/2014/07/31/gumbel-max-trick/
     logits_w_noise = logits + gumbel_rsample(logits.shape, device=logits.shape)
@@ -401,11 +399,9 @@ class TopKGate(Module):
         return gate_output
 
 
-# TODO : Implement kernel optimized code
 class ExpertParallelFrontBlock(Module):
     def __init__(
         self,
-        # ep_context: ExpertParallelContext,
         link_info: dict,
         in_features: int,
         out_features: int,
@@ -418,7 +414,6 @@ class ExpertParallelFrontBlock(Module):
     ):
         super().__init__()
 
-        # self.ep_context = ep_context
         self.link_info = link_info
 
         self.gate = gate
@@ -451,7 +446,6 @@ class ExpertParallelFrontBlock(Module):
 
         residual_weight = self.expert_parallel_residual_mix(inputs)
         residual_weight = F.softmax(residual_weight, dim=-1)
-        # residual_weight = F.softmax(residual_weight, dim=1)
         # |residual_weight| = (sent_len, batch_size, 2)
 
         return residual_inter, residual_weight
@@ -471,7 +465,6 @@ class ExpertParallelFrontBlock(Module):
         reshaped_input = inputs.reshape(-1, d_model)
         # |reshaped_input| = (num_tokens = batch_size * sent_len, d_model)
 
-        # TODO : Implement the code based on kernel optimization
         # Calculate information to dispatch tokens
         l_aux, combine_weights, dispatch_mask, self.exp_counts = self.gate(
             reshaped_input
@@ -496,7 +489,6 @@ class ExpertParallelFrontBlock(Module):
         )
         # |dispatched_input| = (ep_size, num_local_experts, capacity, in_features)
 
-        # TODO : Think about the needs to recover the shape of experts' input (a.k.a expert_shape)
         expert_output = self.front_experts(dispatched_input)
         # |expert_output| = (ep_size, num_local_experts, capacity, out_features)
 
@@ -521,11 +513,10 @@ class ExpertParallelFrontBlock(Module):
         return output
 
 
-# TODO : Implement Kernel Optimized Code
+# TODO: implement tutel for efficient communication
 class ExpertParallelBehindBlock(Module):
     def __init__(
         self,
-        # ep_context: ExpertParallelContext,
         link_info: dict,
         in_features: int,
         out_features: int,
@@ -537,14 +528,12 @@ class ExpertParallelBehindBlock(Module):
     ):
         super().__init__()
 
-        # self.ep_context = ep_context
         self.link_info = link_info
 
         self.in_features = in_features
         self.out_features = out_features
 
         self.behind_experts = experts
-        # TODO : Need to implement initialize ep_group
         self.ep_group = None
         self.ep_size = ep_size
         self.num_local_experts = num_local_experts

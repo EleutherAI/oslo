@@ -1,5 +1,6 @@
 import os
 import random
+import time
 from functools import partial
 
 import numpy as np
@@ -93,6 +94,7 @@ def run_test(rank, port):
                 ep_size=ep_size,
                 k=top_k,
                 use_residual=use_residual,
+                use_tutel=False,
             )
             # module.__class__ = MoE
             setattr(model_ep, module_name, moe)
@@ -109,6 +111,7 @@ def run_test(rank, port):
 
     # 7. Train
     for i, data in enumerate(dataloader):
+        start = time.time()
         optimizer.zero_grad()
 
         inputs = tokenizer(
@@ -117,7 +120,7 @@ def run_test(rank, port):
         loss = model_ep(**inputs, labels=inputs["input_ids"]).loss
         if rank == 0:
             print(f"Rank #{rank} Iteration #{i} loss : {loss}")
-            wandb.log({"iter": i, "ep_loss": loss})
+            wandb.log({"iter": i, "ep_loss": loss, "iter_time": time.time() - start})
         loss.backward()
         optimizer.step()
 

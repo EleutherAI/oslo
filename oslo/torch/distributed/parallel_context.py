@@ -412,23 +412,20 @@ class ParallelContext(object):
                 "if param `tensor_parallel_mode` is `ParallelMode.TENSOR_2P5D`."
             )
 
-        if isinstance(expert_parallel_size, int):
-            assert (
-                world_size
-                == data_parallel_size
-                * pipeline_parallel_size
-                * tensor_parallel_size
-                * sequence_parallel_size
-                * expert_parallel_size
-            ), (
-                f"Expected the world size {world_size} to be equal to data"
-                f" parallel size ({data_parallel_size}) * pipeline parallel size "
-                f"({pipeline_parallel_size}) * tensor parallel size ({tensor_parallel_size}) "
-                f"* sequence parallel size ({sequence_parallel_size}) * "
-                f"expert parallel size ({expert_parallel_size})."
-            )
-        elif isinstance(expert_parallel_size, dict):
-            raise NotImplementedError
+        assert (
+            world_size
+            == data_parallel_size
+            * pipeline_parallel_size
+            * tensor_parallel_size
+            * sequence_parallel_size
+            * expert_parallel_size
+        ), (
+            f"Expected the world size {world_size} to be equal to data"
+            f" parallel size ({data_parallel_size}) * pipeline parallel size "
+            f"({pipeline_parallel_size}) * tensor parallel size ({tensor_parallel_size}) "
+            f"* sequence parallel size ({sequence_parallel_size}) * "
+            f"expert parallel size ({expert_parallel_size})."
+        )
 
         self._global_ranks = {}
         self._local_ranks = {}

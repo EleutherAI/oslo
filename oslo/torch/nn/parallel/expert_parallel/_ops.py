@@ -112,5 +112,3 @@ class AllReduce:
     def __call__(self, grad):
         grad.mul_(1.0 / self.ep_size)
         dist.all_reduce(grad, group=self.ep_group)
-
-        return

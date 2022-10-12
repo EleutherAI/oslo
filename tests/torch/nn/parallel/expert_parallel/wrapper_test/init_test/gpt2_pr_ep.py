@@ -1,5 +1,6 @@
 import os
 import random
+import time
 from functools import partial
 
 import numpy as np
@@ -79,7 +80,6 @@ def run_test(rank, port):
         parallel_context,
         num_enc_experts=num_experts,
         top_k=1,
-        use_kernel_optim=False,
         use_residual=use_residual,
     ).to(rank)
     wrapper_ep = DistributedDataParallel(wrapper_ep, parallel_context=parallel_context)
@@ -110,6 +110,7 @@ def run_test(rank, port):
 
     # 9. Forward Propagation
     for i, data in enumerate(dataloader):
+        start = time.time()
         optimizer.zero_grad()
 
         inputs = tokenizer(
@@ -118,7 +119,7 @@ def run_test(rank, port):
         loss = wrapper_ep(**inputs, labels=inputs["input_ids"]).loss
         if rank == 0:
             print(f"Rank #{rank} Iteration #{i} loss : {loss}")
-            wandb.log({"iter": i, "ep_loss": loss})
+            wandb.log({"iter": i, "ep_loss": loss, "iter_time": time.time() - start})
 
         loss.backward()
         optimizer.step()

@@ -22,10 +22,10 @@ from oslo.transformers.mapping_utils import _ExpertParallelMappingForHuggingFace
 class _ExpertParallel(nn.Module):
     """
     A class to wrap the given model for expert parallelization
+
     Args:
         model: model to wrap for expert paralleization
         parallel_context: global parallel context
-        use_kernel_optim: flag to use kernel optimization
         num_experts: number of experts
         top_k: the number of experts for each token to be dispatched
         capacity_factor_train: capacity of each expert for training
@@ -36,9 +36,11 @@ class _ExpertParallel(nn.Module):
         drop_tks: flag to drop tokens in the case that the number of dispatched tokens is larger than capacity
         use_residual: flag to use residual network proposed by
                       DeepSpeed-MoE: Advancing Mixture-of-Experts Inference and Training to Power Next-Generation AI Scale
+
     Notes:
         1. Similar design with `torch.nn.parallel.DistributedDataParallel`
         2. Support data parallel for non-expert paramete
+
     Examples:
         >>> from oslo.torch.nn.parallel.expert_parallel.expert_parallel import ExpertParallel
         >>> model = TransformersModel()
@@ -53,7 +55,6 @@ class _ExpertParallel(nn.Module):
         self,
         model: nn.Module,
         parallel_context: ParallelContext,
-        use_kernel_optim=True,
         num_enc_experts: Union[int, dict] = None,
         num_dec_experts: Union[int, dict] = None,
         top_k: int = 2,
@@ -64,7 +65,7 @@ class _ExpertParallel(nn.Module):
         noisy_policy: str = None,
         use_rts: bool = True,
         drop_tokens: bool = True,
-        use_residual: bool = None,
+        use_residual: bool = False,
     ):
         super().__init__()
 
@@ -109,7 +110,7 @@ class _ExpertParallel(nn.Module):
 
     def _sanity_check(self):
         if isinstance(self.parallel_context.expert_parallel_size, int):
-            return
+            return None
 
         if "enc" in self.parallel_context.expert_parallel_size:
             # num_experts must be divisible by corresponding expert parallel size
@@ -166,8 +167,6 @@ class _ExpertParallel(nn.Module):
                 )
                 module.__class__ = ExpertParallelBehindBlock
 
-        return
-
     def _get_num_experts(self, num_experts, layer_ids):
         num_experts = (
             self.parallel_context.get_world_size(ParallelMode.GLOBAL)
@@ -193,15 +192,13 @@ class _ExpertParallel(nn.Module):
     def _get_module_role(self, module_name):
         elem = self.expert_parallel_mapping.search(self.model, module_name)
         if elem is None:
-            return
+            return None
 
         if elem.enc_name is not None and elem.enc_name in module_name:
             return "enc"
 
         if elem.dec_name is not None and elem.dec_name in module_name:
             return "dec"
-
-        return
 
     def _get_architecture_info(self):
         enc_layer_ids, dec_layer_ids = set(), set()
@@ -281,7 +278,6 @@ class _ExpertParallel(nn.Module):
         if layer_id not in self.link_info:
             self.link_info[layer_id] = dict()
 
-        # num_local_experts, ep_info = self.ep_context.get_info(num_experts)
         num_local_experts = num_experts // ep_size
         experts = Experts(module, num_local_experts)
 
@@ -289,7 +285,6 @@ class _ExpertParallel(nn.Module):
 
         _update_module_arguments(
             module=module,
-            # ep_context=self.ep_context,
             link_info=self.link_info[layer_id],
             gate=gate,
             in_features=in_features,
@@ -297,8 +292,6 @@ class _ExpertParallel(nn.Module):
             front_experts=experts,
             ep_group=ep_group,
             ep_size=ep_size,
-            # ep_group=ep_info.ep_group,
-            # ep_size=ep_info.ep_size,
             num_local_experts=num_local_experts,
             use_residual=self.use_residual,
             expert_parallel_residual=expert_parallel_residual,
@@ -330,7 +323,6 @@ class _ExpertParallel(nn.Module):
         if layer_id not in self.link_info:
             self.link_info[layer_id] = dict()
 
-        # num_local_experts, ep_info = self.ep_context.get_info(num_experts)
         num_local_experts = num_experts // ep_size
         experts = Experts(module, num_local_experts)
 
@@ -338,15 +330,12 @@ class _ExpertParallel(nn.Module):
 
         _update_module_arguments(
             module,
-            # ep_context=self.ep_context,
             link_info=self.link_info[layer_id],
             in_features=in_features,
             out_features=out_features,
             behind_experts=experts,
             ep_size=ep_size,
             ep_group=ep_group,
-            # ep_size=ep_info.ep_size,
-            # ep_group=ep_info.ep_group,
             num_local_experts=num_local_experts,
             use_residual=self.use_residual,
             expert_parallel_residual=expert_parallel_residual,
