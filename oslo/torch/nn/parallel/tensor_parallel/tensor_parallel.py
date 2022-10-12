@@ -241,3 +241,6 @@ class _TensorParallel(nn.Module):
 
     def deparallelize(self):
         self.module.deparallelize()
+
+    def parallelize(self):
+        self.module.parallelize()

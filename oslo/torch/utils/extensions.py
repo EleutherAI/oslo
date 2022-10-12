@@ -51,7 +51,8 @@ def save_pretrained(
 
         if hasattr(self, "oslo_wrappers"):
             for parallel_mode, wrapper in self.oslo_wrappers.items():
-                pass
+                if hasattr(wrapper, "parallelize"):
+                    state_dict = wrapper.parallelize()
                 # TODO: Parallelization, Kevin-ai
 
         model_to_save.load_state_dict(state_dict)
