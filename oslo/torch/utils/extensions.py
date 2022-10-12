@@ -52,7 +52,7 @@ def save_pretrained(
         if hasattr(self, "oslo_wrappers"):
             for parallel_mode, wrapper in self.oslo_wrappers.items():
                 if hasattr(wrapper, "parallelize"):
-                    state_dict = wrapper.parallelize()
+                    wrapper.parallelize(model_to_save) # module to save를 자르자.
                 # TODO: Parallelization, Kevin-ai
 
         model_to_save.load_state_dict(state_dict)
@@ -61,7 +61,7 @@ def save_pretrained(
         if hasattr(model_to_save, "oslo_wrappers"):
             for parallel_mode, wrapper in model_to_save.oslo_wrappers.items():
                 if hasattr(wrapper, "deparallelize"):
-                    wrapper.deparallelize()
+                    model_to_save = wrapper.deparallelize()
                     # TODO: De-Parallelization, Kevin-ai
 
         if dist.get_rank() == 0:
