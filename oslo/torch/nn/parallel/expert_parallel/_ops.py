@@ -11,17 +11,12 @@ from oslo.torch._C import get_expert_parallel_kernel
 class AllToAll(torch.autograd.Function):
     @staticmethod
     def forward(
-        context: Any, inputs: Tensor, group: Optional[ProcessGroup] = None
+        context: Any,
+        group: ProcessGroup,
+        inputs: Tensor,
     ) -> Tensor:
-        if context is not None:
-            context.comm_group = group
-
-        if not inputs.is_contiguous():
-            inputs = inputs.is_contiguous()
-
-        if dist.get_world_size() == 1:
-            return inputs
-
+        context.comm_group = group
+        inputs = inputs.contiguous()
         output = torch.empty_like(inputs)
         dist.all_to_all_single(output, inputs, group=group)
 
@@ -29,7 +24,7 @@ class AllToAll(torch.autograd.Function):
 
     @staticmethod
     def backward(context: Any, *grad_outputs: Tensor) -> Tuple[Tensor, None]:
-        return AllToAll.forward(None, *grad_outputs, context.comm_group), None
+        return (None, AllToAll.apply(context.comm_group, *grad_outputs))
 
 
 class EPDispatch(torch.autograd.Function):
@@ -106,3 +101,14 @@ class EPCombine(torch.autograd.Function):
         d_expert = d_expert.to(torch.float16) if context.fp16_flag else d_expert
 
         return d_expert, d_logits, None, None, None
+
+
+class AllReduce:
+    def __init__(self, ep_group, ep_size, para_name):
+        self.ep_group = ep_group
+        self.ep_size = ep_size
+        self.para_name = para_name
+
+    def __call__(self, grad):
+        grad.mul_(1.0 / self.ep_size)
+        dist.all_reduce(grad, group=self.ep_group)
