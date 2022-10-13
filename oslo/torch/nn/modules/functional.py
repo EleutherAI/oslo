@@ -348,7 +348,7 @@ def fused_bias_dropout(x, bias, p, training, inplace):
 def _fused_scale_mask_softmax_sanity_check(input, scale, softmax_in_fp32):
     assert input.dim() == 4, "input must be be `(batch, nhead, len_q, len_k)`."
     assert scale is not None, "scale must not be None."
-    assert scale == 1.0 or softmax_in_fp32, "softmax should be in fp32 when scaled"
+    # assert scale == 1.0 or softmax_in_fp32, "softmax should be in fp32 when scaled"
 
 
 def _is_fused_scale_mask_softmax_available(
@@ -357,6 +357,9 @@ def _is_fused_scale_mask_softmax_available(
     bsz, np, sq, sk = input.size()
     dtype = input.dtype
     _fused_scale_mask_softmax_sanity_check(input, scale, softmax_in_fp32)
+
+    if not (scale == 1.0 or softmax_in_fp32):
+        return False
 
     if dtype != torch.float16 and dtype != torch.bfloat16:
         return False

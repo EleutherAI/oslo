@@ -118,7 +118,6 @@ class GPT2Attention(nn.Module):
 
         self.scale_attn_weights = config.scale_attn_weights
         self.is_cross_attention = is_cross_attention
-        self.use_triang_mask = not self.is_cross_attention
 
         # Layer-wise attention scaling, reordering, and upcasting
         self.scale_attn_by_inverse_layer_idx = config.scale_attn_by_inverse_layer_idx
@@ -136,6 +135,10 @@ class GPT2Attention(nn.Module):
         self.resid_dropout = onn.FusedBiasDropout(config.resid_pdrop)
 
         self.pruned_heads = set()
+        if not hasattr(config, "softmax_in_fp32"):
+            self.softmax_in_fp32 = True
+        else:
+            self.softmax_in_fp32 = config.softmax_in_fp32
 
     def prune_heads(self, heads):
         if len(heads) == 0:
@@ -168,21 +171,20 @@ class GPT2Attention(nn.Module):
         if self.scale_attn_by_inverse_layer_idx:
             scale_factor /= float(self.layer_idx + 1)
 
-        attn_weights *= scale_factor
-
         if F._is_fused_scale_mask_softmax_available(
             input=attn_weights,
-            scale=1.0,
-            use_triang_mask=self.use_triang_mask,
-            softmax_in_fp32=False,
+            scale=scale_factor,
+            use_triang_mask=self.is_cross_attention,
+            softmax_in_fp32=self.softmax_in_fp32,
         ):
             attn_weights = F._fused_scale_mask_softmax_cuda(
                 input=attn_weights,
-                scale=1.0,
+                scale=scale_factor,
                 use_triang_mask=self.use_triang_mask,
                 pad_mask=attention_mask,
             )
         else:
+            attn_weights *= scale_factor
             if not self.is_cross_attention:
                 # if only "normal" attention layer implements causal mask
                 query_length, key_length = query.size(-2), key.size(-2)
@@ -262,9 +264,13 @@ class GPT2Attention(nn.Module):
             causal_mask = self.bias[
                 :, :, key_length - query_length : key_length, :key_length
             ].bool()
-            attn_weights = torch.where(
-                causal_mask, attn_weights, self.masked_bias.to(attn_weights.dtype)
+            mask_value = torch.finfo(attn_weights.dtype).min
+            # Need to be a tensor, otherwise we get error: `RuntimeError: expected scalar type float but found double`.
+            # Need to be on the same device, otherwise `RuntimeError: ..., x and y to be on the same device`
+            mask_value = torch.tensor(mask_value, dtype=attn_weights.dtype).to(
+                attn_weights.device
             )
+            attn_weights = torch.where(causal_mask, attn_weights, mask_value)
 
         if attention_mask is not None:
             # Apply the attention mask
