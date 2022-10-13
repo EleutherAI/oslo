@@ -285,6 +285,7 @@ class FlattenParamsWrapper(nn.Module):
     def __init__(self, module: nn.Module, param_list: List[nn.Parameter]):
         super().__init__()
         self._fpw_module = module
+        self.module_forward = module.forward
         # People may test whether this module contains parameters by using
         # `getattr(module, "flat_param") is None`. This is not always accurate
         # as the above condition is also true if this module is unflattened.
@@ -474,4 +475,4 @@ class FlattenParamsWrapper(nn.Module):
 
     def forward(self, *inputs: Any, **kwinputs: Any) -> Any:
         self._unflatten_params_if_needed()
-        return self.module(*inputs, **kwinputs)
+        return self.module_forward(*inputs, **kwinputs)

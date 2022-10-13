@@ -16,6 +16,7 @@ SEQUENCE_PARALLEL_KEYS = [
     "decoder_input_ids",
     "decoder_attention_mask",
     "token_type_ids",
+    "labels",
 ]
 
 
