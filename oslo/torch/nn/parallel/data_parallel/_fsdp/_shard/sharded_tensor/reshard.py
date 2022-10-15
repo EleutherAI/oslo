@@ -46,7 +46,7 @@ def get_idx_from_placements(placements, current_rank) -> int:
 
 def build_reshard_metadata(
     st_size: torch.Size,
-    sharding_spec: shard_spec.ShardingSpec,
+    sharding_spec,
     world_size: int,
 ) -> Tuple[List[ShardMetadata], List[int]]:
     """
@@ -87,8 +87,8 @@ def build_reshard_metadata(
 def reshuffle_local_shard(
     local_shard: torch.Tensor,
     st_size: torch.Size,
-    sharding_spec: shard_spec.ShardingSpec,
-    resharding_spec: shard_spec.ShardingSpec,
+    sharding_spec,
+    resharding_spec,
     pg: ProcessGroup,
 ) -> Tuple[List[Shard], List[ShardMetadata]]:
     """
@@ -154,8 +154,8 @@ def reshuffle_local_shard(
 def reshard_local_shard(
     local_tensor: torch.Tensor,
     st_size: torch.Size,
-    sharding_spec: shard_spec.ShardingSpec,
-    resharding_spec: shard_spec.ShardingSpec,
+    sharding_spec,
+    resharding_spec,
     pg: ProcessGroup,
 ) -> Tuple[List[Shard], List[ShardMetadata]]:
     """

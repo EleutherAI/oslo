@@ -9,8 +9,10 @@ import functools
 
 class _RequiredParameter(object):
     """Singleton class representing a required parameter for an Optimizer."""
+
     def __repr__(self):
         return "<required parameter>"
+
 
 required = _RequiredParameter()
 
@@ -37,9 +39,10 @@ class Optimizer(object):
         self._hook_for_profile()
 
         if isinstance(params, torch.Tensor):
-            raise TypeError("params argument given to the optimizer should be "
-                            "an iterable of Tensors or dicts, but got " +
-                            torch.typename(params))
+            raise TypeError(
+                "params argument given to the optimizer should be "
+                "an iterable of Tensors or dicts, but got " + torch.typename(params)
+            )
 
         self.state = defaultdict(dict)
         self.param_groups = []
@@ -48,7 +51,7 @@ class Optimizer(object):
         if len(param_groups) == 0:
             raise ValueError("optimizer got an empty parameter list")
         if not isinstance(param_groups[0], dict):
-            param_groups = [{'params': param_groups}]
+            param_groups = [{"params": param_groups}]
 
         for param_group in param_groups:
             self.add_param_group(param_group)
@@ -60,9 +63,9 @@ class Optimizer(object):
 
     def __getstate__(self):
         return {
-            'defaults': self.defaults,
-            'state': self.state,
-            'param_groups': self.param_groups,
+            "defaults": self.defaults,
+            "state": self.state,
+            "param_groups": self.param_groups,
         }
 
     def __setstate__(self, state):
@@ -70,14 +73,14 @@ class Optimizer(object):
         self._hook_for_profile()  # To support multiprocessing pickle/unpickle.
 
     def __repr__(self):
-        format_string = self.__class__.__name__ + ' ('
+        format_string = self.__class__.__name__ + " ("
         for i, group in enumerate(self.param_groups):
-            format_string += '\n'
-            format_string += 'Parameter Group {0}\n'.format(i)
+            format_string += "\n"
+            format_string += "Parameter Group {0}\n".format(i)
             for key in sorted(group.keys()):
-                if key != 'params':
-                    format_string += '    {0}: {1}\n'.format(key, group[key])
-        format_string += ')'
+                if key != "params":
+                    format_string += "    {0}: {1}\n".format(key, group[key])
+        format_string += ")"
         return format_string
 
     # Currently needed by Adam and AdamW
@@ -85,32 +88,38 @@ class Optimizer(object):
         if torch.has_cuda and torch.cuda.is_available():
             capturing = torch.cuda.is_current_stream_capturing()
 
-            if capturing and not self.defaults['capturable']:
-                raise RuntimeError("Attempting CUDA graph capture of step() for an instance of " +
-                                   self.__class__.__name__ +
-                                   " but this instance was constructed with capturable=False.")
+            if capturing and not self.defaults["capturable"]:
+                raise RuntimeError(
+                    "Attempting CUDA graph capture of step() for an instance of "
+                    + self.__class__.__name__
+                    + " but this instance was constructed with capturable=False."
+                )
 
             if (
                 (not getattr(self, "_warned_capturable_if_run_uncaptured", False))
                 and self.defaults["capturable"]
                 and (not capturing)
             ):
-                print("Warning: This instance was constructed with capturable=True, but step() " +
-                      "is running without CUDA graph capture. If you never intend to graph-capture this " +
-                      "instance, capturable=True can impair performance, and you should set capturable=False.")
+                print(
+                    "Warning: This instance was constructed with capturable=True, but step() "
+                    + "is running without CUDA graph capture. If you never intend to graph-capture this "
+                    + "instance, capturable=True can impair performance, and you should set capturable=False."
+                )
                 self._warned_capturable_if_run_uncaptured = True
 
     def _hook_for_profile(self):
-        self._zero_grad_profile_name = "Optimizer.zero_grad#{}.zero_grad".format(self.__class__.__name__)
+        self._zero_grad_profile_name = "Optimizer.zero_grad#{}.zero_grad".format(
+            self.__class__.__name__
+        )
 
         def profile_hook_step(func):
-
             @functools.wraps(func)
             def wrapper(*args, **kwargs):
                 obj, *_ = args
                 profile_name = "Optimizer.step#{}.step".format(obj.__class__.__name__)
                 with torch.autograd.profiler.record_function(profile_name):
                     return func(*args, **kwargs)
+
             return wrapper
 
         hooked = getattr(self.__class__.step, "hooked", None)
@@ -134,19 +143,27 @@ class Optimizer(object):
 
         def pack_group(group):
             nonlocal start_index
-            packed = {k: v for k, v in group.items() if k != 'params'}
-            param_mappings.update({id(p): i for i, p in enumerate(group['params'], start_index)
-                                   if id(p) not in param_mappings})
-            packed['params'] = [param_mappings[id(p)] for p in group['params']]
-            start_index += len(packed['params'])
+            packed = {k: v for k, v in group.items() if k != "params"}
+            param_mappings.update(
+                {
+                    id(p): i
+                    for i, p in enumerate(group["params"], start_index)
+                    if id(p) not in param_mappings
+                }
+            )
+            packed["params"] = [param_mappings[id(p)] for p in group["params"]]
+            start_index += len(packed["params"])
             return packed
+
         param_groups = [pack_group(g) for g in self.param_groups]
         # Remap state to use order indices as keys
-        packed_state = {(param_mappings[id(k)] if isinstance(k, torch.Tensor) else k): v
-                        for k, v in self.state.items()}
+        packed_state = {
+            (param_mappings[id(k)] if isinstance(k, torch.Tensor) else k): v
+            for k, v in self.state.items()
+        }
         return {
-            'state': packed_state,
-            'param_groups': param_groups,
+            "state": packed_state,
+            "param_groups": param_groups,
         }
 
     def load_state_dict(self, state_dict):
@@ -160,21 +177,28 @@ class Optimizer(object):
         state_dict = deepcopy(state_dict)
         # Validate the state_dict
         groups = self.param_groups
-        saved_groups = state_dict['param_groups']
+        saved_groups = state_dict["param_groups"]
 
         if len(groups) != len(saved_groups):
-            raise ValueError("loaded state dict has a different number of "
-                             "parameter groups")
-        param_lens = (len(g['params']) for g in groups)
-        saved_lens = (len(g['params']) for g in saved_groups)
+            raise ValueError(
+                "loaded state dict has a different number of " "parameter groups"
+            )
+        param_lens = (len(g["params"]) for g in groups)
+        saved_lens = (len(g["params"]) for g in saved_groups)
         if any(p_len != s_len for p_len, s_len in zip(param_lens, saved_lens)):
-            raise ValueError("loaded state dict contains a parameter group "
-                             "that doesn't match the size of optimizer's group")
+            raise ValueError(
+                "loaded state dict contains a parameter group "
+                "that doesn't match the size of optimizer's group"
+            )
 
         # Update the state
-        id_map = {old_id: p for old_id, p in
-                  zip(chain.from_iterable((g['params'] for g in saved_groups)),
-                      chain.from_iterable((g['params'] for g in groups)))}
+        id_map = {
+            old_id: p
+            for old_id, p in zip(
+                chain.from_iterable((g["params"] for g in saved_groups)),
+                chain.from_iterable((g["params"] for g in groups)),
+            )
+        }
 
         def cast(param, value, key=None):
             r"""Make a deep copy of value, casting all tensors to device of param."""
@@ -182,7 +206,7 @@ class Optimizer(object):
                 # Floating-point types are a bit special here. They are the only ones
                 # that are assumed to always match the type of params.
                 # Make sure state['step'] is not casted https://github.com/pytorch/pytorch/issues/74424
-                if (key != "step"):
+                if key != "step":
                     if param.is_floating_point():
                         value = value.to(param.dtype)
                     value = value.to(param.device)
@@ -198,7 +222,7 @@ class Optimizer(object):
         # State that is not assigned to params is copied as is (needed for
         # backward compatibility).
         state = defaultdict(dict)
-        for k, v in state_dict['state'].items():
+        for k, v in state_dict["state"].items():
             if k in id_map:
                 param = id_map[k]
                 state[param] = cast(param, v)
@@ -207,11 +231,11 @@ class Optimizer(object):
 
         # Update parameter groups, setting their 'params' value
         def update_group(group, new_group):
-            new_group['params'] = group['params']
+            new_group["params"] = group["params"]
             return new_group
-        param_groups = [
-            update_group(g, ng) for g, ng in zip(groups, saved_groups)]
-        self.__setstate__({'state': state, 'param_groups': param_groups})
+
+        param_groups = [update_group(g, ng) for g, ng in zip(groups, saved_groups)]
+        self.__setstate__({"state": state, "param_groups": param_groups})
 
     def zero_grad(self, set_to_none: bool = False):
         r"""Sets the gradients of all optimized :class:`torch.Tensor` s to zero.
@@ -228,7 +252,7 @@ class Optimizer(object):
                 (in one case it does the step with a gradient of 0 and in the other it skips
                 the step altogether).
         """
-        foreach = self.defaults.get('foreach', False)
+        foreach = self.defaults.get("foreach", False)
 
         if not hasattr(self, "_zero_grad_profile_name"):
             self._hook_for_profile()
@@ -236,7 +260,7 @@ class Optimizer(object):
             per_device_and_dtype_grads = defaultdict(lambda: defaultdict(list))
         with torch.autograd.profiler.record_function(self._zero_grad_profile_name):
             for group in self.param_groups:
-                for p in group['params']:
+                for p in group["params"]:
                     if p.grad is not None:
                         if set_to_none:
                             p.grad = None
@@ -245,10 +269,12 @@ class Optimizer(object):
                                 p.grad.detach_()
                             else:
                                 p.grad.requires_grad_(False)
-                            if (not foreach or p.grad.is_sparse):
+                            if not foreach or p.grad.is_sparse:
                                 p.grad.zero_()
                             else:
-                                per_device_and_dtype_grads[p.grad.device][p.grad.dtype].append(p.grad)
+                                per_device_and_dtype_grads[p.grad.device][
+                                    p.grad.dtype
+                                ].append(p.grad)
             if foreach:
                 for _, per_dtype_grads in per_device_and_dtype_grads.items():
                     for grads in per_dtype_grads.values():
@@ -279,40 +305,49 @@ class Optimizer(object):
         """
         assert isinstance(param_group, dict), "param group must be a dict"
 
-        params = param_group['params']
+        params = param_group["params"]
         if isinstance(params, torch.Tensor):
-            param_group['params'] = [params]
+            param_group["params"] = [params]
         elif isinstance(params, set):
-            raise TypeError('optimizer parameters need to be organized in ordered collections, but '
-                            'the ordering of tensors in sets will change between runs. Please use a list instead.')
+            raise TypeError(
+                "optimizer parameters need to be organized in ordered collections, but "
+                "the ordering of tensors in sets will change between runs. Please use a list instead."
+            )
         else:
-            param_group['params'] = list(params)
+            param_group["params"] = list(params)
 
-        for param in param_group['params']:
+        for param in param_group["params"]:
             if not isinstance(param, torch.Tensor):
-                raise TypeError("optimizer can only optimize Tensors, "
-                                "but one of the params is " + torch.typename(param))
+                raise TypeError(
+                    "optimizer can only optimize Tensors, "
+                    "but one of the params is " + torch.typename(param)
+                )
             if not param.is_leaf:
                 raise ValueError("can't optimize a non-leaf Tensor")
 
         for name, default in self.defaults.items():
             if default is required and name not in param_group:
-                raise ValueError("parameter group didn't specify a value of required optimization parameter " +
-                                 name)
+                raise ValueError(
+                    "parameter group didn't specify a value of required optimization parameter "
+                    + name
+                )
             else:
                 param_group.setdefault(name, default)
 
-        params = param_group['params']
+        params = param_group["params"]
         if len(params) != len(set(params)):
-            warnings.warn("optimizer contains a parameter group with duplicate parameters; "
-                          "in future, this will cause an error; "
-                          "see github.com/pytorch/pytorch/issues/40967 for more information", stacklevel=3)
+            warnings.warn(
+                "optimizer contains a parameter group with duplicate parameters; "
+                "in future, this will cause an error; "
+                "see github.com/pytorch/pytorch/issues/40967 for more information",
+                stacklevel=3,
+            )
 
         param_set = set()
         for group in self.param_groups:
-            param_set.update(set(group['params']))
+            param_set.update(set(group["params"]))
 
-        if not param_set.isdisjoint(set(param_group['params'])):
+        if not param_set.isdisjoint(set(param_group["params"])):
             raise ValueError("some parameters appear in more than one parameter group")
 
         self.param_groups.append(param_group)
