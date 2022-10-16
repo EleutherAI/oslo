@@ -8,7 +8,7 @@ OSLO Python library stands for *Open-Source Framework for Large-scale Model Opti
 Requirements for building OSLO without any issues:
 
 - CUDA 11 & nvcc
-- PyTorch=1.11.0
+- PyTorch >= 1.11.0
 - Turing or Ampere GPU
 
 ```

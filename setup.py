@@ -38,16 +38,16 @@ try:
     import torch
 except ModuleNotFoundError as err:
     print(
-        "PyTorch could not import. Please install torch==1.1.0 to use OSLO.\nBuild exited with error: {}".format(
+        "PyTorch could not import. Please install torch >= 1.11.0 to use OSLO.\nBuild exited with error: {}".format(
             err
         )
     )
     sys.exit(-1)
 
-if torch.__version__ != pytorch_min_version_str:
+if not torch.__version__ >= pytorch_min_version_str:
     print(
-        "OSLO requires PyTorch 1.11.0.\n"
-        + "You are using torch.__version__ = {}.\nRequired version for torch.__version__ is {}.".format(
+        "OSLO requires PyTorch >= 1.11.0.\n"
+        + "You are using torch.__version__ = {}.\nRequired version for torch.__version__ is >= {}. Please upgrade your PyTorch version.".format(
             torch.__version__, pytorch_min_version_str
         )
     )
@@ -58,8 +58,8 @@ TORCH_MAJOR = int(torch.__version__.split(".")[0])
 TORCH_MINOR = int(torch.__version__.split(".")[1])
 if TORCH_MAJOR < 1 or (TORCH_MAJOR == 1 and TORCH_MINOR < 10):
     raise RuntimeError(
-        "OSLO requires PyTorch 1.11.0.\n"
-        + "The latest stable release can be obtained from https://pytorch.org/"
+        "OSLO requires PyTorch >= 1.11.0.\n"
+        + "The required release can be obtained from https://pytorch.org/"
     )
 
 if not torch.cuda.is_available():
