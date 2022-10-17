@@ -8,7 +8,7 @@ from oslo.torch.nn.parallel.data_parallel._ddp.distributed_data_parallel import 
     _DistributedDataParallel,
 )
 from oslo.torch.nn.parallel.utils import add_wrapper
-from oslo.torch.utils.data import SequenceDataParallelCollator
+from oslo.torch.utils.data import SequenceParallelCollator
 
 SEQUENCE_PARALLEL_KEYS = [
     "input_ids",
@@ -20,15 +20,15 @@ SEQUENCE_PARALLEL_KEYS = [
 ]
 
 
-class _SequenceDataParallelState(object):
+class _SequenceParallelState(object):
     def __init__(self, parallel_context: ParallelContext):
         self.parallel_context = parallel_context
 
 
 # based on `allreduce_hook` in
 # torch.distributed.algorithm.ddp_comm_hooks.default_hooks
-def _sequence_data_parallel_hook(
-    state: _SequenceDataParallelState, bucket: dist.GradBucket
+def _sequence_parallel_hook(
+    state: _SequenceParallelState, bucket: dist.GradBucket
 ) -> torch.futures.Future[torch.Tensor]:
     parallel_context = state.parallel_context
     group_to_use = parallel_context.get_group(ParallelMode.SEQUENCE_DP)
@@ -44,7 +44,7 @@ def _sequence_data_parallel_hook(
     return fut.then(lambda x: x.value()[0])
 
 
-def SequenceDataParallel(
+def SequenceParallel(
     module,
     parallel_context,
     pad_token_id=None,
@@ -70,8 +70,8 @@ def SequenceDataParallel(
         static_graph=static_graph,
     )
     sp.register_comm_hook(
-        state=_SequenceDataParallelState(parallel_context),
-        hook=_sequence_data_parallel_hook,
+        state=_SequenceParallelState(parallel_context),
+        hook=_sequence_parallel_hook,
     )
 
     add_wrapper(module, ParallelMode.SEQUENCE_DP, sp)
@@ -97,7 +97,7 @@ def SequenceDataParallel(
                 "`model(input_ids=input_ids, attention_mask=attention_mask)`."
             )
 
-        collator = SequenceDataParallelCollator(
+        collator = SequenceParallelCollator(
             parallel_keys=[key for key in kwargs if key in SEQUENCE_PARALLEL_KEYS],
             dim=dim,
             parallel_context=parallel_context,
