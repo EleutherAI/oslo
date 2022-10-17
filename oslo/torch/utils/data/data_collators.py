@@ -5,7 +5,7 @@ import torch
 from oslo.torch.distributed import ParallelContext, ParallelMode
 
 
-class SequenceDataParallelCollator:
+class SequenceParallelCollator:
     def __init__(
         self,
         parallel_keys: List[str],
