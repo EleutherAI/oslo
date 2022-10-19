@@ -7,8 +7,12 @@ import torch
 import torch.distributed as dist
 from torch import nn
 
+import oslo
 from oslo.torch.distributed import ParallelContext, ParallelMode
+from oslo.torch.nn.parallel.pipeline_parallel.pipeline_parallel import _PipelineParallel, \
+    PipelineParallel
 from oslo.torch.nn.parallel.tensor_parallel import TensorParallel
+from oslo.torch.nn.parallel.tensor_parallel.tensor_parallel import _TensorParallel
 from oslo.torch.nn.parallel.utils import (
     allocate_params,
     get_parameter_dtype,
@@ -17,20 +21,20 @@ from oslo.torch.nn.parallel.utils import (
 
 @torch.no_grad()
 def save_pretrained(
-    self,
-    save_directory: Union[str, os.PathLike],
-    save_config: bool = True,
-    state_dict: Optional[dict] = None,
-    save_function: Callable = torch.save,
-    merge_checkpoints: bool = False,
-    **kwargs,
+        self,
+        save_directory: Union[str, os.PathLike],
+        save_config: bool = True,
+        state_dict: Optional[dict] = None,
+        save_function: Callable = torch.save,
+        merge_checkpoints: bool = False,
+        **kwargs,
 ):
-    logger = getLogger("TensorParallel")
+    logger = getLogger()
     PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0.bin"
 
     if (
-        self.parallel_context.get_world_size(ParallelMode.TENSOR) == 1
-        and self.parallel_context.get_world_size(ParallelMode.PIPELINE) == 1
+            self.parallel_context.get_world_size(ParallelMode.TENSOR) == 1
+            and self.parallel_context.get_world_size(ParallelMode.PIPELINE) == 1
     ):
         if dist.get_rank() == 0:
             self.save_pretrained(
@@ -43,7 +47,7 @@ def save_pretrained(
         dist.barrier()
         return None
 
-    if merge_checkpoints:
+    if merge_checkpoints: # TODO: 확인하기
         model_to_save = self.__class__(self.config).eval()
 
         if state_dict is None:
@@ -51,18 +55,31 @@ def save_pretrained(
 
         if hasattr(self, "oslo_wrappers"):
             for parallel_mode, wrapper in self.oslo_wrappers.items():
-                if hasattr(wrapper, "parallelize"):
-                    wrapper.parallelize(model_to_save) # module to save를 자르자.
-                # TODO: Parallelization, Kevin-ai
+                if isinstance(wrapper, _TensorParallel):
+                    model_to_save = TensorParallel(
+                        model_to_save,
+                        parallel_context=self.parallel_context,
+                        memory_priority=wrapper.memory_priority,
+                    )
+                    if dist.get_rank() == 0:
+                        print("Tensor parallel parallelized")
+                elif isinstance(wrapper, _PipelineParallel):
+                    model_to_save = PipelineParallel(
+                        model_to_save,
+                        parallel_context=self.parallel_context,
+                        num_micro_batches=wrapper.num_micro_batches,
+                        memory_computation_balance=wrapper.memory_computation_balance,
+                    )
 
         model_to_save.load_state_dict(state_dict)
-        allocate_params(model_to_save, self.parallel_context)
+        oslo.ready(model_to_save, parallel_context=self.parallel_context)
 
         if hasattr(model_to_save, "oslo_wrappers"):
             for parallel_mode, wrapper in model_to_save.oslo_wrappers.items():
                 if hasattr(wrapper, "deparallelize"):
-                    model_to_save = wrapper.deparallelize()
-                    # TODO: De-Parallelization, Kevin-ai
+                    wrapper.deparallelize()
+                    if dist.get_rank() == 0:
+                        print("Tensor parallel de-parallelized")
 
         if dist.get_rank() == 0:
             model_to_save.save_pretrained(

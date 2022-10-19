@@ -241,8 +241,6 @@ class _TensorParallel(nn.Module):
 
     def deparallelize(self):
         self.module.deparallelize()
-        module = self.module.module
-        return module
 
     def parallelize(self, module):
         module = self._resize_vocab_size(module, self.parallel_context)
