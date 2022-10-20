@@ -28,7 +28,7 @@ oslo_init_dict_form = {
     },
     "pipeline_parallelism": {
         "enable": True,
-        "parallel_size": 4
+        "parallel_size": 2
     }
 
 }

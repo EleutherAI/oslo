@@ -23,7 +23,7 @@ oslo_init_dict_form = {
     },
     "tensor_parallelism": {
         "enable": True,
-        "parallel_size": 4,
+        "parallel_size": 8,
         "parallel_mode": "2.5d",
     },
     "pipeline_parallelism": {
@@ -66,6 +66,7 @@ args = TrainingArguments(
     num_train_epochs=3,
     seed=0,
     load_best_model_at_end=True,
+    per_device_train_batch_size=16,
     oslo_config_path_or_dict=oslo_init_dict_form,
     dataloader_drop_last=True,
 )
