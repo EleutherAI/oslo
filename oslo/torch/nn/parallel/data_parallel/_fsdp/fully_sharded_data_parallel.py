@@ -486,8 +486,8 @@ def FullyShardedDataParallel(
                     transformer_wrap_layers_intersection.add(transformer_wrap_layers[i])
 
         if len(transformer_wrap_layers) != len(transformer_wrap_layers_intersection):
-            unsupport = set(transformer_wrap_layers_str) - transformer_wrap_layers_intersection
-            print(f"Modules not supported: {unsupport}")
+            unsupported = set(transformer_wrap_layers_str) - transformer_wrap_layers_intersection
+            print(f"Modules not supported: {unsupported}")
             
         transformer_wrap_layers = transformer_wrap_layers_intersection
 
