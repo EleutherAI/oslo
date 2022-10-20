@@ -51,12 +51,11 @@ from transformers.trainer_callback import (
 )
 # from oslo.torch.optim import ZeroRedundancyOptimizer
 from oslo.torch.nn.parallel.utils import allocate_params
-from oslo.torch.optim.sharded_grad_scaler import ShardedGradScaler
 from oslo.torch.nn.parallel import (
     PipelineParallel,
     TensorParallel,
-    SequenceDataParallel,
 )
+from oslo.torch.nn.parallel.sequence_parallel import SequenceParallel
 from oslo.torch.nn.parallel.data_parallel.data_parallel import DataParallel
 from oslo.torch.nn.parallel.data_parallel._ddp.distributed_data_parallel import (
     DistributedDataParallel,
@@ -483,7 +482,7 @@ class Trainer:
                         **self.args.oslo_config.pipeline_parallelism["params"],
                     )
                     log_dist(f"Model wrapping with {wrapper}")
-                elif wrapper == SequenceDataParallel:
+                elif wrapper == SequenceParallel:
                     model = wrapper(
                         model,
                         parallel_context=self.parallel_context,
