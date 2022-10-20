@@ -483,7 +483,7 @@ def FullyShardedDataParallel(
     if transformer_wrap_layers is not None:
         transformer_wrap_layers_intersection = set()
         transformer_wrap_layers_str = [
-            layer.__name__ for layer in transformer_wrap_layers
+            layer.__qualname__ for layer in transformer_wrap_layers
         ]
         transformer_layer_cls = fsdp_map_for_hf.get_mapping(module)
         for cls, mapping in transformer_layer_cls.items():
