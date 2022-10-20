@@ -49,7 +49,7 @@ from transformers.trainer_callback import (
     TrainerControl,
     TrainerState,
 )
-from oslo.torch.optim import ZeroRedundancyOptimizer
+# from oslo.torch.optim import ZeroRedundancyOptimizer
 from oslo.torch.nn.parallel.utils import allocate_params
 from oslo.torch.optim.sharded_grad_scaler import ShardedGradScaler
 from oslo.torch.nn.parallel import (
@@ -490,7 +490,7 @@ class Trainer:
                         **self.args.oslo_config.sequence_parallelism["params"],
                     )
                     log_dist(f"Model wrapping with {wrapper}")
-                elif wrapper in [DistributedDataParallel, ShardedDataParallel, FullyShardedDataParallel]:
+                elif wrapper == DistributedDataParallel:
                     # model = model.to()
                     model = wrapper(
                         model,
@@ -498,6 +498,14 @@ class Trainer:
                         **self.args.oslo_config.data_parallelism["params"],
                     )
                     log_dist(f"Model wrapping with {wrapper}")
+                elif wrapper == DataParallel:
+                    self.create_optimizer()
+                    model, self.optimizer = wrapper(
+                        model,
+                        self.optimizer,
+                        parallel_context=self.parallel_context,
+                        zero_stage=self.args.oslo_config["data_parallelism"]["zero_stage"],
+                    )
 
             allocate_params(model, self.parallel_context)
         return model
@@ -573,17 +581,10 @@ class Trainer:
         optimizer_cls = Trainer.get_optimizer_cls_and_kwargs(
             self.args
         )
-        if self.args.oslo_config and self.args.oslo_config["data_parallelism"] and self.args.oslo_config["data_parallelism"]["zero_stage"] > 0:
-            self.optimizer = ZeroRedundancyOptimizer(
-                parallel_context=self.parallel_context,
-                params=opt_model.parameters(),
-                optim=optimizer_cls,
-                # **optimizer_kwargs,
-            )
-
-        else:
+        # This if-case is for Oslo DP wrapper which pre-define optimizer before wrapping the model.
+        if self.optimizer is None:
             self.optimizer = optimizer_cls(opt_model.parameters())
-        log_dist(f"Optimizer: {self.optimizer}")
+            log_dist(f"Optimizer: {self.optimizer}")
         return self.optimizer
 
     @staticmethod
