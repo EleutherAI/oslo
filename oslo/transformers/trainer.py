@@ -54,7 +54,7 @@ from oslo.torch.nn.parallel import (
     PipelineParallel,
     TensorParallel,
 )
-from oslo.torch.nn.parallel.sequence_parallel import SequenceParalle
+from oslo.torch.nn.parallel.sequence_parallel import SequenceParallel
 from oslo.torch.nn.parallel.data_parallel.data_parallel import DataParallel
 from oslo.torch.nn.parallel.data_parallel._ddp.distributed_data_parallel import (
     DistributedDataParallel,
@@ -336,7 +336,6 @@ class Trainer:
 
             step = -1
 
-
             for step, inputs in enumerate(epoch_iterator):
                 # # TODO Skip past any already trained steps if resuming training
                 # if steps_trained_in_current_epoch > 0:
@@ -463,7 +462,7 @@ class Trainer:
         # Distributed training (should be after apex fp16 initialization)
         if self.parallel_context is not None:
             for wrapper in model_wrappers:
-                # logging.info(f"Model wrapping with wrapper: {wrapper}")
+                log_dist(f"Model wrapping with wrapper: {wrapper}")
 
                 if wrapper == TensorParallel:
                     log_dist(self.args.oslo_config)
@@ -472,21 +471,18 @@ class Trainer:
                         parallel_context=self.parallel_context,
                         **self.args.oslo_config.tensor_parallelism["params"],
                     )
-                    log_dist(f"Model wrapping with {wrapper}")
                 elif wrapper == PipelineParallel:
                     model = wrapper(
                         model,
                         parallel_context=self.parallel_context,
                         **self.args.oslo_config.pipeline_parallelism["params"],
                     )
-                    log_dist(f"Model wrapping with {wrapper}")
                 elif wrapper == SequenceParallel:
                     model = wrapper(
                         model,
                         parallel_context=self.parallel_context,
                         **self.args.oslo_config.sequence_parallelism["params"],
                     )
-                    log_dist(f"Model wrapping with {wrapper}")
                 elif wrapper == DistributedDataParallel:
                     # model = model.to()
                     model = wrapper(
@@ -494,7 +490,6 @@ class Trainer:
                         parallel_context=self.parallel_context,
                         **self.args.oslo_config.data_parallelism["params"],
                     )
-                    log_dist(f"Model wrapping with {wrapper}")
                 elif wrapper == DataParallel:
                     self.create_optimizer()
                     model, self.optimizer = wrapper(
@@ -503,6 +498,7 @@ class Trainer:
                         parallel_context=self.parallel_context,
                         zero_stage=self.args.oslo_config["data_parallelism"]["zero_stage"],
                     )
+                log_dist(f"Model wrapping with {wrapper}")
 
             allocate_params(model, self.parallel_context)
         return model
@@ -581,7 +577,7 @@ class Trainer:
         # This if-case is for Oslo DP wrapper which pre-define optimizer before wrapping the model.
         if self.optimizer is None:
             self.optimizer = optimizer_cls(opt_model.parameters())
-            log_dist(f"Optimizer: {self.optimizer}")
+        log_dist(f"Optimizer: {self.optimizer}")
         return self.optimizer
 
     @staticmethod
