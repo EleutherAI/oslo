@@ -8,13 +8,12 @@ from oslo.torch.distributed import ParallelContext
 from oslo.torch.nn.parallel import (
     PipelineParallel,
     TensorParallel,
-    SequenceDataParallel
 )
+from oslo.torch.nn.parallel.sequence_parallel import SequenceParallel
 from oslo.torch.nn.parallel.data_parallel.data_parallel import DataParallel
 from oslo.torch.nn.parallel.data_parallel._ddp.distributed_data_parallel import (
     DistributedDataParallel,
 )
-
 
 from oslo.torch.distributed.parallel_mode import ParallelMode
 from .trainer_utils import (
@@ -444,7 +443,7 @@ def init_oslo_features(
     if tensor_parallel_size > 1:
         model_wrapper.append(TensorParallel)
     if sequence_parallel_size > 1:
-        model_wrapper.append(SequenceDataParallel)
+        model_wrapper.append(SequenceParallel)
     if pipeline_parallel_size > 1:
         model_wrapper.append(PipelineParallel)
     # TODO expert mode

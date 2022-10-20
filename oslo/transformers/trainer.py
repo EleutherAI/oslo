@@ -49,24 +49,22 @@ from transformers.trainer_callback import (
     TrainerControl,
     TrainerState,
 )
-# from oslo.torch.optim import ZeroRedundancyOptimizer
 from oslo.torch.nn.parallel.utils import allocate_params
 from oslo.torch.nn.parallel import (
     PipelineParallel,
     TensorParallel,
 )
-from oslo.torch.nn.parallel.sequence_parallel import SequenceParallel
+from oslo.torch.nn.parallel.sequence_parallel import SequenceParalle
 from oslo.torch.nn.parallel.data_parallel.data_parallel import DataParallel
 from oslo.torch.nn.parallel.data_parallel._ddp.distributed_data_parallel import (
     DistributedDataParallel,
 )
 from .data.data_collator import (
     DataCollator,
-    # DataCollatorWithPadding,
     default_data_collator,
 )
 
-from .training_args_dev import TrainingArguments
+from .training_args import TrainingArguments
 from .trainer_utils import (
     unwrap_model,
     OptimizerNames,
