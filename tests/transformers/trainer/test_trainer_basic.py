@@ -16,16 +16,12 @@ logging.basicConfig(level=logging.INFO)
 model = BertForSequenceClassification.from_pretrained("bert-base-uncased")
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 
-processor = ProcessorForSequenceClassification("bert-base-uncased", 512)
-if processor._tokenizer.pad_token is None:
-    processor._tokenizer.pad_token = processor._tokenizer.eos_token
-
 # 데이터셋 생성
 dataset = load_dataset("glue", "cola")
 dataset = dataset.rename_column("sentence", "text")
 dataset = dataset.rename_column("label", "labels")
 
-processor = ProcessorForSequenceClassification("bert-base-uncased", 512)
+processor = ProcessorForSequenceClassification(tokenizer, 512)
 if processor._tokenizer.pad_token is None:
     processor._tokenizer.pad_token = processor._tokenizer.eos_token
 

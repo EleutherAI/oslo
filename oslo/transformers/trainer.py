@@ -95,8 +95,6 @@ class Trainer:
         self,
         model: nn.Module = None,
         args: TrainingArguments = None,
-        # train_dataloader: Optional[DataLoader] = None,
-        # eval_dataloader: Optional[DataLoader] = None,
         train_dataset: Optional[Dataset] = None,
         eval_dataset: Optional[Dataset] = None,
         data_collator: Optional[DataCollator] = None,
@@ -670,7 +668,6 @@ class Trainer:
         elif args.optim == OptimizerNames.ADAMW_BNB:
             try:
                 from bitsandbytes.optim import Adam8bit
-
                 optimizer_cls = Adam8bit
             except ImportError:
                 raise ValueError(
@@ -704,10 +701,8 @@ class Trainer:
         Args:
             num_training_steps (int): The number of training steps to do.
         """
-
         if self.parallel_context or self.lr_scheduler is None:
             from transformers import get_scheduler
-
             self.lr_scheduler = get_scheduler(
                 self.args.lr_scheduler_type,
                 optimizer=self.optimizer if optimizer is None else optimizer,
@@ -876,33 +871,3 @@ class Trainer:
         )
         return ctx_manager
 
-    # def _remove_unused_columns(self, dataset: "datasets.Dataset", description: Optional[str] = None):
-    #     """ Copy HF Transformer _remove_unused_columns """
-    #     if not self.args.remove_unused_columns:
-    #         return dataset
-    #     if self._signature_columns is None:
-    #         # Inspect model forward signature to keep only the arguments it accepts.
-    #         signature = inspect.signature(self.model.forward)
-    #         self._signature_columns = list(signature.parameters.keys())
-    #         # Labels may be named label or label_ids, the default data collator handles that.
-    #         self._signature_columns += ["label", "label_ids"]
-    #
-    #     ignored_columns = list(set(dataset.column_names) - set(self._signature_columns))
-    #     if len(ignored_columns) > 0:
-    #         dset_description = "" if description is None else f"in the {description} set "
-    #         logger.info(
-    #             f"The following columns {dset_description} don't have a corresponding argument in "
-    #             f"`{self.model.__class__.__name__}.forward` and have been ignored: {', '.join(ignored_columns)}."
-    #             f" If {', '.join(ignored_columns)} are not expected by `{self.model.__class__.__name__}.forward`, "
-    #             f" you can safely ignore this message."
-    #         )
-    #
-    #     columns = [k for k in self._signature_columns if k in dataset.column_names]
-    #
-    #     if version.parse(datasets.__version__) < version.parse("1.4.0"):
-    #         dataset.set_format(
-    #             type=dataset.format["type"], columns=columns, format_kwargs=dataset.format["format_kwargs"]
-    #         )
-    #         return dataset
-    #     else:
-    #         return dataset.remove_columns(ignored_columns)
