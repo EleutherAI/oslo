@@ -6,9 +6,6 @@ from typing import List
 from transformers.utils import ExplicitEnum
 
 
-# logger = logging.get_logger(__name__)
-
-
 class SchedulerType(ExplicitEnum):
     LINEAR = "linear"
     COSINE = "cosine"
