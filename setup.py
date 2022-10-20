@@ -20,11 +20,11 @@ import subprocess
 from setuptools import find_packages, setup
 from torch.utils.cpp_extension import CUDAExtension, CUDA_HOME, BuildExtension
 
+this_dir = os.path.dirname(os.path.abspath(__file__))
 
 # ----------------------------------------------------------------------
 # CUDA OS environment configuration check
 
-CUDA_HOME = os.environ.get("CUDA_HOME")
 if not CUDA_HOME:
     CUDA_HOME = os.environ.get("CUDA_PATH")
 if not CUDA_HOME:
