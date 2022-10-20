@@ -1,3 +1,7 @@
+###################################################
+# WARNING: This script not work
+###################################################
+
 import os
 import torch
 from datasets import load_dataset
