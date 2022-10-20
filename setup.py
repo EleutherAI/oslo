@@ -23,14 +23,6 @@ from torch.utils.cpp_extension import CUDAExtension, CUDA_HOME, BuildExtension
 this_dir = os.path.dirname(os.path.abspath(__file__))
 
 # ----------------------------------------------------------------------
-# CUDA OS environment configuration check
-
-if not CUDA_HOME:
-    CUDA_HOME = os.environ.get("CUDA_PATH")
-if not CUDA_HOME:
-    raise RuntimeError("ENV variable for CUDA_HOME or CUDA_PATH is not set")
-
-# ----------------------------------------------------------------------
 # Python & PyTorch configuration check
 
 python_min_version = (3, 6, 0)
