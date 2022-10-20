@@ -1,4 +1,4 @@
-""" 
+"""
 Copyright 2021 TUNiB Inc.
 
 To build oslo on Windows:
@@ -28,7 +28,7 @@ CUDA_HOME = os.environ.get("CUDA_HOME")
 if not CUDA_HOME:
     CUDA_HOME = os.environ.get("CUDA_PATH")
 if not CUDA_HOME:
-    raise RuntimeError('ENV variable for CUDA_HOME or CUDA_PATH is not set')
+    raise RuntimeError("ENV variable for CUDA_HOME or CUDA_PATH is not set")
 
 # ----------------------------------------------------------------------
 # Python & PyTorch configuration check
@@ -102,8 +102,11 @@ if not torch.cuda.is_available():
 # ----------------------------------------------------------------------
 # CUDA & nvcc compile configurations check
 
+
 def get_cuda_bare_metal_version(cuda_dir):
-    raw_output = subprocess.check_output([cuda_dir + "/bin/nvcc", "-V"], universal_newlines=True)
+    raw_output = subprocess.check_output(
+        [cuda_dir + "/bin/nvcc", "-V"], universal_newlines=True
+    )
     output = raw_output.split()
     release_idx = output.index("release") + 1
     release = output[release_idx].split(".")
@@ -114,21 +117,28 @@ def get_cuda_bare_metal_version(cuda_dir):
 
 
 def check_cuda_torch_binary_vs_bare_metal(cuda_dir):
-    raw_output, bare_metal_major, bare_metal_minor = get_cuda_bare_metal_version(cuda_dir)
+    raw_output, bare_metal_major, bare_metal_minor = get_cuda_bare_metal_version(
+        cuda_dir
+    )
     torch_binary_major = torch.version.cuda.split(".")[0]
     torch_binary_minor = torch.version.cuda.split(".")[1]
 
     print("\nCompiling cuda extensions with")
     print(raw_output + "from " + cuda_dir + "/bin\n")
 
-    if (bare_metal_major != torch_binary_major) or (bare_metal_minor != torch_binary_minor):
+    if (bare_metal_major != torch_binary_major) or (
+        bare_metal_minor != torch_binary_minor
+    ):
         raise RuntimeError(
-            "CUDA extensions are being compiled with a version of CUDA that does " +
-            "not match the version used to compile Pytorch binaries.  " +
-            "Pytorch binaries were compiled with Cuda {}.\n".format(torch.version.cuda) +
-            "In some cases, a minor-version mismatch will not cause later errors:  " +
-            "https://github.com/NVIDIA/apex/pull/323#discussion_r287021798.  "
-            "You can try commenting out this check (at your own risk).")
+            "CUDA extensions are being compiled with a version of CUDA that does "
+            + "not match the version used to compile Pytorch binaries.  "
+            + "Pytorch binaries were compiled with Cuda {}.\n".format(
+                torch.version.cuda
+            )
+            + "In some cases, a minor-version mismatch will not cause later errors:  "
+            + "https://github.com/NVIDIA/apex/pull/323#discussion_r287021798.  "
+            "You can try commenting out this check (at your own risk)."
+        )
 
 
 def append_nvcc_threads(nvcc_extra_args):
@@ -137,41 +147,47 @@ def append_nvcc_threads(nvcc_extra_args):
         return nvcc_extra_args + ["--threads", "4"]
     return nvcc_extra_args
 
+
 cmdclass = {}
 ext_modules = []
-version_dependent_macros = ['-DVERSION_GE_1_1', '-DVERSION_GE_1_3', '-DVERSION_GE_1_5']
+version_dependent_macros = ["-DVERSION_GE_1_1", "-DVERSION_GE_1_3", "-DVERSION_GE_1_5"]
 
 if CUDA_HOME is None:
     print(
         "Are you sure your environment has nvcc available?\n",
-        "If you're installing within a container from https://hub.docker.com/r/pytorch/pytorch," 
-        "only images whose names contain 'devel' will provide nvcc."
+        "If you're installing within a container from https://hub.docker.com/r/pytorch/pytorch,"
+        "only images whose names contain 'devel' will provide nvcc.",
     )
 else:
+
     def cuda_ext_helper(name, sources, extra_cuda_flags):
         return CUDAExtension(
             name=name,
-            sources=[
-                os.path.join('oslo/torch/_C/csrc', path) for path in sources
-            ],
-            include_dirs=[
-                os.path.join(this_dir, 'oslo/torch/_C/csrc/includes')
-            ],
+            sources=[os.path.join("oslo/torch/_C/csrc", path) for path in sources],
+            include_dirs=[os.path.join(this_dir, "oslo/torch/_C/csrc/includes")],
             extra_compile_args={
-                'cxx': ['-O3'] + version_dependent_macros,
-                'nvcc':
-                    append_nvcc_threads(['-O3', '--use_fast_math'] + version_dependent_macros + extra_cuda_flags)
-            })
+                "cxx": ["-O3"] + version_dependent_macros,
+                "nvcc": append_nvcc_threads(
+                    ["-O3", "--use_fast_math"]
+                    + version_dependent_macros
+                    + extra_cuda_flags
+                ),
+            },
+        )
 
-    cc_flag = ['-gencode', 'arch=compute_70,code=sm_70']
+    cc_flag = ["-gencode", "arch=compute_70,code=sm_70"]
     _, bare_metal_major, _ = get_cuda_bare_metal_version(CUDA_HOME)
     if int(bare_metal_major) >= 11:
-        cc_flag.append('-gencode')
-        cc_flag.append('arch=compute_80,code=sm_80')
+        cc_flag.append("-gencode")
+        cc_flag.append("arch=compute_80,code=sm_80")
 
     extra_cuda_flags = [
-        '-std=c++14', '-maxrregcount=50', '-U__CUDA_NO_HALF_OPERATORS__',
-        '-U__CUDA_NO_HALF_CONVERSIONS__', '--expt-relaxed-constexpr', '--expt-extended-lambda'
+        "-std=c++14",
+        "-maxrregcount=50",
+        "-U__CUDA_NO_HALF_OPERATORS__",
+        "-U__CUDA_NO_HALF_CONVERSIONS__",
+        "--expt-relaxed-constexpr",
+        "--expt-extended-lambda",
     ]
 
     # TODO: add ext_modules
@@ -228,4 +244,4 @@ setup(
 )
 
 end_time = time.time()
-print(f'oslo build time finished at = {end_time - start_time} seconds')
+print(f"oslo build time finished at = {end_time - start_time} seconds")
