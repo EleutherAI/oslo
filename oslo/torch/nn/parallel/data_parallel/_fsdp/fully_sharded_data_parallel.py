@@ -1,6 +1,7 @@
 import contextlib
 import copy
 import functools
+import importlib
 import itertools
 import math
 import traceback
@@ -73,6 +74,10 @@ from oslo.torch.nn.parallel.data_parallel._fsdp.wrap import (
 
 from oslo.torch.distributed import ParallelMode
 from oslo.torch.nn.parallel.utils import add_wrapper
+
+from oslo.transformers.mapping_utils import (
+    _FullyShardedDataParallelMappingForHuggingFace,
+)
 
 from torch.distributed.fsdp.wrap import (
     transformer_auto_wrap_policy,
@@ -469,15 +474,46 @@ def FullyShardedDataParallel(
     module,
     parallel_context,
     sharding_strategy: Optional[ShardingStrategy] = None,
-    auto_wrap_policy: Optional[Callable] = None,
+    transformer_wrap_layers: Optional[List] = None,
     backward_prefetch: Optional[BackwardPrefetch] = BackwardPrefetch.BACKWARD_PRE,
     mixed_precision: Optional[MixedPrecision] = None,
     cpu_offload: Optional[CPUOffload] = None,
 ):
-    """
-    TODO: Mingu Kang
-    wrapping transformer layer
-    """
+    fsdp_map_for_hf = _FullyShardedDataParallelMappingForHuggingFace()
+    if transformer_wrap_layers is not None:
+        transformer_wrap_layers_intersection = set()
+        transformer_wrap_layers_str = [
+            layer.__qualname__ for layer in transformer_wrap_layers
+        ]
+        transformer_layer_cls = fsdp_map_for_hf.get_mapping(module)
+        for cls, mapping in transformer_layer_cls.items():
+            for i, layer in enumerate(mapping):
+                if layer in transformer_wrap_layers_str:
+                    transformer_wrap_layers_intersection.add(transformer_wrap_layers[i])
+
+        if len(transformer_wrap_layers) != len(transformer_wrap_layers_intersection):
+            unsupported = (
+                set(transformer_wrap_layers_str) - transformer_wrap_layers_intersection
+            )
+            print(f"Modules not supported: {unsupported}")
+
+        transformer_wrap_layers = transformer_wrap_layers_intersection
+
+    else:
+        transformer_layer_cls = fsdp_map_for_hf.get_mapping(module)
+        transformer_wrap_layers = []
+        for cls, mapping in transformer_layer_cls.items():
+            transformer_module_path = ".".join(str(cls).split("'")[1].split(".")[0:-1])
+
+            for layer in mapping:
+                transformer_mod = importlib.import_module(transformer_module_path)
+                transformer_cls = getattr(transformer_mod, layer)
+                transformer_wrap_layers.append(transformer_cls)
+
+    auto_wrap_policy = functools.partial(
+        transformer_auto_wrap_policy,
+        transformer_layer_cls=tuple(transformer_wrap_layers),
+    )
 
     fsdp = _FullyShardedDataParallel(
         module,
