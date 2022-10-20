@@ -8,7 +8,18 @@ from packaging import version
 import sys
 import contextlib
 import time
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union, Type, Mapping
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    Type,
+    Mapping,
+)
 import logging
 from tqdm.auto import tqdm
 import datasets
@@ -49,7 +60,7 @@ from transformers.trainer_callback import (
     TrainerControl,
     TrainerState,
 )
-from oslo.torch.nn.parallel.utils import allocate_params
+import oslo
 from oslo.torch.nn.parallel import (
     PipelineParallel,
     TensorParallel,
@@ -59,17 +70,13 @@ from oslo.torch.nn.parallel.data_parallel.data_parallel import DataParallel
 from oslo.torch.nn.parallel.data_parallel._ddp.distributed_data_parallel import (
     DistributedDataParallel,
 )
-from .data.data_collator import (
+from oslo.transformers.data.data_collator import (
     DataCollator,
     default_data_collator,
 )
 
-from .training_args import TrainingArguments
-from .trainer_utils import (
-    unwrap_model,
-    OptimizerNames,
-    log_dist
-)
+from oslo.transformers.training_args import TrainingArguments
+from oslo.transformers.trainer_utils import OptimizerNames, log_dist
 
 TRAINING_ARGS_NAME = "training_args.bin"
 TRAINER_STATE_NAME = "trainer_state.json"
@@ -85,30 +92,34 @@ DEFAULT_PROGRESS_CALLBACK = ProgressCallback
 
 class Trainer:
     def __init__(
-            self,
-            model: nn.Module = None,
-            args: TrainingArguments = None,
-            # train_dataloader: Optional[DataLoader] = None,
-            # eval_dataloader: Optional[DataLoader] = None,
-            train_dataset: Optional[Dataset] = None,
-            eval_dataset: Optional[Dataset] = None,
-            data_collator: Optional[DataCollator] = None,
-            tokenizer: Optional[PreTrainedTokenizerBase] = None,
-            # compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
+        self,
+        model: nn.Module = None,
+        args: TrainingArguments = None,
+        # train_dataloader: Optional[DataLoader] = None,
+        # eval_dataloader: Optional[DataLoader] = None,
+        train_dataset: Optional[Dataset] = None,
+        eval_dataset: Optional[Dataset] = None,
+        data_collator: Optional[DataCollator] = None,
+        tokenizer: Optional[PreTrainedTokenizerBase] = None,
+        # compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
     ):
 
         if args is None:
             # No Arguments passed
             output_dir = "tmp_trainer"
-            log_dist(
-                f"No `TrainingArguments` passed, using `output_dir={output_dir}`."
-            )
+            log_dist(f"No `TrainingArguments` passed, using `output_dir={output_dir}`.")
             args = TrainingArguments(output_dir=output_dir)
 
         self.args = args
 
-        default_collator = default_data_collator if tokenizer is None else DataCollatorWithPadding(tokenizer)
-        self.data_collator = data_collator if data_collator is not None else default_collator
+        default_collator = (
+            default_data_collator
+            if tokenizer is None
+            else DataCollatorWithPadding(tokenizer)
+        )
+        self.data_collator = (
+            data_collator if data_collator is not None else default_collator
+        )
         self.train_dataset = train_dataset
         self.eval_dataset = eval_dataset
         self.tokenizer = tokenizer
@@ -149,7 +160,8 @@ class Trainer:
             )
 
         if (
-            len(self.model_wrappers) > 0
+            len(self.model_wrappers)
+            > 0
             # or ((args.fp16_full_eval or args.bf16_full_eval) and not args.do_train)
         ):
             self.place_model_on_device = False
@@ -161,8 +173,6 @@ class Trainer:
             kwargs = dict(device=self.args.device)
             model = model.to(**kwargs)
 
-        # later use `self.model is self.model_wrapped` to check if it's wrapped or not
-        self.model_wrapped = model
         self.model = model
 
         # Define and add callback
@@ -174,8 +184,14 @@ class Trainer:
         )
         self.callback_handler.add_callback(DEFAULT_PROGRESS_CALLBACK)
 
-        if train_dataset is not None and not hasattr(train_dataset, '__len__') and args.max_steps <= 0:
-            raise ValueError("train_dataset does not implement __len__, max_steps has to be specified")
+        if (
+            train_dataset is not None
+            and not hasattr(train_dataset, "__len__")
+            and args.max_steps <= 0
+        ):
+            raise ValueError(
+                "train_dataset does not implement __len__, max_steps has to be specified"
+            )
 
         # TODO Grade Scaler
         # TODO Label Smoother
@@ -185,14 +201,19 @@ class Trainer:
             is_world_process_zero=self.is_world_process_zero(),
         )
         self.control = TrainerControl()
-        self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
+        self.control = self.callback_handler.on_init_end(
+            self.args, self.state, self.control
+        )
 
-    def train(self,
+    def train(
+        self,
         resume_from_checkpoint: Optional[Union[str, bool]] = None,
         # trial: Union["optuna.Trial", Dict[str, Any]] = None,
         # ignore_keys_for_eval: Optional[List[str]] = None,
-      ):
-        resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
+    ):
+        resume_from_checkpoint = (
+            None if not resume_from_checkpoint else resume_from_checkpoint
+        )
 
         args = self.args
         # TODO Load potential model checkpoint
@@ -211,10 +232,14 @@ class Trainer:
         # number of training epochs: num_train_epochs
         # number of training steps per epoch: num_update_steps_per_epoch
         # total number of training steps to execute: max_steps
-        total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.world_size
+        total_train_batch_size = (
+            args.train_batch_size * args.gradient_accumulation_steps * args.world_size
+        )
         if len(train_dataloader) is not None:
             len_dataloader = len(train_dataloader)
-            num_update_steps_per_epoch = len_dataloader // args.gradient_accumulation_steps
+            num_update_steps_per_epoch = (
+                len_dataloader // args.gradient_accumulation_steps
+            )
             num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
             num_examples = self.num_examples(train_dataloader)
             if args.max_steps > 0:
@@ -226,9 +251,13 @@ class Trainer:
                 # the best we can do.
                 num_train_samples = args.max_steps * total_train_batch_size
             else:
-                max_steps = math.ceil(args.num_train_epochs * num_update_steps_per_epoch)
+                max_steps = math.ceil(
+                    args.num_train_epochs * num_update_steps_per_epoch
+                )
                 num_train_epochs = math.ceil(args.num_train_epochs)
-                num_train_samples = self.num_examples(train_dataloader) * args.num_train_epochs
+                num_train_samples = (
+                    self.num_examples(train_dataloader) * args.num_train_epochs
+                )
         else:
             raise ValueError(
                 f"args.max_steps must be set to a positive value if dataloader does not have a length, was {args.max_steps}"
@@ -241,33 +270,29 @@ class Trainer:
 
         model = self._wrap_model(self.model_wrappers)
 
-        # for the rest of this function `model` is the outside model, whether it was wrapped or not
-        if model is not self.model:
-            self.model_wrapped = model
-
         self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
         # # TODO Check if saved optimizer or scheduler states exist
         # self._load_optimizer_and_scheduler(resume_from_checkpoint)
 
-        # important: at this point:
-        # self.model         is the Transformers Model
-        # self.model_wrapped is DDP(Transformers Model), Deepspeed(Transformers Model), etc.
-
         # Train!
         log_dist(f"  Num examples = {num_examples}")
         log_dist(f"  Num Epochs = {num_train_epochs}")
-        log_dist(f"  Instantaneous batch size per device = {self.args.per_device_train_batch_size}")
-        log_dist(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}")
+        log_dist(
+            f"  Instantaneous batch size per device = {self.args.per_device_train_batch_size}"
+        )
+        log_dist(
+            f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}"
+        )
         log_dist(f"  Total number of train samples = {num_train_samples}")
         log_dist(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
         log_dist(f"  Total optimization steps = {max_steps}")
 
         self.state.epoch = 0
-        start_time = time.time()
+        # start_time = time.time()
         epochs_trained = 0
-        steps_trained_in_current_epoch = 0
-        steps_trained_progress_bar = None
+        # steps_trained_in_current_epoch = 0
+        # steps_trained_progress_bar = None
 
         # # TODO Check if continuing training from a checkpoint
         # if resume_from_checkpoint is not None and os.path.isfile(
@@ -310,17 +335,23 @@ class Trainer:
         # tr_loss is a tensor to avoid synchronization of TPUs through .item()
         # log_dist(f"args.device: {args.device}", rank=-1)
         tr_loss = torch.tensor(0.0).to(args.device)
-        # _total_loss_scalar is updated everytime .item() has to be called on tr_loss and stores the sum of all losses
+        # _total_loss_scalar is updated every time .item() has to be called on tr_loss and stores the sum of all losses
         self._total_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
         self.optimizer.zero_grad()
 
-        self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
+        self.control = self.callback_handler.on_train_begin(
+            args, self.state, self.control
+        )
 
         for epoch in range(epochs_trained, num_train_epochs):
-            if isinstance(train_dataloader, DataLoader) and isinstance(train_dataloader.sampler, DistributedSampler):
+            if isinstance(train_dataloader, DataLoader) and isinstance(
+                train_dataloader.sampler, DistributedSampler
+            ):
                 train_dataloader.sampler.set_epoch(epoch)
-            elif hasattr(train_dataloader, "dataset") and isinstance(train_dataloader.dataset, IterableDatasetShard):
+            elif hasattr(train_dataloader, "dataset") and isinstance(
+                train_dataloader.dataset, IterableDatasetShard
+            ):
                 train_dataloader.dataset.set_epoch(epoch)
 
             epoch_iterator = train_dataloader
@@ -332,7 +363,9 @@ class Trainer:
                 if len_dataloader is not None
                 else args.max_steps * args.gradient_accumulation_steps
             )
-            self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
+            self.control = self.callback_handler.on_epoch_begin(
+                args, self.state, self.control
+            )
 
             step = -1
 
@@ -349,7 +382,9 @@ class Trainer:
                 #     steps_trained_progress_bar.close()
                 #     steps_trained_progress_bar = None
                 if step % args.gradient_accumulation_steps == 0:
-                    self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
+                    self.control = self.callback_handler.on_step_begin(
+                        args, self.state, self.control
+                    )
 
                 # TODO _no_sync_in_gradient_accumulation
                 # if (
@@ -363,20 +398,18 @@ class Trainer:
                 # else:
                 tr_loss_step = self.training_step(model, inputs)
 
-                if (
-                        # args.logging_nan_inf_filter
-                        # and
-                        (torch.isnan(tr_loss_step) or torch.isinf(tr_loss_step))
-                ):
+                if torch.isnan(tr_loss_step) or torch.isinf(tr_loss_step):
                     # if loss is nan or inf simply add the average of previous logged losses
-                    tr_loss += tr_loss / (1 + self.state.global_step - self._globalstep_last_logged)
+                    tr_loss += tr_loss / (
+                        1 + self.state.global_step - self._globalstep_last_logged
+                    )
                 else:
                     tr_loss += tr_loss_step
 
                 if (step + 1) % args.gradient_accumulation_steps == 0 or (
-                        # last step in epoch but step is always smaller than gradient_accumulation_steps
-                        steps_in_epoch <= args.gradient_accumulation_steps
-                        and (step + 1) == steps_in_epoch
+                    # last step in epoch but step is always smaller than gradient_accumulation_steps
+                    steps_in_epoch <= args.gradient_accumulation_steps
+                    and (step + 1) == steps_in_epoch
                 ):
                     # TODO Gradient Clipping
                     # Optimizer step
@@ -396,23 +429,31 @@ class Trainer:
                     self.optimizer.zero_grad()
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
-                    self.control = self.callback_handler.on_step_end(args, self.state, self.control)
+                    self.control = self.callback_handler.on_step_end(
+                        args, self.state, self.control
+                    )
                 else:
-                    self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
+                    self.control = self.callback_handler.on_substep_end(
+                        args, self.state, self.control
+                    )
                 if step < 0:
                     log_dist(
                         f"There seems to be not a single sample in your epoch_iterator, stopping training at step"
                         f" {self.state.global_step}! This is expected if you're using an IterableDataset and set"
                         f" num_steps ({max_steps}) higher than the number of available samples.",
-                        logging.WARNING
+                        logging.WARNING,
                     )
                     self.control.should_training_stop = True
 
-                self.control = self.callback_handler.on_epoch_end(args, self.state, self.control)
+                self.control = self.callback_handler.on_epoch_end(
+                    args, self.state, self.control
+                )
 
                 # TODO Continue ....
 
-    def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
+    def training_step(
+        self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]
+    ) -> torch.Tensor:
         """
         Perform a training step on a batch of inputs.
 
@@ -438,9 +479,6 @@ class Trainer:
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
 
-        if self.args.n_gpu > 1:
-            loss = loss.mean()  # mean() to average on multi-gpu parallel training
-
         if self.args.gradient_accumulation_steps > 1:
             # deepspeed handles loss scaling by gradient_accumulation_steps in its `backward`
             loss = loss / self.args.gradient_accumulation_steps
@@ -454,8 +492,6 @@ class Trainer:
 
     def _wrap_model(self, model_wrappers: List, training: bool = True):
         if not training:
-            return self.model
-        if unwrap_model(self.model) is not self.model:
             return self.model
 
         model = self.model
@@ -496,11 +532,13 @@ class Trainer:
                         model,
                         self.optimizer,
                         parallel_context=self.parallel_context,
-                        zero_stage=self.args.oslo_config["data_parallelism"]["zero_stage"],
+                        zero_stage=self.args.oslo_config["data_parallelism"][
+                            "zero_stage"
+                        ],
                     )
                 log_dist(f"Model wrapping with {wrapper}")
 
-            allocate_params(model, self.parallel_context)
+            oslo.ready(model, self.parallel_context)
         return model
 
     def is_local_process_zero(self) -> bool:
@@ -526,7 +564,11 @@ class Trainer:
         """
         try:
             return len(dataloader.dataset)
-        except (NameError, AttributeError, TypeError):  # no dataset or length, estimate by length of dataloader
+        except (
+            NameError,
+            AttributeError,
+            TypeError,
+        ):  # no dataset or length, estimate by length of dataloader
             return len(dataloader) * self.args.per_device_train_batch_size
 
     def create_optimizer_and_scheduler(self, num_training_steps: int):
@@ -549,15 +591,13 @@ class Trainer:
         We provide a reasonable default that works well. If you want to use something else, you can pass a tuple in the
         Trainer's init through `optimizers`, or subclass and override this method in a subclass.
         """
-        opt_model = self.model_wrapped
+        opt_model = self.model
         decay_parameters = get_parameter_names(opt_model, [nn.LayerNorm])
         decay_parameters = [name for name in decay_parameters if "bias" not in name]
         optimizer_grouped_parameters = [
             {
                 "params": [
-                    p
-                    for n, p in opt_model.named_parameters()
-                    if n in decay_parameters
+                    p for n, p in opt_model.named_parameters() if n in decay_parameters
                 ],
                 "weight_decay": self.args.weight_decay,
             },
@@ -571,17 +611,21 @@ class Trainer:
             },
         ]
 
-        optimizer_cls = Trainer.get_optimizer_cls_and_kwargs(
+        optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(
             self.args
         )
         # This if-case is for Oslo DP wrapper which pre-define optimizer before wrapping the model.
         if self.optimizer is None:
-            self.optimizer = optimizer_cls(opt_model.parameters())
+            self.optimizer = optimizer_cls(
+                optimizer_grouped_parameters, **optimizer_kwargs
+            )
         log_dist(f"Optimizer: {self.optimizer}")
         return self.optimizer
 
     @staticmethod
-    def get_optimizer_cls_and_kwargs(args: TrainingArguments) -> Type[torch.optim.Optimizer]:
+    def get_optimizer_cls_and_kwargs(
+        args: TrainingArguments,
+    ) -> (Type[torch.optim.Optimizer], Dict):
         """
         Returns the optimizer class and optimizer parameters based on the training arguments.
 
@@ -591,57 +635,64 @@ class Trainer:
 
         """
         optimizer_kwargs = {"lr": args.learning_rate}
-        # adam_kwargs = {
-        #     "betas": (args.adam_beta1, args.adam_beta2),
-        #     "eps": args.adam_epsilon,
-        # }
 
         if args.optim == OptimizerNames.ADAFACTOR:
             from transformers.optimization import Adafactor
+
             optimizer_cls = Adafactor
             optimizer_kwargs.update({"scale_parameter": False, "relative_step": False})
         elif args.optim == OptimizerNames.ADAMW:
             from torch.optim import AdamW
+
             optimizer_cls = AdamW
         elif args.optim == OptimizerNames.ADAM:
             if args.oslo_config and args.oslo_config.cpu_offload:
                 from oslo.torch.optim import CPUAdam
+
                 optimizer_cls = CPUAdam
             else:
                 from oslo.torch.optim import FusedAdam
+
                 optimizer_cls = FusedAdam
         elif args.optim == OptimizerNames.ADAGRAD:
             if args.oslo_config and args.oslo_config.cpu_offload:
                 from oslo.torch.optim import CPUAdagrad
+
                 optimizer_cls = CPUAdagrad
             else:
                 from oslo.torch.optim import FusedAdagrad
+
                 optimizer_cls = FusedAdagrad
         elif args.optim == OptimizerNames.ADADELTA:
             from torch.optim import Adadelta
+
             optimizer_cls = Adadelta
         elif args.optim == OptimizerNames.ADAMW_BNB:
             try:
                 from bitsandbytes.optim import Adam8bit
+
                 optimizer_cls = Adam8bit
             except ImportError:
                 raise ValueError(
                     "Trainer tried to instantiate bnb Adam8bit but bnb is not installed!"
                 )
         elif args.optim == OptimizerNames.SGD:
-            from ..torch.optim import FusedSGD
+            from oslo.torch.optim import FusedSGD
+
             optimizer_cls = FusedSGD
         elif args.optim == OptimizerNames.NOVOGRAD:
-            from ..torch.optim import FusedNovoGrad
+            from oslo.torch.optim import FusedNovoGrad
+
             optimizer_cls = FusedNovoGrad
         elif args.optim == OptimizerNames.LAMB:
-            from ..torch.optim import FusedLamb
+            from oslo.torch.optim import FusedLamb
+
             optimizer_cls = FusedLamb
         else:
             raise ValueError(
                 f"Trainer cannot instantiate unsupported optimizer: {args.optim}. Support optimizers: {', '.join([e.value for e in OptimizerNames])}"
             )
-        return optimizer_cls
+        return optimizer_cls, optimizer_kwargs
 
     def create_scheduler(
         self, num_training_steps: int, optimizer: torch.optim.Optimizer = None
@@ -690,7 +741,9 @@ class Trainer:
 
         return (loss, outputs) if return_outputs else loss
 
-    def _prepare_input(self, data: Union[torch.Tensor, Any]) -> Union[torch.Tensor, Any]:
+    def _prepare_input(
+        self, data: Union[torch.Tensor, Any]
+    ) -> Union[torch.Tensor, Any]:
         """
         Prepares one `data` before feeding it to the model, be it a tensor or a nested list/dictionary of tensors.
         """
@@ -703,7 +756,9 @@ class Trainer:
             return data.to(**kwargs)
         return data
 
-    def _prepare_inputs(self, inputs: Dict[str, Union[torch.Tensor, Any]]) -> Dict[str, Union[torch.Tensor, Any]]:
+    def _prepare_inputs(
+        self, inputs: Dict[str, Union[torch.Tensor, Any]]
+    ) -> Dict[str, Union[torch.Tensor, Any]]:
         """
         Prepare `inputs` before feeding them to the model, converting them to tensors if they are not already and
         handling potential state.
@@ -712,7 +767,7 @@ class Trainer:
         if len(inputs) == 0:
             raise ValueError(
                 "The batch received was empty, your model won't be able to train on it. Double-check that your "
-                f"training dataset contains keys expected by the model."
+                "training dataset contains keys expected by the model."
             )
         # TODO mems
         # if self.args.past_index >= 0 and self._past is not None:
@@ -721,7 +776,7 @@ class Trainer:
         return inputs
 
     def _get_train_sampler(self) -> Optional[torch.utils.data.Sampler]:
-        generator = None
+        # generator = None
         # TODO
         # if self.args.world_size <= 1 and _is_torch_generator_available:
         #     generator = torch.Generator()
@@ -736,7 +791,10 @@ class Trainer:
         #
         # seed = self.args.data_seed if self.args.data_seed is not None else self.args.seed
 
-        if self.args.world_size > 1 and self.args.oslo_config.data_parallelism is not None:
+        if (
+            self.args.world_size > 1
+            and self.args.oslo_config.data_parallelism is not None
+        ):
             if not self.args.dataloader_drop_last:
                 return DistributedSamplerWithLoop(
                     self.train_dataset,
@@ -752,7 +810,6 @@ class Trainer:
                     rank=self.args.process_index,
                     # seed=seed, TODO oslo seed
                 )
-
         else:
             return RandomSampler(self.train_dataset)
 
@@ -772,8 +829,7 @@ class Trainer:
         # TODO later
         # if isinstance(train_dataset, datasets.Dataset):
         #     train_dataset = self._remove_unused_columns(train_dataset, description="training")
-        log_dist(
-            f"Collate_fn: {self.data_collator.__class__}")
+        log_dist(f"Collate_fn: {self.data_collator.__class__}")
 
         if isinstance(train_dataset, torch.utils.data.IterableDataset):
             if self.args.world_size > 1:
@@ -784,7 +840,9 @@ class Trainer:
                     num_processes=self.args.world_size,
                     process_index=self.args.process_index,
                 )
-                log_dist(f"Dataset: {train_dataset.__class__} with\nbatch_size:{self.args.train_batch_size}\n world_size:{self.args.world_size}\n dataloader_drop_last: {self.args.dataloader_drop_last}")
+                log_dist(
+                    f"Dataset: {train_dataset.__class__} with\nbatch_size:{self.args.train_batch_size}\n world_size:{self.args.world_size}\n dataloader_drop_last: {self.args.dataloader_drop_last}"
+                )
             return DataLoader(
                 train_dataset,
                 batch_size=self.args.per_device_train_batch_size,
@@ -794,7 +852,8 @@ class Trainer:
             )
         train_sampler = self._get_train_sampler()
         log_dist(
-            f"Sampler: {train_sampler.__class__} with\nbatch_size:{self.args.train_batch_size}\nworld_size:{self.args.world_size}, dataloader_drop_last: {self.args.dataloader_drop_last}")
+            f"Sampler: {train_sampler.__class__} with\nbatch_size:{self.args.train_batch_size}\nworld_size:{self.args.world_size}, dataloader_drop_last: {self.args.dataloader_drop_last}"
+        )
         return DataLoader(
             train_dataset,
             batch_size=self.args.train_batch_size,
@@ -847,6 +906,3 @@ class Trainer:
     #         return dataset
     #     else:
     #         return dataset.remove_columns(ignored_columns)
-
-
-

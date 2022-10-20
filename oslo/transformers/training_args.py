@@ -8,7 +8,6 @@ from transformers.trainer_utils import SchedulerType, IntervalStrategy
 from .trainer_utils import OptimizerNames
 
 
-
 @dataclass
 class TrainingArguments:
     """
@@ -99,8 +98,11 @@ class TrainingArguments:
         `"comet_ml"`, `"mlflow"`, `"tensorboard"` and `"wandb"`. Use `"all"` to report to all integrations
         installed, `"none"` for no integrations.
     """
+
     output_dir: str = field(
-        metadata={"help": "The output directory where the model predictions and checkpoints will be written."},
+        metadata={
+            "help": "The output directory where the model predictions and checkpoints will be written."
+        },
     )
     oslo_config_path_or_dict: Union[str, dict] = field(
         default=None,
@@ -120,7 +122,9 @@ class TrainingArguments:
     )
     gradient_accumulation_steps: int = field(
         default=1,
-        metadata={"help": "Number of updates steps to accumulate before performing a backward/update pass."},
+        metadata={
+            "help": "Number of updates steps to accumulate before performing a backward/update pass."
+        },
     )
     eval_delay: Optional[float] = field(
         default=0,
@@ -128,25 +132,42 @@ class TrainingArguments:
             "help": "Number of epochs or steps to wait for before the first evaluation can be performed, depending on the evaluation_strategy."
         },
     )
-    learning_rate: float = field(default=5e-5, metadata={"help": "The initial learning rate for AdamW."})
-    weight_decay: float = field(default=0.0, metadata={"help": "Weight decay for AdamW if we apply some."})
+    learning_rate: float = field(
+        default=5e-5, metadata={"help": "The initial learning rate for AdamW."}
+    )
+    weight_decay: float = field(
+        default=0.0, metadata={"help": "Weight decay for AdamW if we apply some."}
+    )
     max_grad_norm: float = field(default=1.0, metadata={"help": "Max gradient norm."})
-    num_train_epochs: float = field(default=3.0, metadata={"help": "Total number of training epochs to perform."})
+    num_train_epochs: float = field(
+        default=3.0, metadata={"help": "Total number of training epochs to perform."}
+    )
     max_steps: int = field(
         default=-1,
-        metadata={"help": "If > 0: set total number of training steps to perform. Override num_train_epochs."},
+        metadata={
+            "help": "If > 0: set total number of training steps to perform. Override num_train_epochs."
+        },
     )
     lr_scheduler_type: SchedulerType = field(
         default="linear",
-        metadata={"help": f"The scheduler type ({', '.join([e.value for e in SchedulerType])})to use "},
+        metadata={
+            "help": f"The scheduler type ({', '.join([e.value for e in SchedulerType])})to use "
+        },
     )
     warmup_ratio: float = field(
-        default=0.0, metadata={"help": "Linear warmup over warmup_ratio fraction of total steps."}
+        default=0.0,
+        metadata={"help": "Linear warmup over warmup_ratio fraction of total steps."},
     )
-    warmup_steps: int = field(default=0, metadata={"help": "Linear warmup over warmup_steps."})
+    warmup_steps: int = field(
+        default=0, metadata={"help": "Linear warmup over warmup_steps."}
+    )
 
-    logging_first_step: bool = field(default=False, metadata={"help": "Log the first global_step"})
-    logging_steps: int = field(default=500, metadata={"help": "Log every X updates steps."})
+    logging_first_step: bool = field(
+        default=False, metadata={"help": "Log the first global_step"}
+    )
+    logging_steps: int = field(
+        default=500, metadata={"help": "Log every X updates steps."}
+    )
     logging_strategy: IntervalStrategy = field(
         default="steps",
         metadata={"help": "The logging strategy to use."},
@@ -155,7 +176,9 @@ class TrainingArguments:
         default="steps",
         metadata={"help": "The checkpoint save strategy to use."},
     )
-    save_steps: int = field(default=500, metadata={"help": "Save checkpoint every X updates steps."})
+    save_steps: int = field(
+        default=500, metadata={"help": "Save checkpoint every X updates steps."}
+    )
 
     # log_level: Optional[str] = field(
     #     default="passive",
@@ -164,17 +187,30 @@ class TrainingArguments:
     #         "choices": trainer_log_levels.keys(),
     #     },
     # )
-    seed: int = field(default=42, metadata={"help": "Random seed that will be set at the beginning of training."})
-    dataloader_drop_last: bool = field(
-        default=False, metadata={"help": "Drop the last incomplete batch if it is not divisible by the batch size."}
+    seed: int = field(
+        default=42,
+        metadata={"help": "Random seed that will be set at the beginning of training."},
     )
-    eval_steps: int = field(default=None, metadata={"help": "Run an evaluation every X steps."})
+    dataloader_drop_last: bool = field(
+        default=False,
+        metadata={
+            "help": "Drop the last incomplete batch if it is not divisible by the batch size."
+        },
+    )
+    eval_steps: int = field(
+        default=None, metadata={"help": "Run an evaluation every X steps."}
+    )
     load_best_model_at_end: Optional[bool] = field(
         default=False,
-        metadata={"help": "Whether or not to load the best model found during training at the end of training."},
+        metadata={
+            "help": "Whether or not to load the best model found during training at the end of training."
+        },
     )
     label_smoothing_factor: float = field(
-        default=0.0, metadata={"help": "The label smoothing epsilon to apply (zero means no label smoothing)."}
+        default=0.0,
+        metadata={
+            "help": "The label smoothing epsilon to apply (zero means no label smoothing)."
+        },
     )
     optim: OptimizerNames = field(
         default="adamw_hf",
@@ -187,7 +223,10 @@ class TrainingArguments:
         },
     )
     report_to: Optional[List[str]] = field(
-        default=None, metadata={"help": "The list of integrations to report the results and logs to."}
+        default=None,
+        metadata={
+            "help": "The list of integrations to report the results and logs to."
+        },
     )
 
     def __post_init__(self):
@@ -213,8 +252,11 @@ class TrainingArguments:
         self.oslo_config, self.parallel_context, self.model_wrappers = None, None, None
 
         if self.oslo_config_path_or_dict:
-            from oslo.transformers.oslo_init import OsloTrainerConfig
-            from .oslo_init import init_oslo_features
+            from oslo.transformers.oslo_init import (
+                OsloTrainerConfig,
+                init_oslo_features,
+            )
+
             # will be used later by the Trainer
             self.oslo_config = OsloTrainerConfig(self.oslo_config_path_or_dict)
             # logging.info(f"Oslo Config: {self.oslo_config}")
@@ -281,72 +323,15 @@ class TrainingArguments:
         Get number of steps used for a linear warmup.
         """
         warmup_steps = (
-            self.warmup_steps if self.warmup_steps > 0 else math.ceil(num_training_steps * self.warmup_ratio)
+            self.warmup_steps
+            if self.warmup_steps > 0
+            else math.ceil(num_training_steps * self.warmup_ratio)
         )
         return warmup_steps
 
     # @cached_property
     @property
     def _setup_devices(self) -> torch.device:
-        # TODO
-        # logger.info("PyTorch: setting up devices")
-        # if torch.distributed.is_available() and torch.distributed.is_initialized() and self.local_rank == -1:
-        #     logger.warning(
-        #         "torch.distributed process group is initialized, but local_rank == -1. "
-        #         "In order to use Torch DDP, launch your script with `python -m torch.distributed.launch"
-        #     )
-        # if self.no_cuda:
-        #     device = torch.device("cpu")
-        #     self._n_gpu = 0
-        #     if self.local_rank != -1 and not torch.distributed.is_initialized():
-        #         # Initializes distributed backend for cpu
-        #         if self.xpu_backend not in ("mpi", "ccl"):
-        #             raise ValueError(
-        #                 "CPU distributed training backend is not properly set. "
-        #                 "Please set '--xpu_backend' to either 'mpi' or 'ccl'."
-        #             )
-        #         torch.distributed.init_process_group(backend=self.xpu_backend)
-        # elif is_torch_tpu_available():
-        #     device = xm.xla_device()
-        #     self._n_gpu = 0
-        # elif is_sagemaker_mp_enabled():
-        #     local_rank = smp.local_rank()
-        #     device = torch.device("cuda", local_rank)
-        #     self._n_gpu = 1
-        # elif is_sagemaker_dp_enabled():
-        #     dist.init_process_group(backend="smddp")
-        #     self.local_rank = int(os.getenv("SMDATAPARALLEL_LOCAL_RANK"))
-        #     device = torch.device("cuda", self.local_rank)
-        #     self._n_gpu = 1
-        # elif self.deepspeed:
-        #     # deepspeed inits torch.distributed internally
-        #     from .deepspeed import is_deepspeed_available
-        #
-        #     if not is_deepspeed_available():
-        #         raise ImportError("--deepspeed requires deepspeed: `pip install deepspeed`.")
-        #     import deepspeed
-        #
-        #     deepspeed.init_distributed()
-        #
-        #     # workaround for setups like notebooks where the launcher can't be used,
-        #     # but deepspeed requires a dist env.
-        #     # env LOCAL_RANK could be set manually by the user, or via init_distributed if mpi4py is installed
-        #     self.local_rank = int(os.environ.get("LOCAL_RANK", "-1"))
-        #
-        #     device = torch.device("cuda", self.local_rank)
-        #     self._n_gpu = 1
-        # elif self.local_rank == -1:
-        #     # if n_gpu is > 1 we'll use nn.DataParallel.
-        #     # If you only want to use a specific subset of GPUs use `CUDA_VISIBLE_DEVICES=0`
-        #     # Explicitly set CUDA to the first (index 0) CUDA device, otherwise `set_device` will
-        #     # trigger an error that a device index is missing. Index 0 takes into account the
-        #     # GPUs available in the environment, so `CUDA_VISIBLE_DEVICES=1,2` with `cuda:0`
-        #     # will use the first GPU in that env, i.e. GPU#1
-        #     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        #     # Sometimes the line in the postinit has not been run before we end up here, so just checking we're not at
-        #     # the default value.
-        #     self._n_gpu = torch.cuda.device_count()
-        # else:
         # Here, we'll use torch.distributed.
         # Initializes the distributed backend which will take care of synchronizing nodes/GPUs
         if not torch.distributed.is_initialized():

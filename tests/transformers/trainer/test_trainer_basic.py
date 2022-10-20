@@ -10,6 +10,7 @@ from oslo.transformers.tasks.data_sequence_classification import (
     DataCollatorForSequenceClassification,
 )
 import logging
+
 logging.basicConfig(level=logging.INFO)
 
 model = BertForSequenceClassification.from_pretrained("bert-base-uncased")

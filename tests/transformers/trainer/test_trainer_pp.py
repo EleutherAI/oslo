@@ -15,6 +15,7 @@ from oslo.transformers.tasks.data_sequence_classification import (
     DataCollatorForSequenceClassification,
 )
 import logging
+
 logging.basicConfig(level=logging.INFO)
 
 os.environ["WANDB_DISABLED"] = "true"
@@ -30,11 +31,7 @@ oslo_init_dict_form = {
         "parallel_size": 4,
         "parallel_mode": "3d",
     },
-    "pipeline_parallelism": {
-        "enable": True,
-        "parallel_size": 2
-    }
-
+    "pipeline_parallelism": {"enable": True, "parallel_size": 2},
 }
 model = BertForSequenceClassification.from_pretrained("bert-base-uncased")
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")

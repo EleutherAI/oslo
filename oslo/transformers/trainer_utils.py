@@ -19,6 +19,7 @@ class OptimizerNames(ExplicitEnum):
     """
     Stores the acceptable string identifiers for optimizers.
     """
+
     ADAM = "adam"
     ADAMW = "adamw"
     ADAGRAD = "adagrad"
@@ -30,23 +31,7 @@ class OptimizerNames(ExplicitEnum):
     LAMB = "lamb"
 
 
-def unwrap_model(model: nn.Module) -> nn.Module:
-    """
-    Recursively unwraps a model from potential containers (as used in distributed training).
-
-    Args:
-        model (`torch.nn.Module`): The model to unwrap.
-    """
-    # since there could be multiple levels of wrapping, unwrap recursively
-    if hasattr(model, "module"):
-        return unwrap_model(model.module)
-    else:
-        return model
-
-
-def log_dist(message: str,
-             rank: int = 0,
-             level: int = logging.INFO) -> None:
+def log_dist(message: str, rank: int = 0, level: int = logging.INFO) -> None:
     if rank == -1:
         ranks = [i for i in range(int(os.environ["WORLD_SIZE"]))]
     else:
@@ -54,8 +39,8 @@ def log_dist(message: str,
     my_rank = int(os.environ.get("RANK", "0"))
     if my_rank in ranks:
         if level == logging.INFO:
-            logging.info(f'[Rank {my_rank}] {message}')
+            logging.info(f"[Rank {my_rank}] {message}")
         if level == logging.ERROR:
-            logging.error(f'[Rank {my_rank}] {message}')
+            logging.error(f"[Rank {my_rank}] {message}")
         if level == logging.DEBUG:
-            logging.debug(f'[Rank {my_rank}] {message}')
+            logging.debug(f"[Rank {my_rank}] {message}")

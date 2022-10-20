@@ -12,10 +12,7 @@ oslo_init_dict_form = {
         "parallel_size": 1,
         "parallel_mode": "1d",
     },
-    "sequence_parallelism": {
-        "enable": True,
-        "parallel_size": 2
-    }
+    "sequence_parallelism": {"enable": True, "parallel_size": 2},
 }
 
 user_config_from_dict = OsloTrainerConfig(oslo_init_dict_form)
