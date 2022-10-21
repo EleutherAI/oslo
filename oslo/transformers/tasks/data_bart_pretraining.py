@@ -13,6 +13,7 @@ try:
     from transformers import (
         BartTokenizer,
         BartTokenizerFast,
+        PreTrainedTokenizerBase
     )
 except ImportError:
     print("You have to install `transformers` to use `oslo.transformers` modules")
@@ -23,10 +24,10 @@ logging.captureWarnings(True)
 class ProcessorForBartPretraining(BaseProcessor):
     def __init__(
         self,
-        model_name_or_path: str,
+        tokenizer: PreTrainedTokenizerBase,
         max_length: int = 1024,
     ) -> None:
-        super().__init__(model_name_or_path, max_length)
+        super().__init__(tokenizer, max_length)
 
         if not isinstance(self._tokenizer, (BartTokenizer, BartTokenizerFast)):
             warnings.warn(

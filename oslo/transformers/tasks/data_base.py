@@ -4,13 +4,13 @@ from typing import Dict, List, Optional
 from datasets.arrow_dataset import Batch
 
 try:
-    from transformers import PreTrainedTokenizer
+    from transformers import PreTrainedTokenizerBase
 except ImportError:
     print("You have to install `transformers` to use `oslo.transformers` modules")
 
 
 class BaseProcessor(ABC):
-    def __init__(self, tokenizer: PreTrainedTokenizer, max_length: int) -> None:
+    def __init__(self, tokenizer: PreTrainedTokenizerBase, max_length: int) -> None:
         self._tokenizer = tokenizer
         self._max_length = max_length
         self._chunk_size = max_length
