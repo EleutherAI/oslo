@@ -32,7 +32,7 @@ oslo_init_dict_form = {
 model = BertForSequenceClassification.from_pretrained("bert-base-uncased")
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 
-processor = ProcessorForSequenceClassification("bert-base-uncased", 512)
+processor = ProcessorForSequenceClassification(tokenizer, 512)
 if processor._tokenizer.pad_token is None:
     processor._tokenizer.pad_token = processor._tokenizer.eos_token
 
@@ -40,10 +40,6 @@ if processor._tokenizer.pad_token is None:
 dataset = load_dataset("glue", "cola")
 dataset = dataset.rename_column("sentence", "text")
 dataset = dataset.rename_column("label", "labels")
-
-processor = ProcessorForSequenceClassification("bert-base-uncased", 512)
-if processor._tokenizer.pad_token is None:
-    processor._tokenizer.pad_token = processor._tokenizer.eos_token
 
 processed_dataset = dataset.map(
     processor, batched=True, remove_columns=dataset["train"].column_names
@@ -53,7 +49,6 @@ train_dataset = processed_dataset["train"]
 valid_dataset = processed_dataset["validation"]
 
 data_collator = DataCollatorForSequenceClassification(processor)
-
 
 args = TrainingArguments(
     output_dir="output",
