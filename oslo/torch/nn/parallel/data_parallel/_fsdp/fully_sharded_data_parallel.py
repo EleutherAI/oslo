@@ -480,15 +480,17 @@ def FullyShardedDataParallel(
     cpu_offload: Optional[CPUOffload] = None,
 ):
     fsdp_map_for_hf = _FullyShardedDataParallelMappingForHuggingFace()
+    transformer_layer_cls = fsdp_map_for_hf.get_mapping(module)
+
     if transformer_wrap_layers is not None:
         transformer_wrap_layers_intersection = set()
         transformer_wrap_layers_str = [
             layer.__qualname__ for layer in transformer_wrap_layers
         ]
-        transformer_layer_cls = fsdp_map_for_hf.get_mapping(module)
+
         for cls, mapping in transformer_layer_cls.items():
-            for i, layer in enumerate(mapping):
-                if layer in transformer_wrap_layers_str:
+            for i, layer in enumerate(transformer_wrap_layers_str):
+                if layer in mapping:
                     transformer_wrap_layers_intersection.add(transformer_wrap_layers[i])
 
         if len(transformer_wrap_layers) != len(transformer_wrap_layers_intersection):
@@ -500,11 +502,9 @@ def FullyShardedDataParallel(
         transformer_wrap_layers = transformer_wrap_layers_intersection
 
     else:
-        transformer_layer_cls = fsdp_map_for_hf.get_mapping(module)
         transformer_wrap_layers = []
         for cls, mapping in transformer_layer_cls.items():
-            transformer_module_path = ".".join(str(cls).split("'")[1].split(".")[0:-1])
-
+            transformer_module_path = cls.__module__
             for layer in mapping:
                 transformer_mod = importlib.import_module(transformer_module_path)
                 transformer_cls = getattr(transformer_mod, layer)
