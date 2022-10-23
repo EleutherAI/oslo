@@ -51,7 +51,7 @@ def save_pretrained(
         dist.barrier()
         return None
 
-    if merge_checkpoints:  # TODO: 확인하기
+    if merge_checkpoints:
         model_to_save = self.__class__(self.config).eval()
 
         if state_dict is None:
