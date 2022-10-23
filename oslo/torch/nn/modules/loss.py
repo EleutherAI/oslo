@@ -11,10 +11,14 @@ from oslo.torch.distributed import ParallelContext, ParallelMode
 
 
 class _VocabParallelCrossEntropy1D(torch.autograd.Function):
-
     @staticmethod
     @custom_fwd(cast_inputs=torch.float32)
-    def forward(ctx: Any, vocab_parallel_logits: Tensor, targets: Tensor, parallel_context: ParallelContext):
+    def forward(
+        ctx: Any,
+        vocab_parallel_logits: Tensor,
+        targets: Tensor,
+        parallel_context: ParallelContext,
+    ):
         logits_max = torch.max(vocab_parallel_logits, dim=-1)[0]
         logits_max = all_reduce(
             logits_max,
@@ -41,7 +45,9 @@ class _VocabParallelCrossEntropy1D(torch.autograd.Function):
         # [*, partition-vocab-size] and target to a 1-D tensor of size [*].
         logits_2d = vocab_parallel_logits.view(-1, partition_vocab_size)
         masked_target_1d = masked_target.view(-1)
-        arange_1d = torch.arange(start=0, end=logits_2d.size(0), device=logits_2d.device)
+        arange_1d = torch.arange(
+            start=0, end=logits_2d.size(0), device=logits_2d.device
+        )
 
         predicted_logits_1d = logits_2d[arange_1d, masked_target_1d]
         predicted_logits_1d = predicted_logits_1d.clone().contiguous()
@@ -85,7 +91,7 @@ class _VocabParallelCrossEntropy1D(torch.autograd.Function):
 
         # Add the gradient from matching classes.
         arange_1d = torch.arange(start=0, end=grad_2d.size(0), device=grad_2d.device)
-        grad_2d[arange_1d, masked_target_1d] -= (1.0 - target_mask.view(-1).float())
+        grad_2d[arange_1d, masked_target_1d] -= 1.0 - target_mask.view(-1).float()
 
         # Finally elementwise multiplication with the output gradients.
         grad_input.mul_(grad_output.unsqueeze(dim=-1))
@@ -99,7 +105,9 @@ class VocabParallelCrossEntropyLoss1D(_Loss):
         reduction (bool, optional): whether to average the loss, defaults to True.
     """
 
-    def __init__(self, reduce_mean=True, parallel_context: Optional[ParallelContext]=None):
+    def __init__(
+        self, reduce_mean=True, parallel_context: Optional[ParallelContext] = None
+    ):
         super().__init__()
         self.reduce_mean = reduce_mean
         self.parallel_context = parallel_context
@@ -110,7 +118,9 @@ class VocabParallelCrossEntropyLoss1D(_Loss):
             logits (:class:`torch.tensor`): Predicted unnormalized scores (often referred to as logits).
             targets (:class:`torch.tensor`): Ground truth class indices or class probabilities.
         """
-        loss = _VocabParallelCrossEntropy1D.apply(logits, targets, self.parallel_context)
+        loss = _VocabParallelCrossEntropy1D.apply(
+            logits, targets, self.parallel_context
+        )
         if self.reduce_mean:
             loss = loss.mean()
         return loss
@@ -131,7 +141,13 @@ class CrossEntropyLoss2D(_Loss):
     `Cross_entropy <https://pytorch.org/docs/stable/generated/torch.nn.functional.cross_entropy.html#torch.nn.functional.cross_entropy>`_.
     """
 
-    def __init__(self, reduce_mean=True, parallel_context: Optional[ParallelContext]=None, *args, **kwargs):
+    def __init__(
+        self,
+        reduce_mean=True,
+        parallel_context: Optional[ParallelContext] = None,
+        *args,
+        **kwargs
+    ):
         super().__init__()
         self.reduce_mean = reduce_mean
         self.parallel_context = parallel_context
@@ -143,6 +159,7 @@ class CrossEntropyLoss2D(_Loss):
             split_batch_2d,
             reduce_by_batch_2d,
         )
+
         """Calculate loss between logits and targets.
         Args:
             logits (:class:`torch.tensor`): Predicted unnormalized scores (often referred to as logits).
@@ -151,12 +168,14 @@ class CrossEntropyLoss2D(_Loss):
             float: the loss between logits and targets.
         """
         targets = split_batch_2d(targets, dim=0, parallel_context=self.parallel_context)
-        loss = cross_entropy(logits, targets, reduction='none', *self.loss_args, **self.loss_kwargs)
+        loss = cross_entropy(
+            logits, targets, reduction="none", *self.loss_args, **self.loss_kwargs
+        )
         if self.reduce_mean:
             loss = loss.mean()
             loss = reduce_by_batch_2d(
-                loss, 
-                reduce_mean=True, 
+                loss,
+                reduce_mean=True,
                 parallel_context=self.parallel_context,
             )
         return loss
@@ -167,7 +186,12 @@ class _VocabParallelCrossEntropy2D(torch.autograd.Function):
 
     @staticmethod
     @custom_fwd(cast_inputs=torch.float32)
-    def forward(ctx, vocab_parallel_logits: Tensor, targets: Tensor, parallel_context: ParallelContext):
+    def forward(
+        ctx,
+        vocab_parallel_logits: Tensor,
+        targets: Tensor,
+        parallel_context: ParallelContext,
+    ):
         # logits: [b/q, h/q]
         # labels: [b/q]
         # loss: [b/q]
@@ -207,7 +231,7 @@ class _VocabParallelCrossEntropy2D(torch.autograd.Function):
         predicted_logits[target_mask] = 0.0
 
         predicted_logits = all_reduce(
-            predicted_logits, 
+            predicted_logits,
             parallel_context=parallel_context,
             parallel_mode=ParallelMode.TENSOR_2D_ROW,
         )
@@ -242,7 +266,7 @@ class _VocabParallelCrossEntropy2D(torch.autograd.Function):
 
         # Add the gradient from matching classes.
         arange_1d = torch.arange(start=0, end=grad_2d.size(0), device=grad_2d.device)
-        grad_2d[arange_1d, masked_target_1d] -= (1.0 - target_mask.view(-1).float())
+        grad_2d[arange_1d, masked_target_1d] -= 1.0 - target_mask.view(-1).float()
 
         # Finally elementwise multiplication with the output gradients.
         grad_input.mul_(output_grad.unsqueeze(dim=-1))
@@ -256,7 +280,9 @@ class VocabParallelCrossEntropyLoss2D(_Loss):
         reduce_mean (bool, optional): whether to average the loss, defaults to True.
     """
 
-    def __init__(self, reduce_mean=True, parallel_context: Optional[ParallelContext]=None):
+    def __init__(
+        self, reduce_mean=True, parallel_context: Optional[ParallelContext] = None
+    ):
         super().__init__()
         self.reduce_mean = reduce_mean
         self.parallel_context = parallel_context
@@ -266,6 +292,7 @@ class VocabParallelCrossEntropyLoss2D(_Loss):
             split_batch_2d,
             reduce_by_batch_2d,
         )
+
         """Calculate loss between logits and targets.
         Args:
             logits (:class:`torch.tensor`): Predicted unnormalized scores (often referred to as logits).
@@ -279,7 +306,9 @@ class VocabParallelCrossEntropyLoss2D(_Loss):
         )
         if self.reduce_mean:
             loss = loss.mean()
-            loss = reduce_by_batch_2d(loss, reduce_mean=True, parallel_context=self.parallel_context)
+            loss = reduce_by_batch_2d(
+                loss, reduce_mean=True, parallel_context=self.parallel_context
+            )
         return loss
 
 
@@ -298,7 +327,13 @@ class CrossEntropyLoss2p5D(_Loss):
     `Cross_entropy <https://pytorch.org/docs/stable/generated/torch.nn.functional.cross_entropy.html#torch.nn.functional.cross_entropy>`_.
     """
 
-    def __init__(self, reduce_mean=True, parallel_context: Optional[ParallelContext]=None, *args, **kwargs):
+    def __init__(
+        self,
+        reduce_mean=True,
+        parallel_context: Optional[ParallelContext] = None,
+        *args,
+        **kwargs
+    ):
         super().__init__()
         self.reduce_mean = reduce_mean
         self.parallel_context = parallel_context
@@ -310,16 +345,21 @@ class CrossEntropyLoss2p5D(_Loss):
             split_batch_2p5d,
             reduce_by_batch_2p5d,
         )
+
         """Calculate loss between logits and targets.
         Args:
             logits (:class:`torch.tensor`): Predicted unnormalized scores (often referred to as logits).
             targets (:class:`torch.tensor`): Ground truth class indices or class probabilities.
         """
-        targets = split_batch_2p5d(targets, dim=0, parallel_context=self.parallel_context)
+        targets = split_batch_2p5d(
+            targets, dim=0, parallel_context=self.parallel_context
+        )
         loss = cross_entropy(logits, targets, *self.loss_args, **self.loss_kwargs)
         if self.reduce_mean:
             loss = loss.mean()
-            loss = reduce_by_batch_2p5d(loss, reduce_mean=True, parallel_context=self.parallel_context)
+            loss = reduce_by_batch_2p5d(
+                loss, reduce_mean=True, parallel_context=self.parallel_context
+            )
         return loss
 
 
@@ -328,7 +368,12 @@ class _VocabParallelCrossEntropy2p5D(torch.autograd.Function):
 
     @staticmethod
     @custom_fwd(cast_inputs=torch.float32)
-    def forward(ctx, vocab_parallel_logits: Tensor, targets: Tensor, parallel_context: ParallelContext):
+    def forward(
+        ctx,
+        vocab_parallel_logits: Tensor,
+        targets: Tensor,
+        parallel_context: ParallelContext,
+    ):
         # logits: [b/dq, h/q]
         # loss: [b/dq]
         # targets: [b/dq, h/q]
@@ -400,7 +445,7 @@ class _VocabParallelCrossEntropy2p5D(torch.autograd.Function):
 
         # Add the gradient from matching classes.
         arange_1d = torch.arange(start=0, end=grad_2d.size(0), device=grad_2d.device)
-        grad_2d[arange_1d, masked_target_1d] -= (1.0 - target_mask.view(-1).float())
+        grad_2d[arange_1d, masked_target_1d] -= 1.0 - target_mask.view(-1).float()
 
         # Finally elementwise multiplication with the output gradients.
         grad_input.mul_(output_grad.unsqueeze(dim=-1))
@@ -415,7 +460,9 @@ class VocabParallelCrossEntropyLoss2p5D(_Loss):
         reduction (bool, optional): whether to average the loss, defaults to True.
     """
 
-    def __init__(self, reduce_mean=True, parallel_context: Optional[ParallelContext]=None):
+    def __init__(
+        self, reduce_mean=True, parallel_context: Optional[ParallelContext] = None
+    ):
         super().__init__()
         self.reduce_mean = reduce_mean
         self.parallel_context = parallel_context
@@ -425,16 +472,23 @@ class VocabParallelCrossEntropyLoss2p5D(_Loss):
             split_batch_2p5d,
             reduce_by_batch_2p5d,
         )
+
         """Calculate loss between logits and targets.
         Args:
             logits (:class:`torch.tensor`): Predicted unnormalized scores (often referred to as logits).
             targets (:class:`torch.tensor`): Ground truth class indices or class probabilities.
         """
-        targets = split_batch_2p5d(targets, dim=0, parallel_context=self.parallel_context)
-        loss = _VocabParallelCrossEntropy2p5D.apply(logits, targets, self.parallel_context)
+        targets = split_batch_2p5d(
+            targets, dim=0, parallel_context=self.parallel_context
+        )
+        loss = _VocabParallelCrossEntropy2p5D.apply(
+            logits, targets, self.parallel_context
+        )
         if self.reduce_mean:
             loss = loss.mean()
-            loss = reduce_by_batch_2p5d(loss, reduce_mean=True, parallel_context=self.parallel_context)
+            loss = reduce_by_batch_2p5d(
+                loss, reduce_mean=True, parallel_context=self.parallel_context
+            )
         return loss
 
 
@@ -453,7 +507,13 @@ class CrossEntropyLoss3D(_Loss):
     `Cross_entropy <https://pytorch.org/docs/stable/generated/torch.nn.functional.cross_entropy.html#torch.nn.functional.cross_entropy>`_.
     """
 
-    def __init__(self, reduce_mean=True, parallel_context: Optional[ParallelContext]=None, *args, **kwargs):
+    def __init__(
+        self,
+        reduce_mean=True,
+        parallel_context: Optional[ParallelContext] = None,
+        *args,
+        **kwargs
+    ):
         super().__init__()
         self.reduce_mean = reduce_mean
         self.parallel_context = parallel_context
@@ -465,28 +525,31 @@ class CrossEntropyLoss3D(_Loss):
             split_tensor_3d,
             reduce_by_batch_3d,
         )
+
         """Calculate loss between logits and targets.
         Args:
             logits (:class:`torch.tensor`): Predicted unnormalized scores (often referred to as logits).
             targets (:class:`torch.tensor`): Ground truth class indices or class probabilities.
         """
         targets = split_tensor_3d(
-            targets, 
-            dim=0, 
-            parallel_context=self.parallel_context, 
+            targets,
+            dim=0,
+            parallel_context=self.parallel_context,
             parallel_mode=ParallelMode.TENSOR_3D_WEIGHT,
         )
         targets = split_tensor_3d(
-            targets, 
-            dim=0, 
-            parallel_context=self.parallel_context, 
+            targets,
+            dim=0,
+            parallel_context=self.parallel_context,
             parallel_mode=ParallelMode.TENSOR_3D_INPUT,
         )
-        loss = cross_entropy(logits, targets, reduction='none', *self.loss_args, **self.loss_kwargs)
+        loss = cross_entropy(
+            logits, targets, reduction="none", *self.loss_args, **self.loss_kwargs
+        )
         if self.reduce_mean:
             loss = loss.mean()
             loss = reduce_by_batch_3d(
-                loss, 
+                loss,
                 reduce_mean=True,
                 parallel_context=self.parallel_context,
                 input_parallel_mode=ParallelMode.TENSOR_3D_INPUT,
@@ -501,15 +564,20 @@ class _VocabParallelCrossEntropy3D(torch.autograd.Function):
 
     @staticmethod
     @custom_fwd(cast_inputs=torch.float32)
-    def forward(ctx, vocab_parallel_logits: Tensor, targets: Tensor, parallel_context: ParallelContext):
+    def forward(
+        ctx,
+        vocab_parallel_logits: Tensor,
+        targets: Tensor,
+        parallel_context: ParallelContext,
+    ):
         # logits: [b/q^2, c/q]
         # labels: [b/q^2]
         # loss: [b/q^2]
         logits_max = torch.max(vocab_parallel_logits, dim=-1)[0]
         logits_max = all_reduce(
-            logits_max, 
+            logits_max,
             op=ReduceOp.MAX,
-            parallel_context=parallel_context, 
+            parallel_context=parallel_context,
             parallel_mode=ParallelMode.TENSOR_3D_OUTPUT,
         )
         # Subtract the maximum value.
@@ -538,7 +606,7 @@ class _VocabParallelCrossEntropy3D(torch.autograd.Function):
         predicted_logits[target_mask] = 0.0
 
         predicted_logits = all_reduce(
-            predicted_logits, 
+            predicted_logits,
             parallel_context=parallel_context,
             parallel_mode=ParallelMode.TENSOR_3D_OUTPUT,
         )
@@ -547,8 +615,8 @@ class _VocabParallelCrossEntropy3D(torch.autograd.Function):
         exp_logits = torch.exp(vocab_parallel_logits)
         sum_exp_logits = exp_logits.sum(dim=-1)
         sum_exp_logits = all_reduce(
-            sum_exp_logits, 
-            parallel_context=parallel_context, 
+            sum_exp_logits,
+            parallel_context=parallel_context,
             parallel_mode=ParallelMode.TENSOR_3D_OUTPUT,
         )
 
@@ -573,7 +641,7 @@ class _VocabParallelCrossEntropy3D(torch.autograd.Function):
 
         # Add the gradient from matching classes.
         arange_1d = torch.arange(start=0, end=grad_2d.size(0), device=grad_2d.device)
-        grad_2d[arange_1d, masked_target_1d] -= (1.0 - target_mask.view(-1).float())
+        grad_2d[arange_1d, masked_target_1d] -= 1.0 - target_mask.view(-1).float()
         input_grad.mul_(output_grad.unsqueeze(dim=-1))
 
         return input_grad, None, None
@@ -585,7 +653,9 @@ class VocabParallelCrossEntropyLoss3D(_Loss):
         reduction (bool, optional): whether to average the loss, defaults to True.
     """
 
-    def __init__(self, reduce_mean=True, parallel_context: Optional[ParallelContext]=None):
+    def __init__(
+        self, reduce_mean=True, parallel_context: Optional[ParallelContext] = None
+    ):
         super().__init__()
         self.reduce_mean = reduce_mean
         self.parallel_context = parallel_context
@@ -595,28 +665,31 @@ class VocabParallelCrossEntropyLoss3D(_Loss):
             split_tensor_3d,
             reduce_by_batch_3d,
         )
+
         """Calculate loss between logits and targets.
         Args:
             logits (:class:`torch.tensor`): Predicted unnormalized scores (often referred to as logits).
             targets (:class:`torch.tensor`): Ground truth class indices or class probabilities.
         """
         targets = split_tensor_3d(
-            targets, 
-            dim=0, 
+            targets,
+            dim=0,
             parallel_context=self.parallel_context,
             parallel_mode=ParallelMode.TENSOR_3D_WEIGHT,
         )
         targets = split_tensor_3d(
-            targets, 
-            dim=0, 
+            targets,
+            dim=0,
             parallel_context=self.parallel_context,
             parallel_mode=ParallelMode.TENSOR_3D_INPUT,
         )
-        loss = _VocabParallelCrossEntropy3D.apply(logits, targets, self.parallel_context)
+        loss = _VocabParallelCrossEntropy3D.apply(
+            logits, targets, self.parallel_context
+        )
         if self.reduce_mean:
             loss = loss.mean()
             loss = reduce_by_batch_3d(
-                loss, 
+                loss,
                 reduce_mean=True,
                 parallel_context=self.parallel_context,
                 input_parallel_mode=ParallelMode.TENSOR_3D_INPUT,

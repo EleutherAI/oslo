@@ -7,7 +7,8 @@ from oslo.torch.nn import VocabParallelCrossEntropyLoss1D
 
 
 def check_equal(A, B):
-    assert torch.allclose(A, B, rtol=1e-3, atol=1e-1) == True
+    assert torch.allclose(A, B, rtol=1e-3, atol=1e-1)
+
 
 def print_rank0(msg: str, logger=None):
     """Print messages and save logs(optional). This is executed only if you are the rank-0 gpu.
@@ -22,7 +23,8 @@ def print_rank0(msg: str, logger=None):
         else:
             logger.info(msg)
 
-tp_size = int(os.environ['WORLD_SIZE'])
+
+tp_size = int(os.environ["WORLD_SIZE"])
 
 parallel_context = ParallelContext.from_torch(
     data_parallel_size=1,
@@ -47,24 +49,30 @@ target = torch.randint(num_classes, size=(batch_size, seq_len), dtype=torch.long
 dist.broadcast(out_master, src=0)
 dist.broadcast(target, src=0)
 
-out = split_1d(out_master.clone(), world_size, dim=-1, parallel_context=parallel_context)
+out = split_1d(
+    out_master.clone(), world_size, dim=-1, parallel_context=parallel_context
+)
 out = out.clone()
 out.requires_grad = True
 loss = criterion(out, target)
 
 out_master = out_master.clone()
 out_master.requires_grad = True
-loss_master = criterion_master(out_master.view(-1, out_master.size(-1)), target.view(-1))
+loss_master = criterion_master(
+    out_master.view(-1, out_master.size(-1)), target.view(-1)
+)
 
 check_equal(loss_master, loss)
-print_rank0('vocab parallel loss forward: pass')
+print_rank0("vocab parallel loss forward: pass")
 
 loss_master.backward()
 loss.backward()
 
 grad_master = out_master.grad
-grad_master = split_1d(grad_master, world_size, dim=-1, parallel_context=parallel_context)
+grad_master = split_1d(
+    grad_master, world_size, dim=-1, parallel_context=parallel_context
+)
 grad = out.grad
 
 check_equal(grad_master, grad)
-print_rank0('vocab parallel loss backward: pass')
+print_rank0("vocab parallel loss backward: pass")
