@@ -29,7 +29,7 @@ class _VocabParallelCrossEntropy1D(torch.autograd.Function):
         # Subtract the maximum value.
         vocab_parallel_logits.sub_(logits_max.unsqueeze(dim=-1))
 
-        # Get the partition's vocab indecies
+        # Get the partition's vocab indices
         partition_vocab_size = vocab_parallel_logits.size(-1)
         rank = parallel_context.get_local_rank(ParallelMode.TENSOR_1D)
         vocab_start_index = partition_vocab_size * rank
@@ -80,10 +80,10 @@ class _VocabParallelCrossEntropy1D(torch.autograd.Function):
     @custom_bwd
     def backward(ctx, grad_output):
 
-        # Retreive tensors from the forward path.
+        # Retrieve tensors from the forward path.
         softmax, target_mask, masked_target_1d = ctx.saved_tensors
 
-        # All the inputs have softmax as thier gradient.
+        # All the inputs have softmax as their gradient.
         grad_input = softmax
         # For simplicity, work with the 2D gradient.
         partition_vocab_size = softmax.size(-1)
@@ -182,8 +182,6 @@ class CrossEntropyLoss2D(_Loss):
 
 
 class _VocabParallelCrossEntropy2D(torch.autograd.Function):
-    ### Modified based on megatron.mpu.cross_entropy ###
-
     @staticmethod
     @custom_fwd(cast_inputs=torch.float32)
     def forward(
@@ -207,7 +205,7 @@ class _VocabParallelCrossEntropy2D(torch.autograd.Function):
         # Subtract the maximum value.
         vocab_parallel_logits.sub_(logits_max.unsqueeze(dim=-1))
 
-        # Get the partition's vocab indecies
+        # Get the partition's vocab indices
         partition_vocab_size = vocab_parallel_logits.size(-1)
         rank = parallel_context.get_local_rank(ParallelMode.TENSOR_2D_ROW)
         vocab_start = rank * partition_vocab_size
@@ -254,7 +252,7 @@ class _VocabParallelCrossEntropy2D(torch.autograd.Function):
     @staticmethod
     @custom_bwd
     def backward(ctx, output_grad):
-        # Retreive tensors from the forward path.
+        # Retrieve tensors from the forward path.
         softmax, target_mask, masked_target_1d = ctx.saved_tensors
 
         # All the inputs have softmax as their gradient.
@@ -364,8 +362,6 @@ class CrossEntropyLoss2p5D(_Loss):
 
 
 class _VocabParallelCrossEntropy2p5D(torch.autograd.Function):
-    ### Modified based on megatron.mpu.cross_entropy ###
-
     @staticmethod
     @custom_fwd(cast_inputs=torch.float32)
     def forward(
@@ -433,7 +429,7 @@ class _VocabParallelCrossEntropy2p5D(torch.autograd.Function):
     @staticmethod
     @custom_bwd
     def backward(ctx, output_grad):
-        # Retreive tensors from the forward path.
+        # Retrieve tensors from the forward path.
         softmax, target_mask, masked_target_1d = ctx.saved_tensors
 
         # All the inputs have softmax as their gradient.
@@ -630,10 +626,10 @@ class _VocabParallelCrossEntropy3D(torch.autograd.Function):
     @staticmethod
     @custom_bwd
     def backward(ctx, output_grad):
-        # Retreive tensors from the forward path.
+        # Retrieve tensors from the forward path.
         softmax, target_mask, masked_target_1d = ctx.saved_tensors
 
-        # All the inputs have softmax as thier gradient.
+        # All the inputs have softmax as their gradient.
         input_grad = softmax
         # For simplicity, work with the 2D gradient.
         partition_vocab_size = softmax.size(-1)
