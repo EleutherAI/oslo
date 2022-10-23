@@ -19,7 +19,7 @@ from transformers import (
 import oslo
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel.tensor_parallel import TensorParallel
-from oslo.torch.nn.parallel.utils import allocate_params
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--memory_priority", action="store_true", default=False)
@@ -72,7 +72,7 @@ def bw(tensors):
 
 
 tp_size = 8
-tp_depth = 1
+tp_depth = 2
 
 model_name = "bert-base-uncased"
 mkwargs = {"pad_token": "[PAD]"}
@@ -83,7 +83,7 @@ parallel_context = ParallelContext.from_torch(
     data_parallel_size=1,
     pipeline_parallel_size=1,
     tensor_parallel_size=tp_size,
-    tensor_parallel_mode=ParallelMode.TENSOR_3D,
+    tensor_parallel_mode=ParallelMode.TENSOR_2P5D,
     tensor_parallel_depth=tp_depth,
 )
 
@@ -100,8 +100,6 @@ wrapper_tp = TensorParallel(
     model_tp, parallel_context, memory_priority=args.memory_priority
 )
 oslo.ready(wrapper_tp, parallel_context)
-# allocate_params 함수는 추후에 모든 페러렐 래퍼를 관장하는 클래스에서 처리될 예정
-# https://github.com/tunib-ai/oslo/blob/307131bbd5ed995ea8dca8ac541bfbce9bfec29b/oslo/pytorch/model_parallelism/model_parallel_engine.py
 
 if dist.get_rank() == 0:
     print(wrapper_tp)
