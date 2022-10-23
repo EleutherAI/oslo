@@ -70,7 +70,7 @@ class _TensorParallel2p5D(nn.Module):
                 else value
                 for key, value in kwargs.items()
             }
-        return self.module(*args, **kwargs)
+        return self.module_forward(*args, **kwargs)
 
     @torch.no_grad()
     def _parallelize(self):
