@@ -71,7 +71,7 @@ def bw(tensors):
     return tensors.backward()
 
 
-tp_size = 4
+tp_size = 8
 tp_depth = 1
 
 model_name = "bert-base-uncased"
@@ -83,7 +83,7 @@ parallel_context = ParallelContext.from_torch(
     data_parallel_size=1,
     pipeline_parallel_size=1,
     tensor_parallel_size=tp_size,
-    tensor_parallel_mode=ParallelMode.TENSOR_1D,
+    tensor_parallel_mode=ParallelMode.TENSOR_3D,
     tensor_parallel_depth=tp_depth,
 )
 
@@ -122,7 +122,7 @@ if dist.get_rank() == 0:
     cur = time.time()
 
 # 저장
-wrapper_tp.save_pretrained(save_directory="test/", merge_checkpoints=False)
+wrapper_tp.save_pretrained(save_directory="test/", merge_checkpoints=True)
 
 # 모니터링 생성 대기
 dist.barrier()
@@ -149,13 +149,10 @@ for data in dataloader:
 
     # blocked after this
     loss_no_tp, notp_fw_time = fw(model_no_tp, **inputs, labels=inputs["input_ids"])
-    print("notp_fw_time", notp_fw_time, dist.get_rank())
     loss_tp, tp_fw_time = fw(wrapper_tp, **inputs, labels=inputs["input_ids"])
-    print("tp_fw_time", tp_fw_time, dist.get_rank())
     loss_gathered, gathered_fw_time = fw(
         model_gathered, **inputs, labels=inputs["input_ids"]
     )
-    print("gathered_fw_time", gathered_fw_time, dist.get_rank())
 
     if dist.get_rank() == 0:
         print(f"TP:{loss_tp}, NOTP:{loss_no_tp} , GATHRED:{loss_gathered}")
@@ -164,7 +161,6 @@ for data in dataloader:
     _, notp_bw_time = bw(loss_no_tp)
     _, tp_bw_time = bw(loss_tp)
     _, gathered_bw_time = bw(loss_gathered)
-    print("backward finished", dist.get_rank())
 
     optimizer_tp.step()
     optimizer_no_tp.step()

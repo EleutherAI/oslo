@@ -7,6 +7,8 @@ import torch
 import torch.distributed as dist
 from torch import nn
 
+from transformers import PreTrainedModel
+
 import oslo
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel.pipeline_parallel.pipeline_parallel import _PipelineParallel, \
@@ -82,15 +84,17 @@ def save_pretrained(
                         print("Tensor parallel de-parallelized")
 
         if dist.get_rank() == 0:
-            model_to_save.save_pretrained(
+            PreTrainedModel.save_pretrained(
+                model_to_save,
                 save_directory=save_directory,
                 save_config=save_config,
                 save_function=save_function,
                 **kwargs,
             )
-        del model_to_save
 
         dist.barrier()
+        del model_to_save
+
         return None
 
     if os.path.isfile(save_directory):
