@@ -25,6 +25,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--memory_priority", action="store_true", default=False)
 args = parser.parse_args()
 
+
 def seed_all(seed: int = 1930):
 
     print("Using Seed Number {}".format(seed))

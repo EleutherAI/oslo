@@ -11,8 +11,10 @@ from transformers import PreTrainedModel
 
 import oslo
 from oslo.torch.distributed import ParallelContext, ParallelMode
-from oslo.torch.nn.parallel.pipeline_parallel.pipeline_parallel import _PipelineParallel, \
-    PipelineParallel
+from oslo.torch.nn.parallel.pipeline_parallel.pipeline_parallel import (
+    _PipelineParallel,
+    PipelineParallel,
+)
 from oslo.torch.nn.parallel.tensor_parallel import TensorParallel
 from oslo.torch.nn.parallel.tensor_parallel.tensor_parallel import _TensorParallel
 from oslo.torch.nn.parallel.utils import (
@@ -23,20 +25,20 @@ from oslo.torch.nn.parallel.utils import (
 
 @torch.no_grad()
 def save_pretrained(
-        self,
-        save_directory: Union[str, os.PathLike],
-        save_config: bool = True,
-        state_dict: Optional[dict] = None,
-        save_function: Callable = torch.save,
-        merge_checkpoints: bool = False,
-        **kwargs,
+    self,
+    save_directory: Union[str, os.PathLike],
+    save_config: bool = True,
+    state_dict: Optional[dict] = None,
+    save_function: Callable = torch.save,
+    merge_checkpoints: bool = False,
+    **kwargs,
 ):
     logger = getLogger()
     PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0.bin"
 
     if (
-            self.parallel_context.get_world_size(ParallelMode.TENSOR) == 1
-            and self.parallel_context.get_world_size(ParallelMode.PIPELINE) == 1
+        self.parallel_context.get_world_size(ParallelMode.TENSOR) == 1
+        and self.parallel_context.get_world_size(ParallelMode.PIPELINE) == 1
     ):
         if dist.get_rank() == 0:
             self.save_pretrained(
@@ -49,7 +51,7 @@ def save_pretrained(
         dist.barrier()
         return None
 
-    if merge_checkpoints: # TODO: 확인하기
+    if merge_checkpoints:  # TODO: 확인하기
         model_to_save = self.__class__(self.config).eval()
 
         if state_dict is None:

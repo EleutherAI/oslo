@@ -99,8 +99,7 @@ model_no_tp = AutoModelForCausalLM.from_config(
 ).cuda()
 model_tp = AutoModelForCausalLM.from_config(AutoConfig.from_pretrained(model_name))
 wrapper_tp = TensorParallel(
-    model_tp, parallel_context,
-    memory_priority=args.memory_priority
+    model_tp, parallel_context, memory_priority=args.memory_priority
 )
 
 oslo.ready(wrapper_tp, parallel_context)
