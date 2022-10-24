@@ -46,7 +46,12 @@ def PipelineParallel(
         num_micro_batches=num_micro_batches,
     )
 
-    add_wrapper(module, mode=ParallelMode.PIPELINE, wrapper=pp, parallel_context=parallel_context)
+    add_wrapper(
+        module,
+        mode=ParallelMode.PIPELINE,
+        wrapper=pp,
+        parallel_context=parallel_context,
+    )
     setattr(module, "forward", pp.forward)
     return module
 

@@ -74,7 +74,12 @@ def SequenceParallel(
         hook=_sequence_parallel_hook,
     )
 
-    add_wrapper(module, mode=ParallelMode.SEQUENCE_DP, wrapper=sp, parallel_context=parallel_context)
+    add_wrapper(
+        module,
+        mode=ParallelMode.SEQUENCE_DP,
+        wrapper=sp,
+        parallel_context=parallel_context,
+    )
 
     if (
         hasattr(module.config, "pad_token_id")

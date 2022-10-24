@@ -106,7 +106,10 @@ class VocabParallelCrossEntropyLoss1D(_Loss):
     """
 
     def __init__(
-        self, reduce_mean: bool = True, ignore_index: int = -100, parallel_context: Optional[ParallelContext] = None
+        self,
+        reduce_mean: bool = True,
+        ignore_index: int = -100,
+        parallel_context: Optional[ParallelContext] = None,
     ):
         super().__init__()
         self.reduce_mean = reduce_mean
@@ -281,7 +284,10 @@ class VocabParallelCrossEntropyLoss2D(_Loss):
     """
 
     def __init__(
-        self, reduce_mean: bool = True, ignore_index: int = -100, parallel_context: Optional[ParallelContext] = None
+        self,
+        reduce_mean: bool = True,
+        ignore_index: int = -100,
+        parallel_context: Optional[ParallelContext] = None,
     ):
         super().__init__()
         self.reduce_mean = reduce_mean
@@ -461,7 +467,10 @@ class VocabParallelCrossEntropyLoss2p5D(_Loss):
     """
 
     def __init__(
-        self, reduce_mean: bool = True, ignore_index: int = -100, parallel_context: Optional[ParallelContext] = None
+        self,
+        reduce_mean: bool = True,
+        ignore_index: int = -100,
+        parallel_context: Optional[ParallelContext] = None,
     ):
         super().__init__()
         self.reduce_mean = reduce_mean
@@ -656,7 +665,10 @@ class VocabParallelCrossEntropyLoss3D(_Loss):
     """
 
     def __init__(
-        self, reduce_mean: bool = True, ignore_index: int = -100, parallel_context: Optional[ParallelContext] = None
+        self,
+        reduce_mean: bool = True,
+        ignore_index: int = -100,
+        parallel_context: Optional[ParallelContext] = None,
     ):
         super().__init__()
         self.reduce_mean = reduce_mean

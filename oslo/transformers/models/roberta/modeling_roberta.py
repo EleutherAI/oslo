@@ -1040,15 +1040,33 @@ class RobertaForCausalLM(RobertaPreTrainedModel):
             shifted_prediction_scores = prediction_scores[:, :-1, :].contiguous()
             labels = labels[:, 1:].contiguous()
             partition_vocab_size = shifted_prediction_scores.size(-1)
-            if hasattr(self, 'parallel_context') and self.parallel_context.tensor_parallel_size > 1:
+            if (
+                hasattr(self, "parallel_context")
+                and self.parallel_context.tensor_parallel_size > 1
+            ):
                 if self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_1D:
-                    loss_lm = VocabParallelCrossEntropyLoss1D(parallel_context=self.parallel_context)
-                elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D:
-                    loss_lm = VocabParallelCrossEntropyLoss2D(parallel_context=self.parallel_context)
-                elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2P5D:
-                    loss_lm = VocabParallelCrossEntropyLoss2p5D(parallel_context=self.parallel_context)
-                elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D:
-                    loss_lm = VocabParallelCrossEntropyLoss3D(parallel_context=self.parallel_context)
+                    loss_lm = VocabParallelCrossEntropyLoss1D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss2D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode
+                    == ParallelMode.TENSOR_2P5D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss2p5D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss3D(
+                        parallel_context=self.parallel_context
+                    )
             else:
                 loss_lm = CrossEntropyLoss()
             lm_loss = loss_lm(
@@ -1177,15 +1195,33 @@ class RobertaForMaskedLM(RobertaPreTrainedModel):
         masked_lm_loss = None
         if labels is not None:
             partition_vocab_size = prediction_scores.size(-1)
-            if hasattr(self, 'parallel_context') and self.parallel_context.tensor_parallel_size > 1:
+            if (
+                hasattr(self, "parallel_context")
+                and self.parallel_context.tensor_parallel_size > 1
+            ):
                 if self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_1D:
-                    loss_lm = VocabParallelCrossEntropyLoss1D(parallel_context=self.parallel_context)
-                elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D:
-                    loss_lm = VocabParallelCrossEntropyLoss2D(parallel_context=self.parallel_context)
-                elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2P5D:
-                    loss_lm = VocabParallelCrossEntropyLoss2p5D(parallel_context=self.parallel_context)
-                elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D:
-                    loss_lm = VocabParallelCrossEntropyLoss3D(parallel_context=self.parallel_context)
+                    loss_lm = VocabParallelCrossEntropyLoss1D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss2D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode
+                    == ParallelMode.TENSOR_2P5D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss2p5D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss3D(
+                        parallel_context=self.parallel_context
+                    )
             else:
                 loss_lm = CrossEntropyLoss()
             masked_lm_loss = loss_lm(

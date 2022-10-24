@@ -575,15 +575,26 @@ class DistilBertForMaskedLM(DistilBertPreTrainedModel):
         # Initialize weights and apply final processing
         self.post_init()
 
-        if hasattr(self, 'parallel_context') and self.parallel_context.tensor_parallel_size > 1:
+        if (
+            hasattr(self, "parallel_context")
+            and self.parallel_context.tensor_parallel_size > 1
+        ):
             if self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_1D:
-                self.mlm_loss_fct = VocabParallelCrossEntropyLoss1D(parallel_context=self.parallel_context)
+                self.mlm_loss_fct = VocabParallelCrossEntropyLoss1D(
+                    parallel_context=self.parallel_context
+                )
             elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D:
-                self.mlm_loss_fct = VocabParallelCrossEntropyLoss2D(parallel_context=self.parallel_context)
+                self.mlm_loss_fct = VocabParallelCrossEntropyLoss2D(
+                    parallel_context=self.parallel_context
+                )
             elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2P5D:
-                self.mlm_loss_fct = VocabParallelCrossEntropyLoss2p5D(parallel_context=self.parallel_context)
+                self.mlm_loss_fct = VocabParallelCrossEntropyLoss2p5D(
+                    parallel_context=self.parallel_context
+                )
             elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D:
-                self.mlm_loss_fct = VocabParallelCrossEntropyLoss3D(parallel_context=self.parallel_context)
+                self.mlm_loss_fct = VocabParallelCrossEntropyLoss3D(
+                    parallel_context=self.parallel_context
+                )
         else:
             self.mlm_loss_fct = CrossEntropyLoss()
 

@@ -526,7 +526,9 @@ def FullyShardedDataParallel(
         device_id=torch.cuda.current_device(),
     )
 
-    add_wrapper(module, mode=ParallelMode.DATA, wrapper=fsdp, parallel_context=parallel_context)
+    add_wrapper(
+        module, mode=ParallelMode.DATA, wrapper=fsdp, parallel_context=parallel_context
+    )
     setattr(module, "forward", fsdp.forward)
     setattr(module, "parameters", fsdp.parameters)
     return module

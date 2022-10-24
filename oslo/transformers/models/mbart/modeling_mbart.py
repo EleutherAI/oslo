@@ -1357,15 +1357,33 @@ class MBartForConditionalGeneration(MBartPreTrainedModel):
         masked_lm_loss = None
         if labels is not None:
             partition_vocab_size = lm_logits.size(-1)
-            if hasattr(self, 'parallel_context') and self.parallel_context.tensor_parallel_size > 1:
+            if (
+                hasattr(self, "parallel_context")
+                and self.parallel_context.tensor_parallel_size > 1
+            ):
                 if self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_1D:
-                    loss_lm = VocabParallelCrossEntropyLoss1D(parallel_context=self.parallel_context)
-                elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D:
-                    loss_lm = VocabParallelCrossEntropyLoss2D(parallel_context=self.parallel_context)
-                elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2P5D:
-                    loss_lm = VocabParallelCrossEntropyLoss2p5D(parallel_context=self.parallel_context)
-                elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D:
-                    loss_lm = VocabParallelCrossEntropyLoss3D(parallel_context=self.parallel_context)
+                    loss_lm = VocabParallelCrossEntropyLoss1D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss2D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode
+                    == ParallelMode.TENSOR_2P5D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss2p5D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss3D(
+                        parallel_context=self.parallel_context
+                    )
             else:
                 loss_lm = CrossEntropyLoss()
             masked_lm_loss = loss_lm(
@@ -1832,15 +1850,33 @@ class MBartForCausalLM(MBartPreTrainedModel):
         loss = None
         if labels is not None:
             partition_vocab_size = logits.size(-1)
-            if hasattr(self, 'parallel_context') and self.parallel_context.tensor_parallel_size > 1:
+            if (
+                hasattr(self, "parallel_context")
+                and self.parallel_context.tensor_parallel_size > 1
+            ):
                 if self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_1D:
-                    loss_lm = VocabParallelCrossEntropyLoss1D(parallel_context=self.parallel_context)
-                elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D:
-                    loss_lm = VocabParallelCrossEntropyLoss2D(parallel_context=self.parallel_context)
-                elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2P5D:
-                    loss_lm = VocabParallelCrossEntropyLoss2p5D(parallel_context=self.parallel_context)
-                elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D:
-                    loss_lm = VocabParallelCrossEntropyLoss3D(parallel_context=self.parallel_context)
+                    loss_lm = VocabParallelCrossEntropyLoss1D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss2D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode
+                    == ParallelMode.TENSOR_2P5D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss2p5D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss3D(
+                        parallel_context=self.parallel_context
+                    )
             else:
                 loss_lm = CrossEntropyLoss()
             loss = loss_lm(logits.view(-1, partition_vocab_size), labels.view(-1))
