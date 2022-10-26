@@ -13,7 +13,6 @@ from oslo.torch.nn.parallel.data_parallel.data_parallel import DataParallel
 from oslo.torch.nn.parallel.data_parallel._ddp.distributed_data_parallel import (
     DistributedDataParallel,
 )
-
 from oslo.torch.distributed.parallel_mode import ParallelMode
 from .trainer_utils import log_dist
 

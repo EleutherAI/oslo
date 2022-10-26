@@ -74,7 +74,7 @@ from oslo.transformers.data.data_collator import (
     DataCollator,
     default_data_collator,
 )
-
+from oslo.torch.utils.checkpoint.activation_checkpointing import ActivationCheckpointing
 from oslo.transformers.training_args import TrainingArguments
 from oslo.transformers.trainer_utils import OptimizerNames, log_dist
 
@@ -264,7 +264,7 @@ class Trainer:
         self.state = TrainerState()
         # Activate gradient checkpointing if needed
         if args.gradient_checkpointing:
-            self.model.gradient_checkpointing_enable()
+            self.model = ActivationCheckpointing(self.model, self.parallel_context, **self.args.oslo_config['activation_checkpointing'])
 
         model = self._wrap_model(self.model_wrappers)
 
@@ -825,6 +825,9 @@ class Trainer:
         # if isinstance(train_dataset, datasets.Dataset):
         #     train_dataset = self._remove_unused_columns(train_dataset, description="training")
         log_dist(f"Collate_fn: {self.data_collator.__class__}")
+        if self.args.dataloader_num_workers % self.args.world_size != 0:
+            raise ValueError("dataloader_num_workers should be dividable by world_size")
+        num_workers = self.args.dataloader_num_workers / self.args.world_size
 
         if isinstance(train_dataset, torch.utils.data.IterableDataset):
             if self.args.world_size > 1:
@@ -842,8 +845,7 @@ class Trainer:
                 train_dataset,
                 batch_size=self.args.per_device_train_batch_size,
                 collate_fn=self.data_collator,
-                # num_workers=self.args.dataloader_num_workers, # TODO
-                # pin_memory=self.args.dataloader_pin_memory,
+                num_workers=num_workers,
             )
         train_sampler = self._get_train_sampler()
         log_dist(
@@ -855,8 +857,7 @@ class Trainer:
             sampler=train_sampler,
             collate_fn=self.data_collator,
             drop_last=self.args.dataloader_drop_last,
-            # num_workers=self.args.dataloader_num_workers, # TODO
-            # pin_memory=self.args.dataloader_pin_memory,
+            num_workers=num_workers,
         )
 
     def autocast_smart_context_manager(self):

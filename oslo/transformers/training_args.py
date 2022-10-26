@@ -5,7 +5,9 @@ from typing import List, Optional, Union
 from enum import Enum
 import torch
 from transformers.trainer_utils import SchedulerType, IntervalStrategy
-from .trainer_utils import OptimizerNames
+from oslo.transformers.trainer_utils import OptimizerNames
+from oslo.torch.distributed.parallel_mode import ParallelMode
+
 
 
 @dataclass
@@ -70,6 +72,9 @@ class TrainingArguments:
     eval_steps (`int`, *optional*):
         Number of update steps between two evaluations if `evaluation_strategy="steps"`. Will default to the same
         value as `logging_steps` if not set.
+    dataloader_num_workers (`int`, *optional*, defaults to 0):
+            Number of subprocesses to use for data loading (PyTorch only). 0 means that the data will be loaded in the
+            main process.
     past_index (`int`, *optional*, defaults to -1): # TODO for transformerxl/XLNet
         Some models like [TransformerXL](../model_doc/transformerxl) or [XLNet](../model_doc/xlnet) can make use of
         the past hidden states for their predictions. If this argument is set to a positive int, the `Trainer` will
@@ -200,6 +205,12 @@ class TrainingArguments:
     eval_steps: int = field(
         default=None, metadata={"help": "Run an evaluation every X steps."}
     )
+    dataloader_num_workers: int = field(
+        default=0,
+        metadata={
+            "help": "Number of subprocesses to use for data loading (PyTorch only). 0 means that the data will be loaded in the main process."
+        },
+    )
     load_best_model_at_end: Optional[bool] = field(
         default=False,
         metadata={
@@ -230,8 +241,6 @@ class TrainingArguments:
     )
 
     def __post_init__(self):
-        self.local_rank = int(os.environ.get("LOCAL_RANK", -1))
-
         # TODO set log level
         # TODO set log dir
         if self.output_dir is not None:
@@ -276,12 +285,24 @@ class TrainingArguments:
     __repr__ = __str__
 
     @property
+    def local_rank(self):
+        """
+        The local rank
+        """
+        if self.parallel_context:
+            return self.parallel_context.get_local_rank(ParallelMode.DATA)
+        else:
+            return int(os.environ.get("LOCAL_RANK", -1))
+
+    @property
     def world_size(self):
         """
         The number of processes used in parallel.
         """
-        if self.local_rank != -1:
-            return torch.distributed.get_world_size()
+        if self.parallel_context:
+            return self.parallel_context.get_world_size(ParallelMode.DATA)
+        elif self.local_rank != -1:
+            return int(os.environ["WORLD_SIZE"])
         return 1
 
     @property
@@ -290,7 +311,7 @@ class TrainingArguments:
         The index of the current process used.
         """
         if self.local_rank != -1:
-            return torch.distributed.get_rank()
+            return self.local_rank
         return 0
 
     @property
