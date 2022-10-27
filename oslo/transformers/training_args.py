@@ -102,6 +102,12 @@ class TrainingArguments:
         The list of integrations to report the results and logs to. Supported platforms are `"azure_ml"`,
         `"comet_ml"`, `"mlflow"`, `"tensorboard"` and `"wandb"`. Use `"all"` to report to all integrations
         installed, `"none"` for no integrations.
+    bf16 (`bool`, *optional*, defaults to `False`):
+            Whether to use bf16 16-bit (mixed) precision training instead of 32-bit training. Requires Ampere or higher
+            NVIDIA architecture. This is an experimental API and it may change.
+    fp16 (`bool`, *optional*, defaults to `False`):
+        Whether to use fp16 16-bit (mixed) precision training instead of 32-bit training.
+
     """
 
     output_dir: str = field(
@@ -185,13 +191,6 @@ class TrainingArguments:
         default=500, metadata={"help": "Save checkpoint every X updates steps."}
     )
 
-    # log_level: Optional[str] = field(
-    #     default="passive",
-    #     metadata={
-    #         "help": "Logger log level to use on the main node. Possible choices are the log levels as strings: 'debug', 'info', 'warning', 'error' and 'critical', plus a 'passive' level which doesn't set anything and lets the application set the level. Defaults to 'passive'.",
-    #         "choices": trainer_log_levels.keys(),
-    #     },
-    # )
     seed: int = field(
         default=42,
         metadata={"help": "Random seed that will be set at the beginning of training."},
@@ -238,6 +237,16 @@ class TrainingArguments:
         metadata={
             "help": "The list of integrations to report the results and logs to."
         },
+    )
+    bf16: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use bf16 (mixed) precision instead of 32-bit. Requires Ampere or higher NVIDIA architecture. This is an experimental API and it may change."
+        },
+    )
+    fp16: bool = field(
+        default=False,
+        metadata={"help": "Whether to use fp16 (mixed) precision instead of 32-bit"},
     )
 
     def __post_init__(self):

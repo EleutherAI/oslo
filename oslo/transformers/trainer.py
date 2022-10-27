@@ -75,6 +75,7 @@ from oslo.transformers.data.data_collator import (
     default_data_collator,
 )
 from oslo.torch.utils.checkpoint.activation_checkpointing import ActivationCheckpointing
+from oslo.torch.nn.parallel.data_parallel._fsdp.sharded_grad_scaler import ShardedGradScaler
 from oslo.transformers.training_args import TrainingArguments
 from oslo.transformers.trainer_utils import OptimizerNames, log_dist
 
@@ -148,7 +149,6 @@ class Trainer:
         self.parallel_context = None
         self.model_wrappers = []
 
-        self.do_grad_scaling = False  # TODO FP16, BF16
         self.label_smoother = None  # TODO label_smooㅇther
 
         if args.oslo_config:
@@ -191,7 +191,10 @@ class Trainer:
                 "train_dataset does not implement __len__, max_steps has to be specified"
             )
 
-        # TODO Grade Scaler
+        self.do_grad_scaling = False
+        if args.fp16 or args.bf16:
+            self.do_grad_scaling = True
+            self.scaler = ShardedGradScaler()
         # TODO Label Smoother
 
         self.state = TrainerState(
@@ -412,15 +415,14 @@ class Trainer:
                     # TODO Gradient Clipping
                     # Optimizer step
                     optimizer_was_run = True
-                    # TODO do_grad_scaling
-                    # if self.do_grad_scaling:
-                    #     scale_before = self.scaler.get_scale()
-                    #     self.scaler.step(self.optimizer)
-                    #     self.scaler.update()
-                    #     scale_after = self.scaler.get_scale()
-                    #     optimizer_was_run = scale_before <= scale_after
-                    # else:
-                    self.optimizer.step()
+                    if self.do_grad_scaling:
+                        scale_before = self.scaler.get_scale()
+                        self.scaler.step(self.optimizer)
+                        self.scaler.update()
+                        scale_after = self.scaler.get_scale()
+                        optimizer_was_run = scale_before <= scale_after
+                    else:
+                        self.optimizer.step()
 
                     if optimizer_was_run:
                         self.lr_scheduler.step()
@@ -473,20 +475,28 @@ class Trainer:
         # log_dist(f"Before self._prepare_inputs: \n{inputs}", rank=-1)
         inputs = self._prepare_inputs(inputs)  # TODO Check
         # log_dist(f"After self._prepare_inputs: \n{inputs}", rank=-1)
-
-        with self.autocast_smart_context_manager():
-            loss = self.compute_loss(model, inputs)
-
-        if self.args.gradient_accumulation_steps > 1:
-            # deepspeed handles loss scaling by gradient_accumulation_steps in its `backward`
-            loss = loss / self.args.gradient_accumulation_steps
-
-        if self.do_grad_scaling:
-            self.scaler.scale(loss).backward()
+        if self.args.oslo_config.pipeline_parallelism:
+            pp_loss = torch.tensor(0.0).to(self.args.device)
+            num_micro_batches = self.args.oslo_config.pipeline_parallelism["param"]["num_micro_batches"] if "num_micro_batches" in self.args.oslo_config.pipeline_parallelism["param"] else 1
+            for idx, out in enumerate(model(**inputs)):
+                loss = out.loss
+                loss = loss / num_micro_batches
+                loss.backward()
+                pp_loss += loss.detach().item()
+            return pp_loss
         else:
-            loss.backward()
+            with self.autocast_smart_context_manager():
+                loss = self.compute_loss(model, inputs)
 
-        return loss.detach()
+            if self.args.gradient_accumulation_steps > 1:
+                loss = loss / self.args.gradient_accumulation_steps
+
+            if self.do_grad_scaling:
+                self.scaler.scale(loss).backward()
+            else:
+                loss.backward()
+
+            return loss.detach()
 
     def _wrap_model(self, model_wrappers: List, training: bool = True):
         if not training:
@@ -722,6 +732,7 @@ class Trainer:
         else:
             labels = None
         # log_dist(f"**inputs: {inputs}", rank=-1)
+
         outputs = model(**inputs)
         # # TODO: Save past state if it exists
         # # HF-TODO: this needs to be fixed and made cleaner later.
