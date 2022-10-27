@@ -11,11 +11,7 @@ from oslo.transformers.tasks.data_base import (
 )
 
 try:
-    from transformers import (
-        T5Tokenizer,
-        T5TokenizerFast,
-        PreTrainedTokenizerBase
-    )
+    from transformers import T5Tokenizer, T5TokenizerFast, PreTrainedTokenizerBase
     from transformers.tokenization_utils_base import BatchEncoding
 except ImportError:
     print("You have to install `transformers` to use `oslo.transformers` modules")

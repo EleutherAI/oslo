@@ -18,7 +18,10 @@ logging.captureWarnings(True)
 
 class ProcessorForSequenceClassification(BaseProcessor):
     def __init__(
-        self, tokenizer: PreTrainedTokenizerBase, max_length: int, is_text_pair: bool = False
+        self,
+        tokenizer: PreTrainedTokenizerBase,
+        max_length: int,
+        is_text_pair: bool = False,
     ) -> None:
         super().__init__(tokenizer=tokenizer, max_length=max_length)
         self.is_text_pair = is_text_pair

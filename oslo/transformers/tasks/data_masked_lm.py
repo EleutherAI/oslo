@@ -15,7 +15,9 @@ logging.captureWarnings(True)
 
 
 class ProcessorForMaskedLM(BaseProcessor):
-    def __init__(self, tokenizer: PreTrainedTokenizerBase, max_length: int = 512) -> None:
+    def __init__(
+        self, tokenizer: PreTrainedTokenizerBase, max_length: int = 512
+    ) -> None:
         super().__init__(tokenizer=tokenizer, max_length=max_length)
         assert (
             self._tokenizer.eos_token_id is not None

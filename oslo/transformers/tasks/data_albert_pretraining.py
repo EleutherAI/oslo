@@ -14,7 +14,7 @@ try:
     from transformers import (
         AlbertTokenizer,
         AlbertTokenizerFast,
-        PreTrainedTokenizerBase
+        PreTrainedTokenizerBase,
     )
 except ImportError:
     print("You have to install `transformers` to use `oslo.transformers` modules")
@@ -23,7 +23,9 @@ logging.captureWarnings(True)
 
 
 class ProcessorForAlbertPretraining(BaseProcessor):
-    def __init__(self, tokenizer: PreTrainedTokenizerBase, max_length: int = 512) -> None:
+    def __init__(
+        self, tokenizer: PreTrainedTokenizerBase, max_length: int = 512
+    ) -> None:
         super().__init__(tokenizer=tokenizer, max_length=max_length)
 
         if not isinstance(self._tokenizer, (AlbertTokenizer, AlbertTokenizerFast)):

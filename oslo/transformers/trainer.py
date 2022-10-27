@@ -75,7 +75,9 @@ from oslo.transformers.data.data_collator import (
     default_data_collator,
 )
 from oslo.torch.utils.checkpoint.activation_checkpointing import ActivationCheckpointing
-from oslo.torch.nn.parallel.data_parallel._fsdp.sharded_grad_scaler import ShardedGradScaler
+from oslo.torch.nn.parallel.data_parallel._fsdp.sharded_grad_scaler import (
+    ShardedGradScaler,
+)
 from oslo.transformers.training_args import TrainingArguments
 from oslo.transformers.trainer_utils import OptimizerNames, log_dist
 
@@ -122,27 +124,6 @@ class Trainer:
         self.train_dataset = train_dataset
         self.eval_dataset = eval_dataset
         self.tokenizer = tokenizer
-        # self.train_dataloader = train_dataloader
-        # self.train_batch_size = train_dataloader.batch_size
-        # if self.train_batch_size % max(1, args.n_gpu) != 0:
-        #     raise ValueError(
-        #         f"Train Dataloader batch_size is not dividable by n_gpu {args.n_gpu}."
-        #     )
-        # self.per_device_train_batch_size = int(self.train_batch_size / max(1, args.n_gpu))
-        # if self.train_dataloader.collate_fn is None:
-        # self.train_dataloader.collate_fn = default_collator
-        #
-        # self.eval_batch_size = None
-        # self.per_device_eval_batch_size = None
-        #
-        # self.eval_dataloader = eval_dataloader
-        # if self.eval_dataloader:
-        #     self.eval_batch_size = eval_dataloader.batch_size
-        #     if self.eval_batch_size % max(1, args.n_gpu) != 0:
-        #         raise ValueError(
-        #             f"Eval Dataloader batch_size is not dividable by n_gpu {args.n_gpu}."
-        #         )
-        #     self.per_device_eval_batch_size = int(self.eval_batch_size / max(1, args.n_gpu))
 
         self.optimizer = None
         self.lr_scheduler = None
@@ -209,8 +190,6 @@ class Trainer:
     def train(
         self,
         resume_from_checkpoint: Optional[Union[str, bool]] = None,
-        # trial: Union["optuna.Trial", Dict[str, Any]] = None,
-        # ignore_keys_for_eval: Optional[List[str]] = None,
     ):
         resume_from_checkpoint = (
             None if not resume_from_checkpoint else resume_from_checkpoint
@@ -267,7 +246,11 @@ class Trainer:
         self.state = TrainerState()
         # Activate gradient checkpointing if needed
         if args.gradient_checkpointing:
-            self.model = ActivationCheckpointing(self.model, self.parallel_context, **self.args.oslo_config['activation_checkpointing'])
+            self.model = ActivationCheckpointing(
+                self.model,
+                self.parallel_context,
+                **self.args.oslo_config["activation_checkpointing"],
+            )
 
         model = self._wrap_model(self.model_wrappers)
 
@@ -369,7 +352,6 @@ class Trainer:
             )
 
             step = -1
-
             for step, inputs in enumerate(epoch_iterator):
                 # # TODO Skip past any already trained steps if resuming training
                 # if steps_trained_in_current_epoch > 0:
@@ -477,7 +459,12 @@ class Trainer:
         # log_dist(f"After self._prepare_inputs: \n{inputs}", rank=-1)
         if self.args.oslo_config.pipeline_parallelism:
             pp_loss = torch.tensor(0.0).to(self.args.device)
-            num_micro_batches = self.args.oslo_config.pipeline_parallelism["param"]["num_micro_batches"] if "num_micro_batches" in self.args.oslo_config.pipeline_parallelism["param"] else 1
+            num_micro_batches = (
+                self.args.oslo_config.pipeline_parallelism["param"]["num_micro_batches"]
+                if "num_micro_batches"
+                in self.args.oslo_config.pipeline_parallelism["param"]
+                else 1
+            )
             for idx, out in enumerate(model(**inputs)):
                 loss = out.loss
                 loss = loss / num_micro_batches
@@ -499,6 +486,9 @@ class Trainer:
             return loss.detach()
 
     def _wrap_model(self, model_wrappers: List, training: bool = True):
+        """
+        Apply parallelism to the model desired by the user to the model based on the oslo_init setting
+        """
         if not training:
             return self.model
 
@@ -678,6 +668,7 @@ class Trainer:
         elif args.optim == OptimizerNames.ADAMW_BNB:
             try:
                 from bitsandbytes.optim import Adam8bit
+
                 optimizer_cls = Adam8bit
             except ImportError:
                 raise ValueError(
@@ -713,6 +704,7 @@ class Trainer:
         """
         if self.parallel_context or self.lr_scheduler is None:
             from transformers import get_scheduler
+
             self.lr_scheduler = get_scheduler(
                 self.args.lr_scheduler_type,
                 optimizer=self.optimizer if optimizer is None else optimizer,
@@ -882,4 +874,3 @@ class Trainer:
             else contextlib.suppress()
         )
         return ctx_manager
-

@@ -9,7 +9,11 @@ from datasets.arrow_dataset import Batch
 from oslo.transformers.tasks.data_base import BaseProcessor
 
 try:
-    from transformers import (AutoTokenizer, PreTrainedTokenizerBase, RobertaTokenizer, )
+    from transformers import (
+        AutoTokenizer,
+        PreTrainedTokenizerBase,
+        RobertaTokenizer,
+    )
     from transformers.file_utils import PaddingStrategy
 except ImportError:
     print("You have to install `transformers` to use `oslo.transformers` modules")

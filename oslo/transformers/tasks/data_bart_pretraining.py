@@ -10,11 +10,7 @@ from datasets.arrow_dataset import Batch
 from oslo.transformers.tasks.data_base import BaseProcessor
 
 try:
-    from transformers import (
-        BartTokenizer,
-        BartTokenizerFast,
-        PreTrainedTokenizerBase
-    )
+    from transformers import BartTokenizer, BartTokenizerFast, PreTrainedTokenizerBase
 except ImportError:
     print("You have to install `transformers` to use `oslo.transformers` modules")
 

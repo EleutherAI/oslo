@@ -74,7 +74,7 @@ SUPPORTED_FEATURES = {
         "parallel_size": _type(int),
         "params": {
             "memory_computation_balance": _type(float),
-            "num_micro_batches": _type(int)
+            "num_micro_batches": _type(int),
         },
     },
     "expert_parallelism": {
