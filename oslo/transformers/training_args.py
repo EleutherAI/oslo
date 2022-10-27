@@ -250,12 +250,9 @@ class TrainingArguments:
     )
 
     def __post_init__(self):
-        # TODO set log level
-        # TODO set log dir
         if self.output_dir is not None:
             self.output_dir = os.path.expanduser(self.output_dir)
 
-        # TODO set eval strategy
         if isinstance(self.evaluation_strategy, IntervalStrategy):
             self.evaluation_strategy = self.evaluation_strategy.value
 
@@ -337,7 +334,7 @@ class TrainingArguments:
         """
         The actual batch size for training (may differ from `per_gpu_train_batch_size` in distributed training).
         """
-        train_batch_size = self.per_device_train_batch_size * max(1, self.n_gpu)
+        train_batch_size = self.per_device_train_batch_size * max(1, self.world_size)
         return train_batch_size
 
     @property
@@ -345,7 +342,7 @@ class TrainingArguments:
         """
         The actual batch size for evaluation (may differ from `per_gpu_eval_batch_size` in distributed training).
         """
-        eval_batch_size = self.per_device_eval_batch_size * max(1, self.n_gpu)
+        eval_batch_size = self.per_device_eval_batch_size * max(1, self.world_size)
         return eval_batch_size
 
     def get_warmup_steps(self, num_training_steps: int):
@@ -359,40 +356,12 @@ class TrainingArguments:
         )
         return warmup_steps
 
-    # @cached_property
-    @property
-    def _setup_devices(self) -> torch.device:
-        # Here, we'll use torch.distributed.
-        # Initializes the distributed backend which will take care of synchronizing nodes/GPUs
-        if not torch.distributed.is_initialized():
-            torch.distributed.init_process_group(backend="nccl")
-        device = torch.device("cuda", self.local_rank)
-        # self._n_gpu = 1
-        self._n_gpu = torch.cuda.device_count()
-        # TODO ?
-        # if device.type == "cuda":
-        #     torch.cuda.set_device(device)
-        return device
-
     @property
     def device(self) -> torch.device:
         """
         The device used by this process.
         """
-        return self._setup_devices
-
-    @property
-    def n_gpu(self):
-        """
-        The number of GPUs used by this process.
-
-        Note:
-            This will only be greater than one when you have multiple GPUs available but are not using distributed
-            training. For distributed training, it will always be 1.
-        """
-        # Make sure `self._n_gpu` is properly setup.
-        _ = self._setup_devices
-        return self._n_gpu
+        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def get_batch_size(per_device_batch_size, n_gpu) -> int:

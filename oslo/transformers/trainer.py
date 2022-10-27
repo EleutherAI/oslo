@@ -149,7 +149,7 @@ class Trainer:
         self.parallel_context = None
         self.model_wrappers = []
 
-        self.label_smoother = None  # TODO label_smooㅇther
+        self.label_smoother = None  # TODO
 
         if args.oslo_config:
             self.parallel_context, self.model_wrappers = (
