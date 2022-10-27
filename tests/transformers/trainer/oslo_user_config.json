@@ -1,0 +1,7 @@
+{
+    "data_parallelism": {
+        "enable": true,
+        "parallel_size": 4,
+        "zero_stage": 0
+    }
+}

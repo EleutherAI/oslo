@@ -11,10 +11,7 @@ from oslo.transformers.tasks.data_base import (
 )
 
 try:
-    from transformers import (
-        T5Tokenizer,
-        T5TokenizerFast,
-    )
+    from transformers import T5Tokenizer, T5TokenizerFast, PreTrainedTokenizerBase
     from transformers.tokenization_utils_base import BatchEncoding
 except ImportError:
     print("You have to install `transformers` to use `oslo.transformers` modules")
@@ -25,12 +22,12 @@ logging.captureWarnings(True)
 class ProcessorForT5Pretraining(BaseProcessor):
     def __init__(
         self,
-        model_name_or_path: str,
+        tokenizer: PreTrainedTokenizerBase,
         max_length: int = 512,
         mlm_probability: float = 0.15,
         mean_noise_span_length: float = 3.0,
     ) -> None:
-        super().__init__(model_name_or_path, max_length)
+        super().__init__(tokenizer, max_length)
         if mlm_probability >= 1.0:
             warnings.warn("MLM Probability is greater than 1.0")
 

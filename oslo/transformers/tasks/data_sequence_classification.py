@@ -7,6 +7,7 @@ from datasets.arrow_dataset import Batch
 from oslo.transformers.tasks.data_base import BaseProcessor
 
 try:
+    from transformers import PreTrainedTokenizerBase
     from transformers.file_utils import PaddingStrategy
 except ImportError:
     print("You have to install `transformers` to use `oslo.transformers` modules")
@@ -17,9 +18,12 @@ logging.captureWarnings(True)
 
 class ProcessorForSequenceClassification(BaseProcessor):
     def __init__(
-        self, model_name_or_path: str, max_length: int, is_text_pair: bool = False
+        self,
+        tokenizer: PreTrainedTokenizerBase,
+        max_length: int,
+        is_text_pair: bool = False,
     ) -> None:
-        super().__init__(model_name_or_path=model_name_or_path, max_length=max_length)
+        super().__init__(tokenizer=tokenizer, max_length=max_length)
         self.is_text_pair = is_text_pair
 
     def __call__(self, examples: Batch) -> Dict[str, List[int]]:
