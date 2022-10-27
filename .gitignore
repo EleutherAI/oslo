@@ -396,3 +396,9 @@ wandb/
 # sample huggingface models
 **/pytorch_model.bin
 **/config.json
+
+# model binary files
+**/*.bin
+
+# ignore run log files
+**/nohup.out

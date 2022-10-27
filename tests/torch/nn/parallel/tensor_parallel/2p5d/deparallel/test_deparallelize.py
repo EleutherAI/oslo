@@ -1,6 +1,7 @@
 import os
 import random
 import time
+import argparse
 
 import numpy as np
 import torch
@@ -15,9 +16,14 @@ from transformers import (
     AutoConfig,
 )
 
+import oslo
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel.tensor_parallel import TensorParallel
-from oslo.torch.nn.parallel.utils import allocate_params
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--memory_priority", action="store_true", default=False)
+args = parser.parse_args()
 
 
 def seed_all(seed: int = 1930):
@@ -91,10 +97,10 @@ model_no_tp = AutoModelForCausalLM.from_config(
     AutoConfig.from_pretrained(model_name)
 ).cuda()
 model_tp = AutoModelForCausalLM.from_config(AutoConfig.from_pretrained(model_name))
-wrapper_tp = TensorParallel(model_tp, parallel_context)
-allocate_params(wrapper_tp, parallel_context)
-# allocate_params 함수는 추후에 모든 페러렐 래퍼를 관장하는 클래스에서 처리될 예정
-# https://github.com/tunib-ai/oslo/blob/307131bbd5ed995ea8dca8ac541bfbce9bfec29b/oslo/pytorch/model_parallelism/model_parallel_engine.py
+wrapper_tp = TensorParallel(
+    model_tp, parallel_context, memory_priority=args.memory_priority
+)
+oslo.ready(wrapper_tp, parallel_context)
 
 if dist.get_rank() == 0:
     print(wrapper_tp)
@@ -115,7 +121,7 @@ if dist.get_rank() == 0:
     cur = time.time()
 
 # 저장
-wrapper_tp.save_parallelized("test/", merge_checkpoints=True)
+wrapper_tp.save_pretrained(save_directory="test/", merge_checkpoints=True)
 
 # 모니터링 생성 대기
 dist.barrier()
@@ -140,6 +146,7 @@ for data in dataloader:
         max_length=512,
     ).to("cuda")
 
+    # blocked after this
     loss_no_tp, notp_fw_time = fw(model_no_tp, **inputs, labels=inputs["input_ids"])
     loss_tp, tp_fw_time = fw(wrapper_tp, **inputs, labels=inputs["input_ids"])
     loss_gathered, gathered_fw_time = fw(
@@ -147,7 +154,7 @@ for data in dataloader:
     )
 
     if dist.get_rank() == 0:
-        print(f"TP:{loss_tp}, NOTP:{loss_no_tp}, GATHRED:{loss_gathered}")
+        print(f"TP:{loss_tp}, NOTP:{loss_no_tp} , GATHRED:{loss_gathered}")
         wandb.log({"tp": loss_tp, "notp": loss_no_tp, "GATHRED": loss_gathered})
 
     _, notp_bw_time = bw(loss_no_tp)
