@@ -106,10 +106,14 @@ class VocabParallelCrossEntropyLoss1D(_Loss):
     """
 
     def __init__(
-        self, reduce_mean=True, parallel_context: Optional[ParallelContext] = None
+        self,
+        reduce_mean: bool = True,
+        ignore_index: int = -100,
+        parallel_context: Optional[ParallelContext] = None,
     ):
         super().__init__()
         self.reduce_mean = reduce_mean
+        self.ignore_index = ignore_index
         self.parallel_context = parallel_context
 
     def forward(self, logits: Tensor, targets: Tensor):
@@ -121,8 +125,9 @@ class VocabParallelCrossEntropyLoss1D(_Loss):
         loss = _VocabParallelCrossEntropy1D.apply(
             logits, targets, self.parallel_context
         )
+        loss[targets == self.ignore_index] = 0.0
         if self.reduce_mean:
-            loss = loss.mean()
+            loss = loss.sum() / (targets != self.ignore_index).sum()
         return loss
 
 
@@ -279,10 +284,14 @@ class VocabParallelCrossEntropyLoss2D(_Loss):
     """
 
     def __init__(
-        self, reduce_mean=True, parallel_context: Optional[ParallelContext] = None
+        self,
+        reduce_mean: bool = True,
+        ignore_index: int = -100,
+        parallel_context: Optional[ParallelContext] = None,
     ):
         super().__init__()
         self.reduce_mean = reduce_mean
+        self.ignore_index = ignore_index
         self.parallel_context = parallel_context
 
     def forward(self, logits: Tensor, targets: Tensor):
@@ -302,8 +311,9 @@ class VocabParallelCrossEntropyLoss2D(_Loss):
             targets,
             self.parallel_context,
         )
+        loss[targets == self.ignore_index] = 0.0
         if self.reduce_mean:
-            loss = loss.mean()
+            loss = loss.sum() / (targets != self.ignore_index).sum()
             loss = reduce_by_batch_2d(
                 loss, reduce_mean=True, parallel_context=self.parallel_context
             )
@@ -457,10 +467,14 @@ class VocabParallelCrossEntropyLoss2p5D(_Loss):
     """
 
     def __init__(
-        self, reduce_mean=True, parallel_context: Optional[ParallelContext] = None
+        self,
+        reduce_mean: bool = True,
+        ignore_index: int = -100,
+        parallel_context: Optional[ParallelContext] = None,
     ):
         super().__init__()
         self.reduce_mean = reduce_mean
+        self.ignore_index = ignore_index
         self.parallel_context = parallel_context
 
     def forward(self, logits: Tensor, targets: Tensor):
@@ -480,8 +494,9 @@ class VocabParallelCrossEntropyLoss2p5D(_Loss):
         loss = _VocabParallelCrossEntropy2p5D.apply(
             logits, targets, self.parallel_context
         )
+        loss[targets == self.ignore_index] = 0.0
         if self.reduce_mean:
-            loss = loss.mean()
+            loss = loss.sum() / (targets != self.ignore_index).sum()
             loss = reduce_by_batch_2p5d(
                 loss, reduce_mean=True, parallel_context=self.parallel_context
             )
@@ -650,10 +665,14 @@ class VocabParallelCrossEntropyLoss3D(_Loss):
     """
 
     def __init__(
-        self, reduce_mean=True, parallel_context: Optional[ParallelContext] = None
+        self,
+        reduce_mean: bool = True,
+        ignore_index: int = -100,
+        parallel_context: Optional[ParallelContext] = None,
     ):
         super().__init__()
         self.reduce_mean = reduce_mean
+        self.ignore_index = ignore_index
         self.parallel_context = parallel_context
 
     def forward(self, logits: Tensor, targets: Tensor):
@@ -682,8 +701,9 @@ class VocabParallelCrossEntropyLoss3D(_Loss):
         loss = _VocabParallelCrossEntropy3D.apply(
             logits, targets, self.parallel_context
         )
+        loss[targets == self.ignore_index] = 0.0
         if self.reduce_mean:
-            loss = loss.mean()
+            loss = loss.sum() / (targets != self.ignore_index).sum()
             loss = reduce_by_batch_3d(
                 loss,
                 reduce_mean=True,

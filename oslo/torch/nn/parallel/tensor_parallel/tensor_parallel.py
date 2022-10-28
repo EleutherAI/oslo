@@ -57,7 +57,9 @@ def TensorParallel(
         parallel_context=parallel_context,
         memory_priority=memory_priority,
     )
-    add_wrapper(module, ParallelMode.TENSOR, tp)
+    add_wrapper(
+        module, mode=ParallelMode.TENSOR, wrapper=tp, parallel_context=parallel_context
+    )
     setattr(module, "forward", tp.forward)
     return module
 

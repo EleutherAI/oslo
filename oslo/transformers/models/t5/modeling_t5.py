@@ -6,6 +6,14 @@ from typing import Optional, Tuple, Union
 import torch
 from torch import nn
 from torch.nn import CrossEntropyLoss
+from oslo.torch.distributed.parallel_mode import ParallelMode
+
+from oslo.torch.nn import (
+    VocabParallelCrossEntropyLoss1D,
+    VocabParallelCrossEntropyLoss2D,
+    VocabParallelCrossEntropyLoss2p5D,
+    VocabParallelCrossEntropyLoss3D,
+)
 from torch.utils.checkpoint import checkpoint
 
 import oslo.torch.nn.modules.functional as F
@@ -1351,8 +1359,36 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
 
         loss = None
         if labels is not None:
-            loss_fct = CrossEntropyLoss(ignore_index=-100)
-            loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
+            if (
+                hasattr(self, "parallel_context")
+                and self.parallel_context.tensor_parallel_size > 1
+            ):
+                if self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_1D:
+                    loss_lm = VocabParallelCrossEntropyLoss1D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss2D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode
+                    == ParallelMode.TENSOR_2P5D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss2p5D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss3D(
+                        parallel_context=self.parallel_context
+                    )
+            else:
+                loss_lm = CrossEntropyLoss(ignore_index=-100)
+            loss = loss_lm(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
             # TODO(thom): Add z_loss https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/layers.py#L666
 
         if not return_dict:
