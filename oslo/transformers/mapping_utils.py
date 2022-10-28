@@ -4,13 +4,17 @@ from oslo.torch.nn.parallel.expert_parallel.mapping import Front, Behind
 from oslo.torch.nn.parallel.tensor_parallel import Column, Row, Update, Head
 
 
-class _ParallelMappingForHuggingFace(object):
+class _ParallelMapping(object):
     __MAPPING__ = {}
 
     def __init__(self):
         cache_mapping = {}
         for cls_name, mapping in self.__MAPPING__.items():
             cls = self._load_hf_class_by_name(cls_name)
+            if cls is not None:
+                cache_mapping[cls] = mapping
+
+            cls = self._load_oslo_class_by_name(cls_name)
             if cls is not None:
                 cache_mapping[cls] = mapping
 
@@ -29,6 +33,26 @@ class _ParallelMappingForHuggingFace(object):
         """
         try:
             transformers = importlib.import_module("transformers")
+            cls = getattr(transformers, f"{model_name}PreTrainedModel", None)
+            if cls is None:
+                cls = getattr(transformers, f"{model_name}PretrainedModel", None)
+            return cls
+        except ImportError:
+            return None
+
+    @staticmethod
+    def _load_oslo_class_by_name(model_name):
+        """
+        Load base class obj by class name
+
+        Args:
+            model_name (str): model name (e.g. Bert, GPT2, T5, ...)
+
+        Returns:
+            class: XXXPreTrainedModel
+        """
+        try:
+            transformers = importlib.import_module("oslo.transformers")
             cls = getattr(transformers, f"{model_name}PreTrainedModel", None)
             if cls is None:
                 cls = getattr(transformers, f"{model_name}PretrainedModel", None)
@@ -58,7 +82,7 @@ class _ParallelMappingForHuggingFace(object):
         return mapping_by_model
 
 
-class _FullyShardedDataParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
+class _FullyShardedDataParallelMapping(_ParallelMapping):
     __MAPPING__ = {
         "Albert": ["AlbertLayer"],
         "Bart": ["BartLayer"],
@@ -79,7 +103,7 @@ class _FullyShardedDataParallelMappingForHuggingFace(_ParallelMappingForHuggingF
     }
 
 
-class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
+class _TensorParallelMapping(_ParallelMapping):
     __MAPPING__ = {
         "Albert": [
             Column("query", "key", "value", "ffn"),
@@ -218,7 +242,7 @@ class _TensorParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
     }
 
 
-class _ExpertParallelMappingForHuggingFace(_ParallelMappingForHuggingFace):
+class _ExpertParallelMapping(_ParallelMapping):
     __MAPPING__ = {
         "Albert": [
             Front("ffn", layer="albert_layer_groups.albert_layers", enc_name="encoder"),
