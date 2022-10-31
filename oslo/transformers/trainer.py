@@ -727,9 +727,7 @@ class Trainer:
         return (loss, outputs) if return_outputs else loss
 
     def compute_pp_loss(self, model, inputs, return_outputs=False):
-        """
-
-        """
+        """ """
         if self.label_smoother is not None and "labels" in inputs:
             labels = inputs.pop("labels")
         else:
@@ -753,7 +751,6 @@ class Trainer:
             loss.backward()
             pp_loss += loss.detach().item()
         return (pp_loss, outputs) if return_outputs else pp_loss
-
 
     def _prepare_input(
         self, data: Union[torch.Tensor, Any]
@@ -813,14 +810,18 @@ class Trainer:
                 return DistributedSamplerWithLoop(
                     self.train_dataset,
                     batch_size=self.args.per_device_train_batch_size,
-                    num_replicas=self.parallel_context.get_local_rank(ParallelMode.DATA),
+                    num_replicas=self.parallel_context.get_local_rank(
+                        ParallelMode.DATA
+                    ),
                     rank=self.parallel_context.get_local_rank(ParallelMode.DATA),
                     # seed=seed, TODO oslo seed
                 )
             else:
                 return DistributedSampler(
                     self.train_dataset,
-                    num_replicas=self.parallel_context.get_local_rank(ParallelMode.DATA),
+                    num_replicas=self.parallel_context.get_local_rank(
+                        ParallelMode.DATA
+                    ),
                     rank=self.parallel_context.get_local_rank(ParallelMode.DATA),
                     # seed=seed, TODO oslo seed
                 )
@@ -844,9 +845,16 @@ class Trainer:
         # if isinstance(train_dataset, datasets.Dataset):
         #     train_dataset = self._remove_unused_columns(train_dataset, description="training")
         log_dist(f"Collate_fn: {self.data_collator.__class__}")
-        if self.args.dataloader_num_workers % self.parallel_context.get_local_rank(ParallelMode.DATA) != 0:
+        if (
+            self.args.dataloader_num_workers
+            % self.parallel_context.get_local_rank(ParallelMode.DATA)
+            != 0
+        ):
             raise ValueError("dataloader_num_workers should be dividable by world_size")
-        num_workers = self.args.dataloader_num_workers / self.parallel_context.get_local_rank(ParallelMode.DATA)
+        num_workers = (
+            self.args.dataloader_num_workers
+            / self.parallel_context.get_local_rank(ParallelMode.DATA)
+        )
 
         if isinstance(train_dataset, torch.utils.data.IterableDataset):
             if self.parallel_context.get_local_rank(ParallelMode.DATA) > 1:
@@ -854,8 +862,12 @@ class Trainer:
                     train_dataset,
                     batch_size=self.args.train_batch_size,
                     drop_last=self.args.dataloader_drop_last,
-                    num_processes=self.parallel_context.get_local_rank(ParallelMode.DATA),
-                    process_index=self.parallel_context.get_local_rank(ParallelMode.DATA),
+                    num_processes=self.parallel_context.get_local_rank(
+                        ParallelMode.DATA
+                    ),
+                    process_index=self.parallel_context.get_local_rank(
+                        ParallelMode.DATA
+                    ),
                 )
                 log_dist(
                     f"Dataset: {train_dataset.__class__} with\nbatch_size:{self.args.train_batch_size}\n world_size:{self.parallel_context.get_local_rank(ParallelMode.DATA)}\n dataloader_drop_last: {self.args.dataloader_drop_last}"

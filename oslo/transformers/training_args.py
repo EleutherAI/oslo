@@ -294,6 +294,7 @@ class TrainingArguments:
         The local rank
         """
         return int(os.environ.get("LOCAL_RANK", -1))
+
     #
     # @property
     # def world_size(self):
