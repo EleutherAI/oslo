@@ -455,22 +455,11 @@ class Trainer:
         """
         model.train()
         # log_dist(f"Before self._prepare_inputs: \n{inputs}", rank=-1)
-        inputs = self._prepare_inputs(inputs)  # TODO Check
+        inputs = self._prepare_inputs(inputs)
         # log_dist(f"After self._prepare_inputs: \n{inputs}", rank=-1)
         if self.args.oslo_config.pipeline_parallelism:
-            pp_loss = torch.tensor(0.0).to(self.args.device)
-            num_micro_batches = (
-                self.args.oslo_config.pipeline_parallelism["param"]["num_micro_batches"]
-                if "num_micro_batches"
-                in self.args.oslo_config.pipeline_parallelism["param"]
-                else 1
-            )
-            for idx, out in enumerate(model(**inputs)):
-                loss = out.loss
-                loss = loss / num_micro_batches
-                loss.backward()
-                pp_loss += loss.detach().item()
-            return pp_loss
+            with self.autocast_smart_context_manager():
+                loss = self.compute_pp_loss(model, inputs)
         else:
             with self.autocast_smart_context_manager():
                 loss = self.compute_loss(model, inputs)
@@ -483,7 +472,7 @@ class Trainer:
             else:
                 loss.backward()
 
-            return loss.detach()
+        return loss.detach()
 
     def _wrap_model(self, model_wrappers: List, training: bool = True):
         """
@@ -716,15 +705,12 @@ class Trainer:
     def compute_loss(self, model, inputs, return_outputs=False):
         """
         How the loss is computed by Trainer. By default, all models return the loss in the first element.
-
         Subclass and override for custom behavior.
         """
         if self.label_smoother is not None and "labels" in inputs:
             labels = inputs.pop("labels")
         else:
             labels = None
-        # log_dist(f"**inputs: {inputs}", rank=-1)
-
         outputs = model(**inputs)
         # # TODO: Save past state if it exists
         # # HF-TODO: this needs to be fixed and made cleaner later.
@@ -738,6 +724,35 @@ class Trainer:
             loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
 
         return (loss, outputs) if return_outputs else loss
+
+    def compute_pp_loss(self, model, inputs, return_outputs=False):
+        """
+
+        """
+        if self.label_smoother is not None and "labels" in inputs:
+            labels = inputs.pop("labels")
+        else:
+            labels = None
+        pp_loss = torch.tensor(0.0).to(self.args.device)
+        num_micro_batches = (
+            self.args.oslo_config.pipeline_parallelism["param"]["num_micro_batches"]
+            if "num_micro_batches"
+            in self.args.oslo_config.pipeline_parallelism["param"]
+            else 1
+        )
+        outputs = []
+        for idx, out in enumerate(model(**inputs)):
+            outputs.append(out)
+            if labels is not None:
+                loss = self.label_smoother(out, labels)
+            else:
+                # We don't use .loss here since the model may return tuples instead of ModelOutput.
+                loss = out["loss"] if isinstance(out, dict) else out[0]
+            loss = loss / num_micro_batches
+            loss.backward()
+            pp_loss += loss.detach().item()
+        return (pp_loss, outputs) if return_outputs else pp_loss
+
 
     def _prepare_input(
         self, data: Union[torch.Tensor, Any]
