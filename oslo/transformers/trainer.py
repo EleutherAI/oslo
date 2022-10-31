@@ -65,6 +65,7 @@ from oslo.torch.nn.parallel import (
     PipelineParallel,
     TensorParallel,
 )
+from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn.parallel.sequence_parallel import SequenceParallel
 from oslo.torch.nn.parallel.data_parallel.data_parallel import DataParallel
 from oslo.torch.nn.parallel.data_parallel._ddp.distributed_data_parallel import (
@@ -805,22 +806,22 @@ class Trainer:
         # seed = self.args.data_seed if self.args.data_seed is not None else self.args.seed
 
         if (
-            self.args.world_size > 1
+            self.parallel_context.get_local_rank(ParallelMode.DATA) > 1
             and self.args.oslo_config.data_parallelism is not None
         ):
             if not self.args.dataloader_drop_last:
                 return DistributedSamplerWithLoop(
                     self.train_dataset,
                     batch_size=self.args.per_device_train_batch_size,
-                    num_replicas=self.args.world_size,
-                    rank=self.args.process_index,
+                    num_replicas=self.parallel_context.get_local_rank(ParallelMode.DATA),
+                    rank=self.parallel_context.get_local_rank(ParallelMode.DATA),
                     # seed=seed, TODO oslo seed
                 )
             else:
                 return DistributedSampler(
                     self.train_dataset,
-                    num_replicas=self.args.world_size,
-                    rank=self.args.process_index,
+                    num_replicas=self.parallel_context.get_local_rank(ParallelMode.DATA),
+                    rank=self.parallel_context.get_local_rank(ParallelMode.DATA),
                     # seed=seed, TODO oslo seed
                 )
         else:
@@ -843,21 +844,21 @@ class Trainer:
         # if isinstance(train_dataset, datasets.Dataset):
         #     train_dataset = self._remove_unused_columns(train_dataset, description="training")
         log_dist(f"Collate_fn: {self.data_collator.__class__}")
-        if self.args.dataloader_num_workers % self.args.world_size != 0:
+        if self.args.dataloader_num_workers % self.parallel_context.get_local_rank(ParallelMode.DATA) != 0:
             raise ValueError("dataloader_num_workers should be dividable by world_size")
-        num_workers = self.args.dataloader_num_workers / self.args.world_size
+        num_workers = self.args.dataloader_num_workers / self.parallel_context.get_local_rank(ParallelMode.DATA)
 
         if isinstance(train_dataset, torch.utils.data.IterableDataset):
-            if self.args.world_size > 1:
+            if self.parallel_context.get_local_rank(ParallelMode.DATA) > 1:
                 train_dataset = IterableDatasetShard(
                     train_dataset,
                     batch_size=self.args.train_batch_size,
                     drop_last=self.args.dataloader_drop_last,
-                    num_processes=self.args.world_size,
-                    process_index=self.args.process_index,
+                    num_processes=self.parallel_context.get_local_rank(ParallelMode.DATA),
+                    process_index=self.parallel_context.get_local_rank(ParallelMode.DATA),
                 )
                 log_dist(
-                    f"Dataset: {train_dataset.__class__} with\nbatch_size:{self.args.train_batch_size}\n world_size:{self.args.world_size}\n dataloader_drop_last: {self.args.dataloader_drop_last}"
+                    f"Dataset: {train_dataset.__class__} with\nbatch_size:{self.args.train_batch_size}\n world_size:{self.parallel_context.get_local_rank(ParallelMode.DATA)}\n dataloader_drop_last: {self.args.dataloader_drop_last}"
                 )
             return DataLoader(
                 train_dataset,
@@ -867,7 +868,7 @@ class Trainer:
             )
         train_sampler = self._get_train_sampler()
         log_dist(
-            f"Sampler: {train_sampler.__class__} with\nbatch_size:{self.args.train_batch_size}\nworld_size:{self.args.world_size}, dataloader_drop_last: {self.args.dataloader_drop_last}"
+            f"Sampler: {train_sampler.__class__} with\nbatch_size:{self.args.train_batch_size}\nworld_size:{self.parallel_context.get_local_rank(ParallelMode.DATA)}, dataloader_drop_last: {self.args.dataloader_drop_last}"
         )
         return DataLoader(
             train_dataset,
