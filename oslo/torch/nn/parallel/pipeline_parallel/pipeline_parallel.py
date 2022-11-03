@@ -107,12 +107,12 @@ class _PipelineParallel(nn.Module):
 
         self._recursive_wrap(self, "")
         self._lock = Lock()
-        self.rank = self.parallel_context.get_local_rank(ParallelMode.PIPELINE)
+        self.local_rank = self.parallel_context.get_local_rank(ParallelMode.PIPELINE)
         self.num_micro_batches = num_micro_batches
 
         # set up worker for inputs
         self.producer = None
-        if self.rank == 0:
+        if self.local_rank == 0:
             self.producer = concurrent.futures.ThreadPoolExecutor()
 
     def forward(self, *args, **kwargs):
@@ -124,7 +124,7 @@ class _PipelineParallel(nn.Module):
             self.parallel_context.get_group(ParallelMode.PIPELINE)
         )
 
-        if self.rank == 0:
+        if self.local_rank == 0:
             # TODO;
             new_args = [list() for _ in range(self.num_micro_batches)]
             for x in args:
@@ -189,7 +189,7 @@ class _PipelineParallel(nn.Module):
                 yield result
 
         # barrier; wait for all rank
-        wait_other_ranks(self.rank, self.parallel_context)
+        wait_other_ranks(self.local_rank, self.parallel_context)
 
         # TODO; seems like this is not necessary?
         torch.cuda.empty_cache()
@@ -233,7 +233,7 @@ class _PipelineParallel(nn.Module):
                 is_training = self.training
                 need_activation_save = any([t.requires_grad for t in tensors])
                 with self._lock:
-                    unique_key = make_unique_key(location, self.rank)
+                    unique_key = make_unique_key(location, self.local_rank)
 
                 if need_activation_save and is_training and is_grad_enabled:
                     # prepare backward
