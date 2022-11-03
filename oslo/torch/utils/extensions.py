@@ -65,8 +65,7 @@ def save_pretrained(
                         parallel_context=self.parallel_context,
                         memory_priority=wrapper.memory_priority,
                     )
-                    if dist.get_rank() == 0:
-                        print("Tensor parallel parallelized")
+                    
                 elif isinstance(wrapper, _PipelineParallel):
                     model_to_save = PipelineParallel(
                         model_to_save,
@@ -82,11 +81,9 @@ def save_pretrained(
             for parallel_mode, wrapper in model_to_save.oslo_wrappers.items():
                 if hasattr(wrapper, "deparallelize"):
                     wrapper.deparallelize()
-                    if dist.get_rank() == 0:
-                        print("Tensor parallel de-parallelized")
 
         if dist.get_rank() == 0:
-            PreTrainedModel.save_pretrained(
+            save_pretrained(
                 model_to_save,
                 save_directory=save_directory,
                 save_config=save_config,
