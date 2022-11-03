@@ -55,7 +55,6 @@ def PipelineParallel(
         parallel_context=parallel_context,
     )
     setattr(module, "forward", pp.forward)
-    setattr(module, "deparallelize", pp.deparallelize)
     return module
 
 
