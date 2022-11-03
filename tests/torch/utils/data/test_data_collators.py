@@ -1,7 +1,7 @@
 import torch
 
 from oslo.torch.distributed import ParallelContext
-from oslo.torch.utils.data import SequenceDataParallelCollator
+from oslo.torch.utils.data import SequenceParallelCollator
 
 parallel_context = ParallelContext.from_torch(sequence_parallel_size=4)
 
@@ -10,7 +10,7 @@ data = {
     "attention_mask": torch.ones(16, 129).cuda(),
 }
 
-collator = SequenceDataParallelCollator(
+collator = SequenceParallelCollator(
     parallel_context=parallel_context,
     parallel_keys=["input_ids", "attention_mask"],
     pad_token_id=99,

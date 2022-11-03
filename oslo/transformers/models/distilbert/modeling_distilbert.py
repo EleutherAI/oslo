@@ -6,8 +6,15 @@ import torch
 from packaging import version
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
+from oslo.torch.distributed.parallel_mode import ParallelMode
 
 import oslo.torch.nn as onn
+from oslo.torch.nn import (
+    VocabParallelCrossEntropyLoss1D,
+    VocabParallelCrossEntropyLoss2D,
+    VocabParallelCrossEntropyLoss2p5D,
+    VocabParallelCrossEntropyLoss3D,
+)
 import oslo.torch.nn.modules.functional as F
 from oslo.transformers.modeling_utils import OsloModel
 
@@ -568,7 +575,28 @@ class DistilBertForMaskedLM(DistilBertPreTrainedModel):
         # Initialize weights and apply final processing
         self.post_init()
 
-        self.mlm_loss_fct = nn.CrossEntropyLoss()
+        if (
+            hasattr(self, "parallel_context")
+            and self.parallel_context.tensor_parallel_size > 1
+        ):
+            if self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_1D:
+                self.mlm_loss_fct = VocabParallelCrossEntropyLoss1D(
+                    parallel_context=self.parallel_context
+                )
+            elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D:
+                self.mlm_loss_fct = VocabParallelCrossEntropyLoss2D(
+                    parallel_context=self.parallel_context
+                )
+            elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2P5D:
+                self.mlm_loss_fct = VocabParallelCrossEntropyLoss2p5D(
+                    parallel_context=self.parallel_context
+                )
+            elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D:
+                self.mlm_loss_fct = VocabParallelCrossEntropyLoss3D(
+                    parallel_context=self.parallel_context
+                )
+        else:
+            self.mlm_loss_fct = CrossEntropyLoss()
 
     def get_position_embeddings(self) -> nn.Embedding:
         """

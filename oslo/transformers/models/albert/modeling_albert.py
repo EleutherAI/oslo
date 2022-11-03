@@ -6,8 +6,15 @@ import torch
 from packaging import version
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
+from oslo.torch.distributed.parallel_mode import ParallelMode
 
 import oslo.torch.nn as onn
+from oslo.torch.nn import (
+    VocabParallelCrossEntropyLoss1D,
+    VocabParallelCrossEntropyLoss2D,
+    VocabParallelCrossEntropyLoss2p5D,
+    VocabParallelCrossEntropyLoss3D,
+)
 import oslo.torch.nn.modules.functional as F
 from oslo.transformers.modeling_utils import OsloModel
 
@@ -742,9 +749,39 @@ class AlbertForPreTraining(AlbertPreTrainedModel):
 
         total_loss = None
         if labels is not None and sentence_order_label is not None:
+            partition_vocab_size = prediction_scores.size(-1)
+            if (
+                hasattr(self, "parallel_context")
+                and self.parallel_context.tensor_parallel_size > 1
+            ):
+                if self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_1D:
+                    loss_lm = VocabParallelCrossEntropyLoss1D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss2D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode
+                    == ParallelMode.TENSOR_2P5D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss2p5D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss3D(
+                        parallel_context=self.parallel_context
+                    )
+            else:
+                loss_lm = CrossEntropyLoss()
             loss_fct = CrossEntropyLoss()
-            masked_lm_loss = loss_fct(
-                prediction_scores.view(-1, self.config.vocab_size), labels.view(-1)
+            masked_lm_loss = loss_lm(
+                prediction_scores.view(-1, partition_vocab_size), labels.view(-1)
             )
             sentence_order_loss = loss_fct(
                 sop_scores.view(-1, 2), sentence_order_label.view(-1)
@@ -898,9 +935,38 @@ class AlbertForMaskedLM(AlbertPreTrainedModel):
 
         masked_lm_loss = None
         if labels is not None:
-            loss_fct = CrossEntropyLoss()
-            masked_lm_loss = loss_fct(
-                prediction_scores.view(-1, self.config.vocab_size), labels.view(-1)
+            partition_vocab_size = prediction_scores.size(-1)
+            if (
+                hasattr(self, "parallel_context")
+                and self.parallel_context.tensor_parallel_size > 1
+            ):
+                if self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_1D:
+                    loss_lm = VocabParallelCrossEntropyLoss1D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss2D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode
+                    == ParallelMode.TENSOR_2P5D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss2p5D(
+                        parallel_context=self.parallel_context
+                    )
+                elif (
+                    self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D
+                ):
+                    loss_lm = VocabParallelCrossEntropyLoss3D(
+                        parallel_context=self.parallel_context
+                    )
+            else:
+                loss_lm = CrossEntropyLoss()
+            masked_lm_loss = loss_lm(
+                prediction_scores.view(-1, partition_vocab_size), labels.view(-1)
             )
 
         if not return_dict:

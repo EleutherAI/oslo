@@ -32,7 +32,7 @@ from oslo.torch.nn.parallel.utils import (
 )
 from oslo.transformers.constants import BATCH_DIMENSIONS
 from oslo.transformers.mapping_utils import (
-    _TensorParallelMappingForHuggingFace,
+    _TensorParallelMapping,
 )
 
 
@@ -52,7 +52,7 @@ class _TensorParallel3D(nn.Module):
         self.parallel_context = parallel_context
         self.device = torch.cuda.current_device()
 
-        mapping = _TensorParallelMappingForHuggingFace().get_mapping(module)
+        mapping = _TensorParallelMapping().get_mapping(module)
         self.tensor_parallel_mapping = TensorParallelMapping(mapping)
         self.config = module.config
         self._parallelize()
@@ -80,7 +80,7 @@ class _TensorParallel3D(nn.Module):
                 else value
                 for key, value in kwargs.items()
             }
-        return self.module(*args, **kwargs)
+        return self.module_forward(*args, **kwargs)
 
     @torch.no_grad()
     def _parallelize(self):

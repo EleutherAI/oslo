@@ -7,7 +7,7 @@ from datasets.arrow_dataset import Batch
 from oslo.transformers.tasks.data_base import BaseProcessor
 
 try:
-    from transformers import DataCollatorForLanguageModeling
+    from transformers import DataCollatorForLanguageModeling, PreTrainedTokenizerBase
 except ImportError:
     print("You have to install `transformers` to use `oslo.transformers` modules")
 
@@ -15,8 +15,10 @@ logging.captureWarnings(True)
 
 
 class ProcessorForMaskedLM(BaseProcessor):
-    def __init__(self, model_name_or_path: str, max_length: int = 512) -> None:
-        super().__init__(model_name_or_path=model_name_or_path, max_length=max_length)
+    def __init__(
+        self, tokenizer: PreTrainedTokenizerBase, max_length: int = 512
+    ) -> None:
+        super().__init__(tokenizer=tokenizer, max_length=max_length)
         assert (
             self._tokenizer.eos_token_id is not None
             or self._tokenizer.sep_token_id is not None

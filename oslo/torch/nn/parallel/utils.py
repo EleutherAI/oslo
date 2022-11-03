@@ -96,8 +96,11 @@ def zero_rank_log(txt):
     dist.barrier()
 
 
-def add_wrapper(module, mode, wrapper):
+def add_wrapper(module, mode, wrapper, parallel_context):
     if hasattr(module, "oslo_wrappers"):
         module.oslo_wrappers[mode] = wrapper
     else:
         setattr(module, "oslo_wrappers", {mode: wrapper})
+
+    if not hasattr(module, "parallel_context"):
+        setattr(module, "parallel_context", parallel_context)

@@ -43,5 +43,14 @@ from oslo.torch.nn.modules.linear import (
     Linear3D,
     RowLinear1D,
 )
+from oslo.torch.nn.modules.loss import (
+    CrossEntropyLoss2D,
+    CrossEntropyLoss2p5D,
+    CrossEntropyLoss3D,
+    VocabParallelCrossEntropyLoss1D,
+    VocabParallelCrossEntropyLoss2D,
+    VocabParallelCrossEntropyLoss2p5D,
+    VocabParallelCrossEntropyLoss3D,
+)
 from oslo.torch.nn.modules.ngram_repeat_block import NGramRepeatBlock
 from oslo.torch.nn.modules.softmax import FusedScaleMaskSoftmax

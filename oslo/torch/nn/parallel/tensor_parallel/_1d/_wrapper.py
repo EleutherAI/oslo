@@ -29,7 +29,7 @@ from oslo.torch.nn.parallel.utils import (
 )
 from oslo.transformers.constants import SEQ_DIMENSIONS
 from oslo.transformers.mapping_utils import (
-    _TensorParallelMappingForHuggingFace,
+    _TensorParallelMapping,
 )
 
 
@@ -57,7 +57,7 @@ class _TensorParallel1D(nn.Module):
         self.memory_priority = memory_priority
         self.device = torch.cuda.current_device()
 
-        mapping = _TensorParallelMappingForHuggingFace().get_mapping(module)
+        mapping = _TensorParallelMapping().get_mapping(module)
         self.tensor_parallel_mapping = TensorParallelMapping(mapping)
         self._parallelize()
 

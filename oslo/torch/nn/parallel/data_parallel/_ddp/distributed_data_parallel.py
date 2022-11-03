@@ -60,7 +60,9 @@ def DistributedDataParallel(
         static_graph=static_graph,
     )
 
-    add_wrapper(module, ParallelMode.DATA, ddp)
+    add_wrapper(
+        module, mode=ParallelMode.DATA, wrapper=ddp, parallel_context=parallel_context
+    )
     setattr(module, "forward", ddp.forward)
     return module
 

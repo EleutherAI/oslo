@@ -9,7 +9,11 @@ from datasets.arrow_dataset import Batch
 from oslo.transformers.tasks.data_base import BaseProcessor
 
 try:
-    from transformers import AutoTokenizer
+    from transformers import (
+        AutoTokenizer,
+        PreTrainedTokenizerBase,
+        RobertaTokenizer,
+    )
     from transformers.file_utils import PaddingStrategy
 except ImportError:
     print("You have to install `transformers` to use `oslo.transformers` modules")
@@ -21,46 +25,16 @@ logging.captureWarnings(True)
 class ProcessorForTokenClassification(BaseProcessor):
     def __init__(
         self,
-        model_name_or_path: str,
+        tokenizer: PreTrainedTokenizerBase,
         max_length: int,
         dataset: Union[Dataset, DatasetDict] = None,
     ) -> None:
-        super().__init__(model_name_or_path, max_length)
+        super().__init__(tokenizer, max_length)
         if dataset is None:
             raise ValueError(
                 "dataset argument must be set. (dataset: Union[Dataset, DatasetDict])"
             )
 
-        if ("gpt2" in model_name_or_path) or ("roberta" in model_name_or_path):
-            self._tokenizer = AutoTokenizer.from_pretrained(
-                model_name_or_path, add_prefix_space=True
-            )
-        """
-        In the 'gpt2' and 'roberta' models, it should be set to 'add_prefix_space=True'
-        to convey information that the word in the sentence begins, not the sentence begins.
-
-        For more information, please refer to the following link
-        : https://github.com/huggingface/transformers/issues/1880
-
-        Example) used in the transformers.examples.pytorch.token_classification.run_ner.py:
-        if config.model_type in {"gpt2", "roberta"}:
-            tokenizer = AutoTokenizer.from_pretrained(
-                tokenizer_name_or_path,
-                cache_dir=model_args.cache_dir,
-                use_fast=True,
-                revision=model_args.model_revision,
-                use_auth_token=True if model_args.use_auth_token else None,
-                add_prefix_space=True,
-        )
-        else:
-            tokenizer = AutoTokenizer.from_pretrained(
-                tokenizer_name_or_path,
-                cache_dir=model_args.cache_dir,
-                use_fast=True,
-                revision=model_args.model_revision,
-                use_auth_token=True if model_args.use_auth_token else None,
-            )
-        """
         if self._tokenizer.pad_token is None:
             warnings.warn(
                 "If pad token doesn't exist in tokenizer, it can be a problem when applying padding."
