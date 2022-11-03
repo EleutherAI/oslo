@@ -1,3 +1,5 @@
+import time
+
 import concurrent.futures
 import copy
 from threading import Lock
@@ -53,6 +55,7 @@ def PipelineParallel(
         parallel_context=parallel_context,
     )
     setattr(module, "forward", pp.forward)
+    setattr(module, "deparallelize", pp.deparallelize)
     return module
 
 
@@ -282,3 +285,42 @@ class _PipelineParallel(nn.Module):
             return result
 
         module.forward = new_forward
+
+    @torch.no_grad()
+    def deparallelize(self):
+        # collect in global rank 0 first
+        if 0 in self.parallel_context.get_ranks_in_group(ParallelMode.PIPELINE):
+            pg = self.parallel_context.get_group(ParallelMode.PIPELINE)
+
+            for name, param in self.module.named_parameters():
+                src = param.oslo_parallel[ParallelMode.PIPELINE]
+
+                from_cpu = False
+                if param.device == torch.device("cpu"):
+                    from_cpu = True
+                    param.data = param.cuda()
+
+                torch.distributed.broadcast(
+                    param.data,
+                    src=src,
+                    group=pg,
+                )
+
+                if from_cpu:
+                    param.data = param.cpu()
+
+        # broadcast to all
+        for name, param in self.module.named_parameters():
+            from_cpu = False
+            if param.device == torch.device("cpu"):
+                from_cpu = True
+                param.data = param.cuda()
+
+            torch.distributed.broadcast(
+                param.data,
+                src=0,
+                group=None,
+            )
+
+            if from_cpu:
+                param.data = param.cpu()
