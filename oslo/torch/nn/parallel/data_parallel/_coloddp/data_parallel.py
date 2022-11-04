@@ -2,12 +2,15 @@ import torch
 import itertools
 import torch.distributed as dist
 from functools import partial
+
 # from colossalai.zero.utils.zero_hook_v2 import ZeROHookV2
 # from colossalai.tensor.param_op_hook import ParamOpHookManager
 # from colossalai.gemini.gemini_mgr import GeminiManager
 from typing import Dict, Iterable, List, Optional, Set
+
 # from colossalai.logging import get_dist_logger
 from collections import OrderedDict
+
 # from colossalai.tensor.colo_parameter import ColoParameter, ColoTensor, ColoTensorSpec
 # from colossalai.tensor import ProcessGroup as ColoProcessGroup
 # from .reducer import Reducer
@@ -21,7 +24,7 @@ from oslo.torch.distributed.parallel_mode import ParallelMode
 try:
     from torch.nn.modules.module import _EXTRA_STATE_KEY_SUFFIX, _IncompatibleKeys
 except ImportError:
-    _EXTRA_STATE_KEY_SUFFIX = '_extra_state'
+    _EXTRA_STATE_KEY_SUFFIX = "_extra_state"
 
 
 def free_storage(data: torch.Tensor) -> None:
@@ -63,12 +66,16 @@ class ColoDDP(torch.nn.Module):
         parallel_context : replace colossal ai's process_group funcitionality
     """
 
-    def __init__(self,
-                 module: torch.nn.Module,
-                 process_group: Optional[dist.ProcessGroup] = None , # parallel_context.get_group(ParallelMode.DATA), #ColoProcessGroup,
-                 bucket_cap_mb: int = 25,
-                 rebuild_bucket: bool = True,
-                 parallel_context : Optional[ParallelContext] = None) -> None:
+    def __init__(
+        self,
+        module: torch.nn.Module,
+        process_group: Optional[
+            dist.ProcessGroup
+        ] = None,  # parallel_context.get_group(ParallelMode.DATA), #ColoProcessGroup,
+        bucket_cap_mb: int = 25,
+        rebuild_bucket: bool = True,
+        parallel_context: Optional[ParallelContext] = None,
+    ) -> None:
         assert not isinstance(module, ColoDDP)
         super().__init__()
         self.module = module
@@ -77,12 +84,14 @@ class ColoDDP(torch.nn.Module):
 
         self.process_group = parallel_context.get_group(ParallelMode.DATA)
         self.parallel_context = parallel_context
-        self.dp_world_size = parallel_context.get_world_size(ParallelMode.DATA) #self.process_group.dp_world_size() 
+        self.dp_world_size = parallel_context.get_world_size(
+            ParallelMode.DATA
+        )  # self.process_group.dp_world_size()
 
         self.reducer = Reducer(bucket_cap_mb)
         self.rebuild_bucket = rebuild_bucket
         for p in module.parameters():
-            if getattr(p, '_ddp_to_ignore', False):
+            if getattr(p, "_ddp_to_ignore", False):
                 continue
             if p.requires_grad:
                 p.register_hook(partial(self.grad_handle, p))
@@ -90,19 +99,21 @@ class ColoDDP(torch.nn.Module):
     def parameters(self, recurse: bool = True):
         return self.module.parameters(recurse)
 
-    def named_parameters(self, prefix: str = '', recurse: bool = True):
+    def named_parameters(self, prefix: str = "", recurse: bool = True):
         return self.module.named_parameters(prefix, recurse)
 
-    def named_buffers(self, prefix: str = '', recurse: bool = True):
+    def named_buffers(self, prefix: str = "", recurse: bool = True):
         return self.module.named_buffers(prefix, recurse)
 
     def named_children(self):
         return self.module.named_children()
 
-    def named_modules(self,
-                      memo: Optional[Set[torch.nn.Module]] = None,
-                      prefix: str = '',
-                      remove_duplicate: bool = True):
+    def named_modules(
+        self,
+        memo: Optional[Set[torch.nn.Module]] = None,
+        prefix: str = "",
+        remove_duplicate: bool = True,
+    ):
         return self.module.named_modules(memo, prefix, remove_duplicate)
 
     def forward(self, *args, **kwargs):
@@ -117,7 +128,7 @@ class ColoDDP(torch.nn.Module):
         if self.rebuild_bucket:
             self.reducer.free()
         for p in self.module.parameters():
-            if getattr(p, '_ddp_to_ignore', False):
+            if getattr(p, "_ddp_to_ignore", False):
                 continue
             if p.grad.device.type != "cpu":
                 p.grad = p._saved_grad
@@ -130,9 +141,11 @@ class ColoDDP(torch.nn.Module):
                 grad = grad / self.dp_world_size
                 self.comm_stream.wait_stream(torch.cuda.current_stream())
                 with torch.cuda.stream(self.comm_stream):
-                    self.reducer.all_reduce_async(grad,
-                                                  group=self.process_group, # group=self.process_group.dp_process_group(),
-                                                  callback_fn=partial(self._save_grad, p))
+                    self.reducer.all_reduce_async(
+                        grad,
+                        group=self.process_group,  # group=self.process_group.dp_process_group(),
+                        callback_fn=partial(self._save_grad, p),
+                    )
                 grad.record_stream(self.comm_stream)
             else:
                 ColoDDP._save_grad(p, grad)
@@ -142,15 +155,17 @@ class ColoDDP(torch.nn.Module):
             # TODO(jiaruifang) fixme
             # TODO fix how to add cpu group () :parallel_context.add_cpu_group(ParallelMode.DATA, group=MY_GROUP
             # No cpu_group() ? (it is called)
-            # self.process_group.set_cpu_groups() 
+            # self.process_group.set_cpu_groups()
 
             # dist.all_reduce(grad, group=self.process_group.cpu_dp_process_group())
-            dist.all_reduce(grad, group=self.parallel_context.get_cpu_group(ParallelMode.DATA))
+            dist.all_reduce(
+                grad, group=self.parallel_context.get_cpu_group(ParallelMode.DATA)
+            )
             return grad
 
     @staticmethod
     def _save_grad(p, grad):
-        if hasattr(p, '_saved_grad'):
+        if hasattr(p, "_saved_grad"):
             p._saved_grad.add_(grad)
         else:
             p._saved_grad = grad
@@ -158,7 +173,7 @@ class ColoDDP(torch.nn.Module):
     def zero_grad(self, set_to_none: bool = False) -> None:
         self.module.zero_grad(set_to_none=True)
         for p in self.module.parameters():
-            if getattr(p, '_saved_grad', None) is not None:
+            if getattr(p, "_saved_grad", None) is not None:
                 if set_to_none:
                     p._saved_grad = None
                 else:
@@ -187,10 +202,14 @@ class ColoDDP(torch.nn.Module):
         for p in params_to_ignore:
             p._ddp_to_ignore = True
 
-    def state_dict(self, destination=None, prefix='', keep_vars=False):
-        return self.module.state_dict(destination=destination, prefix=prefix, keep_vars=keep_vars)
+    def state_dict(self, destination=None, prefix="", keep_vars=False):
+        return self.module.state_dict(
+            destination=destination, prefix=prefix, keep_vars=keep_vars
+        )
 
-    def load_state_dict(self, state_dict: 'OrderedDict[str, torch.Tensor]', strict: bool = True):
+    def load_state_dict(
+        self, state_dict: "OrderedDict[str, torch.Tensor]", strict: bool = True
+    ):
         return self.module.load_state_dict(state_dict, strict)
 
 
@@ -212,7 +231,7 @@ class ColoDDP(torch.nn.Module):
 
 #     Args:
 #         module (torch.nn.Module): Module to apply ZeRO-DP.
-#         gemini_manager (GeminiManager): Manages the chunk manager and heterogeneous momery space.
+#         gemini_manager (GeminiManager): Manages the chunk manager and heterogeneous memory space.
 #             For more details, see the API reference of ``GeminiManager``.
 #         force_outputs_fp32 (bool): If set to True, outputs will be fp32. Otherwise, outputs will be fp16.  Defaults to False.
 #     """
