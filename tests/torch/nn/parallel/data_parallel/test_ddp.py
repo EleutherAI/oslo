@@ -21,6 +21,7 @@ from oslo.torch.nn.parallel.data_parallel._coloddp.data_parallel import (
     ColoDDP,
 )
 
+
 def get_parallel_context(configs):
     # parallel context 생성
     parallel_context = ParallelContext.from_torch(
@@ -50,11 +51,14 @@ def get_test_train_dataloader(
             shuffle=False,
         )
         batch_size = int(batch_size // world_size)
-        dataloader = DataLoader(datasets, batch_size=batch_size, sampler=train_sampler, shuffle=False)
+        dataloader = DataLoader(
+            datasets, batch_size=batch_size, sampler=train_sampler, shuffle=False
+        )
     else:
         dataloader = DataLoader(datasets, batch_size=batch_size, shuffle=False)
 
     return dataloader
+
 
 class GPTLMLoss(torch.nn.Module):
     def __init__(self):
@@ -65,12 +69,12 @@ class GPTLMLoss(torch.nn.Module):
         shift_logits = logits[..., :-1, :].contiguous()
         shift_labels = labels[..., 1:].contiguous()
         # Flatten the tokens
-        return self.loss_fn(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+        return self.loss_fn(
+            shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
+        )
+
 
 def train(training_type, dataloader, model, optimizer, tokenizer):
-
-    criterion = GPTLMLoss()
-
     # 학습 시작
     model.train()
 
@@ -134,7 +138,8 @@ def run_dp_gpt2_test(parallel_context, configs):
     train("no_ddp", dataloader_no_ddp, model_no_ddp, optimizer_no_ddp, tokenizer)
     train("ddp", dataloader_ddp, model_ddp, optimizer_ddp, tokenizer)
 
-def run_coloddp_gpt2_test(parallel_context, configs) :
+
+def run_coloddp_gpt2_test(parallel_context, configs):
 
     # 토크나이저 생성
     tokenizer = AutoTokenizer.from_pretrained(configs["model_name"])
@@ -145,7 +150,9 @@ def run_coloddp_gpt2_test(parallel_context, configs) :
         GPT2Config.from_pretrained(configs["model_name"])
     ).cuda()
 
-    model_ddp = GPT2LMHeadModel(GPT2Config.from_pretrained(configs["model_name"])).cuda()
+    model_ddp = GPT2LMHeadModel(
+        GPT2Config.from_pretrained(configs["model_name"])
+    ).cuda()
     model_ddp = ColoDDP(
         model_ddp,
         parallel_context=parallel_context,
@@ -173,7 +180,6 @@ def run_coloddp_gpt2_test(parallel_context, configs) :
 
     # # 학습 시작
     train("no_ddp", dataloader_no_ddp, model_no_ddp, optimizer_no_ddp, tokenizer)
-    
 
     # coloddp case
     criterion = GPTLMLoss()
@@ -201,6 +207,7 @@ def run_coloddp_gpt2_test(parallel_context, configs) :
         model_ddp.backward(loss)
         optimizer_ddp.step()
 
+
 def args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_parallel_size", default=2)
@@ -221,6 +228,7 @@ def args():
 
     return configs
 
+
 def run(configs):
 
     parallel_context = get_parallel_context(configs)
@@ -228,7 +236,7 @@ def run(configs):
     if configs["model_name"] == "gpt2":
         if configs["ddp_mode"] == "coloddp":
             run_coloddp_gpt2_test(parallel_context, configs)
-        else :
+        else:
             print("pytorch native torch ddp")
             run_dp_gpt2_test(parallel_context, configs)
 
