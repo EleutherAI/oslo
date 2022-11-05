@@ -64,7 +64,7 @@ def save_pretrained(
                         parallel_context=self.parallel_context,
                         memory_priority=wrapper.memory_priority,
                     )
-                    
+
                 elif isinstance(wrapper, _PipelineParallel):
                     model_to_save = PipelineParallel(
                         model_to_save,
@@ -87,8 +87,8 @@ def save_pretrained(
                 save_directory=save_directory,
                 save_config=save_config,
                 save_function=save_function,
-                deparallelized = True,
-                **kwargs
+                deparallelized=True,
+                **kwargs,
             )
             os.rename(
                 os.path.join(save_directory, PARALLELIZED_WEIGHTS_NAME),
@@ -99,10 +99,12 @@ def save_pretrained(
         return None
 
     _save_pretrained_per_rank(
-        self=self, save_directory=save_directory,
-        save_config=save_config, state_dict=state_dict,
-        save_function=save_function
-        **kwargs
+        self=self,
+        save_directory=save_directory,
+        save_config=save_config,
+        state_dict=state_dict,
+        save_function=save_function,
+        **kwargs,
     )
     return None
 
@@ -110,13 +112,13 @@ def save_pretrained(
 # To avoid deadlock
 @torch.no_grad()
 def _save_pretrained_per_rank(
-        self,
-        save_directory: Union[str, os.PathLike],
-        save_config: bool = True,
-        state_dict: Optional[dict] = None,
-        save_function: Callable = torch.save,
-        deparallelized: bool = False,
-        **kwargs,
+    self,
+    save_directory: Union[str, os.PathLike],
+    save_config: bool = True,
+    state_dict: Optional[dict] = None,
+    save_function: Callable = torch.save,
+    deparallelized: bool = False,
+    **kwargs,
 ):
     logger = getLogger()
     PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0.bin"
