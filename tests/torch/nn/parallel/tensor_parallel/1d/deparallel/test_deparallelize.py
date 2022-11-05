@@ -124,17 +124,18 @@ if dist.get_rank() == 0:
     wandb.init(project="oslo", name=f"{model_name}_tp1d_bs{batch_size}")
     cur = time.time()
 
-# 저장
-wrapper_tp.save_parallelized("test/", merge_checkpoints=True)
+# # 저장
+wrapper_tp.save_pretrained(save_directory="test/", merge_checkpoints=True)
 
 # 모니터링 생성 대기
-dist.barrier()
+# dist.barrier()
 
 # 로드
 model_gathered = AutoModelForCausalLM.from_pretrained("test/").cuda()
 optimizer_gathered = Adam(model_gathered.parameters(), lr=3e-5)
-
 dist.barrier()
+
+print("all models loaded finished")
 
 # 학습 시작
 for data in dataloader:
