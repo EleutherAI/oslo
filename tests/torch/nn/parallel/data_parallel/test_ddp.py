@@ -14,11 +14,11 @@ import random
 
 # parallel context 생성
 from oslo.torch.nn.parallel.data_parallel._ddp.distributed_data_parallel import (
-    DistributedDataParallel,
+    DistributedDataParallel as DistributedDataParallelv1,
 )
 
-from oslo.torch.nn.parallel.data_parallel._coloddp.data_parallel import (
-    ColoDDP,
+from oslo.torch.nn.parallel.data_parallel._coloddp.distributed_data_parallel import (
+    DistributedDataParallel,
 )
 
 
@@ -110,7 +110,7 @@ def run_dp_gpt2_test(parallel_context, configs):
     ).cuda()
 
     model_ddp = GPT2LMHeadModel(GPT2Config.from_pretrained(configs["model_name"]))
-    model_ddp = DistributedDataParallel(
+    model_ddp = DistributedDataParallelv1(
         model_ddp,
         parallel_context=parallel_context,
     )
@@ -152,8 +152,9 @@ def run_coloddp_gpt2_test(parallel_context, configs):
 
     model_ddp = GPT2LMHeadModel(
         GPT2Config.from_pretrained(configs["model_name"])
-    ).cuda()
-    model_ddp = ColoDDP(
+    )
+
+    model_ddp = DistributedDataParallel(
         model_ddp,
         parallel_context=parallel_context,
     )

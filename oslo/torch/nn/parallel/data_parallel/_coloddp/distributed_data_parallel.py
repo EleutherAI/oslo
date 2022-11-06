@@ -46,7 +46,7 @@ def _cast_float(args, dtype: torch.dtype):
     return args
 
 
-class ColoDDP(torch.nn.Module):
+class DistributedDataParallel(torch.nn.Module):
     """Distributed data parallel for ColoTensor. Nested ColoDDP is not supported now.
 
     Example:
@@ -61,26 +61,21 @@ class ColoDDP(torch.nn.Module):
 
     Args:
         module (torch.nn.Module): Module to apply DDP.
-        process_group (Optional[dist.ProcessGroup], optional): The process group which DDP uses.
-            If it's None, the default data parallel group will be used. Defaults to None.
         parallel_context : replace colossal ai's process_group funcitionality
     """
 
     def __init__(
         self,
         module: torch.nn.Module,
-        process_group: Optional[
-            dist.ProcessGroup
-        ] = None,  # parallel_context.get_group(ParallelMode.DATA), #ColoProcessGroup,
         bucket_cap_mb: int = 25,
         rebuild_bucket: bool = True,
         parallel_context: Optional[ParallelContext] = None,
     ) -> None:
-        assert not isinstance(module, ColoDDP)
+        assert not isinstance(module, DistributedDataParallel)
         super().__init__()
         self.module = module
         self.comm_stream: torch.cuda.Stream = torch.cuda.Stream()
-        # assert process_group
+        assert parallel_context
 
         self.process_group = parallel_context.get_group(ParallelMode.DATA)
         self.parallel_context = parallel_context
