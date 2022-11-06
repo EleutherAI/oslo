@@ -150,9 +150,7 @@ def run_coloddp_gpt2_test(parallel_context, configs):
         GPT2Config.from_pretrained(configs["model_name"])
     ).cuda()
 
-    model_ddp = GPT2LMHeadModel(
-        GPT2Config.from_pretrained(configs["model_name"])
-    )
+    model_ddp = GPT2LMHeadModel(GPT2Config.from_pretrained(configs["model_name"]))
 
     model_ddp = DistributedDataParallel(
         model_ddp,

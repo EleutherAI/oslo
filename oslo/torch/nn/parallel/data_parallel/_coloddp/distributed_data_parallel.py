@@ -143,7 +143,7 @@ class DistributedDataParallel(torch.nn.Module):
                     )
                 grad.record_stream(self.comm_stream)
             else:
-                ColoDDP._save_grad(p, grad)
+                DistributedDataParallel._save_grad(p, grad)
             return empty_grad
 
         else:

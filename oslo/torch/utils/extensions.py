@@ -65,7 +65,7 @@ def save_pretrained(
                         parallel_context=self.parallel_context,
                         memory_priority=wrapper.memory_priority,
                     )
-                    
+
                 elif isinstance(wrapper, _PipelineParallel):
                     model_to_save = PipelineParallel(
                         model_to_save,
