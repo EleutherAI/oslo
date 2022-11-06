@@ -33,7 +33,6 @@ def save_pretrained(
     merge_checkpoints: bool = False,
     **kwargs,
 ):
-    logger = getLogger()
     PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0.bin"
 
     if (
@@ -83,18 +82,46 @@ def save_pretrained(
                     wrapper.deparallelize()
 
         if dist.get_rank() == 0:
-            save_pretrained(
-                model_to_save,
+            _save_pretrained_per_rank(
+                self=model_to_save,
                 save_directory=save_directory,
                 save_config=save_config,
                 save_function=save_function,
+                deparallelized=True,
                 **kwargs,
             )
-
+            os.rename(
+                os.path.join(save_directory, PARALLELIZED_WEIGHTS_NAME),
+                os.path.join(save_directory, "pytorch_model.bin"),
+            )
         dist.barrier()
         del model_to_save
-
         return None
+
+    _save_pretrained_per_rank(
+        self=self,
+        save_directory=save_directory,
+        save_config=save_config,
+        state_dict=state_dict,
+        save_function=save_function,
+        **kwargs,
+    )
+    return None
+
+
+# To avoid deadlock
+@torch.no_grad()
+def _save_pretrained_per_rank(
+    self,
+    save_directory: Union[str, os.PathLike],
+    save_config: bool = True,
+    state_dict: Optional[dict] = None,
+    save_function: Callable = torch.save,
+    deparallelized: bool = False,
+    **kwargs,
+):
+    logger = getLogger()
+    PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0.bin"
 
     if os.path.isfile(save_directory):
         logger.error(
@@ -146,8 +173,11 @@ def save_pretrained(
     else:
         save_function(state_dict, output_model_file)
 
-    dist.barrier()
+    if not deparallelized:
+        dist.barrier()
+
     logger.info(f"Model weights saved in {output_model_file}")
+    return None
 
 
 def from_parallelized(self, path):
