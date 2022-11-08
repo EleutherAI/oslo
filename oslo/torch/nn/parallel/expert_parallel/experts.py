@@ -9,6 +9,7 @@ class Experts(torch.nn.Module):
         self.experts = torch.nn.ModuleList(
             [copy.deepcopy(expert) for i in range(num_local_experts)]
         )
+        # |experts| = (num_local_experts, in_features, out_features)
 
         self.num_local_experts = num_local_experts
 
