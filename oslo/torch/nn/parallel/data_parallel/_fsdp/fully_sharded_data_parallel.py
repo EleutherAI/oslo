@@ -76,7 +76,7 @@ from oslo.torch.distributed import ParallelMode
 from oslo.torch.nn.parallel.utils import add_wrapper
 
 from oslo.transformers.mapping_utils import (
-    _FullyShardedDataParallelMappingForHuggingFace,
+    _FullyShardedDataParallelMapping,
 )
 
 from torch.distributed.fsdp.wrap import (
