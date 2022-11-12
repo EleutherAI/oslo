@@ -25,7 +25,7 @@ from oslo.torch.nn.parallel.utils import (
     add_wrapper,
 )
 from oslo.transformers.mapping_utils import (
-    _TensorParallelMappingForHuggingFace,
+    _TensorParallelMapping,
 )
 
 
@@ -160,7 +160,7 @@ class _TensorParallel(nn.Module):
 
     @staticmethod
     def _resize_num_classes(model, parallel_context):
-        mapping = _TensorParallelMappingForHuggingFace().get_mapping(model)
+        mapping = _TensorParallelMapping().get_mapping(model)
         tensor_parallel_mapping = TensorParallelMapping(mapping)
         divisible_by = get_divisible_by(parallel_context)
 
@@ -243,3 +243,8 @@ class _TensorParallel(nn.Module):
 
     def deparallelize(self):
         self.module.deparallelize()
+
+    def parallelize(self, module):
+        module = self._resize_vocab_size(module, self.parallel_context)
+        self.module.module = self._resize_num_classes(module, self.parallel_context)
+        self.module._parallelize()

@@ -37,9 +37,9 @@ def checkpoint(function, *args):
 def ActivationCheckpointing(
     module: nn.Module,
     parallel_context: ParallelContext,
-    partitioned_checkpointing: bool,
-    contiguous_checkpointing: bool,
-    cpu_checkpointing: bool,
+    partitioned_checkpointing: bool = False,
+    contiguous_checkpointing: bool = False,
+    cpu_checkpointing: bool = False,
 ):
     """
     Activation Checkpointing Engine

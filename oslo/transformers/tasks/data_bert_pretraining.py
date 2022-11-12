@@ -9,10 +9,7 @@ from oslo.transformers.tasks.data_base import BaseProcessor, pad_labels
 
 try:
     from transformers import DataCollatorForWholeWordMask
-    from transformers import (
-        BertTokenizer,
-        BertTokenizerFast,
-    )
+    from transformers import BertTokenizer, BertTokenizerFast, PreTrainedTokenizerBase
 except ImportError:
     print("You have to install `transformers` to use `oslo.transformers` modules")
 
@@ -20,8 +17,10 @@ logging.captureWarnings(True)
 
 
 class ProcessorForBertPretraining(BaseProcessor):
-    def __init__(self, model_name_or_path: str, max_length: int = 512) -> None:
-        super().__init__(model_name_or_path=model_name_or_path, max_length=max_length)
+    def __init__(
+        self, tokenizer: PreTrainedTokenizerBase, max_length: int = 512
+    ) -> None:
+        super().__init__(tokenizer=tokenizer, max_length=max_length)
 
         if not isinstance(self._tokenizer, (BertTokenizer, BertTokenizerFast)):
             warnings.warn(
