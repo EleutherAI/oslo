@@ -23,6 +23,13 @@ from oslo.torch.nn.parallel.utils import (
 )
 
 
+def is_merge_meaningless(parallel_context):
+    return (
+        parallel_context.get_world_size(ParallelMode.TENSOR) == 1
+        and parallel_context.get_world_size(ParallelMode.PIPELINE) == 1
+    )
+
+
 @torch.no_grad()
 def save_pretrained(
     self,
@@ -35,7 +42,7 @@ def save_pretrained(
 ):
     PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0.bin"
 
-    if merge_checkpoints:
+    if merge_checkpoints and not is_merge_meaningless(self.parallel_context):
         model_to_save = self.__class__(self.config).eval()
 
         if state_dict is None:
