@@ -1,16 +1,40 @@
-# OSLO
+# OSLO: Open Source for Large-scale Optimization
 
-OSLO Python library stands for *Open-Source Framework for Large-scale Model Optimization.* This framework that provides various GPU-based optimization technologies for large-scale modeling. 3D Parallelism and Kernel Fusion which could be useful when training a large model like EleutherAI/gpt-j-6B are the key features. OSLO makes these technologies easy-to-use by magical compatibility with Hugging Face Transformers.
+![](https://github.com/EleutherAI/oslo/blob/main/assets/oslo.png?raw=true)
 
+## What is OSLO about?
 
-## Build Requirements
+OSLO is a framework that provides various GPU based optimization technologies for large-scale modeling.
+Features like 3D parallelism and kernel fusion which could be useful when training a large model are the key features.
+OSLO makes these technologies easy-to-use by magical compatibility with [Hugging Face Transformers](https://github.com/huggingface/transformers) that is being considered as a de facto standard in NLP field.
+We look forward large-scale modeling technologies to be more democratized by significantly decreasing the difficulty of using these technologies using OSLO.
 
-Requirements for building OSLO without any issues:
+## Installation
 
-- CUDA 11 & nvcc
-- PyTorch >= 1.11.0
-- Turing or Ampere GPU
+OSLO can be easily installed using the pip package manager.
+Be careful that the ‘core’ is in the PyPI project name.
+
+```console
+pip install oslo-core
+```
+
+## Administrative Notes
+
+### Citing OSLO
+
+If you find our work useful, please consider citing:
 
 ```
-python3 setup.py install
+@misc{oslo,
+  author       = {},
+  title        = {OSLO: Open Source for Large-scale Optimization},
+  howpublished = {\url{https://github.com/EleutherAI/oslo}},
+  year         = {2022},
+}
 ```
+
+### Licensing
+
+The Code of the OSLO project is licensed under the terms of the Apache License 2.0.
+
+Copyright 2022 EleutherAI. All Rights Reserved.
