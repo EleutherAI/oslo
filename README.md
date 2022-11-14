@@ -1,6 +1,6 @@
 # OSLO: Open Source for Large-scale Optimization
 
-![](https://github.com/EleutherAI/oslo/blob/main/assets/oslo.png?raw=true)
+![](https://github.com/EleutherAI/oslo/blob/main/assets/logo.png?raw=true)
 
 ## What is OSLO about?
 
