@@ -168,7 +168,7 @@ class ParallelContext(object):
         tensor_parallel_depth: Optional[int] = None,
         tensor_parallel_mode: Optional[ParallelMode] = ParallelMode.TENSOR_1D,
         backend: str = "nccl",
-        seed: bool = 42,
+        seed: int = 42,
     ):
         """
         Initialize parallel context from `torch.distributed.launch`.

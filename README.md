@@ -1,6 +1,6 @@
 # OSLO: Open Source for Large-scale Optimization
 
-![](https://github.com/EleutherAI/oslo/blob/main/assets/logo.png?raw=true)
+![](https://raw.githubusercontent.com/EleutherAI/oslo/main/assets/logo.png)
 
 ## What is OSLO about?
 
@@ -35,6 +35,6 @@ If you find our work useful, please consider citing:
 
 ### Licensing
 
-The Code of the OSLO project is licensed under the terms of the Apache License 2.0.
+The code of the OSLO is licensed under the terms of the Apache License 2.0.
 
 Copyright 2022 EleutherAI. All Rights Reserved.
