@@ -18,6 +18,159 @@ from oslo.transformers.models.bert.modeling_bert import (
     BertForMultipleChoice,
 )
 
-__ALL__ = [GPT2Model, GPT2LMHeadModel, ...]
+from oslo.transformers.models.albert.modeling_albert import (
+    AlbertPreTrainedModel,
+    AlbertModel,
+    AlbertForPreTraining,
+    AlbertMLMHead,
+    AlbertSOPHead,
+    AlbertForMaskedLM,
+    AlbertForSequenceClassification,
+    AlbertForTokenClassification,
+    AlbertForQuestionAnswering,
+    AlbertForMultipleChoice,
+)
 
-# TODO : add rest of oslo models
+from oslo.transformers.models.bart.modeling_bart import (
+    BartPretrainedModel,
+    PretrainedBartModel,
+    BartEncoder,
+    BartDecoder,
+    BartModel,
+    BartForConditionalGeneration,
+    BartForSequenceClassification,
+    BartForQuestionAnswering,
+    BartDecoderWrapper,
+    BartForCausalLM,
+)
+
+
+from oslo.transformers.models.distilbert.modeling_distilbert import (
+    DistilBertPreTrainedModel,
+    DistilBertModel,
+    DistilBertForMaskedLM,
+    DistilBertForSequenceClassification,
+    DistilBertForQuestionAnswering,
+    DistilBertForTokenClassification,
+    DistilBertForMultipleChoice,
+)
+
+from oslo.transformers.models.electra.modeling_electra import (
+    ElectraPreTrainedModel,
+    ElectraModel,
+    ElectraForSequenceClassification,
+    ElectraForPreTraining,
+    ElectraForMaskedLM,
+    ElectraForTokenClassification,
+    ElectraForQuestionAnswering,
+    ElectraForMultipleChoice,
+    ElectraForCausalLM,
+)
+
+from oslo.transformers.models.mbart.modeling_mbart import (
+    MBartPreTrainedModel,
+    MBartEncoder,
+    MBartDecoder,
+    MBartModel,
+    MBartForConditionalGeneration,
+    MBartForSequenceClassification,
+    MBartForQuestionAnswering,
+    MBartDecoderWrapper,
+    MBartForCausalLM,
+)
+
+from oslo.transformers.models.mt5.modeling_mt5 import (
+    MT5Model,
+    MT5ForConditionalGeneration,
+    MT5EncoderModel,
+)
+
+from oslo.transformers.models.roberta.modeling_roberta import (
+    RobertaPreTrainedModel,
+    RobertaModel,
+    RobertaForCausalLM,
+    RobertaForMaskedLM,
+    RobertaForSequenceClassification,
+    RobertaForMultipleChoice,
+    RobertaForTokenClassification,
+    RobertaClassificationHead,
+    RobertaForQuestionAnswering,
+)
+
+from oslo.transformers.models.t5.modeling_t5 import (
+    T5PreTrainedModel,
+    T5Stack,
+    T5Model,
+    T5ForConditionalGeneration,
+    T5EncoderModel,
+)
+
+__ALL__ = [
+    GPT2Model,
+    GPT2LMHeadModel,
+    GPT2DoubleHeadsModel,
+    GPT2ForSequenceClassification,
+    GPT2ForTokenClassification,
+    GPT2PreTrainedModel,
+    BertForPreTraining,
+    BertLMHeadModel,
+    BertForMaskedLM,
+    BertForNextSentencePrediction,
+    BertForQuestionAnswering,
+    BertForSequenceClassification,
+    BertForTokenClassification,
+    BertForMultipleChoice,
+    AlbertPreTrainedModel,
+    AlbertModel,
+    AlbertForPreTraining,
+    AlbertMLMHead,
+    AlbertSOPHead,
+    AlbertForMaskedLM,
+    AlbertForSequenceClassification,
+    AlbertForTokenClassification,
+    AlbertForQuestionAnswering,
+    AlbertForMultipleChoice,
+    BartPretrainedModel,
+    PretrainedBartModel,
+    BartEncoder,
+    BartDecoder,
+    BartModel,
+    BartForConditionalGeneration,
+    BartForSequenceClassification,
+    BartForQuestionAnswering,
+    BartDecoderWrapper,
+    BartForCausalLM,
+    DistilBertPreTrainedModel,
+    DistilBertModel,
+    DistilBertForMaskedLM,
+    DistilBertForSequenceClassification,
+    DistilBertForQuestionAnswering,
+    DistilBertForTokenClassification,
+    DistilBertForMultipleChoice,
+    ElectraPreTrainedModel,
+    ElectraModel,
+    ElectraForSequenceClassification,
+    ElectraForPreTraining,
+    ElectraForMaskedLM,
+    ElectraForTokenClassification,
+    ElectraForQuestionAnswering,
+    ElectraForMultipleChoice,
+    ElectraForCausalLM,
+    MT5Model,
+    MT5ForConditionalGeneration,
+    MT5EncoderModel,
+    RobertaPreTrainedModel,
+    RobertaModel,
+    RobertaForCausalLM,
+    RobertaForMaskedLM,
+    RobertaForSequenceClassification,
+    RobertaForMultipleChoice,
+    RobertaForTokenClassification,
+    RobertaClassificationHead,
+    RobertaForQuestionAnswering,
+    T5PreTrainedModel,
+    T5Stack,
+    T5Model,
+    T5ForConditionalGeneration,
+    T5EncoderModel,
+]
