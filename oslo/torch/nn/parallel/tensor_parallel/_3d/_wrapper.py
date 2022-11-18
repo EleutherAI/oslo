@@ -63,23 +63,22 @@ class _TensorParallel3D(nn.Module):
             "If you wrote code like ``model(input_ids, labels)``, "
             "please modify your code like ``model(input_ids=input_ids, labels=labels)``."
         )
-        if not is_oslo_model(self.module):
-            kwargs = {
-                key: scatter(
-                    scatter(
-                        value,
-                        dim=BATCH_DIMENSIONS[key],
-                        parallel_context=self.parallel_context,
-                        parallel_mode=ParallelMode.TENSOR_3D_WEIGHT,
-                    ),
+        kwargs = {
+            key: scatter(
+                scatter(
+                    value,
                     dim=BATCH_DIMENSIONS[key],
                     parallel_context=self.parallel_context,
-                    parallel_mode=ParallelMode.TENSOR_3D_INPUT,
-                )
-                if key in BATCH_DIMENSIONS
-                else value
-                for key, value in kwargs.items()
-            }
+                    parallel_mode=ParallelMode.TENSOR_3D_WEIGHT,
+                ),
+                dim=BATCH_DIMENSIONS[key],
+                parallel_context=self.parallel_context,
+                parallel_mode=ParallelMode.TENSOR_3D_INPUT,
+            )
+            if key in BATCH_DIMENSIONS
+            else value
+            for key, value in kwargs.items()
+        }
         return self.module_forward(*args, **kwargs)
 
     @torch.no_grad()
