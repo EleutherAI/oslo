@@ -89,7 +89,7 @@ def save_pretrained(
 
         del model_to_save
 
-    else:   # save weights of every rank without merge
+    else:  # save weights of every rank without merge
         _save_pretrained_per_rank(
             self=self,
             save_directory=save_directory,
