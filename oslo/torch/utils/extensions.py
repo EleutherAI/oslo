@@ -23,6 +23,13 @@ from oslo.torch.nn.parallel.utils import (
 )
 
 
+def is_merge_meaningless(parallel_context):
+    return (
+        parallel_context.get_world_size(ParallelMode.TENSOR) == 1
+        and parallel_context.get_world_size(ParallelMode.PIPELINE) == 1
+    )
+
+
 @torch.no_grad()
 def save_pretrained(
     self,
@@ -35,22 +42,7 @@ def save_pretrained(
 ):
     PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0.bin"
 
-    if (
-        self.parallel_context.get_world_size(ParallelMode.TENSOR) == 1
-        and self.parallel_context.get_world_size(ParallelMode.PIPELINE) == 1
-    ):
-        if dist.get_rank() == 0:
-            self.save_pretrained(
-                save_directory=save_directory,
-                save_config=save_config,
-                state_dict=state_dict,
-                save_function=save_function,
-                **kwargs,
-            )
-        dist.barrier()
-        return None
-
-    if merge_checkpoints:
+    if merge_checkpoints and not is_merge_meaningless(self.parallel_context):
         model_to_save = self.__class__(self.config).eval()
 
         if state_dict is None:
@@ -70,7 +62,7 @@ def save_pretrained(
                         model_to_save,
                         parallel_context=self.parallel_context,
                         num_micro_batches=wrapper.num_micro_batches,
-                        memory_computation_balance=wrapper.memory_computation_balance,
+                        memory_computation_balance=wrapper.partitioner.memory_computation_balance,
                     )
 
         model_to_save.load_state_dict(state_dict)
@@ -81,35 +73,35 @@ def save_pretrained(
                 if hasattr(wrapper, "deparallelize"):
                     wrapper.deparallelize()
 
+        # save the merged weight of rank 0
         if dist.get_rank() == 0:
             _save_pretrained_per_rank(
                 self=model_to_save,
                 save_directory=save_directory,
                 save_config=save_config,
                 save_function=save_function,
-                deparallelized=True,
                 **kwargs,
             )
             os.rename(
                 os.path.join(save_directory, PARALLELIZED_WEIGHTS_NAME),
                 os.path.join(save_directory, "pytorch_model.bin"),
             )
-        dist.barrier()
+
         del model_to_save
-        return None
 
-    _save_pretrained_per_rank(
-        self=self,
-        save_directory=save_directory,
-        save_config=save_config,
-        state_dict=state_dict,
-        save_function=save_function,
-        **kwargs,
-    )
-    return None
+    else:  # save weights of every rank without merge
+        _save_pretrained_per_rank(
+            self=self,
+            save_directory=save_directory,
+            save_config=save_config,
+            state_dict=state_dict,
+            save_function=save_function,
+            **kwargs,
+        )
+
+    dist.barrier()
 
 
-# To avoid deadlock
 @torch.no_grad()
 def _save_pretrained_per_rank(
     self,
@@ -117,7 +109,6 @@ def _save_pretrained_per_rank(
     save_config: bool = True,
     state_dict: Optional[dict] = None,
     save_function: Callable = torch.save,
-    deparallelized: bool = False,
     **kwargs,
 ):
     logger = getLogger()
@@ -173,11 +164,7 @@ def _save_pretrained_per_rank(
     else:
         save_function(state_dict, output_model_file)
 
-    if not deparallelized:
-        dist.barrier()
-
     logger.info(f"Model weights saved in {output_model_file}")
-    return None
 
 
 def from_parallelized(self, path):
