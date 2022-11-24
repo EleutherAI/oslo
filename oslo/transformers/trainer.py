@@ -65,6 +65,7 @@ from oslo.torch.nn.parallel import (
     PipelineParallel,
     TensorParallel,
 )
+from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn.parallel.sequence_parallel import SequenceParallel
 from oslo.torch.nn.parallel.data_parallel.data_parallel import DataParallel
 from oslo.torch.nn.parallel.data_parallel._ddp.distributed_data_parallel import (
@@ -455,22 +456,11 @@ class Trainer:
         """
         model.train()
         # log_dist(f"Before self._prepare_inputs: \n{inputs}", rank=-1)
-        inputs = self._prepare_inputs(inputs)  # TODO Check
+        inputs = self._prepare_inputs(inputs)
         # log_dist(f"After self._prepare_inputs: \n{inputs}", rank=-1)
         if self.args.oslo_config.pipeline_parallelism:
-            pp_loss = torch.tensor(0.0).to(self.args.device)
-            num_micro_batches = (
-                self.args.oslo_config.pipeline_parallelism["param"]["num_micro_batches"]
-                if "num_micro_batches"
-                in self.args.oslo_config.pipeline_parallelism["param"]
-                else 1
-            )
-            for idx, out in enumerate(model(**inputs)):
-                loss = out.loss
-                loss = loss / num_micro_batches
-                loss.backward()
-                pp_loss += loss.detach().item()
-            return pp_loss
+            with self.autocast_smart_context_manager():
+                loss = self.compute_pp_loss(model, inputs)
         else:
             with self.autocast_smart_context_manager():
                 loss = self.compute_loss(model, inputs)
@@ -483,7 +473,7 @@ class Trainer:
             else:
                 loss.backward()
 
-            return loss.detach()
+        return loss.detach()
 
     def _wrap_model(self, model_wrappers: List, training: bool = True):
         """
@@ -716,15 +706,12 @@ class Trainer:
     def compute_loss(self, model, inputs, return_outputs=False):
         """
         How the loss is computed by Trainer. By default, all models return the loss in the first element.
-
         Subclass and override for custom behavior.
         """
         if self.label_smoother is not None and "labels" in inputs:
             labels = inputs.pop("labels")
         else:
             labels = None
-        # log_dist(f"**inputs: {inputs}", rank=-1)
-
         outputs = model(**inputs)
         # # TODO: Save past state if it exists
         # # HF-TODO: this needs to be fixed and made cleaner later.
@@ -738,6 +725,32 @@ class Trainer:
             loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
 
         return (loss, outputs) if return_outputs else loss
+
+    def compute_pp_loss(self, model, inputs, return_outputs=False):
+        """ """
+        if self.label_smoother is not None and "labels" in inputs:
+            labels = inputs.pop("labels")
+        else:
+            labels = None
+        pp_loss = torch.tensor(0.0).to(self.args.device)
+        num_micro_batches = (
+            self.args.oslo_config.pipeline_parallelism["param"]["num_micro_batches"]
+            if "num_micro_batches"
+            in self.args.oslo_config.pipeline_parallelism["param"]
+            else 1
+        )
+        outputs = []
+        for idx, out in enumerate(model(**inputs)):
+            outputs.append(out)
+            if labels is not None:
+                loss = self.label_smoother(out, labels)
+            else:
+                # We don't use .loss here since the model may return tuples instead of ModelOutput.
+                loss = out["loss"] if isinstance(out, dict) else out[0]
+            loss = loss / num_micro_batches
+            loss.backward()
+            pp_loss += loss.detach().item()
+        return (pp_loss, outputs) if return_outputs else pp_loss
 
     def _prepare_input(
         self, data: Union[torch.Tensor, Any]
@@ -790,22 +803,26 @@ class Trainer:
         # seed = self.args.data_seed if self.args.data_seed is not None else self.args.seed
 
         if (
-            self.args.world_size > 1
+            self.parallel_context.get_local_rank(ParallelMode.DATA) > 1
             and self.args.oslo_config.data_parallelism is not None
         ):
             if not self.args.dataloader_drop_last:
                 return DistributedSamplerWithLoop(
                     self.train_dataset,
                     batch_size=self.args.per_device_train_batch_size,
-                    num_replicas=self.args.world_size,
-                    rank=self.args.process_index,
+                    num_replicas=self.parallel_context.get_local_rank(
+                        ParallelMode.DATA
+                    ),
+                    rank=self.parallel_context.get_local_rank(ParallelMode.DATA),
                     # seed=seed, TODO oslo seed
                 )
             else:
                 return DistributedSampler(
                     self.train_dataset,
-                    num_replicas=self.args.world_size,
-                    rank=self.args.process_index,
+                    num_replicas=self.parallel_context.get_local_rank(
+                        ParallelMode.DATA
+                    ),
+                    rank=self.parallel_context.get_local_rank(ParallelMode.DATA),
                     # seed=seed, TODO oslo seed
                 )
         else:
@@ -828,21 +845,32 @@ class Trainer:
         # if isinstance(train_dataset, datasets.Dataset):
         #     train_dataset = self._remove_unused_columns(train_dataset, description="training")
         log_dist(f"Collate_fn: {self.data_collator.__class__}")
-        if self.args.dataloader_num_workers % self.args.world_size != 0:
+        if (
+            self.args.dataloader_num_workers
+            % self.parallel_context.get_local_rank(ParallelMode.DATA)
+            != 0
+        ):
             raise ValueError("dataloader_num_workers should be dividable by world_size")
-        num_workers = self.args.dataloader_num_workers / self.args.world_size
+        num_workers = (
+            self.args.dataloader_num_workers
+            / self.parallel_context.get_local_rank(ParallelMode.DATA)
+        )
 
         if isinstance(train_dataset, torch.utils.data.IterableDataset):
-            if self.args.world_size > 1:
+            if self.parallel_context.get_local_rank(ParallelMode.DATA) > 1:
                 train_dataset = IterableDatasetShard(
                     train_dataset,
                     batch_size=self.args.train_batch_size,
                     drop_last=self.args.dataloader_drop_last,
-                    num_processes=self.args.world_size,
-                    process_index=self.args.process_index,
+                    num_processes=self.parallel_context.get_local_rank(
+                        ParallelMode.DATA
+                    ),
+                    process_index=self.parallel_context.get_local_rank(
+                        ParallelMode.DATA
+                    ),
                 )
                 log_dist(
-                    f"Dataset: {train_dataset.__class__} with\nbatch_size:{self.args.train_batch_size}\n world_size:{self.args.world_size}\n dataloader_drop_last: {self.args.dataloader_drop_last}"
+                    f"Dataset: {train_dataset.__class__} with\nbatch_size:{self.args.train_batch_size}\n world_size:{self.parallel_context.get_local_rank(ParallelMode.DATA)}\n dataloader_drop_last: {self.args.dataloader_drop_last}"
                 )
             return DataLoader(
                 train_dataset,
@@ -852,7 +880,7 @@ class Trainer:
             )
         train_sampler = self._get_train_sampler()
         log_dist(
-            f"Sampler: {train_sampler.__class__} with\nbatch_size:{self.args.train_batch_size}\nworld_size:{self.args.world_size}, dataloader_drop_last: {self.args.dataloader_drop_last}"
+            f"Sampler: {train_sampler.__class__} with\nbatch_size:{self.args.train_batch_size}\nworld_size:{self.parallel_context.get_local_rank(ParallelMode.DATA)}, dataloader_drop_last: {self.args.dataloader_drop_last}"
         )
         return DataLoader(
             train_dataset,

@@ -6,7 +6,6 @@ from enum import Enum
 import torch
 from transformers.trainer_utils import SchedulerType, IntervalStrategy
 from oslo.transformers.trainer_utils import OptimizerNames
-from oslo.torch.distributed.parallel_mode import ParallelMode
 
 
 @dataclass
@@ -294,29 +293,27 @@ class TrainingArguments:
         """
         The local rank
         """
-        if self.parallel_context:
-            return self.parallel_context.get_local_rank(ParallelMode.DATA)
-        else:
-            return int(os.environ.get("LOCAL_RANK", -1))
+        return int(os.environ.get("LOCAL_RANK", -1))
 
-    @property
-    def world_size(self):
-        """
-        The number of processes used in parallel.
-        """
-        if self.parallel_context:
-            return self.parallel_context.get_world_size(ParallelMode.DATA)
-        elif self.local_rank != -1:
-            return int(os.environ["WORLD_SIZE"])
-        return 1
-
+    #
+    # @property
+    # def world_size(self):
+    #     """
+    #     The number of processes used in parallel.
+    #     """
+    #     if self.parallel_context:
+    #         return self.parallel_context.get_world_size(ParallelMode.DATA)
+    #     elif self.local_rank != -1:
+    #         return int(os.environ["WORLD_SIZE"])
+    #     return 1
+    #
     @property
     def process_index(self):
         """
         The index of the current process used.
         """
         if self.local_rank != -1:
-            return self.local_rank
+            return torch.distributed.get_rank()
         return 0
 
     @property
