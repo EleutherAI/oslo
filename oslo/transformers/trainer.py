@@ -133,11 +133,10 @@ class Trainer:
 
         self.label_smoother = None  # TODO
 
-        if args.oslo_config:
-            self.parallel_context, self.model_wrappers = (
-                args.parallel_context,
-                args.model_wrappers,
-            )
+        self.parallel_context, self.model_wrappers = (
+            args.parallel_context,
+            args.model_wrappers,
+        )
 
         if (
             len(self.model_wrappers)
@@ -156,7 +155,6 @@ class Trainer:
         self.model = model
 
         # Define and add callback
-        # default_callbacks = DEFAULT_CALLBACKS + get_reporting_integration_callbacks(self.args.report_to)
         default_callbacks = DEFAULT_CALLBACKS
         callbacks = default_callbacks
         self.callback_handler = CallbackHandler(
@@ -214,7 +212,7 @@ class Trainer:
         # number of training steps per epoch: num_update_steps_per_epoch
         # total number of training steps to execute: max_steps
         total_train_batch_size = (
-            args.train_batch_size * args.gradient_accumulation_steps * args.world_size
+            args.train_batch_size * args.gradient_accumulation_steps * self.parallel_context.get_world_size(ParallelMode.DATA)
         )
         if len(train_dataloader) is not None:
             len_dataloader = len(train_dataloader)
@@ -534,7 +532,7 @@ class Trainer:
         Whether or not this process is the local (e.g., on one machine if training in a distributed fashion on several
         machines) main process.
         """
-        return self.args.local_process_index == 0
+        return self.parallel_context.get_local_rank(ParallelMode.GLOBAL) == 0
 
     def is_world_process_zero(self) -> bool:
         """
@@ -543,7 +541,7 @@ class Trainer:
         """
         # Special case for SageMaker ModelParallel since there process_index is dp_process_index, not the global
         # process index.
-        return self.args.process_index == 0
+        return self.parallel_context.get_global_rank() == 0
 
     def num_examples(self, dataloader: DataLoader) -> int:
         """
@@ -847,13 +845,13 @@ class Trainer:
         log_dist(f"Collate_fn: {self.data_collator.__class__}")
         if (
             self.args.dataloader_num_workers
-            % self.parallel_context.get_local_rank(ParallelMode.DATA)
+            % self.parallel_context.get_world_size(ParallelMode.DATA)
             != 0
         ):
             raise ValueError("dataloader_num_workers should be dividable by world_size")
         num_workers = (
             self.args.dataloader_num_workers
-            / self.parallel_context.get_local_rank(ParallelMode.DATA)
+            / self.parallel_context.get_world_size(ParallelMode.DATA)
         )
 
         if isinstance(train_dataset, torch.utils.data.IterableDataset):

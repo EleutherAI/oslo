@@ -4,7 +4,7 @@ from oslo.transformers.oslo_init import OsloTrainerConfig, init_oslo_features
 oslo_init_dict_form = {
     "data_parallelism": {
         "enable": True,
-        "parallel_size": 2,
+        "parallel_size": 1,
         "zero_stage": 0,
     },
     "tensor_parallelism": {
@@ -12,13 +12,13 @@ oslo_init_dict_form = {
         "parallel_size": 1,
         "parallel_mode": "1d",
     },
-    "sequence_parallelism": {"enable": True, "parallel_size": 2},
+    "sequence_parallelism": {"enable": True, "parallel_size": 1},
 }
 
 user_config_from_dict = OsloTrainerConfig(oslo_init_dict_form)
 
 user_config_from_json = OsloTrainerConfig(
-    "tests/transformers/trainer/oslo_user_config.json"
+    "oslo_user_config.json"
 )
 
 print(user_config_from_dict)

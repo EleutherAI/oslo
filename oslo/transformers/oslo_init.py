@@ -1,5 +1,6 @@
 import json
 import logging
+from enum import Enum
 from copy import deepcopy
 from typing import List, Tuple
 from dataclasses import dataclass
@@ -41,7 +42,18 @@ TENSOR_PARALLEL_MAPPING = {
 }
 
 
+class SupportedBackends(Enum):
+    TORCH = 'torch'
+    SLURM = 'slurm'
+    OPENMPI = 'openmpi'
+
+
 SUPPORTED_FEATURES = {
+    "backend": {
+        "name": str,
+        "host": str,
+        "port": str
+    },
     "mixed_precision": {
         "enable": _type(bool),
     },
@@ -159,6 +171,11 @@ class OsloTrainerConfig(Config):
     [Oslo `TrainingArguments`] uses this class to set oslo features includes parallel, fused optimizer etc.
     json file or dictionary form should be like the following:
         SUPPORTED_FEATURES = {
+            "backend": {
+                "name": str,
+                "host": str,
+                "port": str
+            },
             "mixed_precision": {
                 "enable": _type(bool),
             },
@@ -231,6 +248,14 @@ class OsloTrainerConfig(Config):
         _config_check(SUPPORTED_FEATURES, cfg)
         super(OsloTrainerConfig, self).__init__(**cfg)
         log_dist("*** OSLO CONFIG ***")
+        if not self.is_exist("backend") or not self.backend["name"]:
+            self.backend = 'torch'
+        else:
+            assert self.backend in SupportedBackends, f'{self.backend} is not supported engine ({", ".join(SupportedBackends)})'
+            log_dist(f'backend engine: {self.backend}')
+        if cfg.backend != SupportedBackends.TORCH:
+            assert cfg.host and cfg.post, f'host, post is required to use {self.backend}'
+
         if not self.is_exist("mixed_precision") or not self.mixed_precision["enable"]:
             self.mixed_precision = None
         else:
@@ -375,15 +400,45 @@ def init_oslo_features(
         if cfg.tensor_parallelism.is_exist("param"):
             tensor_parallel_depth = cfg.tensor_parallelism.param["parallel_depth_2.5d"]
 
-    parallel_context = ParallelContext.from_torch(
-        data_parallel_size=data_parallel_size,
-        sequence_parallel_size=sequence_parallel_size,
-        expert_parallel_size=expert_parallel_size,
-        pipeline_parallel_size=pipeline_parallel_size,
-        tensor_parallel_size=tensor_parallel_size,
-        tensor_parallel_depth=tensor_parallel_depth,
-        tensor_parallel_mode=tensor_parallel_mode,
-    )
+
+    if cfg.backend == SupportedBackends.TORCH:
+        parallel_context = ParallelContext.from_torch(
+            data_parallel_size=data_parallel_size,
+            sequence_parallel_size=sequence_parallel_size,
+            expert_parallel_size=expert_parallel_size,
+            pipeline_parallel_size=pipeline_parallel_size,
+            tensor_parallel_size=tensor_parallel_size,
+            tensor_parallel_depth=tensor_parallel_depth,
+            tensor_parallel_mode=tensor_parallel_mode,
+        )
+
+    elif cfg.backend == SupportedBackends.SLURM:
+        parallel_context = ParallelContext.from_slurm(
+            host=cfg.host,
+            port=cfg.port,
+            data_parallel_size=data_parallel_size,
+            sequence_parallel_size=sequence_parallel_size,
+            expert_parallel_size=expert_parallel_size,
+            pipeline_parallel_size=pipeline_parallel_size,
+            tensor_parallel_size=tensor_parallel_size,
+            tensor_parallel_depth=tensor_parallel_depth,
+            tensor_parallel_mode=tensor_parallel_mode,
+        )
+
+    elif cfg.backend == SupportedBackends.OPENMPI:
+        parallel_context = ParallelContext.from_openmpi(
+            host=cfg.host,
+            port=cfg.port,
+            data_parallel_size=data_parallel_size,
+            sequence_parallel_size=sequence_parallel_size,
+            expert_parallel_size=expert_parallel_size,
+            pipeline_parallel_size=pipeline_parallel_size,
+            tensor_parallel_size=tensor_parallel_size,
+            tensor_parallel_depth=tensor_parallel_depth,
+            tensor_parallel_mode=tensor_parallel_mode,
+        )
+    else:
+        raise ValueError(f"Wrong backend config: {cfg.backend}")
 
     if tensor_parallel_size > 1 and sequence_parallel_size > 1:
         raise ValueError(
@@ -401,5 +456,4 @@ def init_oslo_features(
     if pipeline_parallel_size > 1:
         model_wrapper.append(PipelineParallel)
     # TODO expert mode
-
     return parallel_context, model_wrapper

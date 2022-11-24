@@ -76,7 +76,8 @@ from oslo.torch.distributed import ParallelMode
 from oslo.torch.nn.parallel.utils import add_wrapper
 
 from oslo.transformers.mapping_utils import (
-    _FullyShardedDataParallelMappingForHuggingFace,
+    # _FullyShardedDataParallelMappingForHuggingFace,
+    _FullyShardedDataParallelMapping,
 )
 
 from torch.distributed.fsdp.wrap import (
@@ -479,7 +480,8 @@ def FullyShardedDataParallel(
     mixed_precision: Optional[MixedPrecision] = None,
     cpu_offload: Optional[CPUOffload] = None,
 ):
-    fsdp_map_for_hf = _FullyShardedDataParallelMappingForHuggingFace()
+    # fsdp_map_for_hf = _FullyShardedDataParallelMappingForHuggingFace()
+    fsdp_map_for_hf = _FullyShardedDataParallelMapping()
     transformer_layer_cls = fsdp_map_for_hf.get_mapping(module)
 
     if transformer_wrap_layers is not None:
