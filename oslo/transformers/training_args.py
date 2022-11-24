@@ -12,6 +12,7 @@ from oslo.transformers.oslo_init import (
     init_oslo_features,
 )
 
+
 @dataclass
 class TrainingArguments:
     """
@@ -297,7 +298,9 @@ class TrainingArguments:
         """
         The actual batch size for training (may differ from `per_gpu_train_batch_size` in distributed training).
         """
-        train_batch_size = self.per_device_train_batch_size * max(1, self.parallel_context.get_world_size(ParallelMode.DATA))
+        train_batch_size = self.per_device_train_batch_size * max(
+            1, self.parallel_context.get_world_size(ParallelMode.DATA)
+        )
         return train_batch_size
 
     @property
@@ -305,7 +308,9 @@ class TrainingArguments:
         """
         The actual batch size for evaluation (may differ from `per_gpu_eval_batch_size` in distributed training).
         """
-        eval_batch_size = self.per_device_eval_batch_size * max(1, self.parallel_context.get_world_size(ParallelMode.DATA))
+        eval_batch_size = self.per_device_eval_batch_size * max(
+            1, self.parallel_context.get_world_size(ParallelMode.DATA)
+        )
         return eval_batch_size
 
     def get_warmup_steps(self, num_training_steps: int):

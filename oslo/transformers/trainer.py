@@ -212,7 +212,9 @@ class Trainer:
         # number of training steps per epoch: num_update_steps_per_epoch
         # total number of training steps to execute: max_steps
         total_train_batch_size = (
-            args.train_batch_size * args.gradient_accumulation_steps * self.parallel_context.get_world_size(ParallelMode.DATA)
+            args.train_batch_size
+            * args.gradient_accumulation_steps
+            * self.parallel_context.get_world_size(ParallelMode.DATA)
         )
         if len(train_dataloader) is not None:
             len_dataloader = len(train_dataloader)

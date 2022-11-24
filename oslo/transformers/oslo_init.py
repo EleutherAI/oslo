@@ -43,17 +43,13 @@ TENSOR_PARALLEL_MAPPING = {
 
 
 class SupportedBackends(Enum):
-    TORCH = 'torch'
-    SLURM = 'slurm'
-    OPENMPI = 'openmpi'
+    TORCH = "torch"
+    SLURM = "slurm"
+    OPENMPI = "openmpi"
 
 
 SUPPORTED_FEATURES = {
-    "backend": {
-        "name": str,
-        "host": str,
-        "port": str
-    },
+    "backend": {"name": str, "host": str, "port": str},
     "mixed_precision": {
         "enable": _type(bool),
     },
@@ -249,12 +245,16 @@ class OsloTrainerConfig(Config):
         super(OsloTrainerConfig, self).__init__(**cfg)
         log_dist("*** OSLO CONFIG ***")
         if not self.is_exist("backend") or not self.backend["name"]:
-            self.backend = 'torch'
+            self.backend = "torch"
         else:
-            assert self.backend in SupportedBackends, f'{self.backend} is not supported engine ({", ".join(SupportedBackends)})'
-            log_dist(f'backend engine: {self.backend}')
+            assert (
+                self.backend in SupportedBackends
+            ), f'{self.backend} is not supported engine ({", ".join(SupportedBackends)})'
+            log_dist(f"backend engine: {self.backend}")
         if cfg.backend != SupportedBackends.TORCH:
-            assert cfg.host and cfg.post, f'host, post is required to use {self.backend}'
+            assert (
+                cfg.host and cfg.post
+            ), f"host, post is required to use {self.backend}"
 
         if not self.is_exist("mixed_precision") or not self.mixed_precision["enable"]:
             self.mixed_precision = None
@@ -399,7 +399,6 @@ def init_oslo_features(
         ]
         if cfg.tensor_parallelism.is_exist("param"):
             tensor_parallel_depth = cfg.tensor_parallelism.param["parallel_depth_2.5d"]
-
 
     if cfg.backend == SupportedBackends.TORCH:
         parallel_context = ParallelContext.from_torch(

@@ -17,9 +17,7 @@ oslo_init_dict_form = {
 
 user_config_from_dict = OsloTrainerConfig(oslo_init_dict_form)
 
-user_config_from_json = OsloTrainerConfig(
-    "oslo_user_config.json"
-)
+user_config_from_json = OsloTrainerConfig("oslo_user_config.json")
 
 print(user_config_from_dict)
 

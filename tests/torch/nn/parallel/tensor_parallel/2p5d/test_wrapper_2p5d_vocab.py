@@ -102,8 +102,8 @@ for data in dataloader:
         max_length=512,
     ).to("cuda")
 
-    loss_no_tp, notp_fw_time = fw(model_no_tp, **inputs, labels=inputs["input_ids"])
-    loss_tp, tp_fw_time = fw(wrapper_tp, **inputs, labels=inputs["input_ids"])
+    loss_no_tp, notp_fw_time = fsw(model_no_tp, **inputs, labels=inputs["input_ids"])
+    loss_tp, tp_fw_time = fsw(wrapper_tp, **inputs, labels=inputs["input_ids"])
 
     _, notp_bw_time = bw(loss_no_tp)
     _, tp_bw_time = bw(loss_tp)
