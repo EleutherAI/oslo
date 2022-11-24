@@ -480,7 +480,6 @@ def FullyShardedDataParallel(
     cpu_offload: Optional[CPUOffload] = None,
 ):
     fsdp_map_for_hf = _FullyShardedDataParallelMapping()
-    fsdp_map_for_hf = _FullyShardedDataParallelMapping()
     transformer_layer_cls = fsdp_map_for_hf.get_mapping(module)
 
     if transformer_wrap_layers is not None:
