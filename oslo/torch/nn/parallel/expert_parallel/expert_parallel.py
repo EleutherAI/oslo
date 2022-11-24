@@ -359,6 +359,19 @@ class _ExpertParallel(nn.Module):
             if all(conditions):
                 dist.broadcast(param, src_rank, group=ep_group)
 
+    def _get_ep_size(self, name=None):
+        if isinstance(self.parallel_context.expert_parallel_size, int):
+            ep_size = self.parallel_context.expert_parallel_size
+        else:
+            assert (
+                name is not None
+            ), "If you use different ep_sizes for each layer, you need to pass the module/parameter name"
+            role = self._get_module_role(name)
+            layer_id = self._extract_layer_id(name)
+            ep_size = self.parallel_context.expert_parallel_size[role][layer_id]
+
+        return ep_size
+
     def _add_allreduce_hook_for_non_expert_params(self):
         ep_group = self.parallel_context.get_group(ParallelMode.EXPERT)
 
@@ -367,12 +380,83 @@ class _ExpertParallel(nn.Module):
                 "front_expert" not in para_name,
                 "behind_expert" not in para_name,
             ]
-            if isinstance(self.parallel_context.expert_parallel_size, int):
-                ep_size = self.parallel_context.expert_parallel_size
-            else:
-                role = self._get_module_role(para_name)
-                layer_id = self._extract_layer_id(para_name)
-                ep_size = self.parallel_context.expert_parallel_size[role][layer_id]
+            ep_size = self._get_ep_size(para_name)
 
             if all(conditions) and param.requires_grad:
                 param.register_hook(AllReduce(ep_group, ep_size, para_name))
+
+    @torch.no_grad()
+    def deparallelize(self):
+        dp_rank = self.parallel_context.get_local_rank(ParallelMode.DATA)
+        ep_rank = self.parallel_context.get_local_rank(ParallelMode.EXPERT)
+
+        if dp_rank == 0:
+            for name, module in self.model.named_modules():
+                if isinstance(module, Experts):
+                    layer_id = self._extract_layer_id(name)
+                    role = self._get_module_role(name)
+                    num_experts = self.num_experts[role][layer_id]
+
+                    depar_w, depar_b = self._deparallelize_experts(
+                        name, module, num_experts
+                    )
+
+                    if ep_rank == 0:
+                        base_expert = module.experts[0]
+                        depar_experts = list()
+
+                        for cur_w, cur_b in zip(depar_w, depar_b):
+                            new_expert = copy.deepcopy(base_expert)
+                            new_expert.weight = nn.parameter.Parameter(cur_w)
+
+                            if cur_b is not None:
+                                new_expert.bias = nn.parameter.Parameter(cur_b)
+
+                            depar_experts.append(new_expert)
+
+                        module.experts = nn.ModuleList(depar_experts)
+
+    @torch.no_grad()
+    def _deparallelize_experts(self, name, experts, num_experts):
+        ep_size = self._get_ep_size(name)
+
+        layer_id = self._extract_layer_id(name)
+        role = self._get_module_role(name)
+        num_experts = self.num_experts[role][layer_id]
+
+        depar_w = [None for i in range(num_experts)]
+        depar_b = [None for i in range(num_experts)]
+
+        for local_expert_id, cur_expert in enumerate(experts.experts):
+            ep_group = self.parallel_context.get_group(ParallelMode.EXPERT)
+
+            experts_w = self._gather_tensors(cur_expert.weight, ep_group, ep_size)
+            self._sort_by_global_expert_id(
+                experts_w, depar_w, local_expert_id, experts.num_local_experts
+            )
+
+            if hasattr(cur_expert, "bias"):
+                experts_b = self._gather_tensors(cur_expert.bias, ep_group, ep_size)
+                self._sort_by_global_expert_id(
+                    experts_b, depar_b, local_expert_id, experts.num_local_experts
+                )
+
+        return depar_w, depar_b
+
+    @torch.no_grad()
+    def _gather_tensors(self, base_tensor, process_group, ep_size):
+        gathered = [torch.zeros_like(base_tensor) for _ in range(ep_size)]
+        dist.all_gather(gathered, base_tensor, process_group)
+
+        return gathered
+
+    def _sort_by_global_expert_id(self, to_sort, dest, local_expert_id, num_experts):
+        if self.parallel_context.get_local_rank(ParallelMode.EXPERT) == 0:
+
+            for ep_rank, tensor in enumerate(to_sort):
+                global_expert_id = ep_rank * num_experts + local_expert_id
+                assert (
+                    dest[global_expert_id] is None
+                ), "Duplicate experts occurred during deparallelization"
+
+                dest[global_expert_id] = tensor

@@ -14,6 +14,7 @@ from oslo.torch.nn.parallel.utils import allocate_params
 from oslo.torch.nn.parallel.pipeline_parallel._buffers import _MODULE_DEVICE_LOCATIONS
 
 from oslo.torch.nn.parallel.data_parallel.data_parallel import DistributedDataParallel
+from oslo.torch.nn.parallel.tensor_parallel.tensor_parallel import TensorParallel
 
 from datasets import load_dataset
 from transformers import (
@@ -169,24 +170,24 @@ matplotlib.use("Agg")
 torch.autograd.set_detect_anomaly(True)
 set_seed(42)
 
-data_parallel_size = 2
+data_parallel_size = 1
 parallel_context = ParallelContext.from_torch(
     data_parallel_size=data_parallel_size,
-    pipeline_parallel_size=4,
-    tensor_parallel_size=1,
+    pipeline_parallel_size=2,
+    tensor_parallel_size=2,
 )
 
 current_device = torch.cuda.current_device()
-num_micro_batches = 8
+num_micro_batches = 1
 
-# model_name = "gpt2"
-# config = GPT2Config.from_pretrained(model_name)
-# model = GPT2LMHeadModel(config)
+model_name = "gpt2"
+config = GPT2Config.from_pretrained(model_name)
+model = GPT2LMHeadModel(config)
 
-model_name = "t5-small"
-config = T5Config.from_pretrained(model_name)
-config.dropout_rate = 0.0
-model = T5ForConditionalGeneration(config)
+# model_name = "t5-small"
+# config = T5Config.from_pretrained(model_name)
+# config.dropout_rate = 0.0
+# model = T5ForConditionalGeneration(config)
 # model = T5Debug(config)
 
 # model_name = "facebook/bart-base"
@@ -202,10 +203,10 @@ for n, m in model.named_modules():
 model_no_pp = deepcopy(model)
 model_no_pp.cuda()
 
+model = TensorParallel(model, parallel_context=parallel_context)
+# model = DistributedDataParallel(model, parallel_context=parallel_context)
 wrapper_pp = PipelineParallel(
-    DistributedDataParallel(model, parallel_context=parallel_context),
-    # DistributedDataParallel(model, process_group=parallel_context.get_group(ParallelMode.DATA)),
-    # model,
+    model,
     parallel_context=parallel_context,
     memory_computation_balance=1.0,
     num_micro_batches=num_micro_batches,

@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -21,6 +22,10 @@ _MIXED_PRECISION_L2NORM_KERNEL = None
 _LAYER_NORM_NORM_KERNEL = None
 _EXPERT_PARALLEL_KERNEL = None
 _NGRAM_REPEAT_BLOCK_KERNEL = None
+
+YELLOW = "\033[93m"
+END = "\033[0m"
+WARNING = f"{YELLOW} [WARNING] {END}"
 
 TORCH_MAJOR = int(torch.__version__.split(".")[0])
 TORCH_MINOR = int(torch.__version__.split(".")[1])
@@ -398,7 +403,8 @@ class Binder(object):
         Binder._rocm_version = (int(ROCM_MAJOR), int(ROCM_MINOR))
         return Binder._rocm_version
 
-    def strip_empty_entries(self, args):
+    @staticmethod
+    def strip_empty_entries(args):
         """
         Drop any empty strings from the list of compile and link flags
         """
@@ -433,6 +439,54 @@ class CPUBinder(Binder):
             SIMD_WIDTH,
         ]
         return args
+
+    def warning(self, msg):
+        self.error_log = f"{msg}"
+        print(f"{WARNING} {msg}")
+
+    def command_exists(self, cmd):
+        if "|" in cmd:
+            cmds = cmd.split("|")
+        else:
+            cmds = [cmd]
+        valid = False
+        for cmd in cmds:
+            result = subprocess.Popen(f"type {cmd}", stdout=subprocess.PIPE, shell=True)
+            valid = valid or result.wait() == 0
+
+        if not valid and len(cmds) > 1:
+            print(
+                f"{WARNING} {self.name} requires one of the following commands '{cmds}', but it does not exist!"
+            )
+        elif not valid and len(cmds) == 1:
+            print(
+                f"{WARNING} {self.name} requires the '{cmd}' command, but it does not exist!"
+            )
+        return valid
+
+    def _backup_cpuinfo(self):
+        # Construct cpu_info dict from lscpu that is similar to what py-cpuinfo provides
+        if not self.command_exists("lscpu"):
+            self.warning(
+                f"{self.name} attempted to query 'lscpu' after failing to use py-cpuinfo "
+                "to detect the CPU architecture. 'lscpu' does not appear to exist on "
+                "your system, will fall back to use -march=native and non-vectorized execution."
+            )
+            return None
+        result = subprocess.check_output("lscpu", shell=True)
+        result = result.decode("utf-8").strip().lower()
+
+        cpu_info = {}
+        cpu_info["arch"] = None
+        cpu_info["flags"] = ""
+        if "genuineintel" in result or "authenticamd" in result:
+            cpu_info["arch"] = "X86_64"
+            if "avx512" in result:
+                cpu_info["flags"] += "avx512,"
+            if "avx2" in result:
+                cpu_info["flags"] += "avx2"
+        elif "ppc64le" in result:
+            cpu_info["arch"] = "PPC_"
 
     def cpu_arch(self):
         try:
@@ -483,6 +537,12 @@ class CPUBinder(Binder):
             elif "avx2" in cpu_info["flags"]:
                 return "-D__AVX256__"
         return "-D__SCALAR__"
+
+    def libraries_args(self):
+        if sys.platform == "win32":
+            return ["cublas", "curand"]
+        else:
+            return []
 
 
 class FusedLayerNormBinder(Binder):

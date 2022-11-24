@@ -247,7 +247,7 @@ class Matmul_AB_2D(torch.autograd.Function):
         )
 
         if ctx:
-            ctx.save_for_backward(A, B)
+            ctx.save_for_backward(A.clone(), B.clone())
 
         A_shape = A.shape
         A = A.reshape((-1, A_shape[-1]))
@@ -402,7 +402,7 @@ class Matmul_ABT_2D(torch.autograd.Function):
         )
 
         if ctx:
-            ctx.save_for_backward(A, B)
+            ctx.save_for_backward(A.clone(), B.clone())
 
         A_shape = A.shape
         A = A.reshape((-1, A_shape[-1]))
@@ -566,7 +566,7 @@ class Matmul_ATB_2D(torch.autograd.Function):
         )
 
         if ctx:
-            ctx.save_for_backward(A, B)
+            ctx.save_for_backward(A.clone(), B.clone())
 
         A_shape = A.shape
         A = A.reshape((-1, A_shape[-1]))

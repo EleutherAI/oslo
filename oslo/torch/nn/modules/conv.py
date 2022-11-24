@@ -10,9 +10,9 @@ class Conv1D(nn.Module):
     Basically works like a linear layer but the weights are transposed.
 
     Args:
-        nf (`int`): The number of output features.
-        nx (`int`): The number of input features.
-        skip_bias_add (`bool`): This was added to enable performance optimization where bias
+        nf (int): The number of output features.
+        nx (int): The number of input features.
+        skip_bias_add (bool): This was added to enable performance optimization where bias
                        can be fused with other elementwise operations. We skip
                        adding bias but instead return it.
     References:

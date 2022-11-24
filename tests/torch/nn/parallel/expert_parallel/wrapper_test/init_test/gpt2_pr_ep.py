@@ -78,7 +78,7 @@ def run_test(rank, port):
     wrapper_ep = _ExpertParallel(
         model_ep,
         parallel_context,
-        num_enc_experts=num_experts,
+        num_dec_experts=num_experts,
         top_k=1,
         use_residual=use_residual,
     ).to(rank)
