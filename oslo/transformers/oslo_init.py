@@ -42,7 +42,7 @@ TENSOR_PARALLEL_MAPPING = {
 }
 
 
-class SupportedBackends(Enum):
+class SupportedBackend(Enum):
     TORCH = "torch"
     SLURM = "slurm"
     OPENMPI = "openmpi"
@@ -248,10 +248,10 @@ class OsloTrainerConfig(Config):
             self.backend = "torch"
         else:
             assert (
-                self.backend in SupportedBackends
-            ), f'{self.backend} is not supported engine ({", ".join(SupportedBackends)})'
+                self.backend in SupportedBackend
+            ), f'{self.backend} is not supported engine ({", ".join(SupportedBackend)})'
             log_dist(f"backend engine: {self.backend}")
-        if cfg.backend != SupportedBackends.TORCH:
+        if cfg.backend != SupportedBackend.TORCH:
             assert (
                 cfg.host and cfg.post
             ), f"host, post is required to use {self.backend}"
@@ -400,7 +400,7 @@ def init_oslo_features(
         if cfg.tensor_parallelism.is_exist("param"):
             tensor_parallel_depth = cfg.tensor_parallelism.param["parallel_depth_2.5d"]
 
-    if cfg.backend == SupportedBackends.TORCH:
+    if cfg.backend == SupportedBackend.TORCH:
         parallel_context = ParallelContext.from_torch(
             data_parallel_size=data_parallel_size,
             sequence_parallel_size=sequence_parallel_size,
@@ -411,7 +411,7 @@ def init_oslo_features(
             tensor_parallel_mode=tensor_parallel_mode,
         )
 
-    elif cfg.backend == SupportedBackends.SLURM:
+    elif cfg.backend == SupportedBackend.SLURM:
         parallel_context = ParallelContext.from_slurm(
             host=cfg.host,
             port=cfg.port,
@@ -424,7 +424,7 @@ def init_oslo_features(
             tensor_parallel_mode=tensor_parallel_mode,
         )
 
-    elif cfg.backend == SupportedBackends.OPENMPI:
+    elif cfg.backend == SupportedBackend.OPENMPI:
         parallel_context = ParallelContext.from_openmpi(
             host=cfg.host,
             port=cfg.port,
