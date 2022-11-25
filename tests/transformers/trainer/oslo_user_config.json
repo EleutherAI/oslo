@@ -1,7 +1,7 @@
 {
     "data_parallelism": {
         "enable": true,
-        "parallel_size": 4,
+        "parallel_size": 1,
         "zero_stage": 0
     }
 }

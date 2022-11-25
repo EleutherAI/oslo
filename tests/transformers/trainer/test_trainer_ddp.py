@@ -19,12 +19,12 @@ os.environ["WANDB_DISABLED"] = "true"
 oslo_init_dict_form = {
     "data_parallelism": {
         "enable": True,
-        "parallel_size": 2,
+        "parallel_size": 1,
         "zero_stage": 0,
     },
     "tensor_parallelism": {
         "enable": False,
-        "parallel_size": 4,
+        "parallel_size": 1,
         "parallel_mode": "2.5d",
     },
     "pipeline_parallelism": {"enable": False, "parallel_size": 4},

@@ -6,6 +6,11 @@ from enum import Enum
 import torch
 from transformers.trainer_utils import SchedulerType, IntervalStrategy
 from oslo.transformers.trainer_utils import OptimizerNames
+from oslo.torch.distributed.parallel_mode import ParallelMode
+from oslo.transformers.oslo_init import (
+    OsloTrainerConfig,
+    init_oslo_features,
+)
 
 
 @dataclass
@@ -265,16 +270,16 @@ class TrainingArguments:
         self.oslo_config, self.parallel_context, self.model_wrappers = None, None, None
 
         if self.oslo_config_path_or_dict:
-            from oslo.transformers.oslo_init import (
-                OsloTrainerConfig,
-                init_oslo_features,
-            )
 
             # will be used later by the Trainer
             self.oslo_config = OsloTrainerConfig(self.oslo_config_path_or_dict)
             # logging.info(f"Oslo Config: {self.oslo_config}")
             self.parallel_context, self.model_wrappers = init_oslo_features(
                 self.oslo_config
+            )
+        else:
+            self.parallel_context, self.model_wrappers = init_oslo_features(
+                OsloTrainerConfig({})
             )
 
     def __str__(self):
@@ -289,48 +294,13 @@ class TrainingArguments:
     __repr__ = __str__
 
     @property
-    def local_rank(self):
-        """
-        The local rank
-        """
-        return int(os.environ.get("LOCAL_RANK", -1))
-
-    #
-    # @property
-    # def world_size(self):
-    #     """
-    #     The number of processes used in parallel.
-    #     """
-    #     if self.parallel_context:
-    #         return self.parallel_context.get_world_size(ParallelMode.DATA)
-    #     elif self.local_rank != -1:
-    #         return int(os.environ["WORLD_SIZE"])
-    #     return 1
-    #
-    @property
-    def process_index(self):
-        """
-        The index of the current process used.
-        """
-        if self.local_rank != -1:
-            return torch.distributed.get_rank()
-        return 0
-
-    @property
-    def local_process_index(self):
-        """
-        The index of the local process used.
-        """
-        if self.local_rank != -1:
-            return self.local_rank
-        return 0
-
-    @property
     def train_batch_size(self) -> int:
         """
         The actual batch size for training (may differ from `per_gpu_train_batch_size` in distributed training).
         """
-        train_batch_size = self.per_device_train_batch_size * max(1, self.world_size)
+        train_batch_size = self.per_device_train_batch_size * max(
+            1, self.parallel_context.get_world_size(ParallelMode.DATA)
+        )
         return train_batch_size
 
     @property
@@ -338,7 +308,9 @@ class TrainingArguments:
         """
         The actual batch size for evaluation (may differ from `per_gpu_eval_batch_size` in distributed training).
         """
-        eval_batch_size = self.per_device_eval_batch_size * max(1, self.world_size)
+        eval_batch_size = self.per_device_eval_batch_size * max(
+            1, self.parallel_context.get_world_size(ParallelMode.DATA)
+        )
         return eval_batch_size
 
     def get_warmup_steps(self, num_training_steps: int):
