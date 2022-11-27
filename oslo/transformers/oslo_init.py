@@ -131,36 +131,7 @@ def _config_check(arg, user_config):
         raise TypeError("configuration must be type of <class 'dict'>")
 
 
-@dataclass
-class Config:
-    def __init__(self, **entries):
-        self.__dict__.update(entries)
-        self.mkconfig(self)
-
-    @staticmethod
-    def mkconfig(obj):
-        for k, v in obj.__dict__.items():
-            if isinstance(v, dict):
-                obj.__setattr__(k, Config(**v))
-
-    def is_exist(self, item):
-        if item not in self.__dict__:
-            return False
-        return True
-
-    def __getitem__(self, item):
-        if not self.is_exist(item):
-            if item == "params":
-                return {}
-            return None
-        else:
-            return getattr(self, item)
-
-    def __repr__(self):
-        return str(self.__dict__.items())
-
-
-class OsloTrainerConfig(Config):
+class OsloTrainerConfig:
     """
     This object contains a Oslo feature configuration dictionary
 
@@ -230,8 +201,18 @@ class OsloTrainerConfig(Config):
     """
 
     def __init__(self, config_file_or_dict):
-        super(OsloTrainerConfig, self).__init__()
         self.cpu_offload = False
+        self.mixed_precision = False
+        self.activation_checkpointing = None
+        self.sequence_parallelism = None
+        self.data_parallelism = None
+        self.tensor_parallelism = None
+        self.pipeline_parallelism = None
+        self.expert_parallelism = None
+        self.backend = None
+        self.host = None
+        self.port = None
+
         if isinstance(config_file_or_dict, dict):
             # Don't modify user's data should they want to reuse it (e.g. in tests), because once we
             # modified it, it will not be accepted here again, since `auto` values would have been overridden
@@ -240,123 +221,130 @@ class OsloTrainerConfig(Config):
             with open(config_file_or_dict, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
         else:
-            raise ValueError("expecting either a path to a oslo config file or a dict")
+            raise ValueError("Expecting either a path to a oslo config file or a dict")
         _config_check(SUPPORTED_FEATURES, cfg)
-        super(OsloTrainerConfig, self).__init__(**cfg)
-        log_dist("*** OSLO CONFIG ***")
-        if not self.is_exist("backend") or not self.backend["name"]:
-            self.backend = "torch"
-        else:
-            assert (
-                self.backend in SupportedBackend
-            ), f'{self.backend} is not supported engine ({", ".join(SupportedBackend)})'
-            log_dist(f"backend engine: {self.backend}")
-        if cfg.backend != SupportedBackend.TORCH:
-            assert (
-                cfg.host and cfg.post
-            ), f"host, post is required to use {self.backend}"
 
-        if not self.is_exist("mixed_precision") or not self.mixed_precision["enable"]:
-            self.mixed_precision = None
-        else:
+        log_dist("*** OSLO CONFIG ***")
+
+        if "backend" not in cfg:
+            self.backend = SupportedBackend.TORCH
+        elif cfg["backend"] in SupportedBackend:
+            self.backend = SupportedBackend[cfg["backend"]]
+            if self.backend in [SupportedBackend.OPENMPI]:
+                if "host" in cfg["backend"]:
+                    self.host = cfg["backend"]["host"]
+                    log_dist(f"host: {self.host}")
+                else:
+                    log_dist(f"host is required to use {self.backend}")
+                if "port" in cfg["backend"]:
+                    self.port = cfg["backend"]["port"]
+                    log_dist(f"host: {self.host}")
+                else:
+                    ValueError(f"post is required to use {self.backend}")
+        log_dist(f"backend engine: {self.backend}")
+
+        if "mixed_precision" in cfg and cfg["mixed_precision"]["enable"] is True:
+            self.mixed_precision = True
             log_dist("mixed_precision: enabled")
 
-        if not self.is_exist("data_parallelism") or not self.data_parallelism["enable"]:
-            self.data_parallelism = None
-        else:
-            if self.data_parallelism["parallel_size"] is None:
+        if "data_parallelism" in cfg and cfg["data_parallelism"]["enable"] is True:
+            if cfg["data_parallelism"]["parallel_size"] is None:
                 log_dist(
                     "data_parallelism can not be usable because parallel_size is required.",
                     logging.WARNING,
                 )
-                self.data_parallelism = None
-
-            elif self.data_parallelism["zero_stage"] is None:
+            elif cfg["data_parallelism"]["zero_stage"] is None:
                 logging.warning(
                     "data_parallelism can not be usable because zero_stage is required."
                 )
-                self.data_parallelism = None
             else:
-                log_dist(
-                    f"data_parallelism: enabled\n\tparallel_size: {self.data_parallelism['parallel_size']}\n\tzero_stage: {self.data_parallelism['zero_stage']}"
-                )
                 if (
-                    hasattr(self.data_parallelism, "params")
-                    and self.data_parallelism.params["cpu_offload"]
+                    "params" in cfg["data_parallelism"]
+                    and cfg["data_parallelism"]["params"]["cpu_offload"]
                 ):
                     self.cpu_offload = True
+                self.data_parallelism = cfg["data_parallelism"]
+                log_dist(
+                    f"data_parallelism: enabled"
+                    f"\tparallel_size: {self.data_parallelism['parallel_size']}"
+                    f"\tzero_stage: {self.data_parallelism['zero_stage']}"
+                    f"\tcpu_offload: {self.cpu_offload}"
+                )
 
         if (
-            not self.is_exist("sequence_parallelism")
-            or not self.sequence_parallelism["enable"]
+            "sequence_parallelism" in cfg
+            and cfg["sequence_parallelism"]["enable"] is True
         ):
-            self.sequence_parallelism = None
-        else:
-            if self.sequence_parallelism["parallel_size"] is None:
+            if cfg["sequence_parallelism"]["parallel_size"] is None:
                 log_dist(
                     "sequence_parallelism can not be usable because parallel_size is required.",
                     logging.WARNING,
                 )
-                self.sequence_parallelism = None
             else:
+                self.sequence_parallelism = cfg["sequence_parallelism"]
                 log_dist(
                     f"sequence_parallelism: enabled\n\tparallel_size: {self.sequence_parallelism['parallel_size']}"
                 )
 
-        if (
-            not self.is_exist("tensor_parallelism")
-            or not self.tensor_parallelism["enable"]
-        ):
-            self.tensor_parallelism = None
-        else:
-            if self.tensor_parallelism["parallel_size"] is None:
+        if "tensor_parallelism" in cfg and cfg["tensor_parallelism"]["enable"] is True:
+            if cfg["tensor_parallelism"]["parallel_size"] is None:
                 ValueError(
                     "tensor_parallelism can not be usable because parallel_size is required."
                 )
-            elif self.tensor_parallelism["parallel_mode"] is None:
+            elif cfg["tensor_parallelism"]["parallel_mode"] is None:
                 log_dist(
                     "tensor_parallelism can not be usable because parallel_mode is required.",
                     logging.WARNING,
                 )
-                self.tensor_parallelism = None
             else:
+                self.tensor_parallelism = cfg["tensor_parallelism"]
                 log_dist(
                     f"tensor_parallelism: enabled\n\tparallel_size: {self.tensor_parallelism['parallel_size']}\n\tparallel_mode: {self.tensor_parallelism['parallel_mode']}"
                 )
 
         if (
-            not self.is_exist("pipeline_parallelism")
-            or not self.pipeline_parallelism["enable"]
+            "pipeline_parallelism" in cfg
+            and cfg["pipeline_parallelism"]["enable"] is True
         ):
-            self.pipeline_parallelism = None
-        else:
-            if self.pipeline_parallelism["parallel_size"] is None:
+            if cfg["pipeline_parallelism"]["parallel_size"] is None:
                 log_dist(
                     "pipeline_parallelism can not be usable because parallel_size is required.",
                     logging.WARNING,
                 )
                 self.pipeline_parallelism = None
             else:
+                self.pipeline_parallelism = cfg["pipeline_parallelism"]
                 log_dist(
                     f"pipeline_parallelism: enabled\n\tparallel_size: {self.pipeline_parallelism['parallel_size']}"
                 )
 
-        if (
-            not self.is_exist("expert_parallelism")
-            or not self.expert_parallelism["enable"]
-        ):
-            self.expert_parallelism = None
-        else:
-            if self.expert_parallelism["parallel_size"] is None:
+        if "expert_parallelism" in cfg and cfg["expert_parallelism"]["enable"] is True:
+            if cfg["expert_parallelism"]["parallel_size"] is None:
                 log_dist(
                     "expert_parallelism can not be usable because parallel_size is required.",
                     logging.WARNING,
                 )
-                self.expert_parallelism = None
             else:
+                self.expert_parallelism = cfg["expert_parallelism"]
                 log_dist(
                     f"expert_parallelism: enabled\n\tparallel_size: {self.expert_parallelism['parallel_size']}"
                 )
+
+    def is_exist(self, item):
+        if item not in self.__dict__:
+            return False
+        return True
+
+    def __getitem__(self, item):
+        if not self.is_exist(item):
+            if item == "params":
+                return {}
+            return None
+        else:
+            return getattr(self, item)
+
+    def __repr__(self):
+        return str(self.__dict__.items())
 
 
 def init_oslo_features(
@@ -376,16 +364,16 @@ def init_oslo_features(
     """
     cfg = oslo_init_config
     data_parallel_size = (
-        cfg.data_parallelism.parallel_size if cfg.data_parallelism else 1
+        cfg.data_parallelism["parallel_size"] if cfg.data_parallelism else 1
     )
     sequence_parallel_size = (
-        cfg.sequence_parallelism.parallel_size if cfg.sequence_parallelism else 1
+        cfg.sequence_parallelism["parallel_size"] if cfg.sequence_parallelism else 1
     )
     expert_parallel_size = (
-        cfg.expert_parallelism.parallel_size if cfg.expert_parallelism else 1
+        cfg.expert_parallelism["parallel_size"] if cfg.expert_parallelism else 1
     )
     pipeline_parallel_size = (
-        cfg.pipeline_parallelism.parallel_size if cfg.pipeline_parallelism else 1
+        cfg.pipeline_parallelism["parallel_size"] if cfg.pipeline_parallelism else 1
     )
     tensor_parallel_size, tensor_parallel_depth, tensor_parallel_mode = (
         1,
@@ -393,12 +381,17 @@ def init_oslo_features(
         TENSOR_PARALLEL_MAPPING["1d"],
     )
     if cfg.tensor_parallelism:
-        tensor_parallel_size = cfg.tensor_parallelism.parallel_size
+        tensor_parallel_size = cfg.tensor_parallelism["parallel_size"]
         tensor_parallel_mode = TENSOR_PARALLEL_MAPPING[
-            cfg.tensor_parallelism.parallel_mode
+            cfg.tensor_parallelism["parallel_mode"]
         ]
-        if cfg.tensor_parallelism.is_exist("param"):
-            tensor_parallel_depth = cfg.tensor_parallelism.param["parallel_depth_2.5d"]
+        if (
+            "param" in cfg.tensor_parallelism
+            and "parallel_depth_2.5d" in cfg.tensor_parallelism["param"]
+        ):
+            tensor_parallel_depth = cfg.tensor_parallelism["param"][
+                "parallel_depth_2.5d"
+            ]
 
     if cfg.backend == SupportedBackend.TORCH:
         parallel_context = ParallelContext.from_torch(
