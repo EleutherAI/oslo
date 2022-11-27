@@ -228,11 +228,10 @@ class OsloTrainerConfig:
 
         log_dist("*** OSLO CONFIG ***")
 
-        if not 'backend' in cfg:
-            self.backend = "torch"
+        if 'backend' not in cfg:
+            self.backend = SupportedBackend.TORCH
         elif cfg['backend'] in SupportedBackend:
             self.backend = SupportedBackend[cfg['backend']]
-            log_dist(f"backend engine: {self.backend}")
             if self.backend in [SupportedBackend.OPENMPI]:
                 if 'host' in cfg['backend']:
                     self.host = cfg['backend']['host']
@@ -243,13 +242,14 @@ class OsloTrainerConfig:
                     self.port = cfg['backend']['port']
                     log_dist(f"host: {self.host}")
                 else:
-                    log_dist(f"post is required to use {self.backend}")
+                    ValueError(f"post is required to use {self.backend}")
+        log_dist(f"backend engine: {self.backend}")
 
-        if 'mixed_precision' not in cfg and cfg['mixed_precision']['enable'] is True:
+        if 'mixed_precision' in cfg and cfg['mixed_precision']['enable'] is True:
             self.mixed_precision = True
             log_dist("mixed_precision: enabled")
 
-        if 'data_parallelism' not in cfg and cfg['data_parallelism']['enable'] is True:
+        if 'data_parallelism' in cfg and cfg['data_parallelism']['enable'] is True:
             if cfg['data_parallelism']["parallel_size"] is None:
                 log_dist(
                     "data_parallelism can not be usable because parallel_size is required.",
@@ -271,7 +271,7 @@ class OsloTrainerConfig:
                     f"\tcpu_offload: {self.cpu_offload}"
                 )
 
-        if 'sequence_parallelism' not in cfg and cfg['sequence_parallelism']['enable'] is True:
+        if 'sequence_parallelism' in cfg and cfg['sequence_parallelism']['enable'] is True:
             if cfg['sequence_parallelism']["parallel_size"] is None:
                 log_dist(
                     "sequence_parallelism can not be usable because parallel_size is required.",
@@ -283,7 +283,7 @@ class OsloTrainerConfig:
                     f"sequence_parallelism: enabled\n\tparallel_size: {self.sequence_parallelism['parallel_size']}"
                 )
 
-        if 'tensor_parallelism' not in cfg and cfg['tensor_parallelism']['enable'] is True:
+        if 'tensor_parallelism' in cfg and cfg['tensor_parallelism']['enable'] is True:
             if cfg['tensor_parallelism']["parallel_size"] is None:
                 ValueError(
                     "tensor_parallelism can not be usable because parallel_size is required."
@@ -299,7 +299,7 @@ class OsloTrainerConfig:
                     f"tensor_parallelism: enabled\n\tparallel_size: {self.tensor_parallelism['parallel_size']}\n\tparallel_mode: {self.tensor_parallelism['parallel_mode']}"
                 )
 
-        if 'pipeline_parallelism' not in cfg and cfg['pipeline_parallelism']['enable'] is True:
+        if 'pipeline_parallelism' in cfg and cfg['pipeline_parallelism']['enable'] is True:
             if cfg['pipeline_parallelism']["parallel_size"] is None:
                 log_dist(
                     "pipeline_parallelism can not be usable because parallel_size is required.",
@@ -312,7 +312,7 @@ class OsloTrainerConfig:
                     f"pipeline_parallelism: enabled\n\tparallel_size: {self.pipeline_parallelism['parallel_size']}"
                 )
 
-        if 'expert_parallelism' not in cfg and cfg['expert_parallelism']['enable'] is True:
+        if 'expert_parallelism' in cfg and cfg['expert_parallelism']['enable'] is True:
             if cfg['expert_parallelism']["parallel_size"] is None:
                 log_dist(
                     "expert_parallelism can not be usable because parallel_size is required.",
@@ -356,13 +356,13 @@ def init_oslo_features(
     >> allocate_params(wrapper_model, parallel_context)
     """
     cfg = oslo_init_config
-    data_parallel_size = (cfg.data_parallelism.parallel_size
+    data_parallel_size = (cfg.data_parallelism['parallel_size']
                           if cfg.data_parallelism else 1)
-    sequence_parallel_size = (cfg.sequence_parallelism.parallel_size
+    sequence_parallel_size = (cfg.sequence_parallelism['parallel_size']
                               if cfg.sequence_parallelism else 1)
-    expert_parallel_size = (cfg.expert_parallelism.parallel_size
+    expert_parallel_size = (cfg.expert_parallelism['parallel_size']
                             if cfg.expert_parallelism else 1)
-    pipeline_parallel_size = (cfg.pipeline_parallelism.parallel_size
+    pipeline_parallel_size = (cfg.pipeline_parallelism['parallel_size']
                               if cfg.pipeline_parallelism else 1)
     tensor_parallel_size, tensor_parallel_depth, tensor_parallel_mode = (
         1,
@@ -370,11 +370,11 @@ def init_oslo_features(
         TENSOR_PARALLEL_MAPPING["1d"],
     )
     if cfg.tensor_parallelism:
-        tensor_parallel_size = cfg.tensor_parallelism.parallel_size
+        tensor_parallel_size = cfg.tensor_parallelism['parallel_size']
         tensor_parallel_mode = TENSOR_PARALLEL_MAPPING[
-            cfg.tensor_parallelism.parallel_mode]
-        if cfg.tensor_parallelism.is_exist("param"):
-            tensor_parallel_depth = cfg.tensor_parallelism.param[
+            cfg.tensor_parallelism['parallel_mode']]
+        if 'param' in cfg.tensor_parallelism and 'parallel_depth_2.5d' in cfg.tensor_parallelism['param']:
+            tensor_parallel_depth = cfg.tensor_parallelism['param'][
                 "parallel_depth_2.5d"]
 
     if cfg.backend == SupportedBackend.TORCH:
