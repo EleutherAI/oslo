@@ -2,7 +2,7 @@ import json
 import logging
 from enum import Enum
 from copy import deepcopy
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from dataclasses import dataclass
 from oslo.torch.distributed import ParallelContext
 from oslo.torch.nn.parallel import (
@@ -16,7 +16,7 @@ from oslo.torch.nn.parallel.data_parallel._ddp.distributed_data_parallel import 
 )
 from oslo.torch.distributed.parallel_mode import ParallelMode
 from .trainer_utils import log_dist
-
+import os 
 NoneType = type(None)
 
 
@@ -104,7 +104,6 @@ SUPPORTED_FEATURES = {
 
 def _config_check(arg, user_config):
     # assert len(user_config) > 0, "There are no arguments in dictionary."
-
     if isinstance(user_config, dict):
         for k in user_config:
             if isinstance(arg, dict):
@@ -200,7 +199,7 @@ class OsloTrainerConfig:
 
     """
 
-    def __init__(self, config_file_or_dict):
+    def __init__(self, config_file_or_dict  : Union[dict,str,None] = None):
         self.cpu_offload = False
         self.mixed_precision = False
         self.activation_checkpointing = None
@@ -212,7 +211,8 @@ class OsloTrainerConfig:
         self.backend = None
         self.host = None
         self.port = None
-
+        
+        
         if isinstance(config_file_or_dict, dict):
             # Don't modify user's data should they want to reuse it (e.g. in tests), because once we
             # modified it, it will not be accepted here again, since `auto` values would have been overridden
@@ -221,9 +221,24 @@ class OsloTrainerConfig:
             with open(config_file_or_dict, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
         else:
-            raise ValueError("Expecting either a path to a oslo config file or a dict")
+            logging.warning("*you must initialize 'config_file_or_dict' parameter for oslo config. See SUPPORTED_FEATURES above*")
+            world_size = int(os.environ["WORLD_SIZE"])
+            cfg = {
+                "data_parallelism": {
+                    "enable": True,
+                    "parallel_size": world_size, # you can adjust parallel_size 
+                    "zero_stage": 0, # zero_stage:0 -> original DDP
+                },
+                "tensor_parallelism": {
+                    "enable": False,
+                    "parallel_size": 1,
+                    "parallel_mode": "1d",
+                },
+                "sequence_parallelism": {"enable": False, "parallel_size": 1},
+                "pipeline_parallelism": {"enable": False, "parallel_size": 1},
+                
+            }
         _config_check(SUPPORTED_FEATURES, cfg)
-
         log_dist("*** OSLO CONFIG ***")
 
         if "backend" not in cfg:
