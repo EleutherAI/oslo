@@ -223,11 +223,10 @@ class OsloTrainerConfig:
             logging.warning(
                 "*you must initialize 'config_file_or_dict' parameter for oslo config. See SUPPORTED_FEATURES above*"
             )
-            world_size = int(os.environ["WORLD_SIZE"])
             cfg = {
                 "data_parallelism": {
-                    "enable": True,
-                    "parallel_size": world_size,  # you can adjust parallel_size
+                    "enable": False,
+                    "parallel_size": 1,  # you can adjust parallel_size
                     "zero_stage": 0,  # zero_stage:0 -> original DDP
                 },
                 "tensor_parallelism": {
