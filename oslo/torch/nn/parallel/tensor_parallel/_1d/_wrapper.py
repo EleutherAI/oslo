@@ -3,6 +3,7 @@ import copy
 import torch
 import torch.distributed as dist
 import torch.nn as nn
+import transformers
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.distributed.nn.functional import (
@@ -246,7 +247,7 @@ class _TensorParallel1D(nn.Module):
                     )
 
                     if isinstance(module_head, nn.Linear) or isinstance(
-                        module_head, nn.Conv1D
+                        module_head, transformers.Conv1D
                     ):
                         if class_replace:
                             module_head.__class__ = ColLinear1D

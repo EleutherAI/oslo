@@ -106,7 +106,7 @@ class _TensorParallel2D(nn.Module):
             if isinstance(module, nn.Embedding):
                 self._slice_embedding(
                     module=module,
-                    class_module=self.tensor_parallel_mapping.class_replace(
+                    class_replace=self.tensor_parallel_mapping.class_replace(
                         self.module, module_name
                     ),
                 )
@@ -115,7 +115,7 @@ class _TensorParallel2D(nn.Module):
         for module_name, module in self.module.named_modules():
             if self.tensor_parallel_mapping.is_column_parallel(
                 self.module, module_name
-            ) or self.tensor_parallel_mapping.is_row_parallel(self.module, param_name):
+            ) or self.tensor_parallel_mapping.is_row_parallel(self.module, module_name):
                 self._slice_linear(
                     module=module,
                     reversed=self.tensor_parallel_mapping.is_reversed(
@@ -125,7 +125,7 @@ class _TensorParallel2D(nn.Module):
                         self.module, module_name, module
                     ),
                     slice_bias=True,
-                    class_module=self.tensor_parallel_mapping.class_replace(
+                    class_replace=self.tensor_parallel_mapping.class_replace(
                         self.module, module_name
                     ),
                 )
@@ -135,7 +135,7 @@ class _TensorParallel2D(nn.Module):
             if isinstance(module, nn.LayerNorm):
                 self._slice_layernorm(
                     module=module,
-                    class_module=self.tensor_parallel_mapping.class_replace(
+                    class_replace=self.tensor_parallel_mapping.class_replace(
                         self.module, module_name
                     ),
                 )
@@ -153,7 +153,7 @@ class _TensorParallel2D(nn.Module):
                     gather_output=self.tensor_parallel_mapping.is_gather_output(
                         self.module, module_name
                     ),
-                    class_module=self.tensor_parallel_mapping.class_replace(
+                    class_replace=self.tensor_parallel_mapping.class_replace(
                         self.module, module_name
                     ),
                 )
@@ -544,7 +544,7 @@ class _TensorParallel2D(nn.Module):
 
     def _gather_head(self, module: Linear2D, class_replace):
         if module.weight is not self.module.get_input_embeddings().weight:
-            return self._gather_linear(module)
+            return self._gather_linear(module, class_replace)
         elif hasattr(module, "bias") and module.bias is not None:
             summa_dim = self.parallel_context.get_world_size(ParallelMode.TENSOR_2D_ROW)
 

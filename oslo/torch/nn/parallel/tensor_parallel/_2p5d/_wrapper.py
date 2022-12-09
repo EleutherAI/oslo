@@ -589,7 +589,7 @@ class _TensorParallel2p5D(nn.Module):
 
     def _gather_head(self, module: Linear2p5D, class_replace):
         if module.weight is not self.module.get_input_embeddings().weight:
-            return self._gather_linear(module)
+            return self._gather_linear(module, class_replace)
         elif hasattr(module, "bias") and module.bias is not None:
             tesseract_dim = self.parallel_context.get_world_size(
                 ParallelMode.TENSOR_2P5D_COL

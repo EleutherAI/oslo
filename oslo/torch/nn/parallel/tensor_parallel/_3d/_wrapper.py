@@ -103,10 +103,13 @@ class _TensorParallel3D(nn.Module):
                     setattr(module, elem.name, reduced_arg)
 
     def _parallelize_embedding(self):
-        for module in self.module.modules():
+        for module_name, module in self.module.named_modules():
             if isinstance(module, nn.Embedding):
                 self._slice_embedding(
                     module=module,
+                    class_replace=self.tensor_parallel_mapping.class_replace(
+                        self.module, module_name
+                    ),
                 )
 
     def _parallelize_linear(self):
@@ -571,7 +574,7 @@ class _TensorParallel3D(nn.Module):
 
     def _gather_head(self, module: Linear3D, class_replace):
         if module.weight is not self.module.get_input_embeddings().weight:
-            return self._gather_linear(module)
+            return self._gather_linear(module, class_replace)
         elif hasattr(module, "bias") and module.bias is not None:
             tesseract_dim = self.parallel_context.get_world_size(
                 ParallelMode.TENSOR_3D_INPUT
