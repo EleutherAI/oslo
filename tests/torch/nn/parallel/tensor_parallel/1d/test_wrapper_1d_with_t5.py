@@ -39,7 +39,9 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 tokenizer.pad_token = tokenizer.eos_token
 
 # 모델 생성 및 병렬화 수행
-model_no_tp = BartForConditionalGeneration(BartConfig.from_pretrained(model_name)).cuda()
+model_no_tp = BartForConditionalGeneration(
+    BartConfig.from_pretrained(model_name)
+).cuda()
 model_tp = BartForConditionalGeneration(BartConfig.from_pretrained(model_name))
 wrapper_tp = TensorParallel(
     model_tp, parallel_context, memory_priority=args.memory_priority
