@@ -1,7 +1,7 @@
+import argparse
 import os
 import random
 import time
-import argparse
 
 import numpy as np
 import torch
@@ -19,7 +19,6 @@ from transformers import (
 import oslo
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel.tensor_parallel import TensorParallel
-from oslo.torch.nn.parallel.utils import allocate_params
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--memory_priority", action="store_true", default=False)

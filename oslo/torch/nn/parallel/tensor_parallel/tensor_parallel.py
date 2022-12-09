@@ -23,6 +23,7 @@ from oslo.torch.nn.parallel.tensor_parallel.mapping import (
 from oslo.torch.nn.parallel.utils import (
     get_parallel_context,
     add_wrapper,
+    is_oslo_model,
 )
 from oslo.transformers.mapping_utils import (
     _TensorParallelMapping,

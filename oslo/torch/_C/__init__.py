@@ -8,7 +8,6 @@ from torch.utils import cpp_extension
 
 from oslo.torch.jit._utils import _set_jit_fusion_options
 
-_SOFTMAX_KERNEL = None
 _ADAM_KERNEL = None
 _ADAGRAD_KERNEL = None
 _NOVOGRAD_KERNEL = None
@@ -29,22 +28,6 @@ WARNING = f"{YELLOW} [WARNING] {END}"
 
 TORCH_MAJOR = int(torch.__version__.split(".")[0])
 TORCH_MINOR = int(torch.__version__.split(".")[1])
-
-
-def get_softmax_kernel():
-    global _SOFTMAX_KERNEL
-
-    try:
-        if _SOFTMAX_KERNEL is None:
-            _set_jit_fusion_options()
-            _SOFTMAX_KERNEL = FusedScaleMaskSoftmaxBinder().bind()
-    except Exception:
-        raise EnvironmentError(
-            "Failed compiling custom CUDA kernels. "
-            "please check your CUDA environment."
-        )
-
-    return _SOFTMAX_KERNEL
 
 
 def get_adam_kernel():
@@ -554,19 +537,6 @@ class FusedLayerNormBinder(Binder):
         return [
             "fused_layer_norm.cu",
             "FusedLayerNormBinder.cpp",
-        ]
-
-
-class FusedScaleMaskSoftmaxBinder(Binder):
-    @property
-    def name(self):
-        return "oslo_softmax"
-
-    def sources(self):
-        return [
-            "fused_scaled_masked_softmax.cu",
-            "fused_scaled_upper_triang_masked_softmax.cu",
-            "FusedScaleMaskSoftmaxBinder.cpp",
         ]
 
 

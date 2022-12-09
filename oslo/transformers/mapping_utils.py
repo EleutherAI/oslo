@@ -82,27 +82,6 @@ class _ParallelMapping(object):
         return mapping_by_model
 
 
-class _FullyShardedDataParallelMapping(_ParallelMapping):
-    __MAPPING__ = {
-        "Albert": ["AlbertLayer"],
-        "Bart": ["BartLayer"],
-        "Bert": ["BertLayer"],
-        "Blenderbot": ["BlenderbotEncoderLayer", "BlenderbotDecoderLayer"],
-        "BlenderbotSmall": [
-            "BlenderbotSmallEncoderLayer",
-            "BlenderbotSmallDecoderLayer",
-        ],
-        "T5": ["T5Block"],
-        "GPT2": ["GPT2Block"],
-        "GPTNeo": ["GPTNeoBlock"],
-        "GPTNeoX": ["GPTNeoXLayer"],
-        "GPTJ": ["GPTJBlock"],
-        "OPT": ["OPTDecoderLayer"],
-        "Electra": ["ElectraLayer"],
-        "Roberta": ["RobertaLayer"],
-    }
-
-
 class _TensorParallelMapping(_ParallelMapping):
     __MAPPING__ = {
         "Albert": [
@@ -162,8 +141,16 @@ class _TensorParallelMapping(_ParallelMapping):
             Head("lm_head"),
         ],
         "T5": [
-            Column("q", "k", "v", "DenseReluDense.wi"),
-            Row("o", "DenseReluDense.wo", "relative_attention_bias"),
+            Column(
+                "q",
+                "k",
+                "v",
+                "DenseReluDense.wi",
+                "DenseReluDense.wi_0",
+                "DenseReluDense.wi_1",
+            ),
+            Row("o", "DenseReluDense.wo"),
+            Row("relative_attention_bias", class_replace=False),
             Update("d_model", "n_heads", "inner_dim"),
             Head("lm_head"),
         ],

@@ -7,16 +7,15 @@ import torch
 import torch.utils.checkpoint
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
-from oslo.torch.distributed.parallel_mode import ParallelMode
 
 import oslo.torch.nn as onn
+import oslo.torch.nn.modules.functional as F
+from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn import (
     VocabParallelCrossEntropyLoss1D,
     VocabParallelCrossEntropyLoss2D,
     VocabParallelCrossEntropyLoss2p5D,
-    VocabParallelCrossEntropyLoss3D,
 )
-import oslo.torch.nn.modules.functional as F
 from oslo.transformers.modeling_utils import OsloModel
 
 try:
@@ -259,52 +258,25 @@ class MBartAttention(nn.Module):
         attn_weights = attn_weights.view(bsz, self.num_heads, tgt_len, src_len)
 
         if self.is_decoder:
-            if F._is_fused_scale_mask_softmax_available(
-                input=attn_weights,
-                scale=1.0,
-                use_triang_mask=True,
-                softmax_in_fp32=False,
-            ):
-                attn_weights = F._fused_scale_mask_softmax_cuda(
-                    input=attn_weights,
-                    scale=1.0,
-                    use_triang_mask=True,
-                    pad_mask=attention_mask,
-                ).view(bsz * self.num_heads, tgt_len, src_len)
-            else:
-                if attention_mask is not None:
-                    if attention_mask.size() != (bsz, 1, tgt_len, src_len):
-                        raise ValueError(
-                            f"Attention mask should be of size {(bsz, 1, tgt_len, src_len)}, but is {attention_mask.size()}"
-                        )
-                    attn_weights = attn_weights + attention_mask
+            if attention_mask is not None:
+                if attention_mask.size() != (bsz, 1, tgt_len, src_len):
+                    raise ValueError(
+                        f"Attention mask should be of size {(bsz, 1, tgt_len, src_len)}, but is {attention_mask.size()}"
+                    )
+                attn_weights = attn_weights + attention_mask
 
-                attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
-                attn_weights = nn.functional.softmax(attn_weights, dim=-1)
+            attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
+            attn_weights = nn.functional.softmax(attn_weights, dim=-1)
         else:
-            if F._is_fused_scale_mask_softmax_available(
-                input=attn_weights,
-                scale=1.0,
-                use_triang_mask=False,
-                softmax_in_fp32=False,
-            ):
-                attention_mask = attention_mask[:, :, 0, :].unsqueeze(2).contiguous()
-                attn_weights = F._fused_scale_mask_softmax_cuda(
-                    input=attn_weights,
-                    scale=1.0,
-                    use_triang_mask=False,
-                    pad_mask=attention_mask,
-                ).view(bsz * self.num_heads, tgt_len, src_len)
-            else:
-                if attention_mask is not None:
-                    if attention_mask.size() != (bsz, 1, tgt_len, src_len):
-                        raise ValueError(
-                            f"Attention mask should be of size {(bsz, 1, tgt_len, src_len)}, but is {attention_mask.size()}"
-                        )
-                    attn_weights = attn_weights + attention_mask
+            if attention_mask is not None:
+                if attention_mask.size() != (bsz, 1, tgt_len, src_len):
+                    raise ValueError(
+                        f"Attention mask should be of size {(bsz, 1, tgt_len, src_len)}, but is {attention_mask.size()}"
+                    )
+                attn_weights = attn_weights + attention_mask
 
-                attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
-                attn_weights = nn.functional.softmax(attn_weights, dim=-1)
+            attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
+            attn_weights = nn.functional.softmax(attn_weights, dim=-1)
 
         if layer_head_mask is not None:
             if layer_head_mask.size() != (self.num_heads,):
@@ -1381,9 +1353,7 @@ class MBartForConditionalGeneration(MBartPreTrainedModel):
                 elif (
                     self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D
                 ):
-                    loss_lm = VocabParallelCrossEntropyLoss3D(
-                        parallel_context=self.parallel_context
-                    )
+                    loss_lm = CrossEntropyLoss()
             else:
                 loss_lm = CrossEntropyLoss()
             masked_lm_loss = loss_lm(
@@ -1874,9 +1844,7 @@ class MBartForCausalLM(MBartPreTrainedModel):
                 elif (
                     self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D
                 ):
-                    loss_lm = VocabParallelCrossEntropyLoss3D(
-                        parallel_context=self.parallel_context
-                    )
+                    loss_lm = CrossEntropyLoss()
             else:
                 loss_lm = CrossEntropyLoss()
             loss = loss_lm(logits.view(-1, partition_vocab_size), labels.view(-1))

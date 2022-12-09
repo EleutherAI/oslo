@@ -7,8 +7,6 @@ import torch
 import torch.distributed as dist
 from torch import nn
 
-from transformers import PreTrainedModel
-
 import oslo
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel.pipeline_parallel.pipeline_parallel import (

@@ -1,8 +1,9 @@
 import logging
 import warnings
 from typing import Dict, List
-from transformers import PreTrainedTokenizerBase
+
 from datasets.arrow_dataset import Batch
+from transformers import PreTrainedTokenizerBase
 
 from oslo.transformers.tasks.data_base import BaseProcessor
 

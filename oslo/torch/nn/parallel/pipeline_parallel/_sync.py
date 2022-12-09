@@ -4,7 +4,6 @@ from torch.distributed import rpc
 
 from oslo.torch.distributed.parallel_mode import ParallelMode
 
-
 # for watching whether every backward work is done or not
 _JOBS_REQUIRE_BACKWARD = set()
 

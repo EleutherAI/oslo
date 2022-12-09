@@ -1,23 +1,14 @@
 import os
 import random
-import time
 from functools import partial
 
 import numpy as np
-
 import torch
-import torch.nn as nn
 import torch.multiprocessing as mp
+from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel.expert_parallel.expert_parallel import _ExpertParallel
-from oslo.torch.nn.parallel.data_parallel.data_parallel import DistributedDataParallel
-
-
-from datasets import load_dataset
-from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel
-
-import wandb
 
 os.environ["TRANSFORMER_CACHE"] = "/fsx/seokung/.cache"
 
