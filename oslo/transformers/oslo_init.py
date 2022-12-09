@@ -1,19 +1,15 @@
 import json
 import logging
 from copy import deepcopy
-from typing import List, Tuple
 from dataclasses import dataclass
+from typing import List, Tuple
+
 from oslo.torch.distributed import ParallelContext
+from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn.parallel import (
     PipelineParallel,
     TensorParallel,
 )
-from oslo.torch.nn.parallel.sequence_parallel import SequenceParallel
-from oslo.torch.nn.parallel.data_parallel.data_parallel import DataParallel
-from oslo.torch.nn.parallel.data_parallel._ddp.distributed_data_parallel import (
-    DistributedDataParallel,
-)
-from oslo.torch.distributed.parallel_mode import ParallelMode
 from .trainer_utils import log_dist
 
 NoneType = type(None)
@@ -392,12 +388,8 @@ def init_oslo_features(
 
     model_wrapper = []
 
-    if data_parallel_size > 1:
-        model_wrapper.append(DataParallel)
     if tensor_parallel_size > 1:
         model_wrapper.append(TensorParallel)
-    if sequence_parallel_size > 1:
-        model_wrapper.append(SequenceParallel)
     if pipeline_parallel_size > 1:
         model_wrapper.append(PipelineParallel)
     # TODO expert mode

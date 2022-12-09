@@ -1,85 +1,51 @@
-import math
-import os
-import random
-import re
-import shutil
-import inspect
-from packaging import version
-import sys
 import contextlib
-import time
+import logging
+import math
+import sys
 from typing import (
-    TYPE_CHECKING,
     Any,
-    Callable,
     Dict,
     List,
     Optional,
-    Tuple,
     Union,
     Type,
     Mapping,
 )
-import logging
-from tqdm.auto import tqdm
-import datasets
-import numpy as np
+
 import torch
-import torch.distributed as dist
+
 from torch import nn
-from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
+from torch.utils.data import DataLoader, Dataset, RandomSampler
 from torch.utils.data.distributed import DistributedSampler
 from transformers import (
     DataCollatorWithPadding,
     PreTrainedTokenizerBase,
-    PreTrainedModel,
-    PretrainedConfig,
-    __version__,
-)
-from transformers.trainer_pt_utils import (
-    LabelSmoother,
-    IterableDatasetShard,
-    ShardSampler,
-    LengthGroupedSampler,
-    distributed_broadcast_scalars,
-    nested_numpify,
-    find_batch_size,
-    nested_concat,
-    nested_truncate,
-    nested_detach,
-    distributed_concat,
-    DistributedLengthGroupedSampler,
-    DistributedSamplerWithLoop,
-    get_parameter_names,
 )
 from transformers.trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
     ProgressCallback,
-    TrainerCallback,
     TrainerControl,
     TrainerState,
 )
+from transformers.trainer_pt_utils import (
+    IterableDatasetShard,
+    DistributedSamplerWithLoop,
+    get_parameter_names,
+)
+
 import oslo
 from oslo.torch.nn.parallel import (
     PipelineParallel,
     TensorParallel,
 )
-from oslo.torch.nn.parallel.sequence_parallel import SequenceParallel
-from oslo.torch.nn.parallel.data_parallel.data_parallel import DataParallel
-from oslo.torch.nn.parallel.data_parallel._ddp.distributed_data_parallel import (
-    DistributedDataParallel,
-)
+from oslo.torch.utils.checkpoint.activation_checkpointing import ActivationCheckpointing
 from oslo.transformers.data.data_collator import (
     DataCollator,
     default_data_collator,
 )
-from oslo.torch.utils.checkpoint.activation_checkpointing import ActivationCheckpointing
-from oslo.torch.nn.parallel.data_parallel._fsdp.sharded_grad_scaler import (
-    ShardedGradScaler,
-)
-from oslo.transformers.training_args import TrainingArguments
 from oslo.transformers.trainer_utils import OptimizerNames, log_dist
+from oslo.transformers.training_args import TrainingArguments
 
 TRAINING_ARGS_NAME = "training_args.bin"
 TRAINER_STATE_NAME = "trainer_state.json"
@@ -175,7 +141,7 @@ class Trainer:
         self.do_grad_scaling = False
         if args.fp16 or args.bf16:
             self.do_grad_scaling = True
-            self.scaler = ShardedGradScaler()
+            # self.scaler = ShardedGradScaler()
         # TODO Label Smoother
 
         self.state = TrainerState(
@@ -511,29 +477,29 @@ class Trainer:
                         parallel_context=self.parallel_context,
                         **self.args.oslo_config.pipeline_parallelism["params"],
                     )
-                elif wrapper == SequenceParallel:
-                    model = wrapper(
-                        model,
-                        parallel_context=self.parallel_context,
-                        **self.args.oslo_config.sequence_parallelism["params"],
-                    )
-                elif wrapper == DistributedDataParallel:
-                    # model = model.to()
-                    model = wrapper(
-                        model,
-                        parallel_context=self.parallel_context,
-                        **self.args.oslo_config.data_parallelism["params"],
-                    )
-                elif wrapper == DataParallel:
-                    self.create_optimizer()
-                    model, self.optimizer = wrapper(
-                        model,
-                        self.optimizer,
-                        parallel_context=self.parallel_context,
-                        zero_stage=self.args.oslo_config["data_parallelism"][
-                            "zero_stage"
-                        ],
-                    )
+                # elif wrapper == SequenceParallel:
+                #     model = wrapper(
+                #         model,
+                #         parallel_context=self.parallel_context,
+                #         **self.args.oslo_config.sequence_parallelism["params"],
+                #     )
+                # elif wrapper == DistributedDataParallel:
+                #     # model = model.to()
+                #     model = wrapper(
+                #         model,
+                #         parallel_context=self.parallel_context,
+                #         **self.args.oslo_config.data_parallelism["params"],
+                #     )
+                # elif wrapper == DataParallel:
+                #     self.create_optimizer()
+                #     model, self.optimizer = wrapper(
+                #         model,
+                #         self.optimizer,
+                #         parallel_context=self.parallel_context,
+                #         zero_stage=self.args.oslo_config["data_parallelism"][
+                #             "zero_stage"
+                #         ],
+                #     )
                 log_dist(f"Model wrapping with {wrapper}")
 
             oslo.ready(model, self.parallel_context)

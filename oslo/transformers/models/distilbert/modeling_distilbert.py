@@ -6,16 +6,15 @@ import torch
 from packaging import version
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
-from oslo.torch.distributed.parallel_mode import ParallelMode
 
 import oslo.torch.nn as onn
+import oslo.torch.nn.modules.functional as F
+from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn import (
     VocabParallelCrossEntropyLoss1D,
     VocabParallelCrossEntropyLoss2D,
     VocabParallelCrossEntropyLoss2p5D,
-    VocabParallelCrossEntropyLoss3D,
 )
-import oslo.torch.nn.modules.functional as F
 from oslo.transformers.modeling_utils import OsloModel
 
 try:
@@ -223,34 +222,17 @@ class MultiHeadSelfAttention(nn.Module):
         q = q / math.sqrt(dim_per_head)  # (bs, n_heads, q_length, dim_per_head)
         scores = torch.matmul(q, k.transpose(2, 3))  # (bs, n_heads, q_length, k_length)
 
-        if F._is_fused_scale_mask_softmax_available(
-            input=scores,
-            scale=1.0,
-            use_triang_mask=False,
-            softmax_in_fp32=False,
-        ):
-            if mask.dim() == 2:
-                mask = (mask == 0)[:, None, None, :]
-            elif mask.dim() == 3:
-                mask = (mask == 0)[:, :, None, :]
+        mask = (
+            (mask == 0).view(mask_reshp).expand_as(scores)
+        )  # (bs, n_heads, q_length, k_length)
+        scores = scores.masked_fill(
+            mask, torch.tensor(-float("inf"))
+        )  # (bs, n_heads, q_length, k_length)
 
-            weights = F._fused_scale_mask_softmax_cuda(
-                input=scores,
-                scale=1.0,
-                use_triang_mask=False,
-                pad_mask=mask,
-            )
-        else:
-            mask = (
-                (mask == 0).view(mask_reshp).expand_as(scores)
-            )  # (bs, n_heads, q_length, k_length)
-            scores = scores.masked_fill(
-                mask, torch.tensor(-float("inf"))
-            )  # (bs, n_heads, q_length, k_length)
+        weights = nn.functional.softmax(
+            scores, dim=-1
+        )  # (bs, n_heads, q_length, k_length)
 
-            weights = nn.functional.softmax(
-                scores, dim=-1
-            )  # (bs, n_heads, q_length, k_length)
         weights = self.dropout(weights)  # (bs, n_heads, q_length, k_length)
 
         # Mask heads if we want to
@@ -592,9 +574,7 @@ class DistilBertForMaskedLM(DistilBertPreTrainedModel):
                     parallel_context=self.parallel_context
                 )
             elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D:
-                self.mlm_loss_fct = VocabParallelCrossEntropyLoss3D(
-                    parallel_context=self.parallel_context
-                )
+                self.mlm_loss_fct = CrossEntropyLoss()
         else:
             self.mlm_loss_fct = CrossEntropyLoss()
 

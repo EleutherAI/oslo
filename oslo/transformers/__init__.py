@@ -1,23 +1,3 @@
-from oslo.transformers.models.gpt2.modeling_gpt2 import (
-    GPT2Model,
-    GPT2LMHeadModel,
-    GPT2DoubleHeadsModel,
-    GPT2ForSequenceClassification,
-    GPT2ForTokenClassification,
-    GPT2PreTrainedModel,
-)
-
-from oslo.transformers.models.bert.modeling_bert import (
-    BertForPreTraining,
-    BertLMHeadModel,
-    BertForMaskedLM,
-    BertForNextSentencePrediction,
-    BertForQuestionAnswering,
-    BertForSequenceClassification,
-    BertForTokenClassification,
-    BertForMultipleChoice,
-)
-
 from oslo.transformers.models.albert.modeling_albert import (
     AlbertPreTrainedModel,
     AlbertModel,
@@ -30,7 +10,6 @@ from oslo.transformers.models.albert.modeling_albert import (
     AlbertForQuestionAnswering,
     AlbertForMultipleChoice,
 )
-
 from oslo.transformers.models.bart.modeling_bart import (
     BartPretrainedModel,
     PretrainedBartModel,
@@ -43,8 +22,16 @@ from oslo.transformers.models.bart.modeling_bart import (
     BartDecoderWrapper,
     BartForCausalLM,
 )
-
-
+from oslo.transformers.models.bert.modeling_bert import (
+    BertForPreTraining,
+    BertLMHeadModel,
+    BertForMaskedLM,
+    BertForNextSentencePrediction,
+    BertForQuestionAnswering,
+    BertForSequenceClassification,
+    BertForTokenClassification,
+    BertForMultipleChoice,
+)
 from oslo.transformers.models.distilbert.modeling_distilbert import (
     DistilBertPreTrainedModel,
     DistilBertModel,
@@ -54,7 +41,6 @@ from oslo.transformers.models.distilbert.modeling_distilbert import (
     DistilBertForTokenClassification,
     DistilBertForMultipleChoice,
 )
-
 from oslo.transformers.models.electra.modeling_electra import (
     ElectraPreTrainedModel,
     ElectraModel,
@@ -66,7 +52,14 @@ from oslo.transformers.models.electra.modeling_electra import (
     ElectraForMultipleChoice,
     ElectraForCausalLM,
 )
-
+from oslo.transformers.models.gpt2.modeling_gpt2 import (
+    GPT2Model,
+    GPT2LMHeadModel,
+    GPT2DoubleHeadsModel,
+    GPT2ForSequenceClassification,
+    GPT2ForTokenClassification,
+    GPT2PreTrainedModel,
+)
 from oslo.transformers.models.mbart.modeling_mbart import (
     MBartPreTrainedModel,
     MBartEncoder,
@@ -78,13 +71,11 @@ from oslo.transformers.models.mbart.modeling_mbart import (
     MBartDecoderWrapper,
     MBartForCausalLM,
 )
-
 from oslo.transformers.models.mt5.modeling_mt5 import (
     MT5Model,
     MT5ForConditionalGeneration,
     MT5EncoderModel,
 )
-
 from oslo.transformers.models.roberta.modeling_roberta import (
     RobertaPreTrainedModel,
     RobertaModel,
@@ -96,7 +87,6 @@ from oslo.transformers.models.roberta.modeling_roberta import (
     RobertaClassificationHead,
     RobertaForQuestionAnswering,
 )
-
 from oslo.transformers.models.t5.modeling_t5 import (
     T5PreTrainedModel,
     T5Stack,

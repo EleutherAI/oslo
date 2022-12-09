@@ -4,23 +4,15 @@ import time
 from functools import partial
 
 import numpy as np
-
 import torch
 import torch.distributed as dist
-import torch.nn as nn
 import torch.multiprocessing as mp
-
+import wandb
+from datasets import load_dataset
+from deepspeed.moe.layer import MoE
 from torch.optim import Adam
 from torch.utils.data import DataLoader
-
-import deepspeed
-from deepspeed.utils import groups
-from deepspeed.moe.layer import MoE
-
-from datasets import load_dataset
 from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel
-
-import wandb
 
 torch.set_printoptions(threshold=10_000)
 

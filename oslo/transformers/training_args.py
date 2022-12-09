@@ -1,12 +1,13 @@
-import os
 import math
+import os
 from dataclasses import asdict, dataclass, field
 from typing import List, Optional, Union
-from enum import Enum
+
 import torch
 from transformers.trainer_utils import SchedulerType, IntervalStrategy
-from oslo.transformers.trainer_utils import OptimizerNames
+
 from oslo.torch.distributed.parallel_mode import ParallelMode
+from oslo.transformers.trainer_utils import OptimizerNames
 
 
 @dataclass

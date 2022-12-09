@@ -7,13 +7,13 @@ from oslo.torch.nn.parallel.pipeline_parallel._buffers import (
     save_activation,
     pop_activation,
 )
-from oslo.torch.nn.parallel.pipeline_parallel._sync import (
-    register_job_requires_backward,
-    notify_backward_job_done,
-)
 from oslo.torch.nn.parallel.pipeline_parallel._messages import (
     pack_tensor_stub,
     unpack_tensor_stub,
+)
+from oslo.torch.nn.parallel.pipeline_parallel._sync import (
+    register_job_requires_backward,
+    notify_backward_job_done,
 )
 
 

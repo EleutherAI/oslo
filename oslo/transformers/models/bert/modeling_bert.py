@@ -7,16 +7,14 @@ import torch.utils.checkpoint
 from packaging import version
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
-from oslo.torch.distributed.parallel_mode import ParallelMode
 
 import oslo.torch.nn as onn
+from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn import (
     VocabParallelCrossEntropyLoss1D,
     VocabParallelCrossEntropyLoss2D,
     VocabParallelCrossEntropyLoss2p5D,
-    VocabParallelCrossEntropyLoss3D,
 )
-import oslo.torch.nn.modules.functional as F
 from oslo.transformers.modeling_utils import OsloModel
 
 try:
@@ -295,26 +293,13 @@ class BertSelfAttention(nn.Module):
 
         scale = 1 / math.sqrt(self.attention_head_size)
 
-        if F._is_fused_scale_mask_softmax_available(
-            input=attention_scores,
-            scale=scale,
-            use_triang_mask=False,
-            softmax_in_fp32=True,
-        ):
-            attention_probs = F._fused_scale_mask_softmax_cuda(
-                input=attention_scores,
-                scale=scale,
-                use_triang_mask=False,
-                pad_mask=attention_mask,
-            )
-        else:
-            attention_scores = attention_scores * scale
-            if attention_mask is not None:
-                # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
-                attention_scores = attention_scores + attention_mask
+        attention_scores = attention_scores * scale
+        if attention_mask is not None:
+            # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
+            attention_scores = attention_scores + attention_mask
 
-            # Normalize the attention scores to probabilities.
-            attention_probs = nn.functional.softmax(attention_scores, dim=-1)
+        # Normalize the attention scores to probabilities.
+        attention_probs = nn.functional.softmax(attention_scores, dim=-1)
 
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
@@ -1038,9 +1023,7 @@ class BertForPreTraining(BertPreTrainedModel):
                 elif (
                     self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D
                 ):
-                    loss_lm = VocabParallelCrossEntropyLoss3D(
-                        parallel_context=self.parallel_context
-                    )
+                    loss_lm = CrossEntropyLoss()
             else:
                 loss_lm = CrossEntropyLoss()
             loss_fct = CrossEntropyLoss()
@@ -1186,9 +1169,7 @@ class BertLMHeadModel(BertPreTrainedModel):
                 elif (
                     self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D
                 ):
-                    loss_lm = VocabParallelCrossEntropyLoss3D(
-                        parallel_context=self.parallel_context
-                    )
+                    loss_lm = CrossEntropyLoss()
             else:
                 loss_lm = CrossEntropyLoss()
             lm_loss = loss_lm(
@@ -1334,9 +1315,7 @@ class BertForMaskedLM(BertPreTrainedModel):
                 elif (
                     self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D
                 ):
-                    loss_lm = VocabParallelCrossEntropyLoss3D(
-                        parallel_context=self.parallel_context
-                    )
+                    loss_lm = CrossEntropyLoss()
             else:
                 loss_lm = CrossEntropyLoss()
             masked_lm_loss = loss_lm(

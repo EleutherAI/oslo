@@ -1,5 +1,3 @@
-import time
-
 import concurrent.futures
 import copy
 from threading import Lock
@@ -10,7 +8,6 @@ from torch.distributed import rpc
 
 from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.distributed.parallel_mode import ParallelMode
-from oslo.torch.nn.parallel.utils import get_parallel_context, add_wrapper
 from oslo.torch.nn.parallel.pipeline_parallel._buffers import (
     register_original_forward_function,
     get_original_forward_function,
@@ -21,6 +18,11 @@ from oslo.torch.nn.parallel.pipeline_parallel._functional import (
     remote_module_forward,
     apply_backward_redirection,
 )
+from oslo.torch.nn.parallel.pipeline_parallel._messages import (
+    pack_tensor_stub,
+    unpack_tensor_stub,
+)
+from oslo.torch.nn.parallel.pipeline_parallel._model_partitioner import ModelPartitioner
 from oslo.torch.nn.parallel.pipeline_parallel._sync import (
     wait_other_ranks,
     make_unique_key,
@@ -28,11 +30,7 @@ from oslo.torch.nn.parallel.pipeline_parallel._sync import (
     set_result,
     get_result,
 )
-from oslo.torch.nn.parallel.pipeline_parallel._messages import (
-    pack_tensor_stub,
-    unpack_tensor_stub,
-)
-from oslo.torch.nn.parallel.pipeline_parallel._model_partitioner import ModelPartitioner
+from oslo.torch.nn.parallel.utils import get_parallel_context, add_wrapper
 
 
 def PipelineParallel(

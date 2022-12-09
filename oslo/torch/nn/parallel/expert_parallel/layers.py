@@ -1,17 +1,14 @@
-import math
-from typing import Any, Callable, cast, Dict, Optional, Union, TYPE_CHECKING, Tuple
+from typing import Callable, Dict, Optional, TYPE_CHECKING, Tuple
 
 import torch
 import torch.distributed as dist
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
-from torch.nn import Module, ModuleList
-from torch.distributed import ProcessGroup
+from torch.nn import Module
 
-from oslo.torch.distributed import ParallelMode
+from oslo.torch.nn.parallel.expert_parallel._ops import AllToAll
 from oslo.torch.nn.parallel.expert_parallel.experts import Experts
-from oslo.torch.nn.parallel.expert_parallel._ops import AllToAll, EPDispatch, EPCombine
 
 if TYPE_CHECKING:
     Base = Module[Tensor]

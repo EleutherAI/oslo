@@ -6,17 +6,14 @@ from typing import Optional, Tuple, Union
 import torch
 from torch import nn
 from torch.nn import CrossEntropyLoss
-from oslo.torch.distributed.parallel_mode import ParallelMode
+from torch.utils.checkpoint import checkpoint
 
+from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn import (
     VocabParallelCrossEntropyLoss1D,
     VocabParallelCrossEntropyLoss2D,
     VocabParallelCrossEntropyLoss2p5D,
-    VocabParallelCrossEntropyLoss3D,
 )
-from torch.utils.checkpoint import checkpoint
-
-import oslo.torch.nn.modules.functional as F
 from oslo.transformers.modeling_utils import OsloModel
 
 try:
@@ -506,43 +503,17 @@ class T5Attention(nn.Module):
             scores = scores + position_bias.to(scores.dtype)
 
         if self.is_decoder:
-            if F._is_fused_scale_mask_softmax_available(
-                input=scores,
-                scale=1.0,
-                use_triang_mask=True,
-                softmax_in_fp32=False,
-            ):
-                attn_weights = F._fused_scale_mask_softmax_cuda(
-                    input=scores,
-                    scale=1.0,
-                    use_triang_mask=True,
-                    pad_mask=mask,
-                )
-            else:
-                if mask is not None:
-                    scores = scores + mask
-                attn_weights = nn.functional.softmax(scores.float(), dim=-1).type_as(
-                    scores
-                )  # (batch_size, n_heads, seq_length, key_length)
+            if mask is not None:
+                scores = scores + mask
+            attn_weights = nn.functional.softmax(scores.float(), dim=-1).type_as(
+                scores
+            )  # (batch_size, n_heads, seq_length, key_length)
         else:
-            if F._is_fused_scale_mask_softmax_available(
-                input=scores,
-                scale=1.0,
-                use_triang_mask=False,
-                softmax_in_fp32=False,
-            ):
-                attn_weights = F._fused_scale_mask_softmax_cuda(
-                    input=scores,
-                    scale=1.0,
-                    use_triang_mask=False,
-                    pad_mask=mask,
-                )
-            else:
-                if mask is not None:
-                    scores = scores + mask
-                attn_weights = nn.functional.softmax(scores.float(), dim=-1).type_as(
-                    scores
-                )  # (batch_size, n_heads, seq_length, key_length)
+            if mask is not None:
+                scores = scores + mask
+            attn_weights = nn.functional.softmax(scores.float(), dim=-1).type_as(
+                scores
+            )  # (batch_size, n_heads, seq_length, key_length)
 
         attn_weights = nn.functional.dropout(
             attn_weights, p=self.dropout, training=self.training
@@ -1383,9 +1354,7 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
                 elif (
                     self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D
                 ):
-                    loss_lm = VocabParallelCrossEntropyLoss3D(
-                        parallel_context=self.parallel_context
-                    )
+                    loss_lm = CrossEntropyLoss(ignore_index=-100)
             else:
                 loss_lm = CrossEntropyLoss(ignore_index=-100)
             loss = loss_lm(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
