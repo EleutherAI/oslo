@@ -1,22 +1,18 @@
 from copy import deepcopy
 
+# for debugging
+from typing import Optional, Tuple, Union
+
+import matplotlib
+import matplotlib.pyplot as plt
 import torch
-import torch.nn as nn
 import torch.distributed as dist
+import torch.nn as nn
+from datasets import load_dataset
 from torch.distributed import rpc
+from torch.nn import CrossEntropyLoss
 from torch.optim import Adam
 from torch.utils.data import DataLoader
-
-from oslo.torch.distributed import ParallelContext
-from oslo.torch.distributed.parallel_mode import ParallelMode
-from oslo.torch.nn.parallel import PipelineParallel
-from oslo.torch.nn.parallel.utils import allocate_params
-from oslo.torch.nn.parallel.pipeline_parallel._buffers import _MODULE_DEVICE_LOCATIONS
-
-from oslo.torch.nn.parallel.data_parallel.data_parallel import DistributedDataParallel
-from oslo.torch.nn.parallel.tensor_parallel.tensor_parallel import TensorParallel
-
-from datasets import load_dataset
 from transformers import (
     AutoTokenizer,
     GPT2Config,
@@ -24,22 +20,19 @@ from transformers import (
     GPT2Tokenizer,
     T5Config,
     T5ForConditionalGeneration,
-    BartConfig,
-    BartForConditionalGeneration,
     set_seed,
 )
-
-import matplotlib
-import matplotlib.pyplot as plt
-
-
-# for debugging
-from typing import Optional, Tuple, Union
 from transformers.modeling_outputs import (
     BaseModelOutput,
     Seq2SeqLMOutput,
 )
-from torch.nn import CrossEntropyLoss
+
+from oslo.torch.distributed import ParallelContext
+from oslo.torch.distributed.parallel_mode import ParallelMode
+from oslo.torch.nn.parallel import PipelineParallel
+from oslo.torch.nn.parallel.pipeline_parallel._buffers import _MODULE_DEVICE_LOCATIONS
+from oslo.torch.nn.parallel.tensor_parallel.tensor_parallel import TensorParallel
+from oslo.torch.nn.parallel.utils import allocate_params
 
 
 class T5Debug(T5ForConditionalGeneration):
@@ -205,7 +198,6 @@ model_no_pp = deepcopy(model)
 model_no_pp.cuda()
 
 # model = TensorParallel(model, parallel_context=parallel_context)
-# model = DistributedDataParallel(model, parallel_context=parallel_context)
 wrapper_pp = PipelineParallel(
     model,
     parallel_context=parallel_context,

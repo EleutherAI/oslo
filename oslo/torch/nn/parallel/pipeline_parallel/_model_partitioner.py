@@ -1,5 +1,5 @@
-from typing import List
 from math import sqrt
+from typing import List
 
 import torch.distributed as dist
 import torch.nn as nn

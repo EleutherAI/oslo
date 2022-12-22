@@ -1,4 +1,4 @@
-from typing import Any, Tuple, Optional
+from typing import Any, Tuple
 
 import torch
 import torch.distributed as dist

@@ -1,5 +1,4 @@
 import copy
-import math
 from typing import Union
 
 import torch
@@ -7,13 +6,12 @@ import torch.distributed as dist
 import torch.nn as nn
 
 from oslo.torch.distributed import ParallelMode
-from oslo.torch.distributed._seed.helper import seed
 from oslo.torch.distributed.parallel_context import ParallelContext
+from oslo.torch.nn.parallel.expert_parallel._ops import AllReduce
 from oslo.torch.nn.parallel.expert_parallel.experts import Experts
 from oslo.torch.nn.parallel.expert_parallel.layers import ExpertParallelBehindBlock
 from oslo.torch.nn.parallel.expert_parallel.layers import ExpertParallelFrontBlock
 from oslo.torch.nn.parallel.expert_parallel.layers import TopKGate
-from oslo.torch.nn.parallel.expert_parallel._ops import AllReduce
 from oslo.torch.nn.parallel.expert_parallel.mapping import ExpertParallelMapping
 from oslo.torch.nn.parallel.utils import _update_module_arguments
 from oslo.transformers.mapping_utils import _ExpertParallelMappingForHuggingFace

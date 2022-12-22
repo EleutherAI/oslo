@@ -7,7 +7,7 @@ import wandb
 from datasets import load_dataset
 from torch.optim import Adam
 from torch.utils.data import DataLoader
-from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel
+from transformers import AutoTokenizer, BartConfig, BartForConditionalGeneration
 
 import oslo
 from oslo.torch.distributed import ParallelContext, ParallelMode
@@ -18,10 +18,10 @@ parser.add_argument("--local_rank", type=int, default=0)
 parser.add_argument("--memory_priority", action="store_true", default=False)
 args = parser.parse_args()
 
-tp_size = 4
+tp_size = 2
 batch_size = 16
 seq_length = 128
-model_name = "gpt2"
+model_name = "facebook/bart-base"
 
 # parallel context 생성
 parallel_context = ParallelContext.from_torch(
@@ -39,8 +39,10 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 tokenizer.pad_token = tokenizer.eos_token
 
 # 모델 생성 및 병렬화 수행
-model_no_tp = GPT2LMHeadModel(GPT2Config.from_pretrained(model_name)).cuda()
-model_tp = GPT2LMHeadModel(GPT2Config.from_pretrained(model_name))
+model_no_tp = BartForConditionalGeneration(
+    BartConfig.from_pretrained(model_name)
+).cuda()
+model_tp = BartForConditionalGeneration(BartConfig.from_pretrained(model_name))
 wrapper_tp = TensorParallel(
     model_tp, parallel_context, memory_priority=args.memory_priority
 )

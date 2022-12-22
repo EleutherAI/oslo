@@ -1,9 +1,8 @@
 # Copyright 2021 TUNiB Inc.
 
-import os
-import sys
 import platform
-import subprocess
+import sys
+
 from setuptools import find_packages, setup
 
 python_min_version = (3, 6, 0)

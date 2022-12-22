@@ -6,16 +6,15 @@ import torch
 from packaging import version
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
-from oslo.torch.distributed.parallel_mode import ParallelMode
 
 import oslo.torch.nn as onn
+import oslo.torch.nn.modules.functional as F
+from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn import (
     VocabParallelCrossEntropyLoss1D,
     VocabParallelCrossEntropyLoss2D,
     VocabParallelCrossEntropyLoss2p5D,
-    VocabParallelCrossEntropyLoss3D,
 )
-import oslo.torch.nn.modules.functional as F
 from oslo.transformers.modeling_utils import OsloModel
 
 try:
@@ -246,12 +245,14 @@ class AlbertAttention(nn.Module):
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
         attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
-        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
+        scale = math.sqrt(self.attention_head_size)
 
         if (
             self.position_embedding_type == "relative_key"
             or self.position_embedding_type == "relative_key_query"
         ):
+            attention_scores = attention_scores / scale
+            scale = 1.0
             seq_length = hidden_states.size()[1]
             position_ids_l = torch.arange(
                 seq_length, dtype=torch.long, device=hidden_states.device
@@ -285,25 +286,12 @@ class AlbertAttention(nn.Module):
                     + relative_position_scores_key
                 )
 
-        if F._is_fused_scale_mask_softmax_available(
-            input=attention_scores,
-            scale=1.0,
-            use_triang_mask=False,
-            softmax_in_fp32=False,
-        ):
-            attention_probs = F._fused_scale_mask_softmax_cuda(
-                input=attention_scores,
-                scale=1.0,
-                use_triang_mask=False,
-                pad_mask=attention_mask,
-            )
-        else:
-            if attention_mask is not None:
-                # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
-                attention_scores = attention_scores + attention_mask
+        if attention_mask is not None:
+            # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
+            attention_scores = attention_scores + attention_mask
 
             # Normalize the attention scores to probabilities.
-            attention_probs = nn.functional.softmax(attention_scores, dim=-1)
+        attention_probs = nn.functional.softmax(attention_scores, dim=-1)
 
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
@@ -774,9 +762,7 @@ class AlbertForPreTraining(AlbertPreTrainedModel):
                 elif (
                     self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D
                 ):
-                    loss_lm = VocabParallelCrossEntropyLoss3D(
-                        parallel_context=self.parallel_context
-                    )
+                    loss_lm = CrossEntropyLoss()
             else:
                 loss_lm = CrossEntropyLoss()
             loss_fct = CrossEntropyLoss()
@@ -960,9 +946,7 @@ class AlbertForMaskedLM(AlbertPreTrainedModel):
                 elif (
                     self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D
                 ):
-                    loss_lm = VocabParallelCrossEntropyLoss3D(
-                        parallel_context=self.parallel_context
-                    )
+                    loss_lm = CrossEntropyLoss()
             else:
                 loss_lm = CrossEntropyLoss()
             masked_lm_loss = loss_lm(

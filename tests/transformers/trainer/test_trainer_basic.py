@@ -1,15 +1,14 @@
-import torch
+import logging
+
 from datasets import load_dataset
-from torch.utils.data import DataLoader
 from transformers import BertTokenizer, BertForSequenceClassification
 
-from oslo.transformers.training_args import TrainingArguments
-from oslo.transformers.trainer import Trainer
 from oslo.transformers.tasks.data_sequence_classification import (
     ProcessorForSequenceClassification,
     DataCollatorForSequenceClassification,
 )
-import logging
+from oslo.transformers.trainer import Trainer
+from oslo.transformers.training_args import TrainingArguments
 
 logging.basicConfig(level=logging.INFO)
 

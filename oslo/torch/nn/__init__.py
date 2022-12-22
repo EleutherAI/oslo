@@ -17,7 +17,6 @@ from oslo.torch.nn.modules.functional import (
     fused_bias_dropout,
     fused_bias_gelu,
     fused_gelu,
-    fused_scale_mask_softmax,
     fused_rms_norm_affine,
     fused_layer_norm,
     mixed_dtype_fused_layer_norm_affine,
@@ -50,7 +49,5 @@ from oslo.torch.nn.modules.loss import (
     VocabParallelCrossEntropyLoss1D,
     VocabParallelCrossEntropyLoss2D,
     VocabParallelCrossEntropyLoss2p5D,
-    VocabParallelCrossEntropyLoss3D,
 )
 from oslo.torch.nn.modules.ngram_repeat_block import NGramRepeatBlock
-from oslo.torch.nn.modules.softmax import FusedScaleMaskSoftmax

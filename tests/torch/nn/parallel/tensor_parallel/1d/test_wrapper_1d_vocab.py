@@ -9,10 +9,10 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, GPT2Config
 
-from oslo.transformers.models.gpt2.modeling_gpt2 import GPT2LMHeadModel
 import oslo
 from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel.tensor_parallel import TensorParallel
+from oslo.transformers.models.gpt2.modeling_gpt2 import GPT2LMHeadModel
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--memory_priority", action="store_true", default=False)

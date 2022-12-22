@@ -1,11 +1,9 @@
-import os
-import json
 import argparse
-
-import torch
-import torch.backends.cudnn as cudnn
+import json
+import os
 
 import deepspeed.comm as dist
+import torch
 
 
 def create_config_from_dict(tmpdir, config_dict):

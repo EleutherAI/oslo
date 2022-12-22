@@ -10,6 +10,9 @@ from torch.distributed import rpc
 from oslo.torch.distributed._initializers.initializer_data import (
     DataParallelGroupInitializer,
 )
+from oslo.torch.distributed._initializers.initializer_expert import (
+    ExpertParallelGroupInitializer,
+)
 from oslo.torch.distributed._initializers.initializer_model import (
     ModelParallelGroupInitializer,
 )
@@ -33,9 +36,6 @@ from oslo.torch.distributed._initializers.initializer_tensor_2p5d import (
 )
 from oslo.torch.distributed._initializers.initializer_tensor_3d import (
     TensorParallel3DGroupInitializer,
-)
-from oslo.torch.distributed._initializers.initializer_expert import (
-    ExpertParallelGroupInitializer,
 )
 from oslo.torch.distributed._seed.helper import add_seed, set_mode
 from oslo.torch.distributed.parallel_mode import ParallelMode

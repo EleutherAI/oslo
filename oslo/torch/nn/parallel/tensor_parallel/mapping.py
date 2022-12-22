@@ -19,11 +19,13 @@ class TensorParallelInfo(object):
         combined_qkv: bool = False,
         reversed: bool = False,
         gather_output: bool = False,
+        class_replace: bool = True,
     ):
         self.name = name
         self.combined_qkv = combined_qkv
         self.reversed = reversed
         self.gather_output = gather_output
+        self.class_replace = class_replace
 
     def __str__(self):
         return f"{self.__class__.__qualname__}({self.name})"
@@ -267,3 +269,8 @@ class TensorParallelMapping(object):
         elem = self.search(model, module_name)
         if elem is not None:
             return isinstance(elem, Head)
+
+    def class_replace(self, model, module_name):
+        elem = self.search(model, module_name)
+        if elem is not None:
+            return elem.class_replace

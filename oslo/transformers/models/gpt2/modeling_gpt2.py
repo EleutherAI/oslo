@@ -5,16 +5,15 @@ import torch
 import torch.nn as nn
 from packaging import version
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
-from oslo.torch.distributed.parallel_mode import ParallelMode
 
 import oslo.torch.nn as onn
+import oslo.torch.nn.modules.functional as F
+from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn import (
     VocabParallelCrossEntropyLoss1D,
     VocabParallelCrossEntropyLoss2D,
     VocabParallelCrossEntropyLoss2p5D,
-    VocabParallelCrossEntropyLoss3D,
 )
-import oslo.torch.nn.modules.functional as F
 from oslo.transformers.modeling_utils import OsloModel
 
 try:
@@ -142,10 +141,6 @@ class GPT2Attention(nn.Module):
         self.resid_dropout = onn.FusedBiasDropout(config.resid_pdrop)
 
         self.pruned_heads = set()
-        if not hasattr(config, "softmax_in_fp32"):
-            self.softmax_in_fp32 = True
-        else:
-            self.softmax_in_fp32 = config.softmax_in_fp32
 
     def prune_heads(self, heads):
         if len(heads) == 0:
@@ -178,35 +173,22 @@ class GPT2Attention(nn.Module):
         if self.scale_attn_by_inverse_layer_idx:
             scale_factor /= float(self.layer_idx + 1)
 
-        if F._is_fused_scale_mask_softmax_available(
-            input=attn_weights,
-            scale=scale_factor,
-            use_triang_mask=self.is_cross_attention,
-            softmax_in_fp32=self.softmax_in_fp32,
-        ):
-            attn_weights = F._fused_scale_mask_softmax_cuda(
-                input=attn_weights,
-                scale=scale_factor,
-                use_triang_mask=self.use_triang_mask,
-                pad_mask=attention_mask,
+        attn_weights *= scale_factor
+        if not self.is_cross_attention:
+            # if only "normal" attention layer implements causal mask
+            query_length, key_length = query.size(-2), key.size(-2)
+            causal_mask = self.bias[
+                :, :, key_length - query_length : key_length, :key_length
+            ].bool()
+            attn_weights = torch.where(
+                causal_mask, attn_weights, self.masked_bias.to(attn_weights.dtype)
             )
-        else:
-            attn_weights *= scale_factor
-            if not self.is_cross_attention:
-                # if only "normal" attention layer implements causal mask
-                query_length, key_length = query.size(-2), key.size(-2)
-                causal_mask = self.bias[
-                    :, :, key_length - query_length : key_length, :key_length
-                ].bool()
-                attn_weights = torch.where(
-                    causal_mask, attn_weights, self.masked_bias.to(attn_weights.dtype)
-                )
 
-            if attention_mask is not None:
-                # Apply the attention mask
-                attn_weights = attn_weights + attention_mask
+        if attention_mask is not None:
+            # Apply the attention mask
+            attn_weights = attn_weights + attention_mask
 
-            attn_weights = nn.functional.softmax(attn_weights, dim=-1)
+        attn_weights = nn.functional.softmax(attn_weights, dim=-1)
 
         # Downcast (if necessary) back to V's dtype (if in mixed-precision) -- No-Op otherwise
         attn_weights = attn_weights.type(value.dtype)
@@ -874,9 +856,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
                 elif (
                     self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D
                 ):
-                    loss_lm = VocabParallelCrossEntropyLoss3D(
-                        parallel_context=self.parallel_context
-                    )
+                    loss_lm = CrossEntropyLoss()
             else:
                 loss_lm = CrossEntropyLoss()
             loss = loss_lm(
@@ -1091,9 +1071,7 @@ class GPT2DoubleHeadsModel(GPT2PreTrainedModel):
                 elif (
                     self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D
                 ):
-                    loss_lm = VocabParallelCrossEntropyLoss3D(
-                        parallel_context=self.parallel_context
-                    )
+                    loss_lm = CrossEntropyLoss()
             else:
                 loss_lm = CrossEntropyLoss()
             lm_loss = loss_lm(
