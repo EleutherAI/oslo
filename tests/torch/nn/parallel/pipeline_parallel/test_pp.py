@@ -21,6 +21,7 @@ from transformers import (
     AutoTokenizer,
     GPT2Config,
     GPT2LMHeadModel,
+    GPT2Tokenizer,
     T5Config,
     T5ForConditionalGeneration,
     BartConfig,
@@ -174,11 +175,11 @@ data_parallel_size = 1
 parallel_context = ParallelContext.from_torch(
     data_parallel_size=data_parallel_size,
     pipeline_parallel_size=2,
-    tensor_parallel_size=2,
+    tensor_parallel_size=1,
 )
 
 current_device = torch.cuda.current_device()
-num_micro_batches = 1
+num_micro_batches = 2
 
 model_name = "gpt2"
 config = GPT2Config.from_pretrained(model_name)
@@ -203,7 +204,7 @@ for n, m in model.named_modules():
 model_no_pp = deepcopy(model)
 model_no_pp.cuda()
 
-model = TensorParallel(model, parallel_context=parallel_context)
+# model = TensorParallel(model, parallel_context=parallel_context)
 # model = DistributedDataParallel(model, parallel_context=parallel_context)
 wrapper_pp = PipelineParallel(
     model,
