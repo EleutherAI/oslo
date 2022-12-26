@@ -52,7 +52,6 @@ def save_pretrained(
                     model_to_save = TensorParallel(
                         model_to_save,
                         parallel_context=self.parallel_context,
-                        memory_priority=wrapper.memory_priority,
                     )
 
                 elif isinstance(wrapper, _PipelineParallel):

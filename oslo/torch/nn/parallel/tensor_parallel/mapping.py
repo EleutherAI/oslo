@@ -19,13 +19,11 @@ class TensorParallelInfo(object):
         combined_qkv: bool = False,
         reversed: bool = False,
         gather_output: bool = False,
-        class_replace: bool = True,
     ):
         self.name = name
         self.combined_qkv = combined_qkv
         self.reversed = reversed
         self.gather_output = gather_output
-        self.class_replace = class_replace
 
     def __str__(self):
         return f"{self.__class__.__qualname__}({self.name})"
@@ -33,11 +31,12 @@ class TensorParallelInfo(object):
     def __repr__(self):
         return self.__str__()
 
-
 Column = type("Column", (TensorParallelInfo,), {})
 Row = type("Row", (TensorParallelInfo,), {})
 Update = type("Update", (TensorParallelInfo,), {})
 Head = type("Head", (TensorParallelInfo,), {})
+Other = type("Other", (TensorParallelInfo,), {})
+Default = TensorParallelInfo()
 
 
 class TensorParallelMapping(object):
@@ -159,23 +158,7 @@ class TensorParallelMapping(object):
                     count_contain_elem_in_param += 1
             if count_contain_elem_in_param == len(elem_split):
                 return elem
-
         return None
-
-    def is_combined_qkv_param(self, model, module_name):
-        """
-        Check whether the module is combined qkv or not
-
-        Args:
-            model (PreTrainedModel): model obj
-            module_name (str): name of module
-
-        Returns:
-            bool: whether the module is combined qkv or not
-        """
-        elem = self.search(model, module_name)
-        if elem is not None:
-            return elem.combined_qkv
 
     def get_combined_qkv_degree(self, model, module_name, module):
         """
@@ -195,36 +178,6 @@ class TensorParallelMapping(object):
             return bigger // smaller
         return 1
 
-    def is_reversed(self, model, module_name):
-        """
-        Check whether the moduleeter is reversed or not
-
-        Args:
-            model (PreTrainedModel): model obj
-            module_name (str): name of module
-
-        Returns:
-            bool: whether the module is reversed or not
-        """
-        elem = self.search(model, module_name)
-        if elem is not None:
-            return elem.reversed
-
-    def is_gather_output(self, model, module_name):
-        """
-        Check whether the module is gather output or not
-
-        Args:
-            model (PreTrainedModel): model obj
-            module_name (str): name of module
-
-        Returns:
-            bool: whether the module is combined qkv or not
-        """
-        elem = self.search(model, module_name)
-        if elem is not None:
-            return elem.gather_output
-
     def is_column_parallel(self, model, module_name):
         """
         Check whether the moduleeter is column parallelizable or not
@@ -239,6 +192,7 @@ class TensorParallelMapping(object):
         elem = self.search(model, module_name)
         if elem is not None:
             return isinstance(elem, Column)
+        return False
 
     def is_row_parallel(self, model, module_name):
         """
@@ -254,6 +208,7 @@ class TensorParallelMapping(object):
         elem = self.search(model, module_name)
         if elem is not None:
             return isinstance(elem, Row)
+        return False
 
     def is_head(self, model, module_name):
         """
@@ -269,8 +224,52 @@ class TensorParallelMapping(object):
         elem = self.search(model, module_name)
         if elem is not None:
             return isinstance(elem, Head)
+        return False
 
-    def class_replace(self, model, module_name):
+    def is_combined_qkv_param(self, model, module_name):
+        """
+        Check whether the module is combined qkv or not
+
+        Args:
+            model (PreTrainedModel): model obj
+            module_name (str): name of module
+
+        Returns:
+            bool: whether the module is combined qkv or not
+        """
         elem = self.search(model, module_name)
         if elem is not None:
-            return elem.class_replace
+            return elem.combined_qkv
+        return Default.combined_qkv
+
+    def is_reversed(self, model, module_name):
+        """
+        Check whether the moduleeter is reversed or not
+
+        Args:
+            model (PreTrainedModel): model obj
+            module_name (str): name of module
+
+        Returns:
+            bool: whether the module is reversed or not
+        """
+        elem = self.search(model, module_name)
+        if elem is not None:
+            return elem.reversed
+        return Default.reversed
+
+    def is_gather_output(self, model, module_name):
+        """
+        Check whether the module is gather output or not
+
+        Args:
+            model (PreTrainedModel): model obj
+            module_name (str): name of module
+
+        Returns:
+            bool: whether the module is gather output or not
+        """
+        elem = self.search(model, module_name)
+        if elem is not None:
+            return elem.gather_output
+        return Default.gather_output

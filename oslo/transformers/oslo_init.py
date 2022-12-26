@@ -70,7 +70,6 @@ SUPPORTED_FEATURES = {
         "parallel_mode": _values(*TENSOR_PARALLEL_MAPPING.keys()),
         "params": {
             "parallel_depth_2.5d": _type(int),
-            "memory_priority": _type(bool),
         },
     },
     "pipeline_parallelism": {
@@ -163,7 +162,6 @@ class OsloTrainerConfig:
                 "parallel_mode": _values(*TENSOR_PARALLEL_MAPPING.keys()),
                 "params": {
                     "parallel_depth_2.5d": _type(int),
-                    "memory_priority": _type(bool),
                 },
             },
             "pipeline_parallelism": {

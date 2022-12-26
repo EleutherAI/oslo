@@ -6,9 +6,6 @@ import torch.nn as nn
 import transformers
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
-from oslo.torch.distributed.nn.functional import (
-    scatter,
-)
 from oslo.torch.nn.modules.embedding import (
     VocabParallelEmbedding1D,
     Embedding1D,
@@ -26,9 +23,7 @@ from oslo.torch.nn.parallel.tensor_parallel.mapping import (
 )
 from oslo.torch.nn.parallel.utils import (
     _update_module_arguments,
-    is_oslo_model,
 )
-from oslo.transformers.constants import SEQ_DIMENSIONS
 from oslo.transformers.mapping_utils import (
     _TensorParallelMapping,
 )
@@ -41,23 +36,19 @@ class _TensorParallel1D(nn.Module):
     Args:
         module (nn.Module): model object
         parallel_context (ParallelContext): parallel context object
-        memory_priority (bool): use tensor sequence parallel
     """
 
     def __init__(
         self,
         module: nn.Module,
         parallel_context: ParallelContext,
-        memory_priority: bool = False,
     ):
         super().__init__()
         self.config = module.config
         self.module = module
         self.module_forward = copy.copy(module.forward)
         self.parallel_context = parallel_context
-        self.memory_priority = memory_priority
         self.device = torch.cuda.current_device()
-
         mapping = _TensorParallelMapping().get_mapping(module)
         self.tensor_parallel_mapping = TensorParallelMapping(mapping)
         self._parallelize()
@@ -68,25 +59,6 @@ class _TensorParallel1D(nn.Module):
             "If you wrote code like ``model(input_ids, labels)``, "
             "please modify your code like ``model(input_ids=input_ids, labels=labels)``."
         )
-        if self.memory_priority:
-            assert (
-                "past_key_values" not in kwargs
-            ), "``past_key_values`` argument is forbidden with memory priority."
-            if "position_ids" not in kwargs:
-                kwargs["position_ids"] = torch.arange(
-                    kwargs["input_ids"].shape[-1], device=kwargs["input_ids"].device
-                ).unsqueeze(0)
-            kwargs = {
-                key: scatter(
-                    value,
-                    dim=SEQ_DIMENSIONS[key],
-                    parallel_context=self.parallel_context,
-                    parallel_mode=ParallelMode.TENSOR_1D,
-                )
-                if key in SEQ_DIMENSIONS
-                else value
-                for key, value in kwargs.items()
-            }
         return self.module_forward(*args, **kwargs)
 
     @torch.no_grad()
@@ -116,9 +88,7 @@ class _TensorParallel1D(nn.Module):
             if isinstance(module, nn.Embedding):
                 self._slice_embedding(
                     module=module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
+                    gather_output=self.tensor_parallel_mapping.is_gather_output(self.module, module_name),
                 )
 
     def _parallelize_layernorm(self):
@@ -126,16 +96,11 @@ class _TensorParallel1D(nn.Module):
             if isinstance(module, nn.LayerNorm):
                 self._slice_layernorm(
                     module=module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
     def _parallelize_linear(self):
         for module_name, module in self.module.named_modules():
-            if self.tensor_parallel_mapping.is_column_parallel(
-                self.module, module_name
-            ):
+            if self.tensor_parallel_mapping.is_column_parallel(self.module, module_name):
                 self._column_slice_linear(
                     module=module,
                     reversed=self.tensor_parallel_mapping.is_reversed(
@@ -147,13 +112,6 @@ class _TensorParallel1D(nn.Module):
                     gather_output=self.tensor_parallel_mapping.is_gather_output(
                         self.module, module_name
                     ),
-                    scatter_output=self.tensor_parallel_mapping.is_gather_output(
-                        self.module, module_name
-                    ),
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module,
-                        module_name,
-                    ),
                 )
 
             elif self.tensor_parallel_mapping.is_row_parallel(self.module, module_name):
@@ -163,25 +121,15 @@ class _TensorParallel1D(nn.Module):
                         self.module, module_name
                     ),
                     fusion_degree=1,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module,
-                        module_name,
-                    ),
                 )
 
     def _parallelize_head(self):
         for module_name, module in self.module.named_modules():
-            if self.tensor_parallel_mapping.is_head(
-                self.module, module_name
-            ) and isinstance(module, nn.Linear):
+            if self.tensor_parallel_mapping.is_head(self.module, module_name) and isinstance(module, nn.Linear):
                 self._slice_head(
                     module=module,
                     reversed=self.tensor_parallel_mapping.is_reversed(
                         self.module, module_name
-                    ),
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module,
-                        module_name,
                     ),
                 )
 
@@ -193,7 +141,7 @@ class _TensorParallel1D(nn.Module):
         tensor = list(map(lambda x: torch.cat([*x], dim=dim), zip(*tensor)))
         return tensor
 
-    def _slice_embedding(self, module, class_replace):
+    def _slice_embedding(self, module: nn.Module, gather_output: bool = True):
         world_size = self.parallel_context.get_world_size(ParallelMode.TENSOR_1D)
         rank = self.parallel_context.get_local_rank(ParallelMode.TENSOR_1D)
         if module is self.module.get_input_embeddings():
@@ -214,14 +162,12 @@ class _TensorParallel1D(nn.Module):
                 vocab_start_index=vocab_start_index,
                 vocab_end_index=vocab_end_index,
                 parallel_context=self.parallel_context,
-                memory_priority=self.memory_priority,
                 world_size=world_size,
                 num_embeddings=module.weight.size()[0],
                 orig_module=copy.deepcopy(module.__class__),
             )
-
-            if class_replace is True:
-                module.__class__ = VocabParallelEmbedding1D
+            
+            module.__class__ = VocabParallelEmbedding1D
 
             for name, module_head in self.module.named_modules():
                 if (
@@ -239,8 +185,7 @@ class _TensorParallel1D(nn.Module):
                         fusion_degree=1,
                         orig_module=copy.deepcopy(module_head.__class__),
                         out_features=module.weight.size()[0],
-                        # in_features=module.weight.size()[1],
-                        gather_output=not is_oslo_model(self.module),
+                        gather_output=True,
                         skip_bias_add=module.skip_bias_add
                         if hasattr(module, "skip_bias_add")
                         else False,
@@ -249,22 +194,20 @@ class _TensorParallel1D(nn.Module):
                     if isinstance(module_head, nn.Linear) or isinstance(
                         module_head, transformers.Conv1D
                     ):
-                        if class_replace:
-                            module_head.__class__ = ColLinear1D
+                        module_head.__class__ = ColLinear1D
         else:
             weight_list = module.weight.data.chunk(world_size, dim=1)
             module.weight.data = weight_list[rank].contiguous()
 
             _update_module_arguments(
                 module=module,
+                gather_output=gather_output,
                 parallel_context=self.parallel_context,
-                memory_priority=self.memory_priority,
                 world_size=world_size,
                 embedding_dim=module.weight.size()[1],
                 orig_module=copy.deepcopy(module.__class__),
             )
-            if class_replace:
-                module.__class__ = Embedding1D
+            module.__class__ = Embedding1D
 
         if hasattr(module.weight, "oslo_parallel"):
             module.weight.oslo_parallel[ParallelMode.TENSOR_1D] = rank
@@ -327,8 +270,6 @@ class _TensorParallel1D(nn.Module):
         reversed: bool,
         fusion_degree: int,
         gather_output: bool,
-        scatter_output: bool,
-        class_replace: bool,
     ):
         world_size = self.parallel_context.get_world_size(ParallelMode.TENSOR_1D)
         self._slice_linear(
@@ -344,27 +285,23 @@ class _TensorParallel1D(nn.Module):
             in_features=module.weight.size()[1],
             out_features=module.weight.size()[0],
             parallel_context=self.parallel_context,
-            memory_priority=self.memory_priority,
             world_size=world_size,
             reversed=reversed,
             fusion_degree=fusion_degree,
             orig_module=copy.deepcopy(module.__class__),
             gather_output=gather_output,
-            scatter_output=scatter_output,
             skip_bias_add=module.skip_bias_add
             if hasattr(module, "skip_bias_add")
             else False,
         )
 
-        if class_replace:
-            module.__class__ = ColLinear1D
+        module.__class__ = ColLinear1D
 
     def _row_slice_linear(
         self,
         module: nn.Module,
         reversed: bool,
         fusion_degree: int,
-        class_replace: bool,
     ):
         world_size = self.parallel_context.get_world_size(ParallelMode.TENSOR_1D)
         self._slice_linear(
@@ -379,7 +316,6 @@ class _TensorParallel1D(nn.Module):
             in_features=module.weight.size()[1],
             out_features=module.weight.size()[0],
             parallel_context=self.parallel_context,
-            memory_priority=self.memory_priority,
             world_size=world_size,
             reversed=reversed,
             fusion_degree=fusion_degree,
@@ -390,32 +326,31 @@ class _TensorParallel1D(nn.Module):
             else False,
         )
 
-        if class_replace:
-            module.__class__ = RowLinear1D
+        module.__class__ = RowLinear1D
 
-    def _slice_layernorm(self, module, class_replace):
+    def _slice_layernorm(self, module: nn.Module):
         world_size = self.parallel_context.get_world_size(ParallelMode.TENSOR_1D)
         _update_module_arguments(
             module=module,
             normalized_shape=module.weight.size()[0],
             partitioned_dim=module.weight.size()[0],
             parallel_context=self.parallel_context,
-            memory_priority=self.memory_priority,
             world_size=world_size,
             orig_module=copy.deepcopy(module.__class__),
         )
-        if class_replace:
-            module.__class__ = LayerNorm1D
+        module.__class__ = LayerNorm1D
 
-    def _slice_head(self, module, reversed, class_replace):
+    def _slice_head(
+        self,
+        module: nn.Module,
+        reversed: bool,
+    ):
         if module.weight is not self.module.get_input_embeddings().weight:
             self._column_slice_linear(
                 module=module,
                 reversed=reversed,
                 fusion_degree=1,
-                gather_output=not is_oslo_model(self.module),
-                scatter_output=False,
-                class_replace=class_replace,
+                gather_output=True,
             )
         else:
             world_size = self.parallel_context.get_world_size(ParallelMode.TENSOR_1D)
@@ -434,20 +369,16 @@ class _TensorParallel1D(nn.Module):
             _update_module_arguments(
                 module=module,
                 parallel_context=self.parallel_context,
-                memory_priority=self.memory_priority,
                 world_size=world_size,
                 reversed=reversed,
                 fusion_degree=1,
                 orig_module=copy.deepcopy(module.__class__),
-                gather_output=not is_oslo_model(self.module),
-                scatter_output=False,
+                gather_output=True,
                 skip_bias_add=module.skip_bias_add
                 if hasattr(module, "skip_bias_add")
                 else False,
             )
-
-        if class_replace:
-            module.__class__ = ColLinear1D
+        module.__class__ = ColLinear1D
 
     @torch.no_grad()
     def deparallelize(self):
@@ -472,16 +403,10 @@ class _TensorParallel1D(nn.Module):
             if module.__class__ == VocabParallelEmbedding1D:
                 self._gather_embedding(
                     module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
             if module.__class__ == Embedding1D:
                 self._gather_embedding(
                     module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
     def _deparallelize_linear(self):
@@ -491,17 +416,11 @@ class _TensorParallel1D(nn.Module):
             ):
                 self._gather_column_linear(
                     module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
             elif self.tensor_parallel_mapping.is_row_parallel(self.module, module_name):
                 self._gather_row_linear(
                     module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
     def _deparallelize_head(self):
@@ -511,12 +430,9 @@ class _TensorParallel1D(nn.Module):
             ) and isinstance(module, ColLinear1D):
                 self._gather_head(
                     module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
-    def _gather_embedding(self, module, class_replace):
+    def _gather_embedding(self, module):
         world_size = self.parallel_context.get_world_size(ParallelMode.TENSOR_1D)
         if hasattr(module, "vocab_start_index") and hasattr(module, "vocab_end_index"):
             # w = gather_2d(self.parallel_context, module.weight.data, world_size, col_first=True)
@@ -564,10 +480,9 @@ class _TensorParallel1D(nn.Module):
                 embedding_dim=module.weight.size()[1],
             )
 
-        if class_replace:
-            module.__class__ = nn.Embedding
+        module.__class__ = nn.Embedding
 
-    def _gather_linear(self, module, class_replace, dim=1):
+    def _gather_linear(self, module, dim=1):
         is_reversed = module.reversed
         fusion_degree = module.fusion_degree
 
@@ -601,18 +516,17 @@ class _TensorParallel1D(nn.Module):
         del module.orig_module
         del module.parallel_context
 
-        if class_replace:
-            module.__class__ = nn.Linear
+        module.__class__ = nn.Linear
 
-    def _gather_column_linear(self, module, class_replace):
-        self._gather_linear(module, dim=0, class_replace=class_replace)
+    def _gather_column_linear(self, module):
+        self._gather_linear(module, dim=0)
 
-    def _gather_row_linear(self, module, class_replace):
-        self._gather_linear(module, dim=1, class_replace=class_replace)
+    def _gather_row_linear(self, module):
+        self._gather_linear(module, dim=1)
 
-    def _gather_head(self, module: ColLinear1D, class_replace):
+    def _gather_head(self, module: ColLinear1D):
         if module.weight is not self.module.get_input_embeddings().weight:
-            return self._gather_column_linear(module, class_replace)
+            return self._gather_column_linear(module)
         elif hasattr(module, "bias") and module.bias is not None:
             world_size = self.parallel_context.get_world_size(ParallelMode.TENSOR_1D)
 
@@ -634,8 +548,7 @@ class _TensorParallel1D(nn.Module):
         del module.orig_module
         del module.parallel_context
 
-        if class_replace:
-            module.__class__ = nn.Linear
+        module.__class__ = nn.Linear
 
     def _reconstruct_combined_qkv(self, tensor, world_size, fusion_degree, dim: int):
         tensor_list = tensor.chunk(fusion_degree, dim=dim)
