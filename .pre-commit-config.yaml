@@ -29,7 +29,6 @@ repos:
       rev: v1.3.5
       hooks:
       - id: clang-format
-        args: [--style=Google]
 
     - repo: https://github.com/psf/black
       rev: 22.12.0
