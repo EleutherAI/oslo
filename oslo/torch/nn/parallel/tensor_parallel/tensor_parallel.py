@@ -51,12 +51,10 @@ def get_divisible_by(parallel_context: ParallelContext):
 def TensorParallel(
     module: nn.Module,
     parallel_context: Optional[ParallelContext] = None,
-    memory_priority: bool = False,
 ):
     tp = _TensorParallel(
         module=module,
         parallel_context=parallel_context,
-        memory_priority=memory_priority,
     )
     add_wrapper(
         module, mode=ParallelMode.TENSOR, wrapper=tp, parallel_context=parallel_context
@@ -72,7 +70,6 @@ class _TensorParallel(nn.Module):
     Args:
         module (nn.Module): PyTorch module object
         parallel_context (ParallelContext): process context
-        memory_priority (bool): use tensor sequence parallel
 
     Notes:
         1. Similar design with `torch.nn.parallel.DistributedDataParallel`.
@@ -94,24 +91,14 @@ class _TensorParallel(nn.Module):
         self,
         module: nn.Module,
         parallel_context: Optional[ParallelContext] = None,
-        memory_priority: bool = False,
     ):
         super().__init__()
         self.parallel_context = get_parallel_context(module, parallel_context)
-        self.memory_priority = memory_priority
         module = self._resize_vocab_size(module, self.parallel_context)
         module = self._resize_num_classes(module, self.parallel_context)
 
-        if parallel_context.tensor_parallel_mode != ParallelMode.TENSOR_1D:
-            if memory_priority and parallel_context.tensor_parallel_size > 1:
-                raise ValueError(
-                    "param `memory_priority` is available only with 1D tensor parallel."
-                )
-
         if self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_1D:
-            self.module = _TensorParallel1D(
-                module, self.parallel_context, memory_priority
-            )
+            self.module = _TensorParallel1D(module, self.parallel_context)
         elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D:
             self.module = _TensorParallel2D(module, self.parallel_context)
         elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2P5D:

@@ -1,7 +1,7 @@
 import importlib
 
 from oslo.torch.nn.parallel.expert_parallel.mapping import Front, Behind
-from oslo.torch.nn.parallel.tensor_parallel import Column, Row, Update, Head
+from oslo.torch.nn.parallel.tensor_parallel import Other, Column, Row, Update, Head
 
 
 class _ParallelMapping(object):
@@ -93,6 +93,7 @@ class _TensorParallelMapping(_ParallelMapping):
                 gather_output=True,
             ),
             Row("attention.dense", "ffn_output"),
+            Other("position_embeddings", "token_type_embeddings", gather_output=True),
             Update("num_attention_heads", "all_head_size"),
             Head(
                 "predictions.decoder",
@@ -106,6 +107,7 @@ class _TensorParallelMapping(_ParallelMapping):
             Column("q_proj", "k_proj", "v_proj", "fc1"),
             Column("classification_head.dense", gather_output=True),
             Row("out_proj", "fc2"),
+            Other("embed_tokens", "embed_positions", gather_output=True),
             Update("embed_dim", "num_heads"),
             Head(
                 "lm_head",
@@ -118,8 +120,8 @@ class _TensorParallelMapping(_ParallelMapping):
             Column("query", "key", "value", "intermediate.dense"),
             Column("pooler.dense", gather_output=True),
             Row("output.dense"),
+            Other("position_embeddings", "token_type_embeddings", gather_output=True),
             Update("num_attention_heads", "all_head_size"),
-            Head("transform.dense", gather_output=False),
             Head(
                 "decoder",
                 "seq_relationship",
@@ -150,13 +152,14 @@ class _TensorParallelMapping(_ParallelMapping):
                 "DenseReluDense.wi_1",
             ),
             Row("o", "DenseReluDense.wo"),
-            Row("relative_attention_bias", class_replace=False),
+            Other("relative_attention_bias", gather_output=False),
             Update("d_model", "n_heads", "inner_dim"),
             Head("lm_head"),
         ],
         "GPT2": [
             Column("c_attn", reversed=True, combined_qkv=True),
             Column("c_fc", "q_attn", reversed=True),
+            Other("wpe", gather_output=True),
             Row("c_proj", reversed=True),
             Update("embed_dim", "split_size", "num_heads"),
             Head("lm_head", "score", "classifier", "summary", gather_output=True),
@@ -164,6 +167,7 @@ class _TensorParallelMapping(_ParallelMapping):
         "GPTNeo": [
             Column("q_proj", "k_proj", "v_proj", "c_fc"),
             Row("out_proj", "c_proj"),
+            Other("wpe", gather_output=True),
             Update("embed_dim", "num_heads"),
             Head("lm_head", "score", "qa_outputs", gather_output=True),
         ],
@@ -183,6 +187,7 @@ class _TensorParallelMapping(_ParallelMapping):
         "OPT": [
             Column("q_proj", "k_proj", "v_proj", "fc1"),
             Row("out_proj", "fc2"),
+            Other("embed_positions", gather_output=True),
             Update("embed_dim", "num_heads"),
             Head("lm_head", "score"),
         ],
@@ -196,6 +201,7 @@ class _TensorParallelMapping(_ParallelMapping):
                 gather_output=True,
             ),
             Row("output.dense"),
+            Other("position_embeddings", "token_type_embeddings", gather_output=True),
             Update("num_attention_heads", "all_head_size"),
             Head(
                 "generator_lm_head",
@@ -216,6 +222,7 @@ class _TensorParallelMapping(_ParallelMapping):
                 gather_output=True,
             ),
             Row("output.dense"),
+            Other("position_embeddings", "token_type_embeddings", gather_output=True),
             Update("num_attention_heads", "all_head_size"),
             Head("lm_head.dense"),
             Head(
