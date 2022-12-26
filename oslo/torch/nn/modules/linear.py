@@ -66,7 +66,7 @@ class ColLinear1D(Linear):
     def extra_repr(self) -> str:
         return (
             f"in_features={self.in_features}, "
-            f"out_features={self.out_features}, " 
+            f"out_features={self.out_features}, "
             f"gather_output={self.gather_output}"
         )
 

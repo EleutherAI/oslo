@@ -88,7 +88,9 @@ class _TensorParallel1D(nn.Module):
             if isinstance(module, nn.Embedding):
                 self._slice_embedding(
                     module=module,
-                    gather_output=self.tensor_parallel_mapping.is_gather_output(self.module, module_name),
+                    gather_output=self.tensor_parallel_mapping.is_gather_output(
+                        self.module, module_name
+                    ),
                 )
 
     def _parallelize_layernorm(self):
@@ -100,7 +102,9 @@ class _TensorParallel1D(nn.Module):
 
     def _parallelize_linear(self):
         for module_name, module in self.module.named_modules():
-            if self.tensor_parallel_mapping.is_column_parallel(self.module, module_name):
+            if self.tensor_parallel_mapping.is_column_parallel(
+                self.module, module_name
+            ):
                 self._column_slice_linear(
                     module=module,
                     reversed=self.tensor_parallel_mapping.is_reversed(
@@ -125,7 +129,9 @@ class _TensorParallel1D(nn.Module):
 
     def _parallelize_head(self):
         for module_name, module in self.module.named_modules():
-            if self.tensor_parallel_mapping.is_head(self.module, module_name) and isinstance(module, nn.Linear):
+            if self.tensor_parallel_mapping.is_head(
+                self.module, module_name
+            ) and isinstance(module, nn.Linear):
                 self._slice_head(
                     module=module,
                     reversed=self.tensor_parallel_mapping.is_reversed(
@@ -166,7 +172,7 @@ class _TensorParallel1D(nn.Module):
                 num_embeddings=module.weight.size()[0],
                 orig_module=copy.deepcopy(module.__class__),
             )
-            
+
             module.__class__ = VocabParallelEmbedding1D
 
             for name, module_head in self.module.named_modules():

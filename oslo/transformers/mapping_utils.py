@@ -144,7 +144,9 @@ class _TensorParallelMapping(_ParallelMapping):
         ],
         "T5": [
             Column(
-                "q", "k", "v",
+                "q",
+                "k",
+                "v",
                 "DenseReluDense.wi",
                 "DenseReluDense.wi_0",
                 "DenseReluDense.wi_1",

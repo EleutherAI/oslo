@@ -150,10 +150,12 @@ def gather_tensor_1d(inputs: Tensor, dim: int, parallel_context: ParallelContext
 def scatter_tensor_1d(inputs: Tensor, dim: int, parallel_context: ParallelContext):
     return _ScatterTensor1D.apply(inputs, dim, parallel_context)
 
+
 def reduce_scatter_tensor_1d(
     inputs: Tensor, dim: int, parallel_context: ParallelContext
 ):
     return _ReduceScatterTensor1D.apply(inputs, dim, parallel_context)
+
 
 def split_1d(parallel_context, tensor, summa_dim, dim=-1):
     tensor = tensor.chunk(summa_dim, dim=dim)[
