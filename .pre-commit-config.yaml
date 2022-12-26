@@ -5,7 +5,7 @@ default_language_version:
 
 repos:
     - repo: https://github.com/pre-commit/pre-commit-hooks
-      rev: v4.1.0
+      rev: v4.4.0
       hooks:
       - id: check-case-conflict
       - id: check-json
@@ -25,26 +25,26 @@ repos:
       - id: requirements-txt-fixer
       - id: trailing-whitespace
 
-    - repo: https://gitlab.com/daverona/pre-commit-cpp
-      rev: 0.8.0
+    - repo: https://github.com/pocc/pre-commit-hooks
+      rev: v1.3.5
       hooks:
-      - id: clang-format # formatter of C/C++ code based on a style guide: LLVM, Google, Chromium, Mozilla, and WebKit available
-        args: []
+      - id: clang-format
+        args: [--style=Google]
 
     - repo: https://github.com/psf/black
-      rev: 22.3.0
+      rev: 22.12.0
       hooks:
       - id: black
         language_version: python3.8
 
-    - repo: https://gitlab.com/pycqa/flake8
-      rev: 4.0.1
+    - repo: https://github.com/PyCQA/flake8
+      rev: 6.0.0
       hooks:
       - id: flake8
         args: [--show-source, --statistics]
 
     - repo: https://github.com/codespell-project/codespell
-      rev: v2.1.0
+      rev: v2.2.2
       hooks:
       - id: codespell
         args: [
