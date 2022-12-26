@@ -37,7 +37,7 @@ class _ExpertParallel(nn.Module):
 
     Notes:
         1. Similar design with `torch.nn.parallel.DistributedDataParallel`
-        2. Support data parallel for non-expert paramete
+        2. Support data parallel for non-expert parameter
 
     Examples:
         >>> from oslo.torch.nn.parallel.expert_parallel.expert_parallel import ExpertParallel

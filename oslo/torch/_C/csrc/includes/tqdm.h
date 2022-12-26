@@ -16,7 +16,7 @@
 
 class tqdm {
 private:
-  // time, iteration counters and deques for rate calculations
+  // time, iteration counters and dequeues for rate calculations
   std::chrono::time_point<std::chrono::system_clock> t_first =
       std::chrono::system_clock::now();
   std::chrono::time_point<std::chrono::system_clock> t_old =
