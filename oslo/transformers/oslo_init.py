@@ -220,23 +220,21 @@ class OsloTrainerConfig:
             with open(config_file_or_dict, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
         else:
-            logging.warning(
-                "*you must initialize 'config_file_or_dict' parameter for oslo config. See SUPPORTED_FEATURES above*"
-            )
             cfg = {
                 "data_parallelism": {
-                    "enable": False,
-                    "parallel_size": 1,  # you can adjust parallel_size
+                    "enable": True,
+                    "parallel_size": 2,  # you can adjust parallel_size
                     "zero_stage": 0,  # zero_stage:0 -> original DDP
                 },
                 "tensor_parallelism": {
-                    "enable": False,
-                    "parallel_size": 1,
+                    "enable": True,
+                    "parallel_size": 2,
                     "parallel_mode": "1d",
                 },
                 "sequence_parallelism": {"enable": False, "parallel_size": 1},
                 "pipeline_parallelism": {"enable": False, "parallel_size": 1},
             }
+            raise ValueError(f"oslo config dict or oslo config file path must be set. \nSee example : {cfg}")
         _config_check(SUPPORTED_FEATURES, cfg)
         log_dist("*** OSLO CONFIG ***")
 
