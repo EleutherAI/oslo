@@ -23,7 +23,7 @@ from oslo.torch.nn.parallel.tensor_parallel.mapping import (
 from oslo.torch.nn.parallel.utils import (
     get_parallel_context,
     add_wrapper,
-    is_oslo_model,
+    OsloParallelWrapper,
 )
 from oslo.transformers.mapping_utils import (
     _TensorParallelMapping,
@@ -59,11 +59,10 @@ def TensorParallel(
     add_wrapper(
         module, mode=ParallelMode.TENSOR, wrapper=tp, parallel_context=parallel_context
     )
-    setattr(module, "forward", tp.forward)
     return module
 
 
-class _TensorParallel(nn.Module):
+class _TensorParallel(OsloParallelWrapper):
     """
     Tensor parallel module
 
@@ -87,29 +86,10 @@ class _TensorParallel(nn.Module):
         >>> optimizer.step()
     """
 
-    def __init__(
-        self,
-        module: nn.Module,
-        parallel_context: Optional[ParallelContext] = None,
-    ):
-        super().__init__()
+    def __init__(self, module: nn.Module, parallel_context: ParallelContext):
+        super().__init__(parallelism_priority=0)
+        self.module = module
         self.parallel_context = get_parallel_context(module, parallel_context)
-        module = self._resize_vocab_size(module, self.parallel_context)
-        module = self._resize_num_classes(module, self.parallel_context)
-
-        if self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_1D:
-            self.module = _TensorParallel1D(module, self.parallel_context)
-        elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D:
-            self.module = _TensorParallel2D(module, self.parallel_context)
-        elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2P5D:
-            self.module = _TensorParallel2p5D(module, self.parallel_context)
-        elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D:
-            self.module = _TensorParallel3D(module, self.parallel_context)
-        else:
-            raise ValueError(
-                "currently, only 1d, 2d, 2p5d tensor parallelism is supported."
-            )
-        self.module_forward = copy.copy(self.module.forward)
 
     def forward(self, *args, **kwargs):
         return self.module_forward(*args, **kwargs)
@@ -232,7 +212,21 @@ class _TensorParallel(nn.Module):
     def deparallelize(self):
         self.module.deparallelize()
 
-    def parallelize(self, module):
-        module = self._resize_vocab_size(module, self.parallel_context)
-        self.module.module = self._resize_num_classes(module, self.parallel_context)
-        self.module._parallelize()
+    def parallelize(self):
+        self.module = self._resize_vocab_size(self.module, self.parallel_context)
+        self.module = self._resize_num_classes(self.module, self.parallel_context)
+
+        if self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_1D:
+            self.module = _TensorParallel1D(self.module, self.parallel_context)
+        elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2D:
+            self.module = _TensorParallel2D(self.module, self.parallel_context)
+        elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_2P5D:
+            self.module = _TensorParallel2p5D(self.module, self.parallel_context)
+        elif self.parallel_context.tensor_parallel_mode == ParallelMode.TENSOR_3D:
+            self.module = _TensorParallel3D(self.module, self.parallel_context)
+        else:
+            raise ValueError(
+                "currently, only 1d, 2d, 2p5d, 3d tensor parallelism are supported."
+            )
+        self.module_forward = copy.copy(self.module.forward)
+        self.module.parallelize()

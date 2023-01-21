@@ -5,6 +5,7 @@ from threading import Lock
 import torch
 import torch.nn as nn
 from torch.distributed import rpc
+from transformers.utils import ModelOutput
 
 from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.distributed.parallel_mode import ParallelMode
@@ -30,7 +31,12 @@ from oslo.torch.nn.parallel.pipeline_parallel._sync import (
     set_result,
     get_result,
 )
-from oslo.torch.nn.parallel.utils import get_parallel_context, add_wrapper
+from oslo.torch.nn.parallel.utils import (
+    get_parallel_context,
+    add_wrapper,
+    OsloParallelWrapper,
+)
+from oslo.transformers.constants import BATCH_DIMENSIONS_PP
 
 
 def PipelineParallel(
@@ -52,7 +58,6 @@ def PipelineParallel(
         wrapper=pp,
         parallel_context=parallel_context,
     )
-    setattr(module, "forward", pp.forward)
     return module
 
 
@@ -65,7 +70,7 @@ def launch(fn, is_grad_enabled, *args, **kwargs):
     return result
 
 
-class _PipelineParallel(nn.Module):
+class _PipelineParallel(OsloParallelWrapper):
     """
     Pipeline parallel module
 
@@ -97,15 +102,22 @@ class _PipelineParallel(nn.Module):
         memory_computation_balance: float = 1.0,
         num_micro_batches: int = 1,
     ):
-        super().__init__()
+        super().__init__(parallelism_priority=99)
         self.module = module
         self.module_forward = copy.copy(module.forward)
         self.parallel_context = get_parallel_context(module, parallel_context)
+        self.memory_computation_balance = memory_computation_balance
+        self.num_micro_batches = num_micro_batches
+
+    @torch.no_grad()
+    def parallelize(self):
         self.partitioner = ModelPartitioner(
-            module=module,
-            process_group=parallel_context.get_group(ParallelMode.PIPELINE),
-            actual_ranks=parallel_context.get_ranks_in_group(ParallelMode.PIPELINE),
-            memory_computation_balance=memory_computation_balance,
+            module=self.module,
+            process_group=self.parallel_context.get_group(ParallelMode.PIPELINE),
+            actual_ranks=self.parallel_context.get_ranks_in_group(
+                ParallelMode.PIPELINE
+            ),
+            memory_computation_balance=self.memory_computation_balance,
         )
         self.partitioner.partition()
         self.oslo_parallel = self.module.oslo_parallel
@@ -113,7 +125,6 @@ class _PipelineParallel(nn.Module):
         self._recursive_wrap(self, "")
         self._lock = Lock()
         self.local_rank = self.parallel_context.get_local_rank(ParallelMode.PIPELINE)
-        self.num_micro_batches = num_micro_batches
 
         # set up worker for inputs
         self.producer = None
@@ -121,6 +132,18 @@ class _PipelineParallel(nn.Module):
             self.producer = concurrent.futures.ThreadPoolExecutor()
 
     def forward(self, *args, **kwargs):
+        assert len(args) == 0, (
+            "Pipeline parallel model only supports ``**kwargs`` input (keyword arguments). "
+            "If you wrote code like ``model(input_ids, labels)``, "
+            "please modify your code like ``model(input_ids=input_ids, labels=labels)``."
+        )
+
+        if "return_dict" in kwargs and kwargs["return_dict"] is False:
+            raise ValueError(
+                "Pipeline parallel model does not support ``return_dict=False``. "
+                "Please set ``return_dict=True``."
+            )
+
         # set forward counter to zero
         reset_forward_used_counter()
 
@@ -130,18 +153,20 @@ class _PipelineParallel(nn.Module):
         )
 
         if self.local_rank == 0:
-            # TODO;
-            new_args = [list() for _ in range(self.num_micro_batches)]
-            for x in args:
-                x = x.chunk(self.num_micro_batches)
-                for i, x_chunk in enumerate(x):
-                    new_args[i].append(x_chunk)
-
             new_kwargs = [dict() for _ in range(self.num_micro_batches)]
             for k, v in kwargs.items():
-                v = v.chunk(self.num_micro_batches)
-                for i, v_chunk in enumerate(v):
-                    new_kwargs[i][k] = v_chunk
+                if k in BATCH_DIMENSIONS_PP:
+                    # splittable
+                    v = v.chunk(
+                        self.num_micro_batches,
+                        dim=BATCH_DIMENSIONS_PP[k],
+                    )
+                    for i, v_chunk in enumerate(v):
+                        new_kwargs[i][k] = v_chunk
+                else:
+                    # not splittable
+                    for i in range(self.num_micro_batches):
+                        new_kwargs[i][k] = v
 
             futures = []
             # TODO; implement warm-up phase?
@@ -155,15 +180,18 @@ class _PipelineParallel(nn.Module):
             #     ind += 1
 
             is_grad_enabled = torch.is_grad_enabled()
-            for ind, (args_, kwargs_) in enumerate(zip(new_args, new_kwargs)):
+            for ind, kwargs_ in enumerate(new_kwargs):
                 future = self.producer.submit(
-                    launch, self.module_forward, is_grad_enabled, *args_, **kwargs_
+                    launch, self.module_forward, is_grad_enabled, **kwargs_
                 )
                 futures.append(future)
 
             for i, done in enumerate(concurrent.futures.as_completed(futures)):
                 result = done.result()
                 set_result(i, result)
+
+                if isinstance(result, ModelOutput) and hasattr(result, "loss"):
+                    result.loss = result.loss / self.num_micro_batches
 
                 yield result
 

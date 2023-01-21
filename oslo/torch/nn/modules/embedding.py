@@ -36,6 +36,7 @@ class Embedding1D(nn.Embedding):
         gather_output: bool = True,
         parallel_context: Optional[ParallelContext] = None,
     ):
+        assert parallel_context is not None, "parallel_context must be provided"
         self.gather_output = gather_output
         self.parallel_context = parallel_context
         self.world_size = self.parallel_context.get_world_size(ParallelMode.TENSOR_1D)
@@ -81,8 +82,9 @@ class VocabParallelEmbedding1D(nn.Embedding):
         dtype: Optional[torch.dtype] = None,
         parallel_context: Optional[ParallelContext] = None,
     ):
+        assert parallel_context is not None, "parallel_context must be provided"
         self.parallel_context = parallel_context
-        rank = self.parallel_context.get_local_rank(ParallelMode.TENSOR_1D)
+        self.rank = self.parallel_context.get_local_rank(ParallelMode.TENSOR_1D)
         self.world_size = self.parallel_context.get_world_size(ParallelMode.TENSOR_1D)
         assert (
             num_embeddings % self.world_size == 0
@@ -91,7 +93,7 @@ class VocabParallelEmbedding1D(nn.Embedding):
             self.vocab_start_index,
             self.vocab_end_index,
         ) = VocabUtility.vocab_range_from_global_vocab_size(
-            num_embeddings, rank, self.world_size
+            num_embeddings, self.rank, self.world_size
         )
 
         super().__init__(
@@ -141,6 +143,7 @@ class Embedding2D(nn.Embedding):
         dtype: Optional[torch.dtype] = None,
         parallel_context: Optional[ParallelContext] = None,
     ):
+        assert parallel_context is not None, "parallel_context must be provided"
         self.parallel_context = parallel_context
         self.summa_dim = self.parallel_context.get_world_size(
             ParallelMode.TENSOR_2D_COL
@@ -186,6 +189,7 @@ class VocabParallelEmbedding2D(nn.Embedding):
         dtype: Optional[torch.dtype] = None,
         parallel_context: Optional[ParallelContext] = None,
     ):
+        assert parallel_context is not None, "parallel_context must be provided"
         self.parallel_context = parallel_context
         self.summa_dim = self.parallel_context.get_world_size(
             ParallelMode.TENSOR_2D_COL
@@ -260,6 +264,7 @@ class Embedding2p5D(nn.Embedding):
         dtype: Optional[torch.dtype] = None,
         parallel_context: Optional[ParallelContext] = None,
     ):
+        assert parallel_context is not None, "parallel_context must be provided"
         self.parallel_context = parallel_context
         self.tesseract_dim = self.parallel_context.get_world_size(
             ParallelMode.TENSOR_2P5D_COL
@@ -307,6 +312,7 @@ class VocabParallelEmbedding2p5D(nn.Embedding):
         dtype: Optional[torch.dtype] = None,
         parallel_context: Optional[ParallelContext] = None,
     ):
+        assert parallel_context is not None, "parallel_context must be provided"
         self.parallel_context = parallel_context
         self.tesseract_dim = self.parallel_context.get_world_size(
             ParallelMode.TENSOR_2P5D_COL
@@ -381,7 +387,8 @@ class Embedding3D(nn.Embedding):
         embedding_dim: int,
         dtype: Optional[torch.dtype] = None,
         parallel_context: Optional[ParallelContext] = None,
-    ):
+    ):  
+        assert parallel_context is not None, "parallel_context must be provided"
         self.parallel_context = parallel_context
         self.cubic_dim = self.parallel_context.get_world_size(
             ParallelMode.TENSOR_3D_INPUT,
@@ -430,6 +437,7 @@ class VocabParallelEmbedding3D(nn.Embedding):
         dtype: Optional[torch.dtype] = None,
         parallel_context: Optional[ParallelContext] = None,
     ):
+        assert parallel_context is not None, "parallel_context must be provided"
         self.parallel_context = parallel_context
         self.cubic_dim = self.parallel_context.get_world_size(
             ParallelMode.TENSOR_3D_INPUT,

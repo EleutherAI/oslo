@@ -4,8 +4,21 @@ from typing import Tuple, List
 import torch
 import torch.nn as nn
 
+from oslo.torch import ParallelMode
 from oslo.torch.distributed import ParallelContext
 from oslo.transformers.modeling_utils import OsloModel
+
+
+class OsloParallelWrapper(nn.Module):
+    def __init__(self, parallelism_priority: int):
+        super().__init__()
+        self.parallelism_priority = parallelism_priority
+
+    def parallelize(self):
+        raise NotImplementedError
+
+    def deparallelize(self):
+        raise NotImplementedError
 
 
 def is_oslo_model(model: nn.Module):
@@ -43,12 +56,26 @@ def _remove_module_arguments(module: nn.Module, args: list):
         delattr(module, k)
 
 
-def allocate_params(model: nn.Module, parallel_context: ParallelContext):
+def parallelize(model: nn.Module, parallel_context: ParallelContext):
+    if hasattr(model, "oslo_wrappers"):
+        model.oslo_wrappers = dict(
+            sorted(
+                model.oslo_wrappers.items(),
+                key=lambda item: item[1].parallelism_priority,
+                # (mode, wrapper)
+            )
+        )
+        for wrapper in model.oslo_wrappers.values():
+            if hasattr(wrapper, "parallelize"):
+                wrapper.parallelize()
+                setattr(model, "forward", wrapper.forward)
+
     for parameter in model.parameters():
         if hasattr(parameter, "oslo_parallel"):
             # sorting parallel groups to fix parallelization order
             parameter.oslo_parallel = OrderedDict(
                 sorted(parameter.oslo_parallel.items(), key=lambda item: str(item[0]))
+                # (mode, group)
             )
             device = parallel_context.ranks2device(parameter.oslo_parallel)
             if device is not None:
@@ -88,16 +115,12 @@ def get_parallel_context(module: nn.Module, parallel_context: ParallelContext):
     return parallel_context
 
 
-def zero_rank_log(txt):
-    import torch.distributed as dist
-
-    if dist.get_rank() == 0:
-        print(txt)
-
-    dist.barrier()
-
-
-def add_wrapper(module, mode, wrapper, parallel_context):
+def add_wrapper(
+    module: nn.Module,
+    mode: ParallelMode,
+    wrapper: OsloParallelWrapper,
+    parallel_context: ParallelContext,
+):
     if hasattr(module, "oslo_wrappers"):
         module.oslo_wrappers[mode] = wrapper
     else:

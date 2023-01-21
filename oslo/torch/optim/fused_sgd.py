@@ -1,5 +1,5 @@
 import torch
-from torch.optim.optimizer import Optimizer, required
+from torch.optim.optimizer import Optimizer
 
 from oslo.torch._C import get_sgd_kernel
 from oslo.torch.utils.multi_tensor_apply import multi_tensor_applier
@@ -78,7 +78,7 @@ class FusedSGD(Optimizer):
     def __init__(
         self,
         params,
-        lr=required,
+        lr=1e-3,
         momentum=0,
         dampening=0,
         weight_decay=0,
@@ -87,7 +87,7 @@ class FusedSGD(Optimizer):
         materialize_master_grads=True,
         set_grad_none=False,
     ):
-        if lr is not required and lr < 0.0:
+        if lr < 0.0:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if momentum < 0.0:
             raise ValueError("Invalid momentum value: {}".format(momentum))
