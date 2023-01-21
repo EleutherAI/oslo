@@ -29,7 +29,7 @@ from oslo.torch.nn.parallel.utils import (
     _update_module_arguments,
     is_oslo_model,
 )
-from oslo.transformers.constants import BATCH_DIMENSIONS
+from oslo.transformers.constants import BATCH_DIMENSIONS_TP
 from oslo.transformers.mapping_utils import (
     _TensorParallelMapping,
 )
@@ -58,7 +58,6 @@ class _TensorParallel2D(nn.Module):
         mapping = _TensorParallelMapping().get_mapping(module)
         self.tensor_parallel_mapping = TensorParallelMapping(mapping)
         self.config = module.config
-        self._parallelize()
 
     def forward(self, *args, **kwargs):
         assert len(args) == 0, (
@@ -69,18 +68,18 @@ class _TensorParallel2D(nn.Module):
         kwargs = {
             key: scatter(
                 value,
-                dim=BATCH_DIMENSIONS[key],
+                dim=BATCH_DIMENSIONS_TP[key],
                 parallel_context=self.parallel_context,
                 parallel_mode=ParallelMode.TENSOR_2D_COL,
             )
-            if key in BATCH_DIMENSIONS
+            if key in BATCH_DIMENSIONS_TP
             else value
             for key, value in kwargs.items()
         }
         return self.module_forward(*args, **kwargs)
 
     @torch.no_grad()
-    def _parallelize(self):
+    def parallelize(self):
         self._update_mp_arguments()
         self._parallelize_embedding()
         self._parallelize_linear()

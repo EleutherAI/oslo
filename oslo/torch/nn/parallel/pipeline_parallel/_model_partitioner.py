@@ -98,9 +98,6 @@ class ModelPartitioner(object):
         for node in post_order_traverse(self.root_node):
             for module in node.modules:
                 if len(self._get_parameters(module)) == 0:
-                    # TODO; Huggingface uses shared activation
-                    #   need to make use own activation, rather
-                    #   than make an rpc
                     self._set_attribute_without_param(module, node)
                 else:
                     self._set_attribute(module, node)

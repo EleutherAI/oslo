@@ -16,7 +16,7 @@ from oslo.torch.nn.parallel.pipeline_parallel.pipeline_parallel import (
 from oslo.torch.nn.parallel.tensor_parallel import TensorParallel
 from oslo.torch.nn.parallel.tensor_parallel.tensor_parallel import _TensorParallel
 from oslo.torch.nn.parallel.utils import (
-    allocate_params,
+    parallelize,
     get_parameter_dtype,
 )
 
@@ -235,7 +235,7 @@ def restrict_embedding_resizing(model):
 
 
 def ready_torch(model: nn.Module, parallel_context: ParallelContext):
-    allocate_params(model, parallel_context)
+    parallelize(model, parallel_context)
     restrict_embedding_resizing(model)
 
     setattr(model, "from_parallelized", partial(from_parallelized, self=model))

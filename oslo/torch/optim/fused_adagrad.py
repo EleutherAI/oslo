@@ -46,7 +46,7 @@ class FusedAdagrad(torch.optim.Optimizer):
     def __init__(
         self,
         params,
-        lr=1e-2,
+        lr=1e-3,
         eps=1e-10,
         weight_decay=0.0,
         set_grad_none=True,

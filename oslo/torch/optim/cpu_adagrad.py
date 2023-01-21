@@ -15,7 +15,7 @@ class CPUAdagrad(torch.optim.Optimizer):
     def __init__(
         self,
         model_params,
-        lr=1e-2,
+        lr=1e-3,
         eps=1e-10,
         weight_decay=0,
         amsgrad=False,

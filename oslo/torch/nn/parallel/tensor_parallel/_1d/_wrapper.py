@@ -51,7 +51,6 @@ class _TensorParallel1D(nn.Module):
         self.device = torch.cuda.current_device()
         mapping = _TensorParallelMapping().get_mapping(module)
         self.tensor_parallel_mapping = TensorParallelMapping(mapping)
-        self._parallelize()
 
     def forward(self, *args, **kwargs):
         assert len(args) == 0, (
@@ -62,7 +61,7 @@ class _TensorParallel1D(nn.Module):
         return self.module_forward(*args, **kwargs)
 
     @torch.no_grad()
-    def _parallelize(self):
+    def parallelize(self):
         self._update_mp_arguments()
         self._parallelize_embedding()
         self._parallelize_linear()

@@ -1,4 +1,4 @@
-from oslo.torch.distributed import ParallelContext
+from oslo.torch.distributed import ParallelContext, ParallelMode
 from oslo.torch.utils.extensions import ready_torch
 
 
