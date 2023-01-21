@@ -387,7 +387,7 @@ class Embedding3D(nn.Embedding):
         embedding_dim: int,
         dtype: Optional[torch.dtype] = None,
         parallel_context: Optional[ParallelContext] = None,
-    ):  
+    ):
         assert parallel_context is not None, "parallel_context must be provided"
         self.parallel_context = parallel_context
         self.cubic_dim = self.parallel_context.get_world_size(
