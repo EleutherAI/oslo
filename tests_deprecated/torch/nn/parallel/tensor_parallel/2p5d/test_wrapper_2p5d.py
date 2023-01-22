@@ -109,6 +109,7 @@ for data in dataloader:
     _, tp_bw_time = bw(loss_tp)
 
     if dist.get_rank() == 0:
+        print(f"[tp/notp loss]: {loss_tp:.4f}, {loss_no_tp:.4f}")
         wandb.log(
             {
                 "tp_loss": loss_tp,

@@ -106,9 +106,6 @@ class _TensorParallel3D(nn.Module):
             if isinstance(module, nn.Embedding):
                 self._slice_embedding(
                     module=module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
     def _parallelize_linear(self):
@@ -125,9 +122,6 @@ class _TensorParallel3D(nn.Module):
                         self.module, module_name, module
                     ),
                     slice_bias=True,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
     def _parallelize_layernorm(self):
@@ -135,9 +129,6 @@ class _TensorParallel3D(nn.Module):
             if isinstance(module, nn.LayerNorm):
                 self._slice_layernorm(
                     module=module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
     def _parallelize_head(self):
@@ -151,9 +142,6 @@ class _TensorParallel3D(nn.Module):
                         self.module, module_name
                     ),
                     gather_output=self.tensor_parallel_mapping.is_gather_output(
-                        self.module, module_name
-                    ),
-                    class_replace=self.tensor_parallel_mapping.class_replace(
                         self.module, module_name
                     ),
                 )
@@ -183,7 +171,7 @@ class _TensorParallel3D(nn.Module):
             ]
         return tensor
 
-    def _slice_embedding(self, module, class_replace):
+    def _slice_embedding(self, module):
         cubic_dim = self.parallel_context.get_world_size(ParallelMode.TENSOR_3D_INPUT)
         input_rank = self.parallel_context.get_local_rank(ParallelMode.TENSOR_3D_INPUT)
         output_rank = self.parallel_context.get_local_rank(
@@ -224,8 +212,7 @@ class _TensorParallel3D(nn.Module):
                 embedding_dim=module.weight.size()[1],
                 orig_module=copy.deepcopy(module.__class__),
             )
-            if class_replace:
-                module.__class__ = VocabParallelEmbedding3D
+            module.__class__ = VocabParallelEmbedding3D
         else:
             weight = module.weight.data.chunk(cubic_dim, dim=-1)
             module.weight.data = weight[output_rank].contiguous()
@@ -237,8 +224,7 @@ class _TensorParallel3D(nn.Module):
                 embedding_dim=module.weight.size()[1],
                 orig_module=copy.deepcopy(module.__class__),
             )
-            if class_replace:
-                module.__class__ = Embedding3D
+            module.__class__ = Embedding3D
 
         if hasattr(module.weight, "oslo_parallel"):
             module.weight.oslo_parallel[ParallelMode.TENSOR_3D_INPUT] = input_rank
@@ -251,7 +237,7 @@ class _TensorParallel3D(nn.Module):
                 ParallelMode.TENSOR_3D_WEIGHT: weight_rank,
             }
 
-    def _slice_linear(self, module, reversed, fusion_degree, slice_bias, class_replace):
+    def _slice_linear(self, module, reversed, fusion_degree, slice_bias):
         cubic_dim = self.parallel_context.get_world_size(ParallelMode.TENSOR_3D_INPUT)
         input_rank = self.parallel_context.get_local_rank(ParallelMode.TENSOR_3D_INPUT)
         output_rank = self.parallel_context.get_local_rank(
@@ -340,10 +326,9 @@ class _TensorParallel3D(nn.Module):
             orig_module=copy.deepcopy(module.__class__),
         )
 
-        if class_replace:
-            module.__class__ = Linear3D
+        module.__class__ = Linear3D
 
-    def _slice_layernorm(self, module, class_replace):
+    def _slice_layernorm(self, module):
         cubic_dim = self.parallel_context.get_world_size(ParallelMode.TENSOR_3D_INPUT)
         input_rank = self.parallel_context.get_local_rank(ParallelMode.TENSOR_3D_INPUT)
         output_rank = self.parallel_context.get_local_rank(
@@ -403,17 +388,15 @@ class _TensorParallel3D(nn.Module):
             cubic_dim=cubic_dim,
             orig_module=copy.deepcopy(module.__class__),
         )
-        if class_replace:
-            module.__class__ = LayerNorm3D
+        module.__class__ = LayerNorm3D
 
-    def _slice_head(self, module, reversed, gather_output, class_replace):
+    def _slice_head(self, module, reversed, gather_output):
         if module.weight is not self.module.get_input_embeddings().weight:
             self._slice_linear(
                 module=module,
                 reversed=reversed,
                 fusion_degree=1,
                 slice_bias=True,
-                class_replace=class_replace,
             )
             _update_module_arguments(
                 module=module,
@@ -466,8 +449,7 @@ class _TensorParallel3D(nn.Module):
                 gather_output=gather_output,
                 orig_module=copy.deepcopy(module.__class__),
             )
-        if class_replace:
-            module.__class__ = Linear3D
+        module.__class__ = Linear3D
 
     @torch.no_grad()
     def deparallelize(self):
@@ -493,16 +475,10 @@ class _TensorParallel3D(nn.Module):
             if module.__class__ == VocabParallelEmbedding3D:
                 self._gather_embedding(
                     module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
             if module.__class__ == Embedding3D:
                 self._gather_embedding(
                     module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
     def _deparallelize_linear(self):
@@ -512,9 +488,6 @@ class _TensorParallel3D(nn.Module):
             ) or self.tensor_parallel_mapping.is_row_parallel(self.module, module_name):
                 self._gather_linear(
                     module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
     def _deparallelize_head(self):
@@ -524,9 +497,6 @@ class _TensorParallel3D(nn.Module):
             ) and isinstance(module, Linear3D):
                 self._gather_head(
                     module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
     def _deparallelize_layernorm(self):
@@ -534,12 +504,9 @@ class _TensorParallel3D(nn.Module):
             if module.__class__ == LayerNorm3D:
                 self._gather_layernorm(
                     module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
-    def _gather_embedding(self, module, class_replace):
+    def _gather_embedding(self, module):
         cubic_dim = self.parallel_context.get_world_size(ParallelMode.TENSOR_3D_INPUT)
         if hasattr(module, "vocab_start_index") and hasattr(module, "vocab_end_index"):
             w = gather_3d(self.parallel_context, module.weight.data, cubic_dim)
@@ -568,12 +535,11 @@ class _TensorParallel3D(nn.Module):
                 parallel_context=None,
                 embedding_dim=module.weight.size()[1],
             )
-        if class_replace:
-            module.__class__ = nn.Embedding
+        module.__class__ = nn.Embedding
 
-    def _gather_head(self, module: Linear3D, class_replace):
+    def _gather_head(self, module: Linear3D):
         if module.weight is not self.module.get_input_embeddings().weight:
-            return self._gather_linear(module, class_replace)
+            return self._gather_linear(module)
         elif hasattr(module, "bias") and module.bias is not None:
             tesseract_dim = self.parallel_context.get_world_size(
                 ParallelMode.TENSOR_3D_INPUT
@@ -591,10 +557,9 @@ class _TensorParallel3D(nn.Module):
             else False,
         )
 
-        if class_replace:
-            module.__class__ = nn.Linear
+        module.__class__ = nn.Linear
 
-    def _gather_linear(self, module: Linear3D, class_replace):
+    def _gather_linear(self, module: Linear3D):
         is_reversed = module.reversed
         fusion_degree = module.fusion_degree
         # slice_bias = module.slice_bias
@@ -632,10 +597,9 @@ class _TensorParallel3D(nn.Module):
             else False,
         )
 
-        if class_replace:
-            module.__class__ = nn.Linear
+        module.__class__ = nn.Linear
 
-    def _gather_layernorm(self, module, class_replace):
+    def _gather_layernorm(self, module):
         cubic_dim = self.parallel_context.get_world_size(ParallelMode.TENSOR_3D_INPUT)
         if hasattr(module, "weight") and module.weight is not None:
             if module.weight.dim() >= 1:
@@ -657,8 +621,7 @@ class _TensorParallel3D(nn.Module):
             module,
             normalized_shape=module.weight.size()[0],
         )
-        if class_replace:
-            module.__class__ = nn.LayerNorm
+        module.__class__ = nn.LayerNorm
 
     @staticmethod
     def _reconstruct_combined_qkv(tensor, cubic_dim, fusion_degree, is_bias=False):

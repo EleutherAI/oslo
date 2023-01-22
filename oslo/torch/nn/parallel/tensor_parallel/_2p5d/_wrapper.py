@@ -97,9 +97,6 @@ class _TensorParallel2p5D(nn.Module):
             if isinstance(module, nn.Embedding):
                 self._slice_embedding(
                     module=module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
     def _parallalize_linear(self):
@@ -116,9 +113,6 @@ class _TensorParallel2p5D(nn.Module):
                         self.module, module_name, module
                     ),
                     slice_bias=True,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
     def _parallelize_layernorm(self):
@@ -126,9 +120,6 @@ class _TensorParallel2p5D(nn.Module):
             if isinstance(module, nn.LayerNorm):
                 self._slice_layernorm(
                     module=module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
     def _parallelize_head(self):
@@ -142,9 +133,6 @@ class _TensorParallel2p5D(nn.Module):
                         self.module, module_name
                     ),
                     gather_output=self.tensor_parallel_mapping.is_gather_output(
-                        self.module, module_name
-                    ),
-                    class_replace=self.tensor_parallel_mapping.class_replace(
                         self.module, module_name
                     ),
                 )
@@ -174,7 +162,7 @@ class _TensorParallel2p5D(nn.Module):
             ]
         return tensor
 
-    def _slice_embedding(self, module, class_replace):
+    def _slice_embedding(self, module):
         tesseract_dim = self.parallel_context.get_world_size(
             ParallelMode.TENSOR_2P5D_COL
         )
@@ -205,8 +193,7 @@ class _TensorParallel2p5D(nn.Module):
                 embedding_dim=module.weight.size()[1],
                 orig_module=copy.deepcopy(module.__class__),
             )
-            if class_replace:
-                module.__class__ = VocabParallelEmbedding2p5D
+            module.__class__ = VocabParallelEmbedding2p5D
         else:
             weight_list = module.weight.data.chunk(tesseract_dim, dim=1)
             weight_list = [weight.chunk(tesseract_dim, dim=1) for weight in weight_list]
@@ -219,8 +206,7 @@ class _TensorParallel2p5D(nn.Module):
                 embedding_dim=module.weight.size()[1],
                 orig_module=copy.deepcopy(module.__class__),
             )
-            if class_replace:
-                module.__class__ = Embedding2p5D
+            module.__class__ = Embedding2p5D
 
         if hasattr(module.weight, "oslo_parallel"):
             module.weight.oslo_parallel[ParallelMode.TENSOR_2P5D_ROW] = row_rank
@@ -233,7 +219,7 @@ class _TensorParallel2p5D(nn.Module):
                 ParallelMode.TENSOR_2P5D_DEP: dep_rank,
             }
 
-    def _slice_linear(self, module, reversed, fusion_degree, slice_bias, class_replace):
+    def _slice_linear(self, module, reversed, fusion_degree, slice_bias):
         tesseract_dim = self.parallel_context.get_world_size(
             ParallelMode.TENSOR_2P5D_COL
         )
@@ -324,11 +310,10 @@ class _TensorParallel2p5D(nn.Module):
             else False,
             gather_output=False,
         )
-        if class_replace:
-            module.__class__ = Linear2p5D
+        module.__class__ = Linear2p5D
         return module
 
-    def _slice_layernorm(self, module, class_replace):
+    def _slice_layernorm(self, module):
         tesseract_dim = self.parallel_context.get_world_size(
             ParallelMode.TENSOR_2P5D_COL
         )
@@ -391,18 +376,16 @@ class _TensorParallel2p5D(nn.Module):
             pipeline_parallel_size=pipeline_parallel_size,
             orig_module=copy.deepcopy(module.__class__),
         )
-        if class_replace:
-            module.__class__ = LayerNorm2p5D
+        module.__class__ = LayerNorm2p5D
         return module
 
-    def _slice_head(self, module, reversed, gather_output, class_replace):
+    def _slice_head(self, module, reversed, gather_output):
         if module.weight is not self.module.get_input_embeddings().weight:
             self._slice_linear(
                 module=module,
                 reversed=reversed,
                 fusion_degree=1,
                 slice_bias=True,
-                class_replace=class_replace,
             )
             _update_module_arguments(
                 module=module,
@@ -475,8 +458,7 @@ class _TensorParallel2p5D(nn.Module):
                 orig_module=copy.deepcopy(module.__class__),
             )
 
-        if class_replace:
-            module.__class__ = Linear2p5D
+        module.__class__ = Linear2p5D
 
     @torch.no_grad()
     def deparallelize(self):
@@ -502,16 +484,10 @@ class _TensorParallel2p5D(nn.Module):
             if module.__class__ == VocabParallelEmbedding2p5D:
                 self._gather_embedding(
                     module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
             if module.__class__ == Embedding2p5D:
                 self._gather_embedding(
                     module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
     def _deparallelize_linear(self):
@@ -521,9 +497,6 @@ class _TensorParallel2p5D(nn.Module):
             ) or self.tensor_parallel_mapping.is_row_parallel(self.module, module_name):
                 self._gather_linear(
                     module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
     def _deparallelize_head(self):
@@ -533,9 +506,6 @@ class _TensorParallel2p5D(nn.Module):
             ) and isinstance(module, Linear2p5D):
                 self._gather_head(
                     module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
     def _deparallelize_layernorm(self):
@@ -543,12 +513,9 @@ class _TensorParallel2p5D(nn.Module):
             if module.__class__ == LayerNorm2p5D:
                 self._gather_layernorm(
                     module,
-                    class_replace=self.tensor_parallel_mapping.class_replace(
-                        self.module, module_name
-                    ),
                 )
 
-    def _gather_embedding(self, module, class_replace):
+    def _gather_embedding(self, module):
         tesseract_dim = self.parallel_context.get_world_size(
             ParallelMode.TENSOR_2P5D_COL
         )
@@ -583,12 +550,11 @@ class _TensorParallel2p5D(nn.Module):
                 embedding_dim=module.weight.size()[1],
             )
 
-        if class_replace:
-            module.__class__ = nn.Embedding
+        module.__class__ = nn.Embedding
 
-    def _gather_head(self, module: Linear2p5D, class_replace):
+    def _gather_head(self, module: Linear2p5D):
         if module.weight is not self.module.get_input_embeddings().weight:
-            return self._gather_linear(module, class_replace)
+            return self._gather_linear(module)
         elif hasattr(module, "bias") and module.bias is not None:
             tesseract_dim = self.parallel_context.get_world_size(
                 ParallelMode.TENSOR_2P5D_COL
@@ -621,10 +587,9 @@ class _TensorParallel2p5D(nn.Module):
         del module.gather_output
         del module.parallel_context
 
-        if class_replace:
-            module.__class__ = nn.Linear
+        module.__class__ = nn.Linear
 
-    def _gather_linear(self, module: Linear2p5D, class_replace):
+    def _gather_linear(self, module: Linear2p5D):
         is_reversed = module.reversed
         fusion_degree = module.fusion_degree
         # slice_bias = module.slice_bias
@@ -677,10 +642,9 @@ class _TensorParallel2p5D(nn.Module):
         del module.gather_output
         del module.parallel_context
 
-        if class_replace:
-            module.__class__ = nn.Linear
+        module.__class__ = nn.Linear
 
-    def _gather_layernorm(self, module, class_replace):
+    def _gather_layernorm(self, module):
         tesseract_dim = self.parallel_context.get_world_size(
             ParallelMode.TENSOR_2P5D_COL
         )
@@ -716,8 +680,7 @@ class _TensorParallel2p5D(nn.Module):
             module,
             normalized_shape=module.weight.size()[0],
         )
-        if class_replace:
-            module.__class__ = nn.LayerNorm
+        module.__class__ = nn.LayerNorm
 
     @staticmethod
     def _reconstruct_combined_qkv(tensor, tesseract_dim, fusion_degree, is_bias=False):
