@@ -39,5 +39,5 @@ def test_conv1d():
 
 
 if __name__ == "__main__":
-    print("Test tests/torch/nn/modules/test_conv.py")
+    print("Test tests/torch/nn/modules/conv/test_conv.py")
     test_conv1d()
