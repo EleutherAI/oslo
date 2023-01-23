@@ -1,3 +1,6 @@
+"""
+python3 test_gelu.py
+"""
 import torch
 from torch.nn import functional as F
 from oslo.torch.nn import fused_gelu, fused_bias_gelu
