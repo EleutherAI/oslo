@@ -57,14 +57,14 @@ class _FusedGeLUFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, input):
-        ctx.save_for_backward(input)
+        ctx.input_tensor = input
         return _fused_gelu_fwb(input)
 
     @staticmethod
     def backward(ctx, grad_output):
-        input = ctx.saved_tensors
+        input = ctx.input_tensor
         tmp = _fused_gelu_bwd(grad_output, input)
-        return tmp, tmp
+        return tmp
 
 
 class _FusedBiasGeLUFunction(torch.autograd.Function):
