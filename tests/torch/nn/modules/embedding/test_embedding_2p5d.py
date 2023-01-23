@@ -1,3 +1,6 @@
+"""
+torchrun --nproc_per_node=4 test_embedding_2p5d.py
+"""
 from copy import deepcopy
 
 import torch

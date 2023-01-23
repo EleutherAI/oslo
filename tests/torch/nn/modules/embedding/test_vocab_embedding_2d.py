@@ -1,3 +1,6 @@
+"""
+torchrun --nproc_per_node=4 test_vocab_embedding_2d.py
+"""
 from copy import deepcopy
 
 import torch
