@@ -39,9 +39,10 @@ def DataParallel(
         #     cpu_offload=CPUOffload(offload_params=cpu_offload),
         # )
         optimizer = LowLevelZeroOptimizer(
-            module.parameters(),
-            optimizer_class=optimizer.__class__,
-            **optimizer.defaults,
+            optimizer,
+            overlap_communication = True,
+            initial_scale = 1,
+            clip_grad_norm = 0.0
         )
         return module, optimizer
 
@@ -55,9 +56,11 @@ def DataParallel(
         #     cpu_offload=CPUOffload(offload_params=cpu_offload),
         # )
         optimizer = LowLevelZeroOptimizer(
-            module.parameters(),
-            optimizer_class=optimizer.__class__,
-            **optimizer.defaults,
+                                         optimizer,
+                                         overlap_communication = True,
+                                         partition_grad = True,
+                                         initial_scale = 1,
+                                         clip_grad_norm = 0.0
         )
         return module, optimizer
 
