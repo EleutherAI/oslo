@@ -36,23 +36,23 @@ class LowLevelZeroOptimizer(ColossalaiOptimizer):
     def __init__(
             self,
             optimizer: Optimizer,
-            parallel_context: Optional[ParallelContext] = None,
+
     # grad scaler config
-            initial_scale=2**32,
+            initial_scale=2**16,
             min_scale=1,
             growth_factor=2,
             backoff_factor=0.5,
-            growth_interval=1000,
+            growth_interval=2000,
             hysteresis=2,
-            max_scale: int = 2**32,
+            max_scale: int = 2**24,
 
     # grad clipping
-            clip_grad_norm=2.0,
+            clip_grad_norm=0.0,
             verbose=False,
 
     # communication
-            reduce_bucket_size=50000000,
-            communication_dtype=torch.float16,
+            reduce_bucket_size=1024 * 1024,
+            communication_dtype=None,
             overlap_communication=False,
 
     # stage 2
@@ -61,19 +61,21 @@ class LowLevelZeroOptimizer(ColossalaiOptimizer):
             mp_parallel_mode=ParallelMode.MODEL,
 
     # cpu offload
-            cpu_offload=False):
+            cpu_offload=False,
+
+    # forced dtype
+            forced_dtype=None):
 
         # TODO: add support for
         # 1. fp16 master weights
         # 2. contiguous gradients
         # 3. cpu offload
         # 4. support when some parameters requires_grad = False
-
-        self._optimizer = optimizer
-        self._dtype = self._optimizer.param_groups[0]['params'][0].dtype
+        super(LowLevelZeroOptimizer, self).__init__(optim=optimizer)
+        self._dtype = self.optim.param_groups[0]['params'][0].dtype
         self._logger = get_dist_logger()
         self._verbose = verbose
-        assert parallel_context
+
         # stage 2
         self._partition_grads = partition_grad
 
@@ -83,12 +85,12 @@ class LowLevelZeroOptimizer(ColossalaiOptimizer):
         # get process groups
         self._dp_parallel_mode = dp_parallel_mode
         self._mp_parallel_mode = mp_parallel_mode
-        self._local_rank = parallel_context.get_local_rank(dp_parallel_mode)
-        self._world_size = parallel_context.get_world_size(dp_parallel_mode)
+        self._local_rank = gpc.get_local_rank(dp_parallel_mode)
+        self._world_size = gpc.get_world_size(dp_parallel_mode)
 
-        self._dp_group = parallel_context.get_group(dp_parallel_mode)
-        if parallel_context.is_initialized(mp_parallel_mode) and ParallelContext.get_world_size(mp_parallel_mode) > 1:
-            self._mp_group = parallel_context.get_group(mp_parallel_mode)
+        self._dp_group = gpc.get_group(dp_parallel_mode)
+        if gpc.is_initialized(mp_parallel_mode) and gpc.get_world_size(mp_parallel_mode) > 1:
+            self._mp_group = gpc.get_group(mp_parallel_mode)
         else:
             self._mp_group = None
 
@@ -115,6 +117,13 @@ class LowLevelZeroOptimizer(ColossalaiOptimizer):
         # gradient clipping
         self._clip_grad_norm = clip_grad_norm
 
+        if forced_dtype:
+            for group in self.optim.param_groups:
+                group_params = group['params']
+                for param in group_params:
+                    param.data = param.data.to(forced_dtype)
+            self._dtype = forced_dtype
+
         # check argument conflict
         self._sanity_checks()
 
@@ -127,7 +136,7 @@ class LowLevelZeroOptimizer(ColossalaiOptimizer):
         # iterate over the param group in the optimizer
         # partition these param groups for data parallel training
         # and add buffers to parameter store for future access
-        for group_id, param_group in enumerate(self._optimizer.param_groups):
+        for group_id, param_group in enumerate(self.optim.param_groups):
             group_params = param_group['params']
 
             # add the fp16 params to fp16_param_groups for bookkeeping
@@ -190,8 +199,12 @@ class LowLevelZeroOptimizer(ColossalaiOptimizer):
         # if it is stage 1 without overlapping, no hook will be attached
         if self._overlap_communication or self._partition_grads:
             self._attach_reduction_hook()
+        # shard hook is applied stage 1,2 both
+        self._shard_reduction_hook()
 
-        self._initialize_optimizer_states()
+    @property
+    def dtype(self):
+        return self._dtype
 
     @property
     def loss_scale(self):
@@ -220,25 +233,13 @@ class LowLevelZeroOptimizer(ColossalaiOptimizer):
                               parallel_mode=self._dp_parallel_mode)
         return params_per_rank
 
-    def _initialize_optimizer_states(self):
-        # create a dummy zero tensor which has the same shape as that of the param
-        # set this dummpy zero tensor as grad
-        for group_id in range(len(self._fp32_flat_param_groups_of_current_rank)):
-            fp32_partition_param = self._fp32_flat_param_groups_of_current_rank[group_id]
-            fp32_partition_grad = torch.zeros_like(fp32_partition_param)
-            fp32_partition_param.grad = fp32_partition_grad
-
-        # update the parameter with zero gradients for initialization of optimizer states
-        self._optimizer.step()
-
-        # remove the grad of the paramter to save memory
-        for group_id, fp32_flat_tensor in self._fp32_flat_param_groups_of_current_rank.items():
-            fp32_flat_tensor.grad = None
-
     def _sanity_checks(self):
         assert torch.cuda.is_available(), 'CUDA is required'
-        assert self._dtype == torch.float16, \
-            f'Parameters are expected to be of type torch.float16, but got {self._dtype}'
+        for param_group in self.optim.param_groups:
+            group_params = param_group['params']
+            for param in group_params:
+                assert param.dtype == self._dtype, \
+                    f"Parameters are expected to have the same dtype `{self._dtype}`, but got `{param.dtype}`"
 
     ###########################################################
     # Backward Reduction Hook
@@ -259,11 +260,10 @@ class LowLevelZeroOptimizer(ColossalaiOptimizer):
                         reduce_rank = self._param_store.get_param_rank(param)
                     else:
                         reduce_rank = None
-
                     def _define_and_attach(param, reduce_rank):
                         # get the AccumulateGrad object of the param itself
-                        accum_grad_obj = get_grad_accumulate_object(param)
-                        self._grad_store.add_accumulate_grad_object(accum_grad_obj)
+                        self.accum_grad_obj = get_grad_accumulate_object(param)
+                        self._grad_store.add_accumulate_grad_object(self.accum_grad_obj)
 
                         reduction_func = partial(self._reduce_and_remove_grads_by_bucket,
                                                  param=param,
@@ -275,9 +275,23 @@ class LowLevelZeroOptimizer(ColossalaiOptimizer):
                         def reduce_grad_hook(*args):
                             reduction_func()
 
-                        accum_grad_obj.register_hook(reduce_grad_hook)
-
+                        self.accum_grad_obj.register_hook(reduce_grad_hook)
                     _define_and_attach(param, reduce_rank)
+
+    def _shard_reduction_hook(self):
+        def shard_grads(*args):
+            #for step
+            if not self._partition_grads:
+                self._reduce_grad_stage1()
+            else:
+                # TODO: support async comm in reduce
+                self._reduce_grad_stage2()
+
+            # clear reduced grads
+            if self._overlap_communication:
+                torch.cuda.synchronize()
+                self._param_store.clear_grads_of_previous_reduced_params()
+        self.accum_grad_obj.register_hook(shard_grads)
 
     def _reduce_and_remove_grads_by_bucket(self, param, reduce_rank=None):
         param_size = param.numel()
@@ -349,6 +363,7 @@ class LowLevelZeroOptimizer(ColossalaiOptimizer):
         for tensor_list in grad_buckets_by_dtype:
             self._reduce_no_retain(tensor_list=tensor_list, bucket_size=bucket_size, reduce_rank=reduce_rank)
 
+
     ##############################
     # Reduction Utility Function #
     ##############################
@@ -388,15 +403,17 @@ class LowLevelZeroOptimizer(ColossalaiOptimizer):
     # torch.optim.Optimizer methods
     ################################
 
-    def backward(self, loss, retain_graph=False):
-        loss = self.loss_scale * loss
-        loss.backward(retain_graph=retain_graph)
+    # def backward(self, loss, retain_graph=False):
+    #     # loss = self.loss_scale * loss
+    #     # loss.backward(retain_graph=retain_graph)
+
+    #     # finish gradient reduction
+
 
     def zero_grad(self, set_to_none=True):
         """
         Set parameter gradients to zero. If set_to_none = True, gradient
         will be set to None to save memory.
-
         :param set_to_none: Whether set the gradient to None. Default value is True.
         :type set_to_none: bool
         """
@@ -461,14 +478,14 @@ class LowLevelZeroOptimizer(ColossalaiOptimizer):
         self._unscale_and_clip_grads(single_grad_partition_groups, global_norm)
 
         # update the parameters
-        self._optimizer.step()
+        self.optim.step()
         # release the fp32 grad
         release_param_grad(self._fp32_flat_param_groups_of_current_rank.values())
 
         # update fp16 partition updated by the current rank
         for group_id in range(len(self._fp16_param_groups)):
             fp16_param = self._param_store.get_flat_fp16_param_by_rank_group(rank=self._local_rank, group_id=group_id)
-            fp32_param = self._fp32_flat_param_groups_of_current_rank[group_id].to(fp16_param.device)
+            fp32_param = self._fp32_flat_param_groups_of_current_rank[group_id]
             fp16_param.data.copy_(fp32_param)
 
         # broadcast the updated model weights
@@ -527,21 +544,10 @@ class LowLevelZeroOptimizer(ColossalaiOptimizer):
     ############################
 
     def sync_grad(self):
-        if not self._partition_grads:
-            self._reduce_grad_stage1()
-        else:
-            # TODO: support async comm in reduce
-            self._reduce_grad_stage2()
-
         # update param already reduced flag
         reduction_states = self._param_store.get_param_reduction_states()
         for tensor, state in reduction_states.items():
             reduction_states[tensor] = False
-
-            # clear reduced grads
-        if self._overlap_communication:
-            torch.cuda.synchronize()
-            self._param_store.clear_grads_of_previous_reduced_params()
 
         # accumulate gradient
         avg_gradients = self._grad_store._averaged_gradients
