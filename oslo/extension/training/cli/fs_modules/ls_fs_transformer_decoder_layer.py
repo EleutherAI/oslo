@@ -3,7 +3,7 @@ from oslo.extension.training.ops.pytorch.transformer_decoder_layer import (
     LSTransformerDecoderLayer,
 )
 
-import lightseq.training.ops.pytorch.transformer_decoder_layer_new as decoder_new
+import oslo.extension.training.ops.pytorch.transformer_decoder_layer_new as decoder_new
 
 
 @with_incremental_state

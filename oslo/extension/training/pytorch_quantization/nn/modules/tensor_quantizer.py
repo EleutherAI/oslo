@@ -31,7 +31,7 @@ from oslo.extension.training.pytorch_quantization.nn.modules.clip import Clip
 
 from oslo.extension.training.pytorch_quantization import calib
 
-import lightseq.training.pytorch_quantization.utils as quant_utils
+import oslo.extension.training.pytorch_quantization.utils as quant_utils
 
 __all__ = ["TensorQuantizer"]
 
