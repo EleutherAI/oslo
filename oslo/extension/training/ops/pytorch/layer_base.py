@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from torch import nn
 
-from lightseq.training.ops.pytorch.util import MODEL_ARCH, check_config
+from oslo.extension.training.ops.pytorch.util import MODEL_ARCH, check_config
 
 
 class TransformerEncoderLayerBase(nn.Module):

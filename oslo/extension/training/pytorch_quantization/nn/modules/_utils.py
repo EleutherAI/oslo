@@ -23,8 +23,8 @@ import logging
 
 from torch import nn
 
-from lightseq.training.pytorch_quantization.nn import TensorQuantizer
-from lightseq.training.pytorch_quantization.tensor_quant import (
+from oslo.extension.training.pytorch_quantization.nn import TensorQuantizer
+from oslo.extension.training.pytorch_quantization.tensor_quant import (
     QuantDescriptor,
     QUANT_DESC_8BIT_PER_TENSOR,
 )

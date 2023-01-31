@@ -23,8 +23,8 @@ from torch.nn.modules.batchnorm import _NormBase
 import torch.nn.functional as F
 from torch.nn.modules import instancenorm
 
-from lightseq.training.pytorch_quantization.nn import TensorQuantizer
-from lightseq.training.pytorch_quantization import tensor_quant
+from oslo.extension.training.pytorch_quantization.nn import TensorQuantizer
+from oslo.extension.training.pytorch_quantization import tensor_quant
 from . import _utils
 
 __all__ = ["QuantInstanceNorm1d", "QuantInstanceNorm2d", "QuantInstanceNorm3d"]

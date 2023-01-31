@@ -16,11 +16,11 @@
 #
 
 
-from lightseq.training.pytorch_quantization.nn.modules.tensor_quantizer import *
-from lightseq.training.pytorch_quantization.nn.modules.quant_conv import *
-from lightseq.training.pytorch_quantization.nn.modules.quant_linear import *
-from lightseq.training.pytorch_quantization.nn.modules.quant_pooling import *
-from lightseq.training.pytorch_quantization.nn.modules.clip import *
-from lightseq.training.pytorch_quantization.nn.modules.quant_rnn import *
-from lightseq.training.pytorch_quantization.nn.modules.quant_bert import *
-from lightseq.training.pytorch_quantization.nn.modules.quant_instancenorm import *
+from oslo.extension.training.pytorch_quantization.nn.modules.tensor_quantizer import *
+from oslo.extension.training.pytorch_quantization.nn.modules.quant_conv import *
+from oslo.extension.training.pytorch_quantization.nn.modules.quant_linear import *
+from oslo.extension.training.pytorch_quantization.nn.modules.quant_pooling import *
+from oslo.extension.training.pytorch_quantization.nn.modules.clip import *
+from oslo.extension.training.pytorch_quantization.nn.modules.quant_rnn import *
+from oslo.extension.training.pytorch_quantization.nn.modules.quant_bert import *
+from oslo.extension.training.pytorch_quantization.nn.modules.quant_instancenorm import *

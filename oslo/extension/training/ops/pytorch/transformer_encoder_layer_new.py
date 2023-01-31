@@ -4,9 +4,9 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
-from lightseq.training.ops.pytorch.layer_base import TransformerEncoderLayerBase
+from oslo.extension.training.ops.pytorch.layer_base import TransformerEncoderLayerBase
 from . import layer_cuda_module
-from lightseq.training.ops.pytorch.util import (
+from oslo.extension.training.ops.pytorch.util import (
     copy_para,
     state_dict,
     calc_offset,

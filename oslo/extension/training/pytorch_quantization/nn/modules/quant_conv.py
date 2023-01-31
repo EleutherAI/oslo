@@ -28,7 +28,7 @@ import torch.nn.functional as F
 from torch.nn.modules.utils import _single, _pair, _triple
 from torch.nn.modules.conv import _ConvTransposeNd
 
-from lightseq.training.pytorch_quantization import tensor_quant
+from oslo.extension.training.pytorch_quantization import tensor_quant
 
 from . import _utils
 

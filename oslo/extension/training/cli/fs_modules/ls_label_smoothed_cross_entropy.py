@@ -6,7 +6,7 @@ from fairseq import metrics, utils
 from fairseq.criterions import FairseqCriterion, register_criterion
 from fairseq.dataclass import FairseqDataclass
 from omegaconf import II
-from lightseq.training.ops.pytorch.cross_entropy_layer import LSCrossEntropyLayer
+from oslo.extension.training.ops.pytorch.cross_entropy_layer import LSCrossEntropyLayer
 
 
 @dataclass

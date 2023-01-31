@@ -20,7 +20,7 @@
 from torch import nn
 from torch.nn import functional as F
 
-from lightseq.training.pytorch_quantization import tensor_quant
+from oslo.extension.training.pytorch_quantization import tensor_quant
 
 from . import _utils
 
