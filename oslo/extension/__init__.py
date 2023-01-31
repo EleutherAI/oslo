@@ -36,9 +36,10 @@ class ExtensionBinder(object):
         return "oslo"
 
     def includes(self):
+        default_paths = [os.path.join(self.base_path, path, "includes") for path in ["layers", "kernels", "pybind"]]
         return [
-            os.path.join(base_path, "includes") for base_path in self.base_paths
-        ]
+            os.path.join(bpath, "includes") for bpath in self.dirnames
+        ] + default_paths
 
     def sources(self):
         return self.sources
@@ -64,9 +65,10 @@ class ExtensionBinder(object):
         ext_path = os.path.join(ext_path, self.name)
         os.makedirs(ext_path, exist_ok=True)
 
+        common_source_paths = [os.path.join(self.base_path, "kernels/cuda_util.cu")]
         op_module = cpp_extension.load(
             name=self.name,
-            sources=[os.path.join(self.base_path, path) for path in self.sources()],
+            sources=common_source_paths + [os.path.join(self.base_path, path) for path in self.sources()],
             extra_include_paths=self.includes(),
             extra_cflags=self.cxx_args(),
             extra_cuda_cflags=self.nvcc_args(),
