@@ -14,7 +14,7 @@ def test_cross_entropy_layer():
             padding_idx=10,
             epsilon=0.0,
             fp16=False,
-            local_rank="cuda:0",
+            local_rank=0,
         )
     
     ls_cross_entropy = LSCrossEntropyLayer(config)
