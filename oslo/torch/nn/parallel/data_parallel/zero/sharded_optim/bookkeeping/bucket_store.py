@@ -1,7 +1,7 @@
 from torch import Tensor
 from torch.distributed import ProcessGroup
 
-from .base_store import BaseStore
+from ._base_store import BaseStore
 
 
 class BucketStore(BaseStore):
