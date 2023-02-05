@@ -33,5 +33,5 @@ def test_fused_bias_dropout():
 
 
 if __name__ == "__main__":
-    print("Test tests/torch/nn/modules/test_dropout.py")
+    print("Test tests/torch/nn/modules/dropout/test_dropout.py")
     test_fused_bias_dropout()
