@@ -229,12 +229,12 @@ class OsloTrainerConfig:
                     self.host = cfg["backend"]["host"]
                     log_dist(f"host: {self.host}")
                 else:
-                    ValueError(f"host is required to use {self.backend}")
+                    raise ValueError(f"host is required to use {self.backend}")
                 if "port" in cfg["backend"]:
                     self.port = cfg["backend"]["port"]
                     log_dist(f"host: {self.host}")
                 else:
-                    ValueError(f"post is required to use {self.backend}")
+                    raise ValueError(f"post is required to use {self.backend}")
         log_dist(f"backend engine: {self.backend}")
 
         if "mixed_precision" in cfg and cfg["mixed_precision"]["enable"] is True:
@@ -243,14 +243,9 @@ class OsloTrainerConfig:
 
         if "data_parallelism" in cfg and cfg["data_parallelism"]["enable"] is True:
             if cfg["data_parallelism"]["parallel_size"] is None:
-                log_dist(
-                    "data_parallelism can not be usable because parallel_size is required.",
-                    logging.WARNING,
-                )
+                raise ValueError(f"data_parallelism can not be usable because parallel_size is required.")
             elif cfg["data_parallelism"]["zero_stage"] is None:
-                logging.warning(
-                    "data_parallelism can not be usable because zero_stage is required."
-                )
+                raise ValueError(f"data_parallelism can not be usable because zero_stage is required.")
             else:
                 if (
                     "params" in cfg["data_parallelism"]
@@ -272,10 +267,7 @@ class OsloTrainerConfig:
             and cfg["sequence_parallelism"]["enable"] is True
         ):
             if cfg["sequence_parallelism"]["parallel_size"] is None:
-                log_dist(
-                    "sequence_parallelism can not be usable because parallel_size is required.",
-                    logging.WARNING,
-                )
+                raise ValueError(f"sequence_parallelism can not be usable because parallel_size is required.")
             else:
                 self.sequence_parallelism = cfg["sequence_parallelism"]
                 if "params" not in self.sequence_parallelism:
@@ -286,13 +278,12 @@ class OsloTrainerConfig:
 
         if "tensor_parallelism" in cfg and cfg["tensor_parallelism"]["enable"] is True:
             if cfg["tensor_parallelism"]["parallel_size"] is None:
-                ValueError(
+                raise ValueError(
                     "tensor_parallelism can not be usable because parallel_size is required."
                 )
             elif cfg["tensor_parallelism"]["parallel_mode"] is None:
-                log_dist(
-                    "tensor_parallelism can not be usable because parallel_mode is required.",
-                    logging.WARNING,
+                raise ValueError(
+                    "tensor_parallelism can not be usable because parallel_mode is required."
                 )
             else:
                 self.tensor_parallelism = cfg["tensor_parallelism"]
@@ -307,11 +298,9 @@ class OsloTrainerConfig:
             and cfg["pipeline_parallelism"]["enable"] is True
         ):
             if cfg["pipeline_parallelism"]["parallel_size"] is None:
-                log_dist(
-                    "pipeline_parallelism can not be usable because parallel_size is required.",
-                    logging.WARNING,
+                raise ValueError(
+                    "pipeline_parallelism can not be usable because parallel_size is required."
                 )
-                self.pipeline_parallelism = None
             else:
                 self.pipeline_parallelism = cfg["pipeline_parallelism"]
                 if "params" not in self.pipeline_parallelism:
@@ -322,9 +311,8 @@ class OsloTrainerConfig:
 
         if "expert_parallelism" in cfg and cfg["expert_parallelism"]["enable"] is True:
             if cfg["expert_parallelism"]["parallel_size"] is None:
-                log_dist(
-                    "expert_parallelism can not be usable because parallel_size is required.",
-                    logging.WARNING,
+                raise ValueError(
+                    "expert_parallelism can not be usable because parallel_size is required."
                 )
             else:
                 self.expert_parallelism = cfg["expert_parallelism"]
