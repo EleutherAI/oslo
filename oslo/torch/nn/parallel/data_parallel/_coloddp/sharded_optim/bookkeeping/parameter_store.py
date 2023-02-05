@@ -24,7 +24,7 @@ class ParameterStore(BaseStore):
         super().__init__(torch_pg)
         # param partitioning data structures
         self._fp16_param_to_rank = dit()
-        self._rank_groupid_to_fp16_param_list = dict()
+        self._rank_group_id_to_fp16_param_list = dict()
         self._rank_group_id_to_flat_fp16_param = dict()
 
         # param reduction data structures
@@ -36,7 +36,7 @@ class ParameterStore(BaseStore):
         Set the mapping between parameter to rank, each parameter should be owned by a rank.
 
         Args:
-            tensor (Tensor): The fp16 parameters.
+            tensor (Tensor): The FP16 parameters.
             ranks (int): The rank of which the process is responsible for updating the parameter
         """
 
@@ -47,10 +47,10 @@ class ParameterStore(BaseStore):
         Gives the rank which the parameter belongs to
 
         Args:
-            tensor (Tensor): The fp16 parameters.
+            tensor (Tensor): The FP16 parameters.
 
         Returns:
-            int: The rank of fp 16 params.
+            int: The rank of FP16 params.
 
         """
         return self._fp16_param_to_rank[tensor]
@@ -69,7 +69,38 @@ class ParameterStore(BaseStore):
         tensor_rank = self._fp16_param_to_rank[tensor]
         return tensor_rank == self._local_rank
 
-    def add_flat_fp16_param_by_rank_group(self, rank, group_id, tensor):
+    def add_fp16_param_list_by_rank_group(self, rank: int, group_id: int , tensor_list: List[Tensor]) -> None:
+        """
+        Add a list of FP16 parameters to the previously added parameters, associated with the given rank and group ID.
+
+        Args:
+            rank (int): The rank of the process.
+            group_id (int): The group ID associated with the parameters.
+            tensor_list (List[Tensor]): The list of FP16 parameters.
+        """
+        if rank not in self._rank_group_id_to_fp16_param_list:
+            self._rank_group_id_to_fp16_param_list[rank] = dict()
+
+        if group_id not in self._rank_group_id_to_fp16_param_list[rank]:
+            self._rank_group_id_to_fp16_param_list[rank][group_id] = []
+
+        self._rank_group_id_to_fp16_param_list[rank][group_id].extend(tensor_list)
+
+    def get_fp16_params_by_rank_group(self, rank: int, group_id: int) -> List[Tensor]:
+        """
+        Retrieve the list of FP16 parameters associated with the given rank and group ID.
+
+        Args:
+            rank (int): The rank of the process.
+            group_id (int): The group ID associated with the parameters.
+
+        Returns:
+            List[Tensor]: The list of FP16 parameters.
+        """
+        return self._rank_group_id_to_fp16_param_list[rank][group_id]
+
+
+    def add_flat_fp16_param_by_rank_group(self, rank: int, group_id: int, tensor: Tensor):
         """
         Add a flat FP16 parameter by rank and group.
 
@@ -83,7 +114,7 @@ class ParameterStore(BaseStore):
 
         self._rank_group_id_to_flat_fp16_param[rank][group_id] = tensor
 
-    def get_flat_fp16_param_by_rank_group(self, rank, group_id):
+    def get_flat_fp16_param_by_rank_group(self, rank: int, group_id: int) -> bool:
         """
         Get a flat FP16 parameter by rank and group.
 
@@ -96,7 +127,7 @@ class ParameterStore(BaseStore):
         """
         return self._rank_group_id_to_flat_fp16_param[rank][group_id]
 
-    def is_param_reduced(self, tensor):
+    def is_param_reduced(self, tensor: Tensor) -> bool:
         """
         Check if a parameter has been reduced.
 
@@ -108,7 +139,7 @@ class ParameterStore(BaseStore):
         """
         return self._is_param_reduced[tensor]
 
-    def set_param_reduction_state(self, tensor, state):
+    def set_param_reduction_state(self, tensor: Tensor, state: bool):
         """
         Set the reduction state of a parameter.
 
@@ -118,7 +149,7 @@ class ParameterStore(BaseStore):
         """
         self._is_param_reduced[tensor] = state
 
-    def get_param_reduction_states(self):
+    def get_param_reduction_states(self) -> Dict[Tensor, bool]:
         """
         Get the reduction states of all parameters.
 
@@ -147,5 +178,8 @@ class ParameterStore(BaseStore):
         Clear the gradients of previously reduced parameters.
         """
         if len(self._reduced_param) > 0:
+            for param in self._reduced_param:
+                param.grad = None
+            self.reset_previous_reduced_params()
 
 
