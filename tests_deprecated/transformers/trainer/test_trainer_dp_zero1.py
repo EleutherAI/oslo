@@ -22,6 +22,7 @@ oslo_init_dict_form = {
         "parallel_size": 1,
         "zero_stage": 1,
     },
+
     "tensor_parallelism": {
         "enable": False,
         "parallel_size": 1,

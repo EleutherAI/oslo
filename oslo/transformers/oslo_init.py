@@ -229,7 +229,7 @@ class OsloTrainerConfig:
                     self.host = cfg["backend"]["host"]
                     log_dist(f"host: {self.host}")
                 else:
-                    log_dist(f"host is required to use {self.backend}")
+                    ValueError(f"host is required to use {self.backend}")
                 if "port" in cfg["backend"]:
                     self.port = cfg["backend"]["port"]
                     log_dist(f"host: {self.host}")
@@ -258,6 +258,8 @@ class OsloTrainerConfig:
                 ):
                     self.cpu_offload = True
                 self.data_parallelism = cfg["data_parallelism"]
+                if "params" not in self.data_parallelism:
+                    self.data_parallelism["params"] = {}
                 log_dist(
                     f"data_parallelism: enabled"
                     f"\tparallel_size: {self.data_parallelism['parallel_size']}"
@@ -276,6 +278,8 @@ class OsloTrainerConfig:
                 )
             else:
                 self.sequence_parallelism = cfg["sequence_parallelism"]
+                if "params" not in self.sequence_parallelism:
+                    self.sequence_parallelism["params"] = {}
                 log_dist(
                     f"sequence_parallelism: enabled\n\tparallel_size: {self.sequence_parallelism['parallel_size']}"
                 )
@@ -292,6 +296,8 @@ class OsloTrainerConfig:
                 )
             else:
                 self.tensor_parallelism = cfg["tensor_parallelism"]
+                if "params" not in self.tensor_parallelism:
+                    self.tensor_parallelism["params"] = {}
                 log_dist(
                     f"tensor_parallelism: enabled\n\tparallel_size: {self.tensor_parallelism['parallel_size']}\n\tparallel_mode: {self.tensor_parallelism['parallel_mode']}"
                 )
@@ -308,6 +314,8 @@ class OsloTrainerConfig:
                 self.pipeline_parallelism = None
             else:
                 self.pipeline_parallelism = cfg["pipeline_parallelism"]
+                if "params" not in self.pipeline_parallelism:
+                    self.pipeline_parallelism["params"] = {}
                 log_dist(
                     f"pipeline_parallelism: enabled\n\tparallel_size: {self.pipeline_parallelism['parallel_size']}"
                 )
@@ -320,6 +328,8 @@ class OsloTrainerConfig:
                 )
             else:
                 self.expert_parallelism = cfg["expert_parallelism"]
+                if "params" not in self.expert_parallelism:
+                    self.expert_parallelism["params"] = {}
                 log_dist(
                     f"expert_parallelism: enabled\n\tparallel_size: {self.expert_parallelism['parallel_size']}"
                 )

@@ -1,5 +1,8 @@
 import logging
 import os
+import numpy as np
+import torch
+import time
 
 from transformers.utils import ExplicitEnum
 
@@ -38,6 +41,8 @@ def log_dist(message: str, rank: int = 0, level: int = logging.INFO) -> None:
     if my_rank in ranks:
         if level == logging.INFO:
             logging.info(f"[Rank {my_rank}] {message}")
+        if level == logging.WARNING:
+            logging.warning(f"[Rank {my_rank}] {message}")
         if level == logging.ERROR:
             logging.error(f"[Rank {my_rank}] {message}")
         if level == logging.DEBUG:
