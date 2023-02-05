@@ -243,9 +243,13 @@ class OsloTrainerConfig:
 
         if "data_parallelism" in cfg and cfg["data_parallelism"]["enable"] is True:
             if cfg["data_parallelism"]["parallel_size"] is None:
-                raise ValueError(f"data_parallelism can not be usable because parallel_size is required.")
+                raise ValueError(
+                    f"data_parallelism can not be usable because parallel_size is required."
+                )
             elif cfg["data_parallelism"]["zero_stage"] is None:
-                raise ValueError(f"data_parallelism can not be usable because zero_stage is required.")
+                raise ValueError(
+                    f"data_parallelism can not be usable because zero_stage is required."
+                )
             else:
                 if (
                     "params" in cfg["data_parallelism"]
@@ -267,7 +271,9 @@ class OsloTrainerConfig:
             and cfg["sequence_parallelism"]["enable"] is True
         ):
             if cfg["sequence_parallelism"]["parallel_size"] is None:
-                raise ValueError(f"sequence_parallelism can not be usable because parallel_size is required.")
+                raise ValueError(
+                    f"sequence_parallelism can not be usable because parallel_size is required."
+                )
             else:
                 self.sequence_parallelism = cfg["sequence_parallelism"]
                 if "params" not in self.sequence_parallelism:

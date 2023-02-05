@@ -164,7 +164,9 @@ class TrainingArguments:
     )
     eval_accumulation_steps: Optional[int] = field(
         default=None,
-        metadata={"help": "Number of predictions steps to accumulate before moving the tensors to the CPU."},
+        metadata={
+            "help": "Number of predictions steps to accumulate before moving the tensors to the CPU."
+        },
     )
     eval_delay: Optional[float] = field(
         default=0,
@@ -246,10 +248,14 @@ class TrainingArguments:
         },
     )
     metric_for_best_model: Optional[str] = field(
-        default=None, metadata={"help": "The metric to use to compare two different models."}
+        default=None,
+        metadata={"help": "The metric to use to compare two different models."},
     )
     greater_is_better: Optional[bool] = field(
-        default=None, metadata={"help": "Whether the `metric_for_best_model` should be maximized or not."}
+        default=None,
+        metadata={
+            "help": "Whether the `metric_for_best_model` should be maximized or not."
+        },
     )
     label_smoothing_factor: float = field(
         default=0.0,
@@ -290,7 +296,10 @@ class TrainingArguments:
         metadata={"help": "Whether to use fp16 (mixed) precision instead of 32-bit"},
     )
     label_names: Optional[List[str]] = field(
-        default=None, metadata={"help": "The list of keys in your dictionary of inputs that correspond to the labels."}
+        default=None,
+        metadata={
+            "help": "The list of keys in your dictionary of inputs that correspond to the labels."
+        },
     )
 
     def __post_init__(self):
@@ -308,7 +317,10 @@ class TrainingArguments:
         if self.load_best_model_at_end and self.metric_for_best_model is None:
             self.metric_for_best_model = "loss"
         if self.greater_is_better is None and self.metric_for_best_model is not None:
-            self.greater_is_better = self.metric_for_best_model not in ["loss", "eval_loss"]
+            self.greater_is_better = self.metric_for_best_model not in [
+                "loss",
+                "eval_loss",
+            ]
 
         self.oslo_config, self.parallel_context, self.model_wrappers = None, None, None
 
