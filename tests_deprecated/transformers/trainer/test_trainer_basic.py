@@ -33,7 +33,7 @@ valid_dataset = processed_dataset["validation"]
 
 data_collator = DataCollatorForSequenceClassification(processor)
 
-
+# Define trainer arguments
 args = TrainingArguments(
     output_dir="output",
     eval_steps=500,
@@ -44,6 +44,7 @@ args = TrainingArguments(
     load_best_model_at_end=True,
 )
 
+# Define trainer
 trainer = Trainer(
     args=args,
     model=model,
@@ -53,4 +54,11 @@ trainer = Trainer(
     data_collator=data_collator,
 )
 
+# Train
 trainer.train()
+
+# # Save
+# trainer.save_model()
+
+# Eval
+metrics = trainer.evaluate(eval_dataset=valid_dataset)
