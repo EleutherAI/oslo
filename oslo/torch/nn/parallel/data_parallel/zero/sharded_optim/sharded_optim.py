@@ -199,9 +199,9 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         # or stage 2 is used
         # if it is stage 1 without overlapping, no hook will be attached
         if self._overlap_communication or self._partition_grads:
-            self._attach_reduction_hook()
+            self._attach_reduction_bucket_hook()
 
-        self._bind_backward_reduction_hook()
+        self._attach_terminate_reduction_hook()
 
     @property
     def dtype(self) -> torch.dtype:
@@ -276,7 +276,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         self._add_to_reduction_bucket(param, reduce_rank)
         return grad
 
-    def _attach_reduction_hook(self):
+    def _attach_reduction_bucket_hook(self):
         """Attaches gradient reduction hook to each model parameter."""
         # we iterate over the fp16 params
         # on each param, we register a hook to its AccumulateGrad object
@@ -297,7 +297,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
                         partial(self._grad_handler, param, reduce_rank=reduce_rank)
                     )
 
-    def _bind_backward_reduction_hook(self):
+    def _attach_terminate_reduction_hook(self):
         """Binds the backward reduction hook.
 
         This hook is responsible for performing the reduction of the gradients and synchronizing them
