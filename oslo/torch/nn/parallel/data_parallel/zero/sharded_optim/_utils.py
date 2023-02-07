@@ -3,23 +3,64 @@ import torch.distributed as dist
 from torch._six import inf
 import math
 import torch
-from typing import Optional
+from typing import Optional, Iterable, List, Union
+from oslo.torch.distributed import ParallelMode
+
 
 # TODO
-def is_model_parallel_parameter(p):
-    return False
+def is_model_parallel_parameter(p: torch.Tensor):
+    """
+    Check if a parameter is parallel in either Pipeline or Tensor mode.
+
+    Args:
+        p (torch.Tensor): Parameter to check.
+
+    Returns:
+        bool: True if the parameter is parallel in either mode, False otherwise.
+    """
+    parallel_mode = getattr(p, "oslo_parallel", dict())
+    return (
+        ParallelMode.PIPELINE in parallel_mode or ParallelMode.TENSOR in parallel_mode
+    )
 
 
-def flatten(input_):
+def flatten(input_: Iterable[torch.Tensor]) -> torch.Tensor:
+    """
+    Flatten the input tensor into a 1D tensor.
+
+    Args:
+        input_ (Iterable[torch.Tensor]): The input tensor to be flattened.
+
+    Returns:
+        torch.Tensor: The flattened tensor.
+    """
     return _flatten_dense_tensors(input_)
 
 
-def unflatten(flat, tensors):
+def unflatten(flat: torch.Tensor, tensors: Iterable[torch.Tensor]) -> torch.Tensor:
+    """
+    Unflatten the flattened tensor back to its original shape.
+
+    Args:
+        flat (torch.Tensor): The flattened tensor.
+        tensors (Iterable[torch.Tensor]): The original tensor shape.
+
+    Returns:
+        torch.Tensor: The unflattened tensor.
+    """
     return _unflatten_dense_tensors(flat, tensors)
 
 
-def calculate_global_norm_from_list(norm_list):
-    """Compute total from a list of norms"""
+def calculate_global_norm_from_list(norm_list: List[float]) -> float:
+    """
+    Compute the total global norm from a list of norms.
+
+    Args:
+        norm_list (List[float]): List of norms to compute the total global norm from.
+
+    Returns:
+        float: Total global norm.
+    """
     total_norm = 0.0
     for norm in norm_list:
         total_norm += norm**2.0
@@ -32,19 +73,21 @@ def reduce_tensor_dp_group(
     dst_local_rank: Optional[int] = None,
     dst_global_rank: Optional[int] = None,
     group: Optional[dist.ProcessGroup] = None,
-):
+) -> torch.Tensor:
     """
-    Reduce the tensor in the data parallel process group
-    :param tensor: A tensor object to reduce/all-reduce
-    :param dtype: The data type used in communication
-    :param dst_rank: The source rank for reduce. If dst_rank is None,
-    :param parallel_mode: Communication parallel mode
-    all-reduce will be used instead of reduce. Default is None.
-    :type tensor: torch.Tensor
-    :type dtype: torch.dtype, optional
-    :type dst_rank: int, optional
-    :type pg: ProcessGroup, optional
+    Reduce a tensor in the data parallel process group.
+
+    Args:
+        tensor (torch.Tensor): Tensor to reduce/all-reduce.
+        dtype (Optional[torch.dtype]): Data type used in communication.
+        dst_local_rank (Optional[int]): Local rank of the destination node.
+        dst_global_rank (Optional[int]): Global rank of the destination node.
+        group (Optional[dist.ProcessGroup]): Process group for the reduction.
+
+    Returns:
+        tensor (torch.Tensor): The reduced tensor.
     """
+
     # use the original dtype
     if dtype is None:
         dtype = tensor.dtype
@@ -76,7 +119,16 @@ def reduce_tensor_dp_group(
     return tensor
 
 
-def has_inf_or_nan(tensor):
+def has_inf_or_nan(tensor: torch.Tensor) -> bool:
+    """
+    Check if a tensor has any NaN or Inf values.
+
+    Args:
+        tensor (torch.Tensor): Tensor to check.
+
+    Returns:
+        bool: True if the tensor has NaN or Inf values, False otherwise.
+    """
     try:
         # if tensor is half, the .float() incurs an additional deep copy, but it's necessary if
         # Pytorch's .sum() creates a one-element tensor of the same type as tensor
@@ -101,24 +153,39 @@ def has_inf_or_nan(tensor):
         return False
 
 
-def release_param_grad(tensor_list):
+def release_param_grad(tensor_list: List[torch.Tensor]):
+    """
+    Release the gradients of a list of tensors.
+
+    Args:
+        tensor_list (List[torch.Tensor]): List of tensors to release gradients for.
+    """
     for tensor in tensor_list:
         tensor.grad = None
 
 
-def compute_norm(gradients, params, dp_group, mp_group, norm_type=2):
+def compute_norm(
+    gradients: Iterable[torch.Tensor],
+    params: Iterable[torch.Tensor],
+    dp_group: dist.ProcessGroup,
+    mp_group: dist.ProcessGroup,
+    norm_type: Union[int, float] = 2,
+) -> Iterable[torch.Tensor]:
     """Clips gradient norm of an iterable of parameters.
     This is adapted from torch.nn.utils.clip_grad.clip_grad_norm_ and
     added functionality to handle model parallel parameters. Note that
     the gradients are modified in place.
-    Arguments:
-        parameters (Iterable[Tensor] or Tensor): an iterable of Tensors or a
-            single Tensor that will have gradients normalized
-        max_norm (float or int): max norm of the gradients
-        norm_type (float or int): type of the used p-norm. Can be ``'inf'`` for
-            infinity norm.
+
+    Args:
+        gradients (Iterable[Tensor]): an iterable of gradient tensors
+        params (Iterable[Tensor]): an iterable of parameters that the gradients are associated with
+        dp_group (torch.nn.parallel.ProcessGroup): data parallel process group
+        mp_group (torch.nn.parallel.ProcessGroup): model parallel process group
+         (float or int): max norm of the gradients
+        norm_type (Union[int, float]): type of the used p-norm. Can be ``2`` for L2 norm or ``inf`` for infinity norm. (default: 2)
+
     Returns:
-        Total norm of the parameters (viewed as a single vector).
+        Iterable[torch.Tensor]: Total norm of the gradients (viewed as a single vector).
     """
 
     if mp_group is None:
@@ -170,7 +237,20 @@ def compute_norm(gradients, params, dp_group, mp_group, norm_type=2):
     return total_norm
 
 
-def split_half_float_double(tensor_list):
+def split_half_float_double(
+    tensor_list: List[torch.Tensor],
+) -> List[List[torch.Tensor]]:
+    """
+    Split the tensors in `tensor_list` into several lists according to their data type,
+    which could be `torch.cuda.HalfTensor`, `torch.cuda.FloatTensor`,
+    `torch.cuda.DoubleTensor`, or `torch.cuda.BFloat16Tensor`.
+
+    Args:
+        tensor_list (List[torch.Tensor]): List of PyTorch tensors.
+
+    Returns:
+        List[List[torch.Tensor]]: A list of lists, where each list contains tensors with the same data type.
+    """
     dtypes = [
         "torch.cuda.HalfTensor",
         "torch.cuda.FloatTensor",
@@ -182,20 +262,20 @@ def split_half_float_double(tensor_list):
         bucket = [t for t in tensor_list if t.type() == dtype]
         if bucket:
             buckets.append(bucket)
-    return
+    return buckets
 
 
-def sync_param(flat_tensor, tensor_list):
+def sync_param(flat_tensor: torch.Tensor, tensor_list: Iterable[torch.Tensor]):
     """
     Synchronize the flattened tensor and unflattened tensor list. When
     a list of tensor are flattened with `torch._utils._unflatten_dense_tensors`,
     a new tensor is created. Thus, the flat tensor and original tensor list do not
     share the same memory space. This function will update the tensor list so that
     they point to the same value.
-    :param flat_tensor: A flat tensor obtained by calling `torch._utils._unflatten_dense_tensors` on a tensor lsit
-    :param tensor_list: A list of tensors corresponding to the flattened tensor
-    :type flat_tensor: torch.Tensor
-    :type tensor_list: List[torch.Tensor]
+
+    Args:
+        flat_tensor (torch.Tensor): A flat tensor obtained by calling `torch._utils._unflatten_dense_tensors` on a tensor lsit
+        tensor_list (Iterable[torch.Tensor]): A list of tensors corresponding to the flattened tensor
     """
     updated_params = unflatten(flat_tensor, tensor_list)
 
