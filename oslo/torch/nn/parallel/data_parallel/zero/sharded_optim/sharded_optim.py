@@ -190,7 +190,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
             for param in self._fp16_param_groups[group_id]:
                 self._param_store.set_param_reduction_state(param, False)
 
-        # intialize communication stream for
+        # initialize communication stream for
         # communication-compuation overlapping
         if self._overlap_communication:
             self._comm_stream = torch.cuda.Stream()
@@ -284,7 +284,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
             param_group = self._fp16_param_groups[group_id]
             for param in param_group:
                 if param.requires_grad:
-                    # determines the reduction destionation rank
+                    # determines the reduction destination rank
                     # this is only valid for stage 2
                     # dst_rank = None means using all-reduce
                     # else using reduce

@@ -63,7 +63,7 @@ def calculate_global_norm_from_list(norm_list: List[float]) -> float:
     """
     total_norm = 0.0
     for norm in norm_list:
-        total_norm += norm**2.0
+        total_norm += norm ** 2.0
     return math.sqrt(total_norm)
 
 
@@ -274,7 +274,7 @@ def sync_param(flat_tensor: torch.Tensor, tensor_list: Iterable[torch.Tensor]):
     they point to the same value.
 
     Args:
-        flat_tensor (torch.Tensor): A flat tensor obtained by calling `torch._utils._unflatten_dense_tensors` on a tensor lsit
+        flat_tensor (torch.Tensor): A flat tensor obtained by calling `torch._utils._unflatten_dense_tensors` on a tensor list
         tensor_list (Iterable[torch.Tensor]): A list of tensors corresponding to the flattened tensor
     """
     updated_params = unflatten(flat_tensor, tensor_list)
