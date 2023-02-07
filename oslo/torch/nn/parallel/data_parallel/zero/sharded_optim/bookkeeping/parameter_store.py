@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 
 from torch import Tensor
 from torch.distributed import ProcessGroup
@@ -23,7 +23,7 @@ class ParameterStore(BaseStore):
 
         super().__init__(torch_pg)
         # param partitioning data structures
-        self._fp16_param_to_rank = dit()
+        self._fp16_param_to_rank = dict()
         self._rank_group_id_to_fp16_param_list = dict()
         self._rank_group_id_to_flat_fp16_param = dict()
 

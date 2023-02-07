@@ -19,7 +19,7 @@ from ._utils import (
     sync_param,
 )
 
-from _base_optim import BaseOptimizerWrapper
+from ._base_optim import BaseOptimizerWrapper
 from .bookkeeping import BucketStore, GradientStore, ParameterStore, TensorBucket
 
 
@@ -30,6 +30,8 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
     Args:
         optimizer (Optimizer):
             The optimizer to wrap.
+        parallel_context (ParallelContext):
+            The parallel context object.
         clip_grad_norm (float, optional):
             Clipping norm for gradients. Defaults to 0.0.
         reduce_bucket_size (int, optional):
@@ -44,13 +46,12 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
             Flag for offloading computations to CPU. Defaults to False.
         forced_dtype (torch.dtype, optional):
             Forced dtype for parameters. Defaults to None.
-        parallel_context (ParallelContext, optional):
-            The parallel context object. Defaults to None.
     """
 
     def __init__(
         self,
         optimizer: Optimizer,
+        parallel_context: ParallelContext,
         clip_grad_norm: float = 0.0,
         reduce_bucket_size: int = 1024 * 1024,  # communication
         communication_dtype: Optional[torch.dtype] = None,
@@ -58,7 +59,6 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         partition_grad: bool = False,  # stage 2 flag
         cpu_offload: bool = False,  # cpu offload
         forced_dtype: Optional[torch.dtype] = None,
-        parallel_context: Optional[ParallelContext] = None,
     ):
         """
         Initialize the ZeroRedundancyOptimizer class.
