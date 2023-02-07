@@ -22,7 +22,7 @@ def calculate_global_norm_from_list(norm_list):
     """Compute total from a list of norms"""
     total_norm = 0.0
     for norm in norm_list:
-        total_norm += norm ** 2.0
+        total_norm += norm**2.0
     return math.sqrt(total_norm)
 
 

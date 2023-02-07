@@ -8,8 +8,8 @@ from ._base_store import BaseStore
 
 class ParameterStore(BaseStore):
     """
-    class that manages the mapping between parameters 
-    and the ranks responsible for updating them, 
+    class that manages the mapping between parameters
+    and the ranks responsible for updating them,
     as well as the state of reduction for each parameter.
 
     Args:
@@ -69,7 +69,9 @@ class ParameterStore(BaseStore):
         tensor_rank = self._fp16_param_to_rank[tensor]
         return tensor_rank == self._local_rank
 
-    def add_fp16_param_list_by_rank_group(self, rank: int, group_id: int , tensor_list: List[Tensor]) -> None:
+    def add_fp16_param_list_by_rank_group(
+        self, rank: int, group_id: int, tensor_list: List[Tensor]
+    ) -> None:
         """
         Add a list of FP16 parameters to the previously added parameters, associated with the given rank and group ID.
 
@@ -99,8 +101,9 @@ class ParameterStore(BaseStore):
         """
         return self._rank_group_id_to_fp16_param_list[rank][group_id]
 
-
-    def add_flat_fp16_param_by_rank_group(self, rank: int, group_id: int, tensor: Tensor):
+    def add_flat_fp16_param_by_rank_group(
+        self, rank: int, group_id: int, tensor: Tensor
+    ):
         """
         Add a flat FP16 parameter by rank and group.
 
@@ -181,5 +184,3 @@ class ParameterStore(BaseStore):
             for param in self._reduced_param:
                 param.grad = None
             self.reset_previous_reduced_params()
-
-

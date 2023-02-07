@@ -5,7 +5,6 @@ from torch.optim import Optimizer
 
 
 class BaseOptimizerWrapper(Optimizer):
-
     def __init__(self, optim: Optimizer):
         """
         Wrap an optimizer with the base optimizer.

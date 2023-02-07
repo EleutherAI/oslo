@@ -28,23 +28,23 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
     Optimizer used for ZeRO-1 and ZeRO-2.
 
     Args:
-        optimizer (Optimizer): 
+        optimizer (Optimizer):
             The optimizer to wrap.
-        clip_grad_norm (float, optional): 
+        clip_grad_norm (float, optional):
             Clipping norm for gradients. Defaults to 0.0.
-        reduce_bucket_size (int, optional): 
+        reduce_bucket_size (int, optional):
             Size of the buckets for communication reduction. Defaults to 1024 * 1024.
-        communication_dtype (torch.dtype, optional): 
+        communication_dtype (torch.dtype, optional):
             Dtype for communication. Defaults to None.
-        overlap_communication (bool, optional): 
+        overlap_communication (bool, optional):
             Enables overlapping of communication and computation. Defaults to False.
-        partition_grad (bool, optional): 
+        partition_grad (bool, optional):
             Flag for partitioning gradients in stage 2. Defaults to False.
-        cpu_offload (bool, optional): 
+        cpu_offload (bool, optional):
             Flag for offloading computations to CPU. Defaults to False.
-        forced_dtype (torch.dtype, optional): 
+        forced_dtype (torch.dtype, optional):
             Forced dtype for parameters. Defaults to None.
-        parallel_context (ParallelContext, optional): 
+        parallel_context (ParallelContext, optional):
             The parallel context object. Defaults to None.
     """
 
@@ -215,7 +215,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
 
     def _sanity_checks(self):
         """Performs sanity checks for the optimizer.
-        
+
         Raises:
             AssertionError: If CUDA is not available.
             AssertionError: If parameters have different dtypes than the optimizer dtype.
@@ -230,7 +230,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
 
     def _partition_param_list(self, param_list: List) -> List:
         """Partitions a list of parameters into sublists for each rank in a greedy fashion.
-        
+
         The parameters are sorted by number of elements in descending order and are assigned to the rank
         with the smallest number of elements.
 
@@ -259,7 +259,9 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
     # Backward Reduction Hook #
     ###########################
 
-    def _grad_handler(self, param: torch.Tensor, grad: torch.Tensor, reduce_rank: Optional[int])->torch.Tensor:
+    def _grad_handler(
+        self, param: torch.Tensor, grad: torch.Tensor, reduce_rank: Optional[int]
+    ) -> torch.Tensor:
         """Handles the gradient for the given parameter.
 
         Args:
@@ -275,8 +277,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         return grad
 
     def _attach_reduction_hook(self):
-        """Attaches gradient reduction hook to each model parameter.
-        """
+        """Attaches gradient reduction hook to each model parameter."""
         # we iterate over the fp16 params
         # on each param, we register a hook to its AccumulateGrad object
         for group_id in range(self.num_param_groups):
@@ -299,11 +300,19 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
     def _bind_backward_reduction_hook(self):
         """Binds the backward reduction hook.
 
-        This hook is responsible for performing the reduction of the gradients and synchronizing them 
+        This hook is responsible for performing the reduction of the gradients and synchronizing them
         between different processes in a distributed setup.
         """
         # TODO: Handle if tartget not contribute to loss
-        target = next((param for group in self._fp16_param_groups for param in group if param.requires_grad), None)
+        target = next(
+            (
+                param
+                for group in self._fp16_param_groups
+                for param in group
+                if param.requires_grad
+            ),
+            None,
+        )
 
         def hook(grad, sync_grad=True):
             # finish gradient reduction
@@ -359,7 +368,9 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
             if reduce_rank is None or reduce_rank == self._local_rank:
                 bucket.unflatten_and_copy(reduced_flat)
 
-    def _reduce_tensor_list_with_one_dtype(self, tensor_list: List, bucket_size: int, reduce_rank: Optional[int]):
+    def _reduce_tensor_list_with_one_dtype(
+        self, tensor_list: List, bucket_size: int, reduce_rank: Optional[int]
+    ):
         """
         Reduces a list of tensors with the same dtype into one tensor.
 
@@ -380,7 +391,9 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         if not param_bucket.is_empty():
             self._reduce_tensor_bucket(bucket=param_bucket, reduce_rank=reduce_rank)
 
-    def _reduce_grads(self, reduce_rank:Optional[int], grads:List[torch.Tensor], bucket_size:int):
+    def _reduce_grads(
+        self, reduce_rank: Optional[int], grads: List[torch.Tensor], bucket_size: int
+    ):
         """Reduces the gradients.
 
         Args:
@@ -401,7 +414,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
     # Reduction Functions #
     #######################
 
-    def _run_reduction(self, reduce_rank:Optional[int]=None):
+    def _run_reduction(self, reduce_rank: Optional[int] = None):
         """Reduces the gradients.
 
         Args:
@@ -458,11 +471,11 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
     # torch.optim.Optimizer methods
     ################################
 
-    def zero_grad(self, set_to_none: bool=True):
+    def zero_grad(self, set_to_none: bool = True):
         """
         Set parameter gradients to zero. If set_to_none = True, gradient
         will be set to None to save memory.
-    
+
         Args:
             set_to_none (bool): Whether set the gradient to None. Default value is True.
         """
@@ -479,7 +492,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
     # Update Parameter #
     ####################
 
-    def step(self, closure:Optional[Callable]=None):
+    def step(self, closure: Optional[Callable] = None):
         """
         Performs a single optimization step.
 
@@ -572,7 +585,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
     ##################
 
     def _check_overflow(self):
-        """check for the presence of numerical overflow 
+        """check for the presence of numerical overflow
         (infinite or NaN values) in the averaged gradient values of a set of model parameters.
 
         Returns:
@@ -682,7 +695,9 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         for reduce_rank in range(self._world_size):
             self._run_reduction(reduce_rank)
 
-    def _add_to_reduction_bucket(self, param: torch.Tensor, reduce_rank:Optional[int]=None):
+    def _add_to_reduction_bucket(
+        self, param: torch.Tensor, reduce_rank: Optional[int] = None
+    ):
         """add a given parameter tensor to a "reduction bucket" for reduction.
 
         Args:

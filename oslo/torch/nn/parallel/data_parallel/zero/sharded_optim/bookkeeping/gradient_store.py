@@ -8,13 +8,14 @@ from ._base_store import BaseStore
 
 class GradientStore(BaseStore):
     """
-    Class for storing and managing the averaged gradients for a given group. 
-    The gradients can be added and retrieved by group id and 
-    the average gradients can be reset for a specific group id. 
-    
+    Class for storing and managing the averaged gradients for a given group.
+    The gradients can be added and retrieved by group id and
+    the average gradients can be reset for a specific group id.
+
     Args:
         torch_pg (ProcessGroup): The torch process group object used for distributed training.
     """
+
     def __init__(self, torch_pg: ProcessGroup):
         """
         Initialize the GradientStore.

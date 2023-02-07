@@ -5,7 +5,7 @@ from torch.distributed import ProcessGroup
 class BaseStore:
     """
     Base class for store classes.
-    
+
     Args:
         torch_pg (ProcessGroup): The torch process group object used for distributed training.
     """

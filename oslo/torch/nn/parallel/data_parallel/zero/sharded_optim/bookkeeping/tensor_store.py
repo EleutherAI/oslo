@@ -3,8 +3,8 @@ from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
 from torch import Tensor
 from typing import List
 
-class TensorBucket:
 
+class TensorBucket:
     def __init__(self, max_size: int):
         """
         Initialize the TensorBucket with max_size.
@@ -41,7 +41,7 @@ class TensorBucket:
         Check if the tensor bucket is full or oversized.
 
         Returns:
-            bool: True if the current size of the tensor bucket is greater than or equal to the maximum size, 
+            bool: True if the current size of the tensor bucket is greater than or equal to the maximum size,
                   False otherwise.
         """
         return self._current_size >= self._max_size
@@ -55,13 +55,13 @@ class TensorBucket:
         """
         return len(self._bucket) == 0
 
-    def add_to_bucket(self, tensor: Tensor, allow_oversize: bool=False):
+    def add_to_bucket(self, tensor: Tensor, allow_oversize: bool = False):
         """
         Add a tensor to the tensor bucket.
 
         Args:
             tensor (torch.Tensor): Tensor to be added to the tensor bucket.
-            allow_oversize (bool, optional): If True, allows tensor to be added even if it will exceed the max_size. 
+            allow_oversize (bool, optional): If True, allows tensor to be added even if it will exceed the max_size.
                                              Default: False.
 
         Raises:
@@ -70,8 +70,10 @@ class TensorBucket:
         tensor_size = tensor.numel()
 
         if not allow_oversize and self.will_exceed_max_size(tensor_size):
-            msg = f"The TensorBucket max size of {self._max_size} is exceeded by " \
-                  f"the added tensor (size: {tensor_size})"
+            msg = (
+                f"The TensorBucket max size of {self._max_size} is exceeded by "
+                f"the added tensor (size: {tensor_size})"
+            )
             raise RuntimeError(msg)
 
         self._bucket.append(tensor)
