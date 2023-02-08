@@ -307,12 +307,13 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         target = next(
             (
                 param
-                for group in self._fp16_param_groups
-                for param in group
+                for group_id in range(self.num_param_groups)
+                for param in self._fp16_param_groups[group_id]
                 if param.requires_grad
             ),
             None,
         )
+        assert target is not None, "At least one parameter is required to apply the reduction hook."
 
         def hook(grad, sync_grad=True):
             # finish gradient reduction
@@ -379,7 +380,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
             bucket_size (int): Maximum size of the tensor bucket.
             reduce_rank (int, optional): Rank to perform reduction on. If None, the tensor will be reduced on all ranks.
         """
-        param_bucket = TensorBucket(size=bucket_size)
+        param_bucket = TensorBucket(bucket_size)
 
         for tensor in tensor_list:
             param_bucket.add_to_bucket(tensor, allow_oversize=True)
