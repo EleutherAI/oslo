@@ -343,7 +343,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         for group_id in range(self.num_param_groups):
             for param in self._fp16_param_groups[group_id]:
                 if param.requires_grad:
-                    param.regist_hook(partial(hook, param))
+                    param.register_hook(partial(hook, param))
 
     def _reduce_tensor_bucket(self, bucket: TensorBucket, reduce_rank: Optional[int]):
         """Reduces the given tensor bucket.
@@ -691,22 +691,28 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
             reduction_states[tensor] = False
 
         # accumulate gradient
-        avg_gradients = self._grad_store._averaged_gradients
         for group_id in range(self.num_param_groups):
             param_group = self._param_store.get_fp16_params_by_rank_group(
                 self._local_rank, group_id
             )
 
-            if group_id not in avg_gradients:
-                avg_gradients[group_id] = []
+            group_avg_gradients = self._grad_store.get_averaged_gradients_by_group(
+                group_id
+            )
+            if not group_avg_gradients:
+                self._grad_store.init_average_gradients_by_group(group_id)
 
             param_idx = 0
             for param in param_group:
                 if param.grad is not None:
-                    if len(avg_gradients[group_id]) == param_idx:
-                        avg_gradients[group_id].append(param.grad)
+                    if len(group_avg_gradients) == param_idx:
+                        self._grad_store.append_average_gradient_by_group(
+                            group_id, param.grad
+                        )
                     else:
-                        avg_gradients[group_id][param_idx].add_(param.grad)
+                        self._grad_store.add_average_gradient_by_group(
+                            group_id, param_idx, param.grad
+                        )
                     param_idx += 1
 
         # the gradients needed are stored in the avg_gradients buffer

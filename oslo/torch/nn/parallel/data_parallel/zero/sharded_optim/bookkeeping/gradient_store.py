@@ -24,9 +24,9 @@ class GradientStore(BaseStore):
         self._averaged_gradients = dict()
         self._grad_acc_objs = []
 
-    def add_accumulate_grad_object(self, tensor: Tensor):
+    def append_accumulate_grad_object(self, tensor: Tensor):
         """
-        Add an object to accumulate gradients.
+        Append an object to accumulate gradients.
 
         Args:
             tensor: The object to accumulate gradients.
@@ -45,9 +45,9 @@ class GradientStore(BaseStore):
         """
         return self._averaged_gradients.get(group_id, [])
 
-    def add_average_gradient_by_group(self, group_id: int, tensor: Tensor):
+    def append_average_gradient_by_group(self, group_id: int, tensor: Tensor):
         """
-        Add an averaged gradient to a specific group.
+        Append an averaged gradient to a specific group.
 
         Args:
             group_id (int): The group ID.
@@ -58,9 +58,22 @@ class GradientStore(BaseStore):
         else:
             self._averaged_gradients[group_id] = [tensor]
 
-    def reset_average_gradients_by_group(self, group_id: int):
+    def add_average_gradient_by_group(
+        self, group_id: int, tensor_index: int, tensor: Tensor
+    ):
         """
-        Reset the averaged gradients for a specific group.
+        Add an averaged gradient to a specific group.
+
+        Args:
+            group_id (int): The group ID.
+            tensor_index (int): The index of the tensor in the group.
+            tensor (Tensor): The averaged gradient.
+        """
+        self._averaged_gradients[group_id][tensor_index].add_(tensor)
+
+    def init_average_gradients_by_group(self, group_id: int):
+        """
+        Init the averaged gradients for a specific group.
 
         Args:
             group_id (int): The group ID.
