@@ -43,7 +43,9 @@ class GradientStore(BaseStore):
         Returns:
             list of Tensor: The averaged gradients for the group.
         """
-        return self._averaged_gradients.get(group_id, [])
+        if group_id not in self._averaged_gradients:
+            self._averaged_gradients[group_id] = []
+        return self._averaged_gradients.get(group_id)
 
     def append_average_gradient_by_group(self, group_id: int, tensor: Tensor):
         """
@@ -71,9 +73,9 @@ class GradientStore(BaseStore):
         """
         self._averaged_gradients[group_id][tensor_index].add_(tensor)
 
-    def init_average_gradients_by_group(self, group_id: int):
+    def reset_average_gradients_by_group(self, group_id: int):
         """
-        Init the averaged gradients for a specific group.
+        Reset the averaged gradients for a specific group.
 
         Args:
             group_id (int): The group ID.

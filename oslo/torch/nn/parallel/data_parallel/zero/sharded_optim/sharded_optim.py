@@ -699,8 +699,6 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
             group_avg_gradients = self._grad_store.get_averaged_gradients_by_group(
                 group_id
             )
-            if not group_avg_gradients:
-                self._grad_store.init_average_gradients_by_group(group_id)
 
             param_idx = 0
             for param in param_group:
