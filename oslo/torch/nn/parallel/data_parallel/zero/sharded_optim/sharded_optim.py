@@ -303,37 +303,47 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         This hook is responsible for performing the reduction of the gradients and synchronizing them
         between different processes in a distributed setup.
         """
-        # TODO: Handle if tartget not contribute to loss
-        target = next(
-            (
-                param
-                for group_id in range(self.num_param_groups)
-                for param in self._fp16_param_groups[group_id]
-                if param.requires_grad
-            ),
-            None,
+        hook_count = 0
+        hook_count_target = sum(
+            1
+            for group_id in range(self.num_param_groups)
+            for param in self._fp16_param_groups[group_id]
+            if param.requires_grad
         )
-        assert target is not None, "At least one parameter is required to apply the reduction hook."
+        assert (
+            hook_count_target > 0
+        ), "At least one parameter is required to apply the reduction hook."
 
-        def hook(grad, sync_grad=True):
-            # finish gradient reduction
-            if not self._partition_grads:
-                self._reduce_grad_stage1()
+        def hook(param: torch.Tensor, grad, sync_grad=True):
+            nonlocal hook_count
+            hook_count += 1
+            if hook_count == hook_count_target:
+                param.grad = grad
+                # finish gradient reduction
+                if not self._partition_grads:
+                    self._reduce_grad_stage1()
+                else:
+                    # TODO: support async comm in reduce
+                    self._reduce_grad_stage2()
+
+                # clear reduced grads
+                if self._overlap_communication:
+                    torch.cuda.synchronize()
+                    self._param_store.clear_grads_of_previous_reduced_params()
+
+                # gradient synchronization
+                if sync_grad:
+                    self._sync_grad()
+
+                hook_count = 0
+                return param.grad
             else:
-                # TODO: support async comm in reduce
-                self._reduce_grad_stage2()
+                return grad
 
-            # clear reduced grads
-            if self._overlap_communication:
-                torch.cuda.synchronize()
-                self._param_store.clear_grads_of_previous_reduced_params()
-
-            # gradient synchronization
-            if sync_grad:
-                self._sync_grad()
-            return grad
-
-        target.regist_hook(hook)
+        for group_id in range(self.num_param_groups):
+            for param in self._fp16_param_groups[group_id]:
+                if param.requires_grad:
+                    param.regist_hook(partial(hook, param))
 
     def _reduce_tensor_bucket(self, bucket: TensorBucket, reduce_rank: Optional[int]):
         """Reduces the given tensor bucket.
@@ -467,6 +477,41 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
                         param.grad = None
 
         self._bucket_store.reset_by_rank(reduce_rank)
+
+    def _add_to_reduction_bucket(
+        self, param: torch.Tensor, reduce_rank: Optional[int] = None
+    ):
+        """add a given parameter tensor to a "reduction bucket" for reduction.
+
+        Args:
+            param (torch.Tensor): Tensor representing the model parameter.
+            reduce_rank (Optional[int]): Rank that should be used for reduction. Defaults to None.
+
+        Raises:
+            RuntimeError: The parameter has already been reduced
+        """
+        param_size = param.numel()
+
+        # check if the bucket is full
+        # if full, will reduce the grads already in the bucket
+        # after reduction, the bucket will be empty
+        if (
+            self._bucket_store.num_elements_in_bucket(reduce_rank) + param_size
+            > self._reduce_bucket_size
+        ):
+            self._run_reduction(reduce_rank)
+
+        # the param must not be reduced to ensure correctness
+        is_param_reduced = self._param_store.is_param_reduced(param)
+        if is_param_reduced:
+            msg = (
+                f"Parameter of size ({param.size()}) has already been reduced, "
+                + "duplicate reduction will lead to arithmetic incorrectness"
+            )
+            raise RuntimeError(msg)
+
+        self._bucket_store.add_num_elements_in_bucket(param_size, reduce_rank)
+        self._bucket_store.add_param(param, reduce_rank)
 
     ################################
     # torch.optim.Optimizer methods
@@ -695,38 +740,3 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         # left in the communication bucket
         for reduce_rank in range(self._world_size):
             self._run_reduction(reduce_rank)
-
-    def _add_to_reduction_bucket(
-        self, param: torch.Tensor, reduce_rank: Optional[int] = None
-    ):
-        """add a given parameter tensor to a "reduction bucket" for reduction.
-
-        Args:
-            param (torch.Tensor): Tensor representing the model parameter.
-            reduce_rank (Optional[int]): Rank that should be used for reduction. Defaults to None.
-
-        Raises:
-            RuntimeError: The parameter has already been reduced
-        """
-        param_size = param.numel()
-
-        # check if the bucket is full
-        # if full, will reduce the grads already in the bucket
-        # after reduction, the bucket will be empty
-        if (
-            self._bucket_store.num_elements_in_bucket(reduce_rank) + param_size
-            > self._reduce_bucket_size
-        ):
-            self._run_reduction(reduce_rank)
-
-        # the param must not be reduced to ensure correctness
-        is_param_reduced = self._param_store.is_param_reduced(param)
-        if is_param_reduced:
-            msg = (
-                f"Parameter of size ({param.size()}) has already been reduced, "
-                + "duplicate reduction will lead to arithmetic incorrectness"
-            )
-            raise RuntimeError(msg)
-
-        self._bucket_store.add_num_elements_in_bucket(param_size, reduce_rank)
-        self._bucket_store.add_param(param, reduce_rank)
