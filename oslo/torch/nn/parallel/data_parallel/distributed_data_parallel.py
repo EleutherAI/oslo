@@ -123,7 +123,7 @@ class _DistributedDataParallel(torch.nn.Module):
                 continue
             if p.requires_grad:
                 p.register_hook(partial(self.grad_handle, p))
-        self.register_backward_hook(partial(self.backward_hook))
+        # self.register_backward_hook(partial(self.backward_hook))
 
 
     def parameters(self, recurse: bool = True):
@@ -152,26 +152,26 @@ class _DistributedDataParallel(torch.nn.Module):
         return self.outputs
 
 
-    @staticmethod
-    def backward_hook(self, grad_input, grad_output):
-        print('model backward')
-        if isinstance(self,_DistributedDataParallel):
-            print('_DistributedDataParallel backward hook')
-            self.outputs.loss.backward()
-        # self._backward()
-        # loss.backward()
-            with torch.cuda.stream(self.comm_stream):
-                self.reducer.flush()
-            torch.cuda.current_stream().wait_stream(self.comm_stream)
-            if self.rebuild_bucket:
-                self.reducer.free()
-            for p in self.module.parameters():
-                if getattr(p, "_ddp_to_ignore", False):
-                    continue
-                if p.grad.device.type != "cpu":
-                    p.grad = p._saved_grad
+    # @staticmethod
+    # def backward_hook(self, grad_input, grad_output):
+    #     print('model backward')
+    #     if isinstance(self,_DistributedDataParallel):
+    #         print('_DistributedDataParallel backward hook')
+    #         self.outputs.loss.backward()
+    #     # self._backward()
+    #     # loss.backward()
+    #         with torch.cuda.stream(self.comm_stream):
+    #             self.reducer.flush()
+    #         torch.cuda.current_stream().wait_stream(self.comm_stream)
+    #         if self.rebuild_bucket:
+    #             self.reducer.free()
+    #         for p in self.module.parameters():
+    #             if getattr(p, "_ddp_to_ignore", False):
+    #                 continue
+    #             if p.grad.device.type != "cpu":
+    #                 p.grad = p._saved_grad
             
-        return grad_input
+    #     return grad_input
         
 
     def backward(self, loss: torch.Tensor):
