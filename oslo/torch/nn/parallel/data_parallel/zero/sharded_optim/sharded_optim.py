@@ -591,7 +591,6 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
                 group_id
             ].grad = flat_fp32_avg_grads.to(device)
             self._grad_store._averaged_gradients[group_id] = []
-            self._grad_store._averaged_gradients[group_id] = []
 
         # unscale and clip grads
         global_norm = calculate_global_norm_from_list(norm_list=norm_groups)
