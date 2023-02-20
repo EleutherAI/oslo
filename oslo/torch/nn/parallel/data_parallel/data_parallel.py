@@ -59,28 +59,28 @@ def DistributedDataParallel(
         rebuild_bucket=rebuild_bucket,
     )
 
-    add_wrapper(
-        module,
-        mode=ParallelMode.DATA,
-        wrapper=ddp,
-        parallel_context=parallel_context,
-    )
-    return module
+    # add_wrapper(
+    #     module,
+    #     mode=ParallelMode.DATA,
+    #     wrapper=ddp,
+    #     parallel_context=parallel_context,
+    # )
+    return ddp
 
 
 class _DistributedDataParallel(OsloParallelWrapper):
-    """Distributed data parallel for ColoTensor. Nested ColoDDP is not supported now.
+    """Distributed data parallel for Oslo.
     Example:
+        >>> from oslo.torch.nn.parallel import DistributedDataParallel as DDP
         >>> model = torch.nn.Linear(20, 1)
-        >>> pg = ProcessGroup(tp_degree = world_size//2)
-        >>> model = ColoDDP(model, pg)
+        >>>
+        >>> model = DDP(model, parallel_context)
         >>> logits = model(x)
         >>> loss = criterion(logits, labels)
         >>> model.backward(loss)
     Args:
-        module (torch.nn.Module): Module to apply DDP.
-        process_group (Optional[dist.ProcessGroup], optional): The process group which DDP uses.
-            If it's None, the default data parallel group will be used. Defaults to None.
+        module (nn.Module): PyTorch module object
+        parallel_context (ParallelContext): process group object
     """
 
     def __init__(

@@ -2,12 +2,12 @@ import os
 import torch.multiprocessing as mp
 
 import torch
-from oslo.torch.nn.parallel.data_parallel import DistributedDataParallel as DDP
 from torch import nn
 from torch import optim
 import torch.distributed as dist
 
 from oslo.torch.distributed.parallel_context import ParallelContext
+from oslo.torch.nn.parallel.data_parallel import DistributedDataParallel as DDP
 
 
 def setup(rank, world_size):
@@ -49,7 +49,8 @@ def train(rank, world_size):
     optimizer.zero_grad()
     outputs = ddp_model(torch.zeros(20, 10).to(rank))
     labels = torch.zeros(20, 5).to(rank)
-    loss_fn(outputs, labels).backward()
+    loss = loss_fn(outputs, labels)
+    ddp_model.backward(loss)
     optimizer.step()
     print(outputs)
     cleanup()
