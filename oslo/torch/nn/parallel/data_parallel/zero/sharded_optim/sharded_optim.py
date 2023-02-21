@@ -67,8 +67,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         # TODO: add support for
         # 1. fp16 master weights
         # 2. contiguous gradients
-        # 3. cpu offload
-        # 4. support when some parameters requires_grad = False
+        # 3. support when some parameters requires_grad = False
         super(ZeroRedundancyOptimizer, self).__init__(optim=optimizer)
         self._dtype = self.optim.param_groups[0]["params"][0].dtype
 
