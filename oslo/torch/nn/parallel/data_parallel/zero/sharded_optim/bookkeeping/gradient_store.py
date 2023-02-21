@@ -81,3 +81,9 @@ class GradientStore(BaseStore):
             group_id (int): The group ID.
         """
         self._averaged_gradients[group_id] = []
+
+    def reset_all_average_gradients(self):
+        """
+        Reset all the averaged gradients.
+        """
+        self._averaged_gradients = dict()

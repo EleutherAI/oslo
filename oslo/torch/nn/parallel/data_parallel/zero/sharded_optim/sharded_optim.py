@@ -553,7 +553,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
 
         # update loss scale if overflow occurs
         if found_inf:
-            self._grad_store._averaged_gradients = dict()
+            self._grad_store.reset_all_average_gradients()
             self.zero_grad()
             return
 
@@ -564,7 +564,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         for group_id in range(self.num_param_groups):
             # compute norm
             norm_group = compute_norm(
-                gradients=self._grad_store._averaged_gradients[group_id],
+                gradients=self._grad_store.get_averaged_gradients_by_group(group_id),
                 params=self._param_store.get_fp16_params_by_rank_group(
                     group_id=group_id, rank=self._local_rank
                 ),
@@ -590,7 +590,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
             self._fp32_flat_param_groups_of_current_rank[
                 group_id
             ].grad = flat_fp32_avg_grads.to(device)
-            self._grad_store._averaged_gradients[group_id] = []
+            self._grad_store.reset_average_gradients_by_group(group_id)
 
         # unscale and clip grads
         global_norm = calculate_global_norm_from_list(norm_list=norm_groups)
