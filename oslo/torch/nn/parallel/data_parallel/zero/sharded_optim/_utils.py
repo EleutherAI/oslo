@@ -211,11 +211,7 @@ def compute_norm(
 
         total_norm = total_norm_cuda[0].item() ** (1.0 / norm_type)
 
-    if (
-        total_norm == float("inf")
-        or total_norm == -float("inf")
-        or total_norm != total_norm
-    ):
+    if torch.isinf(total_norm).any() or torch.isnan(total_norm).any():
         total_norm = -1
 
     return total_norm
