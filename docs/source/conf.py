@@ -4,8 +4,8 @@ import sys
 sys.path.append(os.path.abspath("."))
 sys.path.append(os.path.abspath(".."))
 project = "OSLO"
-copyright = "2021, TUNiB"
-author = "TUNiB"
+copyright = "2023, EleutherAI"
+author = "EleutherAI"
 extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.doctest",
