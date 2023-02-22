@@ -1,6 +1,3 @@
-from oslo.torch.nn.parallel.data_parallel.distributed_data_parallel import (
-    DistributedDataParallel,
-)  # , ZeroDDP
+from oslo.torch.nn.parallel.data_parallel.zero import ZeroRedundancyOptimizer
 
-# __all__ = ['ColoDDP', 'ZeroDDP']
-__all__ = ["DistributedDataParallel"]
+__all__ = ["ZeroRedundancyOptimizer"]
