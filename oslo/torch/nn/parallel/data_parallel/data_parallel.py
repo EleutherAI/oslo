@@ -1,16 +1,13 @@
-import itertools
+import copy
 from collections import OrderedDict
 from functools import partial
-from typing import Dict, Iterable, List, Optional, Set
+from typing import Dict, List, Optional, Set
 
 import torch
-import torch.distributed as dist
 import torch.nn as nn
 
-from ._reducer import Reducer
-
 try:
-    from torch.nn.modules.module import _EXTRA_STATE_KEY_SUFFIX, _IncompatibleKeys
+    from torch.nn.modules.module import _EXTRA_STATE_KEY_SUFFIX
 except ImportError:
     _EXTRA_STATE_KEY_SUFFIX = "_extra_state"
 
@@ -21,6 +18,8 @@ from oslo.torch.nn.parallel.utils import (
     add_wrapper,
     OsloParallelWrapper,
 )
+from ._reducer import Reducer
+from ._utils import is_ddp_ignored
 
 
 def free_storage(data: torch.Tensor) -> None:
@@ -42,39 +41,36 @@ def _cast_float(args, dtype: torch.dtype):
     return args
 
 
-def is_ddp_ignored(p):
-    return getattr(p, "_ddp_to_ignore", False)
-
-
 def DistributedDataParallel(
     module: nn.Module,
     parallel_context: ParallelContext,
     bucket_cap_mb: int = 25,
     rebuild_bucket: bool = True,
 ):
-    ddp = _DistributedDataParallel(
+    ddp = _DistirbutedDataParallelWrapper(
         module=module,
         parallel_context=parallel_context,
         bucket_cap_mb=bucket_cap_mb,
         rebuild_bucket=rebuild_bucket,
     )
 
-    # add_wrapper(
-    #     module,
-    #     mode=ParallelMode.DATA,
-    #     wrapper=ddp,
-    #     parallel_context=parallel_context,
-    # )
-    return ddp
+    add_wrapper(
+        module,
+        mode=ParallelMode.DATA,
+        wrapper=ddp,
+        parallel_context=parallel_context,
+    )
+    return module
 
 
-class _DistributedDataParallel(OsloParallelWrapper):
-    """Distributed data parallel for Oslo.
+class _DistirbutedDataParallelWrapper(OsloParallelWrapper):
+    """Distributed data parallel wrapper for Oslo.
     Example:
         >>> from oslo.torch.nn.parallel import DistributedDataParallel as DDP
         >>> model = torch.nn.Linear(20, 1)
         >>>
         >>> model = DDP(model, parallel_context)
+        >>> olso.ready(model, parallel_context)
         >>> logits = model(x)
         >>> loss = criterion(logits, labels)
         >>> model.backward(loss)
@@ -92,6 +88,45 @@ class _DistributedDataParallel(OsloParallelWrapper):
     ) -> None:
         super().__init__(parallelism_priority=99)
         self.module = module
+        self.parallel_context = get_parallel_context(module, parallel_context)
+        self.bucket_cap_mb = bucket_cap_mb
+        self.rebuild_bucket = rebuild_bucket
+
+    def forward(self, *args, **kwargs):
+        return self.module_forward(*args, **kwargs)
+
+    def backward(self, *args, **kwargs):
+        return self.module_backward(*args, **kwargs)
+
+    def deparallelize(self):
+        self.module.deparallelize()
+
+    def parallelize(self):
+        self.module = _DistributedDataParallel(
+            self.module, self.parallel_context, self.bucket_cap_mb, self.rebuild_bucket
+        )
+        self.module_forward = copy.copy(self.module.forward)
+        self.module_backward = copy.copy(self.module.backward)
+
+
+class _DistributedDataParallel(nn.Module):
+    """Distributed data parallel for Oslo.
+
+    Args:
+    module (nn.Module): PyTorch module object
+    parallel_context (ParallelContext): process group object
+    """
+
+    def __init__(
+        self,
+        module: torch.nn.Module,
+        parallel_context: ParallelContext = None,
+        bucket_cap_mb: int = 25,
+        rebuild_bucket: bool = True,
+    ) -> None:
+        super().__init__()
+        self.module = module
+        self.module_forward = module.forward
         self.comm_stream: torch.cuda.Stream = torch.cuda.Stream()
         assert parallel_context
 
@@ -101,7 +136,6 @@ class _DistributedDataParallel(OsloParallelWrapper):
         self.reducer = Reducer(bucket_cap_mb)
         self.rebuild_bucket = rebuild_bucket
         for p in module.parameters():
-            # TODO: replace is_ddp_ignored(p)
             if is_ddp_ignored(p):
                 continue
             if p.requires_grad:
@@ -129,7 +163,7 @@ class _DistributedDataParallel(OsloParallelWrapper):
 
     def forward(self, *args, **kwargs):
         self.module.zero_grad(set_to_none=True)
-        return self.module(*args, **kwargs)
+        return self.module_forward(*args, **kwargs)
 
     def backward(self, loss: torch.Tensor):
         loss.backward()
@@ -139,7 +173,6 @@ class _DistributedDataParallel(OsloParallelWrapper):
         if self.rebuild_bucket:
             self.reducer.free()
         for p in self.module.parameters():
-            # TODO: replace is_ddp_ignored(p)
             if is_ddp_ignored(p):
                 continue
             if p.grad.device.type != "cpu":
@@ -191,23 +224,6 @@ class _DistributedDataParallel(OsloParallelWrapper):
                     else:
                         p._saved_grad.requires_grad_(False)
                     p._saved_grad.zero_()
-
-    @staticmethod
-    def set_params_to_ignore(params_to_ignore: Iterable[torch.Tensor]) -> None:
-        """Sets parameters to be ignored by DDP.
-        This method must be called before initializing ColoDDP.
-        Example:
-            >>> params_to_ignore = []
-            >>> for p in module.parameters():
-            >>>     if should_ignore(p):
-            >>>         params_to_ignore.append(p)
-            >>> ColoDDP.set_params_to_ignore(params_to_ignore)
-            >>> module = ColoDDP(module)
-        Args:
-            params_to_ignore (Iterable[torch.Tensor]): A list of parameters to be ignored.
-        """
-        for p in params_to_ignore:
-            p._ddp_to_ignore = True
 
     def state_dict(self, destination=None, prefix="", keep_vars=False):
         return self.module.state_dict(
