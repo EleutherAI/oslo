@@ -23,7 +23,7 @@ oslo_init_dict_form = {
     },
     "tensor_parallelism": {
         "enable": True,
-        "parallel_size": 4,
+        "parallel_size": 2,
         "parallel_mode": "1d",
     },
     "pipeline_parallelism": {"enable": False, "parallel_size": 4},
