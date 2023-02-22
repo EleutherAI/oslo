@@ -156,11 +156,12 @@ def compute_norm(
     dp_group: dist.ProcessGroup,
     mp_group: dist.ProcessGroup,
     norm_type: Union[int, float] = 2,
-) -> Iterable[torch.Tensor]:
+) -> float:
     """Clips gradient norm of an iterable of parameters.
     This is adapted from torch.nn.utils.clip_grad.clip_grad_norm_ and
     added functionality to handle model parallel parameters. Note that
     the gradients are modified in place.
+
     Args:
         gradients (Iterable[Tensor]): an iterable of gradient tensors
         params (Iterable[Tensor]): an iterable of parameters that the gradients are associated with
@@ -168,8 +169,9 @@ def compute_norm(
         mp_group (torch.nn.parallel.ProcessGroup): model parallel process group
          (float or int): max norm of the gradients
         norm_type (Union[int, float]): type of the used p-norm. Can be ``2`` for L2 norm or ``inf`` for infinity norm. (default: 2)
+
     Returns:
-        Iterable[torch.Tensor]: Total norm of the gradients (viewed as a single vector).
+        float: Total norm of the gradients.
     """
 
     if mp_group is None:
@@ -211,7 +213,11 @@ def compute_norm(
 
         total_norm = total_norm_cuda[0].item() ** (1.0 / norm_type)
 
-    if torch.isinf(total_norm).any() or torch.isnan(total_norm).any():
+    if (
+        total_norm == float("inf")
+        or total_norm == -float("inf")
+        or total_norm != total_norm
+    ):
         total_norm = -1
 
     return total_norm
