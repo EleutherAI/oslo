@@ -9,14 +9,14 @@ def is_ddp_ignored(p):
 
 def set_params_to_ignore(params_to_ignore: Iterable[torch.Tensor]) -> None:
     """Sets parameters to be ignored by DDP.
-    This method must be called before initializing ColoDDP.
+    This method must be called before initializing DistributedDataParallel.
     Example:
         >>> params_to_ignore = []
         >>> for p in module.parameters():
         >>>     if should_ignore(p):
         >>>         params_to_ignore.append(p)
         >>>         set_params_to_ignore(params_to_ignore)
-        >>> module = ColoDDP(module)
+        >>> module = DistributedDataParallel(module)
     Args:
         params_to_ignore (Iterable[torch.Tensor]): A list of parameters to be ignored.
     """
