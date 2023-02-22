@@ -9,6 +9,8 @@ from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.distributed.parallel_context import ParallelContext
 
 from ._utils import (
+    calculate_global_norm_from_list,
+    compute_norm,
     flatten,
     has_inf_or_nan,
     reduce_tensor_dp_group,
@@ -30,6 +32,8 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
             The optimizer to wrap.
         parallel_context (ParallelContext):
             The parallel context object.
+        clip_grad_norm (float, optional):
+            Clipping norm for gradients. Defaults to 0.0.
         reduce_bucket_size (int, optional):
             Size of the buckets for communication reduction. Defaults to 1024 * 1024.
         communication_dtype (torch.dtype, optional):
@@ -48,6 +52,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         self,
         optimizer: Optimizer,
         parallel_context: ParallelContext,
+        clip_grad_norm: float = 0.0,
         reduce_bucket_size: int = 1024 * 1024,  # communication
         communication_dtype: Optional[torch.dtype] = None,
         overlap_communication: bool = False,
@@ -92,6 +97,9 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         self._communication_dtype = communication_dtype
 
         self._found_overflow = torch.FloatTensor([0]).to(torch.cuda.current_device())
+
+        # gradient clipping
+        self._clip_grad_norm = clip_grad_norm
 
         if forced_dtype:
             for group in self.optim.param_groups:
@@ -550,8 +558,20 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
 
         # copy the grad of fp16 param to fp32 param
         single_grad_partition_groups = []
+        norm_groups = []
 
         for group_id in range(self.num_param_groups):
+            # compute norm
+            norm_group = compute_norm(
+                gradients=self._grad_store.get_averaged_gradients_by_group(group_id),
+                params=self._param_store.get_fp16_params_by_rank_group(
+                    group_id=group_id, rank=self._local_rank
+                ),
+                dp_group=self._dp_torch_group,
+                mp_group=self._mp_torch_group,
+            )
+            norm_groups.append(norm_group)
+
             # create flat gradient for the flat fp32 params
             fp16_avg_grads = self._grad_store.get_averaged_gradients_by_group(group_id)
             flat_fp16_avg_grads = flatten(fp16_avg_grads)
@@ -570,6 +590,10 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
                 group_id
             ].grad = flat_fp32_avg_grads.to(device)
             self._grad_store.reset_average_gradients_by_group(group_id)
+
+        # unscale and clip grads
+        global_norm = calculate_global_norm_from_list(norm_list=norm_groups)
+        self._unscale_and_clip_grads(single_grad_partition_groups, global_norm)
 
         # update the parameters
         self.optim.step()
@@ -636,6 +660,20 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
             return True
         else:
             return False
+
+    def _unscale_and_clip_grads(self, grad_groups_flat: List, total_norm: float):
+        """
+        Unscale the gradient norms and clip them if the `clip_grad_norm` argument is provided.
+
+        Args:
+            grad_groups_flat (List): List of PyTorch tensors representing the gradient.
+            total_norm (float): Combined normalization factor for the gradients.
+        """
+        if self._clip_grad_norm > 0.0:
+            clip = (total_norm + 1e-6) / self._clip_grad_norm
+            if clip > 1:
+                for grad in grad_groups_flat:
+                    grad.data.mul_(1.0 / clip)
 
     ############################
     # Gradient Synchronization #
