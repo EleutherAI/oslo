@@ -51,22 +51,6 @@ def unflatten(flat: torch.Tensor, tensors: Iterable[torch.Tensor]) -> torch.Tens
     return _unflatten_dense_tensors(flat, tensors)
 
 
-def calculate_global_norm_from_list(norm_list: List[float]) -> float:
-    """
-    Compute the total global norm from a list of norms.
-
-    Args:
-        norm_list (List[float]): List of norms to compute the total global norm from.
-
-    Returns:
-        float: Total global norm.
-    """
-    total_norm = 0.0
-    for norm in norm_list:
-        total_norm += norm**2.0
-    return math.sqrt(total_norm)
-
-
 def reduce_tensor_dp_group(
     tensor: torch.Tensor,
     dtype: Optional[torch.dtype] = None,
@@ -130,25 +114,13 @@ def has_inf_or_nan(tensor: torch.Tensor) -> bool:
         bool: True if the tensor has NaN or Inf values, False otherwise.
     """
     try:
-        # if tensor is half, the .float() incurs an additional deep copy, but it's necessary if
-        # Pytorch's .sum() creates a one-element tensor of the same type as tensor
-        # (which is true for some recent version of pytorch).
-        tensor_sum = float(tensor.float().sum())
-        # More efficient version that can be used if .sum() returns a Python scalar
-        # tensor_sum = float(tensor.sum())
-    except RuntimeError as instance:
-        # We want to check if inst is actually an overflow exception.
-        # RuntimeError could come from a different error.
-        # If so, we still want the exception to propagate.
-        if "value cannot be converted" not in instance.args[0]:
-            raise
+        fp32_tensor = tensor.float()
+    except RuntimeError as exception:
+        if "value cannot be converted" not in exception.args[0]:
+            raise exception
         return True
     else:
-        if (
-            tensor_sum == float("inf")
-            or tensor_sum == -float("inf")
-            or tensor_sum != tensor_sum
-        ):
+        if any(torch.isinf(fp32_tensor)) or any(torch.isnan(fp32_tensor)):
             return True
         return False
 
@@ -162,79 +134,6 @@ def release_param_grad(tensor_list: List[torch.Tensor]):
     """
     for tensor in tensor_list:
         tensor.grad = None
-
-
-def compute_norm(
-    gradients: Iterable[torch.Tensor],
-    params: Iterable[torch.Tensor],
-    dp_group: dist.ProcessGroup,
-    mp_group: dist.ProcessGroup,
-    norm_type: Union[int, float] = 2,
-) -> Iterable[torch.Tensor]:
-    """Clips gradient norm of an iterable of parameters.
-    This is adapted from torch.nn.utils.clip_grad.clip_grad_norm_ and
-    added functionality to handle model parallel parameters. Note that
-    the gradients are modified in place.
-
-    Args:
-        gradients (Iterable[Tensor]): an iterable of gradient tensors
-        params (Iterable[Tensor]): an iterable of parameters that the gradients are associated with
-        dp_group (torch.nn.parallel.ProcessGroup): data parallel process group
-        mp_group (torch.nn.parallel.ProcessGroup): model parallel process group
-         (float or int): max norm of the gradients
-        norm_type (Union[int, float]): type of the used p-norm. Can be ``2`` for L2 norm or ``inf`` for infinity norm. (default: 2)
-
-    Returns:
-        Iterable[torch.Tensor]: Total norm of the gradients (viewed as a single vector).
-    """
-
-    if mp_group is None:
-        mp_rank = 0
-    else:
-        mp_rank = dist.get_rank(mp_group)
-
-    norm_type = float(norm_type)
-    if norm_type == inf:
-        total_norm = max(g.data.abs().max() for g in gradients)
-        total_norm_cuda = torch.cuda.FloatTensor([float(total_norm)])
-        dist.all_reduce(
-            total_norm_cuda, op=torch.distributed.ReduceOp.MAX, group=dp_group
-        )
-
-        # Take max across all GPUs.
-        if mp_group is not None:
-            dist.all_reduce(tensor=total_norm_cuda, op=torch.distributed.ReduceOp.MAX)
-        total_norm = total_norm_cuda[0].item()
-    else:
-        total_norm = 0.0
-        # if dist.get_rank() == 0:
-        #    logger.info(f"Total Norm beginning {total_norm}")
-
-        for g, p in zip(gradients, params):
-            # Pipeline parallelism may replicate parameters. Avoid multi-counting.
-            if is_model_parallel_parameter(p) or mp_rank == 0:
-                param_norm = g.data.double().norm(2)
-                total_norm += param_norm.item() ** 2
-
-        # Sum across all model parallel GPUs.
-        total_norm_cuda = torch.cuda.FloatTensor([float(total_norm)])
-        torch.distributed.all_reduce(
-            total_norm_cuda, op=torch.distributed.ReduceOp.SUM, group=dp_group
-        )
-
-        if mp_group is not None:
-            dist.all_reduce(tensor=total_norm_cuda, op=torch.distributed.ReduceOp.SUM)
-
-        total_norm = total_norm_cuda[0].item() ** (1.0 / norm_type)
-
-    if (
-        total_norm == float("inf")
-        or total_norm == -float("inf")
-        or total_norm != total_norm
-    ):
-        total_norm = -1
-
-    return total_norm
 
 
 def split_half_float_double(
@@ -258,7 +157,7 @@ def split_half_float_double(
         "torch.cuda.BFloat16Tensor",
     ]
     buckets = []
-    for i, dtype in enumerate(dtypes):
+    for _, dtype in enumerate(dtypes):
         bucket = [t for t in tensor_list if t.type() == dtype]
         if bucket:
             buckets.append(bucket)
