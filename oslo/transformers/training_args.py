@@ -39,11 +39,10 @@ class TrainingArguments:
         evaluation, save will be conducted every `gradient_accumulation_steps * xxx_step` training examples.
 
         </Tip>
-    # TODO later
-    # eval_accumulation_steps (`int`, *optional*):
-    #     Number of predictions steps to accumulate the output tensors for, before moving the results to the CPU. If
-    #     left unset, the whole predictions are accumulated on GPU/TPU before being moved to the CPU (faster but
-    #     requires more memory).
+    eval_accumulation_steps (`int`, *optional*):
+        Number of predictions steps to accumulate the output tensors for, before moving the results to the CPU. If
+        left unset, the whole predictions are accumulated on GPU/TPU before being moved to the CPU (faster but
+        requires more memory).
     eval_delay (`float`, *optional*):
         Number of epochs or steps to wait for before the first evaluation can be performed, depending on the
         evaluation_strategy.
@@ -70,9 +69,7 @@ class TrainingArguments:
         Whether to log and evaluate the first `global_step` or not.
     logging_steps (`int`, *optional*, defaults to 500):
         Number of update steps between two logs if `logging_strategy="steps"`.
-    #TODO SAVE 할 때 each node에서 save할지 합쳐서 할지
     seed (`int`, *optional*, defaults to 42):
-        TODO seed np랑 python꺼는 해줘야하는지
     eval_steps (`int`, *optional*):
         Number of update steps between two evaluations if `evaluation_strategy="steps"`. Will default to the same
         value as `logging_steps` if not set.
@@ -93,6 +90,19 @@ class TrainingArguments:
         it is "steps", `save_steps` must be a round multiple of `eval_steps`.
 
         </Tip>
+    metric_for_best_model (`str`, *optional*):
+            Use in conjunction with `load_best_model_at_end` to specify the metric to use to compare two different
+            models. Must be the name of a metric returned by the evaluation with or without the prefix `"eval_"`. Will
+            default to `"loss"` if unspecified and `load_best_model_at_end=True` (to use the evaluation loss).
+
+            If you set this value, `greater_is_better` will default to `True`. Don't forget to set it to `False` if
+            your metric is better when lower.
+    greater_is_better (`bool`, *optional*):
+        Use in conjunction with `load_best_model_at_end` and `metric_for_best_model` to specify if better models
+        should have a greater metric or not. Will default to:
+
+        - `True` if `metric_for_best_model` is set to a value that isn't `"loss"` or `"eval_loss"`.
+        - `False` if `metric_for_best_model` is not set, or set to `"loss"` or `"eval_loss"`.
     label_smoothing_factor (`float`, *optional*, defaults to 0.0):
         The label smoothing factor to use. Zero means no label smoothing, otherwise the underlying onehot-encoded
         labels are changed from 0s and 1s to `label_smoothing_factor/num_labels` and `1 - label_smoothing_factor +
@@ -106,11 +116,22 @@ class TrainingArguments:
         The list of integrations to report the results and logs to. Supported platforms are `"azure_ml"`,
         `"comet_ml"`, `"mlflow"`, `"tensorboard"` and `"wandb"`. Use `"all"` to report to all integrations
         installed, `"none"` for no integrations.
+    save_on_each_node (`bool`, *optional*, defaults to `False`):
+        When doing multi-node distributed training, whether to save models and checkpoints on each node, or only on
+        the main one.
+
+        This should not be activated when the different nodes use the same storage as the files will be saved with
+        the same names for each node.
     bf16 (`bool`, *optional*, defaults to `False`):
             Whether to use bf16 16-bit (mixed) precision training instead of 32-bit training. Requires Ampere or higher
             NVIDIA architecture. This is an experimental API and it may change.
     fp16 (`bool`, *optional*, defaults to `False`):
         Whether to use fp16 16-bit (mixed) precision training instead of 32-bit training.
+    label_names (`List[str]`, *optional*):
+            The list of keys in your dictionary of inputs that correspond to the labels.
+
+            Will eventually default to `["labels"]` except if the model used is one of the `XxxForQuestionAnswering` in
+            which case it will default to `["start_positions", "end_positions"]`.
 
     """
 
@@ -139,6 +160,12 @@ class TrainingArguments:
         default=1,
         metadata={
             "help": "Number of updates steps to accumulate before performing a backward/update pass."
+        },
+    )
+    eval_accumulation_steps: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "Number of predictions steps to accumulate before moving the tensors to the CPU."
         },
     )
     eval_delay: Optional[float] = field(
@@ -220,6 +247,16 @@ class TrainingArguments:
             "help": "Whether or not to load the best model found during training at the end of training."
         },
     )
+    metric_for_best_model: Optional[str] = field(
+        default=None,
+        metadata={"help": "The metric to use to compare two different models."},
+    )
+    greater_is_better: Optional[bool] = field(
+        default=None,
+        metadata={
+            "help": "Whether the `metric_for_best_model` should be maximized or not."
+        },
+    )
     label_smoothing_factor: float = field(
         default=0.0,
         metadata={
@@ -242,6 +279,12 @@ class TrainingArguments:
             "help": "The list of integrations to report the results and logs to."
         },
     )
+    save_on_each_node: bool = field(
+        default=False,
+        metadata={
+            "help": "When doing multi-node distributed training, whether to save models and checkpoints on each node, or only on the main one"
+        },
+    )
     bf16: bool = field(
         default=False,
         metadata={
@@ -251,6 +294,12 @@ class TrainingArguments:
     fp16: bool = field(
         default=False,
         metadata={"help": "Whether to use fp16 (mixed) precision instead of 32-bit"},
+    )
+    label_names: Optional[List[str]] = field(
+        default=None,
+        metadata={
+            "help": "The list of keys in your dictionary of inputs that correspond to the labels."
+        },
     )
 
     def __post_init__(self):
@@ -265,8 +314,13 @@ class TrainingArguments:
         self.save_strategy = IntervalStrategy(self.save_strategy)
         self.lr_scheduler_type = SchedulerType(self.lr_scheduler_type)
 
-        if self.load_best_model_at_end:
+        if self.load_best_model_at_end and self.metric_for_best_model is None:
             self.metric_for_best_model = "loss"
+        if self.greater_is_better is None and self.metric_for_best_model is not None:
+            self.greater_is_better = self.metric_for_best_model not in [
+                "loss",
+                "eval_loss",
+            ]
 
         self.oslo_config, self.parallel_context, self.model_wrappers = None, None, None
 
