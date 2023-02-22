@@ -120,7 +120,7 @@ def has_inf_or_nan(tensor: torch.Tensor) -> bool:
             raise exception
         return True
     else:
-        if any(torch.isinf(fp32_tensor)) or any(torch.isnan(fp32_tensor)):
+        if torch.isinf(fp32_tensor).any() or torch.isnan(fp32_tensor).any():
             return True
         return False
 
