@@ -134,9 +134,9 @@ def has_inf_or_nan(tensor: torch.Tensor) -> bool:
             raise exception
         return True
     else:
-        if torch.isinf(fp32_tensor).any() or torch.isnan(fp32_tensor).any():
-            return True
-        return False
+        if torch.isfinite(fp32_tensor).all():
+            return False
+        return True
 
 
 def release_param_grad(tensor_list: List[torch.Tensor]):
