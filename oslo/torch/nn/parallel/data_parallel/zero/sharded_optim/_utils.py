@@ -117,7 +117,7 @@ def reduce_tensor_dp_group(
     return tensor
 
 
-def has_inf_or_nan(tensor: torch.Tensor) -> bool:
+def has_inf_or_nan(tensor):
     """
     Check if a tensor has any NaN or Inf values.
 
@@ -128,15 +128,27 @@ def has_inf_or_nan(tensor: torch.Tensor) -> bool:
         bool: True if the tensor has NaN or Inf values, False otherwise.
     """
     try:
-        fp32_tensor = tensor.float()
-    except RuntimeError as exception:
-        if "value cannot be converted" not in exception.args[0]:
-            raise exception
+        # if tensor is half, the .float() incurs an additional deep copy, but it's necessary if
+        # Pytorch's .sum() creates a one-element tensor of the same type as tensor
+        # (which is true for some recent version of pytorch).
+        tensor_sum = float(tensor.float().sum())
+        # More efficient version that can be used if .sum() returns a Python scalar
+        # tensor_sum = float(tensor.sum())
+    except RuntimeError as instance:
+        # We want to check if inst is actually an overflow exception.
+        # RuntimeError could come from a different error.
+        # If so, we still want the exception to propagate.
+        if "value cannot be converted" not in instance.args[0]:
+            raise
         return True
     else:
-        if torch.isfinite(fp32_tensor).all():
-            return False
-        return True
+        if (
+            tensor_sum == float("inf")
+            or tensor_sum == -float("inf")
+            or tensor_sum != tensor_sum
+        ):
+            return True
+        return False
 
 
 def release_param_grad(tensor_list: List[torch.Tensor]):
