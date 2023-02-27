@@ -13,6 +13,10 @@ from oslo.torch.nn.parallel.data_parallel.zero import ZeroRedundancyOptimizer
 from torch.testing import assert_close
 from oslo.torch.nn.parallel import TensorParallel
 
+skip_if_no_dist = pytest.mark.skipif(
+    torch.cuda.device_count() < 2, reason="dist required"
+)
+
 
 class MlpModel(nn.Module):
     def __init__(self):
@@ -112,7 +116,7 @@ def run_dist(rank, world_size):
     run(parallel_context)
 
 
-@pytest.mark.dist
+@skip_if_no_dist
 def test_hybrid():
     world_size = 2
     os.environ["WORLD_SIZE"] = str(world_size)

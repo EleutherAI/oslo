@@ -12,6 +12,10 @@ from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.utils import get_free_port, set_seed
 from oslo.torch.nn.parallel.data_parallel.zero import ZeroRedundancyOptimizer
 
+skip_if_no_dist = pytest.mark.skipif(
+    torch.cuda.device_count() < 2, reason="dist required"
+)
+
 
 class MlpModel(nn.Module):
     def __init__(self):
@@ -107,7 +111,7 @@ def run_dist(rank, world_size):
     run(parallel_context)
 
 
-@pytest.mark.dist
+@skip_if_no_dist
 def test_grad_accumulation():
     world_size = 2
     os.environ["WORLD_SIZE"] = str(world_size)
