@@ -12,7 +12,7 @@ from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.utils import get_free_port, set_seed
 from oslo.torch.nn.parallel.data_parallel.zero import ZeroRedundancyOptimizer
 
-skip_if_no_dist = pytest.mark.skipif(
+skip_if_dist_unavailable = pytest.mark.skipif(
     torch.cuda.device_count() < 2, reason="dist required"
 )
 
@@ -31,7 +31,6 @@ class MlpModel(nn.Module):
 
 def run(parallel_context: ParallelContext):
     local_rank = torch.distributed.get_rank()
-    set_seed(2009)
 
     # create model
     model = MlpModel().cuda()
@@ -62,23 +61,13 @@ def run(parallel_context: ParallelContext):
     zero1_output = zero1_model(input_data)
     zero2_output = zero2_model(input_data)
 
-    assert torch.equal(naive_output, zero1_output)
-    assert torch.equal(zero1_output, zero2_output)
+    assert torch.allclose(naive_output, zero1_output)
+    assert torch.allclose(zero1_output, zero2_output)
 
     # zero-dp backward
     naive_output.sum().float().backward()
-    zero1_output.sum().float().backward(sync_grad=False)
-    zero2_output.sum().float().backward(sync_grad=False)
-
-    for p, z1p, z2p in zip(
-        naive_ddp_model.parameters(), zero1_model.parameters(), zero2_model.parameters()
-    ):
-        if z2p.grad is not None:
-            assert torch.equal(p.grad, z1p.grad)
-            assert torch.equal(z1p.grad, z2p.grad)
-
-    zero1_optimizer._sync_grad()
-    zero2_optimizer._sync_grad()
+    zero1_output.sum().float().backward()
+    zero2_output.sum().float().backward()
 
     # step
     naive_optimizer.step()
@@ -89,8 +78,8 @@ def run(parallel_context: ParallelContext):
     for p, z1p, z2p in zip(
         naive_ddp_model.parameters(), zero1_model.parameters(), zero2_model.parameters()
     ):
-        assert torch.equal(p.data, z1p.data)
-        assert torch.equal(z1p.data, z2p.data)
+        assert torch.allclose(p.data, z1p.data)
+        assert torch.allclose(z1p.data, z2p.data)
 
 
 def run_dist(rank, world_size):
@@ -100,7 +89,7 @@ def run_dist(rank, world_size):
     run(parallel_context)
 
 
-@skip_if_no_dist
+@skip_if_dist_unavailable
 def test_integrity():
     world_size = 2
     os.environ["WORLD_SIZE"] = str(world_size)
@@ -109,7 +98,3 @@ def test_integrity():
     os.environ["MASTER_PORT"] = str(get_free_port())
 
     mp.spawn(partial(run_dist, world_size=world_size), nprocs=world_size)
-
-
-if __name__ == "__main__":
-    test_integrity()

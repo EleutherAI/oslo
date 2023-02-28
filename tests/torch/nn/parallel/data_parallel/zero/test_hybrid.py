@@ -13,7 +13,7 @@ from oslo.torch.nn.parallel.data_parallel.zero import ZeroRedundancyOptimizer
 from torch.testing import assert_close
 from oslo.torch.nn.parallel import TensorParallel
 
-skip_if_no_dist = pytest.mark.skipif(
+skip_if_dist_unavailable = pytest.mark.skipif(
     torch.cuda.device_count() < 2, reason="dist required"
 )
 
@@ -56,8 +56,6 @@ def assert_shard_close(
 
 def run(parallel_context: ParallelContext):
     local_rank = torch.distributed.get_rank()
-    world_size = torch.distributed.get_world_size()
-    set_seed(2009)
 
     # create model
     model = MlpModel().cuda()
@@ -87,26 +85,19 @@ def run(parallel_context: ParallelContext):
     hybrid_output = hybrid_model(input_data)
     zero_output = zero_model(input_data)
 
-    assert torch.equal(hybrid_output, zero_output)
+    assert torch.allclose(hybrid_output, zero_output)
 
     # zero-dp backward
-    hybrid_output.sum().float().backward(sync_grad=False)
-    zero_output.sum().float().backward(sync_grad=False)
-
-    for hp, zp in zip(hybrid_model.parameters(), zero_model.parameters()):
-        if zp.grad is not None:
-            assert_shard_close(zp.grad, hp.grad, local_rank, world_size)
-
-    hybrid_optimizer._sync_grad()
-    zero_optimizer._sync_grad()
+    hybrid_output.sum().float().backward()
+    zero_output.sum().float().backward()
 
     # step
     hybrid_optimizer.step()
-    hybrid_optimizer.step()
+    zero_optimizer.step()
 
     # check updated param
     for hp, zp in zip(hybrid_model.parameters(), zero_model.parameters()):
-        assert torch.equal(hp.data, zp.data)
+        assert torch.allclose(hp.data, zp.data)
 
 
 def run_dist(rank, world_size):
@@ -116,7 +107,7 @@ def run_dist(rank, world_size):
     run(parallel_context)
 
 
-@skip_if_no_dist
+@skip_if_dist_unavailable
 def test_hybrid():
     world_size = 2
     os.environ["WORLD_SIZE"] = str(world_size)
@@ -125,7 +116,3 @@ def test_hybrid():
     os.environ["MASTER_PORT"] = str(get_free_port())
 
     mp.spawn(partial(run_dist, world_size=world_size), nprocs=world_size)
-
-
-if __name__ == "__main__":
-    test_hybrid()

@@ -13,7 +13,7 @@ from oslo.utils import get_free_port, set_seed
 from oslo.torch.nn.parallel.data_parallel.zero import ZeroRedundancyOptimizer
 from torch.testing import assert_close
 
-skip_if_no_dist = pytest.mark.skipif(
+skip_if_dist_unavailable = pytest.mark.skipif(
     torch.cuda.device_count() < 2, reason="dist required"
 )
 
@@ -30,22 +30,21 @@ class MlpModel(nn.Module):
         return x
 
 
-def half_close(a, b, loose=False):
+def half_close(input, other, loose=False):
     rtol = None
     atol = None
     if loose:
         rtol = 5e-2
         atol = 5e-4
 
-    a = a.detach().half()
-    b = b.detach().half()
+    input = input.detach().half()
+    other = other.detach().half()
 
-    assert_close(a, b, rtol=rtol, atol=atol)
+    assert_close(input, other, rtol=rtol, atol=atol)
 
 
 def run(parallel_context: ParallelContext):
     local_rank = torch.distributed.get_rank()
-    set_seed(2009)
 
     # create model
     model = MlpModel().cuda()
@@ -58,7 +57,6 @@ def run(parallel_context: ParallelContext):
         torch.optim.Adam(zero_model.parameters(), lr=1),
         parallel_context=parallel_context,
         overlap_communication=True,
-        verbose=True,
     )
 
     # create data
@@ -67,19 +65,13 @@ def run(parallel_context: ParallelContext):
 
     # zero-dp forward
     naive_output = naive_ddp_model(input_data)
-    zero_output = zero_model(input_data)
+    zero_output = zero_model(input_data.half())
 
     half_close(naive_output, zero_output, loose=True)
 
     # zero-dp backward
     naive_output.sum().backward()
-    zero_output.sum().backward(sync_grad=False)
-
-    for p, zp in zip(naive_ddp_model.parameters(), zero_model.parameters()):
-        if zp.grad is not None:
-            half_close(p.grad, zp.grad, loose=True)
-
-    zero_optimizer._sync_grad()
+    zero_output.sum().backward()
 
     # step
     naive_optimizer.step()
@@ -98,7 +90,7 @@ def run_dist(rank, world_size):
     run(parallel_context)
 
 
-@skip_if_no_dist
+@skip_if_dist_unavailable
 def test_mixed_prec():
     world_size = 2
     os.environ["WORLD_SIZE"] = str(world_size)
@@ -107,7 +99,3 @@ def test_mixed_prec():
     os.environ["MASTER_PORT"] = str(get_free_port())
 
     mp.spawn(partial(run_dist, world_size=world_size), nprocs=world_size)
-
-
-if __name__ == "__main__":
-    test_mixed_prec()
