@@ -4,6 +4,7 @@
 
 #include "context.h"
 #include "cuda_util.h"
+#include "multihead_attention_layer.h"
 #include "transformer_encoder_layer.h"
 #include "transformer_decoder_layer.h"
 
@@ -254,6 +255,108 @@ std::vector<torch::Tensor> transformer_decoder_layer_fw(
 }
 
 template <typename T1, typename T2>
+int create_multihead_attention_layer_new(
+    int layer_id, int max_batch_tokens, int max_seq_len, int hidden_dim,
+    int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
+    float activation_dropout_ratio, float hidden_dropout_ratio,
+    bool pre_or_postLayerNorm, std::string activation_fn,
+    bool mask_future_tokens, bool is_post_ln) {
+  auto layer = std::make_shared<MultiheadAttentionLayer<T1, T2>>(
+      layer_id, max_batch_tokens, max_seq_len, hidden_dim, num_heads,
+      attn_prob_dropout_ratio, hidden_dropout_ratio,
+      pre_or_postLayerNorm, mask_future_tokens, is_post_ln);
+
+  Variable *inp(new Variable("input"));
+  Variable *inp_mask(new Variable("inp_mask"));
+
+  Variable* attn_out = (*layer)(inp, inp_mask);
+
+  Context::regist_pybind_layer("MultiheadAttentionLayer", layer_id, layer);
+
+  layer->before_forward(1, 32);
+
+  std::string T1_dtype = (std::is_same<T1, __half>::value) ? "half" : "float";
+  std::string T2_dtype = (std::is_same<T2, __half>::value) ? "half" : "float";
+
+  std::cout << "Encoder layer #" << layer_id << " is created with date type ["
+            << T1_dtype << ", " << T2_dtype << "]." << std::endl;
+
+  return 0;
+}
+
+template <typename T1, typename T2>
+std::vector<torch::Tensor> multihead_attention_layer_fw(
+    int layer_id, const torch::Tensor &input, const torch::Tensor &input_mask,
+    bool training_mode) {
+  CHECK_INPUT(input);
+  CHECK_INPUT(input_mask);
+
+  auto output = torch::empty_like(input);
+
+  const char *input_ptr = (const char *)input.data_ptr();
+  const char *input_mask_ptr = (const char *)input_mask.data_ptr();
+
+  char *out_ptr = (char *)output.data_ptr();
+
+  std::shared_ptr<MultiheadAttentionLayer<T1, T2>> layer =
+      std::static_pointer_cast<MultiheadAttentionLayer<T1, T2>>(
+          Context::get_pybind_layer("MultiheadAttentionLayer", layer_id));
+
+  Variable *inp_node = layer->input(0);
+  inp_node->set_value(input_ptr);
+  Variable *inp_mask_node = layer->input(1);
+  inp_mask_node->set_value(input_mask_ptr);
+
+  Variable *out_node = layer->output(0);
+  out_node->set_value(out_ptr);
+
+  layer->before_forward(input.size(0), input.size(1));
+
+  layer->forward();
+
+  return {output};
+}
+
+template <typename T1, typename T2>
+std::vector<torch::Tensor> multihead_attention_layer_bw(
+    int layer_id, const torch::Tensor &grad_out, const torch::Tensor &output,
+    const torch::Tensor &input, const torch::Tensor &input_mask) {
+  CHECK_INPUT(grad_out);
+  CHECK_INPUT(output);
+  CHECK_INPUT(input);
+  CHECK_INPUT(input_mask);
+
+  auto grad_inp = torch::empty_like(grad_out);
+
+  // inputs.
+  char *grad_output_ptr = (char *)grad_out.data_ptr();
+  const char *input_ptr = (const char *)input.data_ptr();
+  const char *output_ptr = (const char *)output.data_ptr();
+  const char *input_mask_ptr = (const char *)input_mask.data_ptr();
+
+  // outputs.
+  char *grad_input_ptr = (char *)grad_inp.data_ptr();
+
+  std::shared_ptr<MultiheadAttentionLayer<T1, T2>> layer =
+      std::static_pointer_cast<MultiheadAttentionLayer<T1, T2>>(
+          Context::get_pybind_layer("MultiheadAttentionLayer", layer_id));
+
+  Variable *inp_node = layer->input(0);
+  inp_node->set_value(input_ptr);
+  inp_node->set_grad(grad_input_ptr);
+  Variable *inp_mask_node = layer->input(1);
+  inp_mask_node->set_value(input_mask_ptr);
+
+  Variable *out_node = layer->output(0);
+  out_node->set_value(output_ptr);
+  out_node->set_grad(grad_output_ptr);
+
+  layer->backward();
+
+  return {grad_inp};
+}
+
+template <typename T1, typename T2>
 void assign_layer_weight_grad(const torch::Tensor &weights,
                               torch::Tensor &grads, std::string layer_name,
                               int layer_id) {
@@ -329,6 +432,29 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("transformer_decoder_layer_fw_fp16",
         &lightseq::transformer_decoder_layer_fw<__half, __half>,
         "LightSeq Transformer Decoder forward with fp16 (CUDA)");
+
+  
+  m.def("create_multihead_attention_layer_new_fp32",
+        &lightseq::create_multihead_attention_layer_new<float, float>,
+        "Create LightSeq Transformer Encoder Layer with fp32 (CUDA)");
+  m.def("create_multihead_attention_layer_new_fp16",
+        &lightseq::create_multihead_attention_layer_new<__half, __half>,
+        "Create LightSeq Transformer Encoder Layer with fp16 (CUDA)");
+
+  m.def("multihead_attention_layer_fw_fp32",
+        &lightseq::multihead_attention_layer_fw<float, float>,
+        "LightSeq Transformer Encoder forward with fp32 (CUDA)");
+  m.def("multihead_attention_layer_fw_fp16",
+        &lightseq::multihead_attention_layer_fw<__half, __half>,
+        "LightSeq Transformer Encoder forward with fp16 (CUDA)");
+
+  m.def("multihead_attention_layer_bw_fp32",
+        &lightseq::multihead_attention_layer_bw<float, float>,
+        "LightSeq Transformer Encoder forward with fp32 (CUDA)");
+  m.def("multihead_attention_layer_bw_fp16",
+        &lightseq::multihead_attention_layer_bw<__half, __half>,
+        "LightSeq Transformer Encoder forward with fp16 (CUDA)");
+
 
   m.def("assign_layer_weight_grad_fp32",
         &lightseq::assign_layer_weight_grad<float, float>,
