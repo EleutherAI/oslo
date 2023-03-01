@@ -48,8 +48,8 @@ def run(parallel_context: ParallelContext):
 
     # create model
     model = MlpModel().cuda()
-    zero_model = copy.deepcopy(model).half()
     naive_ddp_model = DDP(model, bucket_cap_mb=0)
+    zero_model = copy.deepcopy(model).half()
 
     # create optimizer
     naive_optimizer = torch.optim.Adam(naive_ddp_model.parameters(), lr=1)
