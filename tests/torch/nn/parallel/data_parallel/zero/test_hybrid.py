@@ -59,8 +59,10 @@ def run(parallel_context: ParallelContext):
 
     # create model
     model = MlpModel().cuda()
-    hybrid_model = TensorParallel(model, parallel_context=parallel_context)
-    zero_model = copy.deepcopy(model)
+    hybrid_model = TensorParallel(
+        copy.deepcopy(model), parallel_context=parallel_context
+    )
+    zero_model = model
 
     # create optimizer
     hybrid_optimizer = ZeroRedundancyOptimizer(
