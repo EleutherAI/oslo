@@ -9,6 +9,10 @@ from torch import nn
 
 import oslo
 from oslo.torch.distributed import ParallelContext, ParallelMode
+from oslo.torch.nn.parallel.expert_parallel.expert_parallel import (
+    _ExpertParallel,
+    ExpertParallel,
+)
 from oslo.torch.nn.parallel.pipeline_parallel.pipeline_parallel import (
     _PipelineParallel,
     PipelineParallel,
@@ -25,6 +29,7 @@ def is_merge_meaningless(parallel_context):
     return (
         parallel_context.get_world_size(ParallelMode.TENSOR) == 1
         and parallel_context.get_world_size(ParallelMode.PIPELINE) == 1
+        and parallel_context.get_world_size(ParallelMode.EXPERT) == 1
     )
 
 
@@ -38,7 +43,7 @@ def save_pretrained(
     merge_checkpoints: bool = False,
     **kwargs,
 ):
-    PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0.bin"
+    PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0_ep_0.bin"
 
     if merge_checkpoints and not is_merge_meaningless(self.parallel_context):
         model_to_save = self.__class__(self.config).eval()
@@ -61,6 +66,21 @@ def save_pretrained(
                         num_micro_batches=wrapper.num_micro_batches,
                         memory_computation_balance=wrapper.partitioner.memory_computation_balance,
                     )
+                elif isinstance(wrapper, _ExpertParallel):
+                    model_to_save = ExpertParallel(
+                        model_to_save,
+                        parallel_context=self.parallel_context,
+                        num_enc_experts=wrapper.num_experts["enc"],
+                        num_dec_experts=wrapper.num_experts["dec"],
+                        top_k=wrapper.top_k,
+                        capacity_factor_train=wrapper.capacity_factor_train,
+                        capacity_factor_eval=wrapper.capacity_factor_eval,
+                        min_capacity=wrapper.min_capacity,
+                        noisy_policy=wrapper.noisy_policy,
+                        use_rts=wrapper.use_rts,
+                        drop_tokens=wrapper.drop_tokens,
+                        use_residual=wrapper.use_residual,
+                    )
 
         model_to_save.load_state_dict(state_dict)
         oslo.ready(model_to_save, parallel_context=self.parallel_context)
@@ -69,6 +89,8 @@ def save_pretrained(
             for parallel_mode, wrapper in model_to_save.oslo_wrappers.items():
                 if hasattr(wrapper, "deparallelize"):
                     wrapper.deparallelize()
+                if hasattr(wrapper, "save_extra_states"):
+                    wrapper.save_extra_states(save_directory)
 
         # save the merged weight of rank 0
         if dist.get_rank() == 0:
@@ -109,7 +131,7 @@ def _save_pretrained_per_rank(
     **kwargs,
 ):
     logger = getLogger()
-    PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0.bin"
+    PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0_ep_0.bin"
 
     if os.path.isfile(save_directory):
         logger.error(
@@ -152,6 +174,9 @@ def _save_pretrained_per_rank(
     weights_name = weights_name.replace(
         "pp_0", f"pp_{self.parallel_context.get_local_rank(ParallelMode.PIPELINE)}"
     )
+    weights_name = weights_name.replace(
+        "ep_0", f"ep_{self.parallel_context.get_local_rank(ParallelMode.EXPERT)}"
+    )
 
     output_model_file = os.path.join(save_directory, weights_name)
 
@@ -171,18 +196,19 @@ def from_parallelized(self, path):
     >>> model = TensorParallel(model, ...)
     >>> model.from_parallelized(path)
     """
-    PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0.bin"
+    PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0_ep_0.bin"
     parallelized_model_path = path
 
     file_names = {
         os.path.join(
             parallelized_model_path,
-            PARALLELIZED_WEIGHTS_NAME.replace("tp_0", f"tp_{tp}").replace(
-                "pp_0", f"pp_{pp}"
-            ),
+            PARALLELIZED_WEIGHTS_NAME.replace("tp_0", f"tp_{tp}")
+            .replace("pp_0", f"pp_{pp}")
+            .replace("ep_0", f"ep_{ep}"),
         )
         for tp in range(self.parallel_context.get_world_size(ParallelMode.TENSOR))
         for pp in range(self.parallel_context.get_world_size(ParallelMode.PIPELINE))
+        for ep in range(self.parallel_context.get_world_size(ParallelMode.EXPERT))
     }
 
     if os.path.isdir(parallelized_model_path):
@@ -193,9 +219,14 @@ def from_parallelized(self, path):
                     PARALLELIZED_WEIGHTS_NAME.replace(
                         "tp_0",
                         f"tp_{self.parallel_context.get_local_rank(ParallelMode.TENSOR)}",
-                    ).replace(
+                    )
+                    .replace(
                         "pp_0",
                         f"pp_{self.parallel_context.get_local_rank(ParallelMode.PIPELINE)}",
+                    )
+                    .replace(
+                        "ep_0",
+                        f"ep_{self.parallel_context.get_local_rank(ParallelMode.EXPERT)}",
                     ),
                 )
             )
