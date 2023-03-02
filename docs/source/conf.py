@@ -4,7 +4,7 @@ import sys
 sys.path.append(os.path.abspath("."))
 sys.path.append(os.path.abspath(".."))
 project = "OSLO"
-copyright = "2021, TUNiB"
+copyright = "2023, EleutherAI"
 author = "TUNiB"
 extensions = [
     "sphinx.ext.autosummary",
@@ -38,7 +38,7 @@ latex_documents = [
         master_doc,
         "OSLO.tex",
         "OSLO Documentation",
-        "TUNiB",
+        "EleutherAI",
         "manual",
     ),
 ]
