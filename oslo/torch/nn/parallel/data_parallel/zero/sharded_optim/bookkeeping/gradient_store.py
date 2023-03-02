@@ -3,7 +3,9 @@ from typing import List
 from torch import Tensor
 from torch.distributed import ProcessGroup
 
-from ._base_store import BaseStore
+from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim.bookkeeping._base_store import (
+    BaseStore,
+)
 
 
 class GradientStore(BaseStore):
