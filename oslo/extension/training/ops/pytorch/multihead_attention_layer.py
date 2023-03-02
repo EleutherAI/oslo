@@ -130,11 +130,14 @@ class LSMultiheadAttentionLayer(nn.Module):
             self.config.layer_id,
             self.config.max_batch_tokens,
             self.config.max_seq_len,
-            self.config.hidden_dim,
-            self.config.num_heads,
+            self.config.hidden_size,
+            self.config.nhead,
+            self.config.intermediate_size,
             self.config.attn_prob_dropout_ratio,
+            self.config.activation_dropout_ratio,
             self.config.hidden_dropout_ratio,
             self.config.pre_or_postLayerNorm,
+            self.config.activation_fn,
             self.config.mask_future_tokens,
             self.config.is_post_ln,
         )
@@ -147,14 +150,16 @@ class LSMultiheadAttentionLayer(nn.Module):
             max_seq_len: int  # max sequence length
             hidden_size: int  # size of transformer hidden layers
             nhead: int  # number of heads in attention
+            intermediate_size: int # size of intermediate layer
             attn_prob_dropout_ratio: float  # attention score dropout ratio
+            activation_dropout_ratio: float # activation dropout ratio
             hidden_dropout_ratio: float  # dropout ration before residual
             pre_or_postLayerNorm: bool  # pre layer norm or post
+            activation_fn: str  # relu or gelu
             mask_future_tokens: bool  # mask future tokens
+            is_post_ln: bool  # post layer norm
             fp16: bool  # fp16 presion
             local_rank: int  # rank in local node
-            activation_fn: str = "relu"  # relu or gelu
-            is_post_ln: bool = False  # post layer norm
 
         return Config(**kwargs)
 
