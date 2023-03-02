@@ -88,7 +88,7 @@ class _DistirbutedDataParallelWrapper(OsloParallelWrapper):
         >>> olso.ready(model, parallel_context)
         >>> logits = model(x)
         >>> loss = criterion(logits, labels)
-        >>> model.backward(loss)
+        >>> loss.backward()
     Args:
         module (nn.Module): PyTorch module object
         parallel_context (ParallelContext): process group object
