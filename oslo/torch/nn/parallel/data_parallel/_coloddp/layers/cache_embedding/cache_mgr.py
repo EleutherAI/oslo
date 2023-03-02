@@ -3,7 +3,9 @@ import torch
 from torch.profiler import record_function
 from typing import List, Optional
 from contexttimer import Timer
-from oslo.torch.nn.parallel.data_parallel._coloddp.layers.cache_embedding.copyer import LimitBuffIndexCopyer
+from oslo.torch.nn.parallel.data_parallel._coloddp.layers.cache_embedding.copyer import (
+    LimitBuffIndexCopyer,
+)
 from enum import Enum
 import sys
 from contextlib import contextmanager
@@ -20,7 +22,7 @@ def _wait_for_data(t, stream: Optional[torch.cuda.streams.Stream]) -> None:
         return
     torch.cuda.current_stream().wait_stream(stream)
     # As mentioned in https://pytorch.org/docs/stable/generated/torch.Tensor.record_stream.html,
-    # PyTorch uses the "caching allocator" for memroy allocation for tensors. When a tensor is
+    # PyTorch uses the "caching allocator" for memory allocation for tensors. When a tensor is
     # freed, its memory is likely to be reused by newly constructed tenosrs.  By default,
     # this allocator traces whether a tensor is still in use by only the CUDA stream where it
     # was created.   When a tensor is used by additional CUDA streams, we need to call record_stream
@@ -35,7 +37,7 @@ def _wait_for_data(t, stream: Optional[torch.cuda.streams.Stream]) -> None:
 class CachedParamMgr(torch.nn.Module):
     """
     Manage Embedding Weights on CPU and CUDA memory uses a software cache.
-    CPU maintains the entire original weight. 
+    CPU maintains the entire original weight.
     CUDA maintains a fraction of the weights used in the upcoming computation. The row number in CUDA is controlled by `cuda_row_num`.
     During training, GPU needs to transmit embedding rows between CPU and GPU.
     Args:
@@ -81,15 +83,20 @@ class CachedParamMgr(torch.nn.Module):
         if self._async_copy:
             self._memcpy_stream = torch.cuda.Stream()
 
-            print('use async copy')
+            print("use async copy")
 
         if self._evict_strategy == EvictionStrategy.LFU:
             # cache_row_idx -> frequency, freq of the cache rows.
             # classic lfu cache. evict the minimal freq value row in cuda cache.
-            self.register_buffer("freq_cnter",
-                                 torch.empty(self.cuda_row_num, device=torch.cuda.current_device(),
-                                             dtype=torch.long).fill_(sys.maxsize),
-                                 persistent=False)
+            self.register_buffer(
+                "freq_cnter",
+                torch.empty(
+                    self.cuda_row_num,
+                    device=torch.cuda.current_device(),
+                    dtype=torch.long,
+                ).fill_(sys.maxsize),
+                persistent=False,
+            )
         self._elapsed_dict = {}
         self._show_cache_miss = True
         self._reset_comm_stats()
@@ -115,7 +122,7 @@ class CachedParamMgr(torch.nn.Module):
         self._elapsed_dict[name] += t.elapsed
 
     def _find_evict_gpu_idxs(self, evict_num: int) -> torch.Tensor:
-        """_find_evict_gpu_idxs 
+        """_find_evict_gpu_idxs
         Find the gpu idxs to be evicted, according to their freq.
         Args:
             evict_num (int): how many rows has to be evicted
@@ -124,14 +131,18 @@ class CachedParamMgr(torch.nn.Module):
         """
         if self._evict_strategy == EvictionStrategy.LFU:
             # find the minimal evict_num freq entries in cached_idx_map
-            _, evict_gpu_row_idxs = torch.topk(self.freq_cnter, evict_num, largest=False)
+            _, evict_gpu_row_idxs = torch.topk(
+                self.freq_cnter, evict_num, largest=False
+            )
             return evict_gpu_row_idxs
         elif self._evict_strategy == EvictionStrategy.DATASET:
             # cached_idx_map itself implies the priority of eviction.
             # The value of self.cached_idx_map represents cpu_row_idx.
             # The larger it is, the less frequently it will appear in the dataset,
             # and the higher its eviction priority will be.
-            _, evict_gpu_row_idxs = torch.topk(self.cached_idx_map, evict_num, largest=True)
+            _, evict_gpu_row_idxs = torch.topk(
+                self.cached_idx_map, evict_num, largest=True
+            )
             return evict_gpu_row_idxs
         else:
             raise TypeError
@@ -140,10 +151,13 @@ class CachedParamMgr(torch.nn.Module):
         if self.cuda_row_num > 0:
             # Enable cache with introducing auxiliary data structures
             self.cuda_cached_weight = torch.nn.Parameter(
-                torch.zeros(self.cuda_row_num,
-                            self.embedding_dim,
-                            device=torch.cuda.current_device(),
-                            dtype=weight.dtype))
+                torch.zeros(
+                    self.cuda_row_num,
+                    self.embedding_dim,
+                    device=torch.cuda.current_device(),
+                    dtype=weight.dtype,
+                )
+            )
 
             # pin memory cpu for higher CPU-GPU copy bandwidth
             self.weight = weight.pin_memory() if self.pin_weight else weight
@@ -151,22 +165,36 @@ class CachedParamMgr(torch.nn.Module):
             # id -> cpu_row_idx
             self.register_buffer(
                 "idx_map",
-                torch.arange(self.num_embeddings, dtype=torch.long, device=torch.cuda.current_device()),
+                torch.arange(
+                    self.num_embeddings,
+                    dtype=torch.long,
+                    device=torch.cuda.current_device(),
+                ),
                 persistent=False,
             )
 
             # cached_idx_map: gpu_row_idx -> cpu_row_idx
-            self.register_buffer("cached_idx_map",
-                                 torch.empty(self.cuda_row_num, device=torch.cuda.current_device(),
-                                             dtype=torch.long).fill_(-1),
-                                 persistent=False)
+            self.register_buffer(
+                "cached_idx_map",
+                torch.empty(
+                    self.cuda_row_num,
+                    device=torch.cuda.current_device(),
+                    dtype=torch.long,
+                ).fill_(-1),
+                persistent=False,
+            )
 
             # cpu_row_id -> gpu_row_idx.
             # gpu_row_idx as -1 means cpu_row_id not in CUDA.
-            self.register_buffer("inverted_cached_idx",
-                                 torch.zeros(self.num_embeddings, device=torch.cuda.current_device(),
-                                             dtype=torch.long).fill_(-1),
-                                 persistent=False)
+            self.register_buffer(
+                "inverted_cached_idx",
+                torch.zeros(
+                    self.num_embeddings,
+                    device=torch.cuda.current_device(),
+                    dtype=torch.long,
+                ).fill_(-1),
+                persistent=False,
+            )
 
             self.evict_backlist = torch.tensor([], device=torch.cuda.current_device())
 
@@ -189,9 +217,11 @@ class CachedParamMgr(torch.nn.Module):
             torch.Tensor: a piece of memory in CPU weight corresponding to row id's payload. The tensor is 1-D.
         """
 
-        return self.weight.data.view(-1).narrow(0,
-                                                int(row_idx) * self.embedding_dim,
-                                                self.embedding_dim).view(1, self.embedding_dim)
+        return (
+            self.weight.data.view(-1)
+            .narrow(0, int(row_idx) * self.embedding_dim, self.embedding_dim)
+            .view(1, self.embedding_dim)
+        )
 
     @property
     def cuda_available_row_num(self):
@@ -202,7 +232,7 @@ class CachedParamMgr(torch.nn.Module):
         """reorder
         reorder the weight according to ids' frequency in dataset before training.
         Execute only once before training, also known as warmup phase.
-        
+
         Note:
             If you would like to use the DATASET as the eviction strategy, you must call this function.
         Note:
@@ -215,7 +245,9 @@ class CachedParamMgr(torch.nn.Module):
         # reorder phase: reorder the cpu weight according to their freq stats in the target dataset.
         # reorder only works for DATASET eviction strategy.
 
-        if ids_freq_mapping is not None and not isinstance(ids_freq_mapping, torch.Tensor):
+        if ids_freq_mapping is not None and not isinstance(
+            ids_freq_mapping, torch.Tensor
+        ):
             ids_freq_mapping = torch.tensor(ids_freq_mapping)
 
         if self._evict_strategy == EvictionStrategy.DATASET:
@@ -225,26 +257,40 @@ class CachedParamMgr(torch.nn.Module):
                 self.idx_map.data.copy_(sorted_idx)
 
         # warmup phase: copy #preload_row_num rows from cpu to gpu.
-        preload_row_num = min(int(np.ceil(self.cuda_row_num * warmup_ratio)), self.num_embeddings)
+        preload_row_num = min(
+            int(np.ceil(self.cuda_row_num * warmup_ratio)), self.num_embeddings
+        )
         if preload_row_num > 0:
             with Timer() as timer:
                 # extract rows from cpu weight
-                if self._evict_strategy == EvictionStrategy.LFU and ids_freq_mapping is not None:
-                    freq_value, preload_cpu_ids = torch.topk(ids_freq_mapping, preload_row_num, dim=0, largest=True)
+                if (
+                    self._evict_strategy == EvictionStrategy.LFU
+                    and ids_freq_mapping is not None
+                ):
+                    freq_value, preload_cpu_ids = torch.topk(
+                        ids_freq_mapping, preload_row_num, dim=0, largest=True
+                    )
                     preload_cuda_row_idxs = torch.arange(preload_row_num).cuda()
                 else:
                     preload_cpu_ids = torch.arange(preload_row_num)
                     preload_cuda_row_idxs = preload_cpu_ids.cuda()
                 if self.buffer_size > 0:
-                    self.limit_buff_index_copyer.index_copy(0,
-                                                            src_index=preload_cpu_ids,
-                                                            tgt_index=preload_cuda_row_idxs,
-                                                            src=self.weight.view(self.num_embeddings, -1),
-                                                            tgt=self.cuda_cached_weight.view(self.cuda_row_num, -1))
+                    self.limit_buff_index_copyer.index_copy(
+                        0,
+                        src_index=preload_cpu_ids,
+                        tgt_index=preload_cuda_row_idxs,
+                        src=self.weight.view(self.num_embeddings, -1),
+                        tgt=self.cuda_cached_weight.view(self.cuda_row_num, -1),
+                    )
                 else:
-                    preload_rows = self.weight.view(self.num_embeddings, -1).index_select(0, preload_cpu_ids).cuda()
-                    self.cuda_cached_weight.view(self.cuda_row_num, -1).index_copy_(0, preload_cuda_row_idxs,
-                                                                                    preload_rows)
+                    preload_rows = (
+                        self.weight.view(self.num_embeddings, -1)
+                        .index_select(0, preload_cpu_ids)
+                        .cuda()
+                    )
+                    self.cuda_cached_weight.view(self.cuda_row_num, -1).index_copy_(
+                        0, preload_cuda_row_idxs, preload_rows
+                    )
 
                 # update auxiliary info
                 self.cached_idx_map[preload_cuda_row_idxs] = preload_cpu_ids.cuda()
@@ -258,7 +304,7 @@ class CachedParamMgr(torch.nn.Module):
                     else:
                         self.freq_cnter[preload_cuda_row_idxs] = freq_value.cuda()
 
-            print(f'Cache warmup finished cost {timer.elapsed} sec.')
+            print(f"Cache warmup finished cost {timer.elapsed} sec.")
 
     def flush(self):
         """flush all CUDA rows to CPU.
@@ -266,7 +312,11 @@ class CachedParamMgr(torch.nn.Module):
         """
         slots = torch.nonzero(self.cached_idx_map > -1).squeeze(1)
         row_ids = self.cached_idx_map[slots]
-        rows = self.cuda_cached_weight.view(self.cuda_row_num, -1).index_select(0, slots).cpu()
+        rows = (
+            self.cuda_cached_weight.view(self.cuda_row_num, -1)
+            .index_select(0, slots)
+            .cpu()
+        )
         self.weight.view(self.num_embeddings, -1).index_copy_(0, row_ids.cpu(), rows)
         self.cached_idx_map.index_fill_(0, slots, -1)
         self.inverted_cached_idx.index_fill_(0, row_ids, -1)
@@ -288,18 +338,18 @@ class CachedParamMgr(torch.nn.Module):
             print(
                 f"CUDA->CPU BWD {self._cuda_to_cpu_numel * self.elem_size_in_byte / 1e6 / elapsed} MB/s {self._cuda_to_cpu_numel / 1e6} M elem"
             )
-            print(f'cuda_to_cpu_elapse {elapsed} sec')
+            print(f"cuda_to_cpu_elapse {elapsed} sec")
         if self._cpu_to_cuda_numel > 0 and "5_evict_in" in self._elapsed_dict:
             elapsed = self._elapsed_dict["5_evict_in"]
             print(
                 f"CPU->CUDA BWD {self._cpu_to_cuda_numel * self.elem_size_in_byte / 1e6 / elapsed} MB/s {self._cpu_to_cuda_numel / 1e6} M elem"
             )
-            print(f'cpu_to_cuda_elpase {elapsed} sec')
+            print(f"cpu_to_cuda_elpase {elapsed} sec")
 
         for k, v in self._elapsed_dict.items():
-            print(f'{k}: {v}')
+            print(f"{k}: {v}")
 
-        print(f'cache miss ratio {self._cache_miss / self._total_cache}')
+        print(f"cache miss ratio {self._cache_miss / self._total_cache}")
 
     @torch.no_grad()
     def _id_to_cached_cuda_id(self, ids: torch.Tensor) -> torch.Tensor:
@@ -330,14 +380,19 @@ class CachedParamMgr(torch.nn.Module):
             with self.timer("1_identify_cpu_row_idxs") as timer:
                 with record_function("(cache) get unique indices"):
                     if self._evict_strategy == EvictionStrategy.LFU:
-                        cpu_row_idxs, repeat_times = torch.unique(ids, return_counts=True)
+                        cpu_row_idxs, repeat_times = torch.unique(
+                            ids, return_counts=True
+                        )
                     else:
-                        cpu_row_idxs, repeat_times = torch.unique(self.idx_map.index_select(0, ids), return_counts=True)
+                        cpu_row_idxs, repeat_times = torch.unique(
+                            self.idx_map.index_select(0, ids), return_counts=True
+                        )
 
-                    assert len(cpu_row_idxs) <= self.cuda_row_num, \
-                        f"You move {len(cpu_row_idxs)} embedding rows from CPU to CUDA. " \
-                        f"It is larger than the capacity of the cache, which at most contains {self.cuda_row_num} rows, " \
+                    assert len(cpu_row_idxs) <= self.cuda_row_num, (
+                        f"You move {len(cpu_row_idxs)} embedding rows from CPU to CUDA. "
+                        f"It is larger than the capacity of the cache, which at most contains {self.cuda_row_num} rows, "
                         f"Please increase cuda_row_num or decrease the training batch size."
+                    )
                     self.evict_backlist = cpu_row_idxs
                     tmp = torch.isin(cpu_row_idxs, self.cached_idx_map, invert=True)
                     comm_cpu_row_idxs = cpu_row_idxs[tmp]
@@ -355,7 +410,9 @@ class CachedParamMgr(torch.nn.Module):
                 with self.timer("prepare_rows_on_cuda") as timer:
                     self._prepare_rows_on_cuda(comm_cpu_row_idxs)
 
-            self.evict_backlist = torch.tensor([], device=cpu_row_idxs.device, dtype=cpu_row_idxs.dtype)
+            self.evict_backlist = torch.tensor(
+                [], device=cpu_row_idxs.device, dtype=cpu_row_idxs.dtype
+            )
 
             with self.timer("6_update_cache") as timer:
                 with record_function("6_update_cache"):
@@ -384,10 +441,15 @@ class CachedParamMgr(torch.nn.Module):
         # move evict in rows to gpu
         if self._async_copy:
             if self.buffer_size == 0:
-                evict_in_rows_gpu = self.weight.view(self.num_embeddings,
-                                                     -1).index_select(0, cpu_row_idxs_copy).pin_memory()
+                evict_in_rows_gpu = (
+                    self.weight.view(self.num_embeddings, -1)
+                    .index_select(0, cpu_row_idxs_copy)
+                    .pin_memory()
+                )
                 with torch.cuda.stream(self._memcpy_stream):
-                    evict_in_rows_gpu = evict_in_rows_gpu.to(torch.cuda.current_device(), non_blocking=True)
+                    evict_in_rows_gpu = evict_in_rows_gpu.to(
+                        torch.cuda.current_device(), non_blocking=True
+                    )
             else:
                 raise NotImplemented
 
@@ -407,11 +469,16 @@ class CachedParamMgr(torch.nn.Module):
 
                     # move evict out rows to cpu
                     if self._async_copy:
-                        evict_out_rows_gpu = self.cuda_cached_weight.view(self.cuda_row_num,
-                                                                          -1).index_select(0, evict_gpu_row_idxs)
-                        evict_out_rows_cpu = torch.empty_like(evict_out_rows_gpu, device='cpu', pin_memory=True)
+                        evict_out_rows_gpu = self.cuda_cached_weight.view(
+                            self.cuda_row_num, -1
+                        ).index_select(0, evict_gpu_row_idxs)
+                        evict_out_rows_cpu = torch.empty_like(
+                            evict_out_rows_gpu, device="cpu", pin_memory=True
+                        )
                         with torch.cuda.stream(None):
-                            evict_out_rows_cpu.copy_(evict_out_rows_gpu, non_blocking=True)
+                            evict_out_rows_cpu.copy_(
+                                evict_out_rows_gpu, non_blocking=True
+                            )
                     self.cached_idx_map.index_copy_(0, invalid_idxs, backup_idxs)
 
                 elif self._evict_strategy == EvictionStrategy.LFU:
@@ -423,11 +490,16 @@ class CachedParamMgr(torch.nn.Module):
                         evict_gpu_row_idxs = self._find_evict_gpu_idxs(evict_num)
 
                     if self._async_copy:
-                        evict_out_rows_gpu = self.cuda_cached_weight.view(self.cuda_row_num,
-                                                                          -1).index_select(0, evict_gpu_row_idxs)
-                        evict_out_rows_cpu = torch.empty_like(evict_out_rows_gpu, device='cpu', pin_memory=True)
+                        evict_out_rows_gpu = self.cuda_cached_weight.view(
+                            self.cuda_row_num, -1
+                        ).index_select(0, evict_gpu_row_idxs)
+                        evict_out_rows_cpu = torch.empty_like(
+                            evict_out_rows_gpu, device="cpu", pin_memory=True
+                        )
                         with torch.cuda.stream(None):
-                            evict_out_rows_cpu.copy_(evict_out_rows_gpu, non_blocking=True)
+                            evict_out_rows_cpu.copy_(
+                                evict_out_rows_gpu, non_blocking=True
+                            )
 
                     with self.timer("2_3_revert_freqs") as timer:
                         self.freq_cnter.index_copy_(0, invalid_idxs, backup_freqs)
@@ -436,11 +508,13 @@ class CachedParamMgr(torch.nn.Module):
 
             with self.timer("3_evict_out") as timer:
                 if self.buffer_size > 0:
-                    self.limit_buff_index_copyer.index_copy(0,
-                                                            src_index=evict_gpu_row_idxs,
-                                                            tgt_index=evict_info.cpu(),
-                                                            src=self.cuda_cached_weight.view(self.cuda_row_num, -1),
-                                                            tgt=self.weight.view(self.num_embeddings, -1))
+                    self.limit_buff_index_copyer.index_copy(
+                        0,
+                        src_index=evict_gpu_row_idxs,
+                        tgt_index=evict_info.cpu(),
+                        src=self.cuda_cached_weight.view(self.cuda_row_num, -1),
+                        tgt=self.weight.view(self.num_embeddings, -1),
+                    )
                 else:
                     # allocate tmp memory on CPU and copy rows on CUDA to CPU.
                     # TODO async gpu -> cpu
@@ -448,13 +522,16 @@ class CachedParamMgr(torch.nn.Module):
                         _wait_for_data(evict_out_rows_cpu, None)
                     else:
                         with self.timer("3_1_evict_out_index_select") as timer:
-                            evict_out_rows_cpu = self.cuda_cached_weight.view(self.cuda_row_num,
-                                                                              -1).index_select(0, evict_gpu_row_idxs)
+                            evict_out_rows_cpu = self.cuda_cached_weight.view(
+                                self.cuda_row_num, -1
+                            ).index_select(0, evict_gpu_row_idxs)
                         with self.timer("3_2_evict_out_gpu_to_cpu_copy") as timer:
                             evict_out_rows_cpu = evict_out_rows_cpu.cpu()
 
                     with self.timer("3_2_evict_out_cpu_copy") as timer:
-                        self.weight.view(self.num_embeddings, -1).index_copy_(0, evict_info.cpu(), evict_out_rows_cpu)
+                        self.weight.view(self.num_embeddings, -1).index_copy_(
+                            0, evict_info.cpu(), evict_out_rows_cpu
+                        )
 
                 self.cached_idx_map.index_fill_(0, evict_gpu_row_idxs, -1)
                 self.inverted_cached_idx.index_fill_(0, evict_info, -1)
@@ -467,17 +544,21 @@ class CachedParamMgr(torch.nn.Module):
 
         # slots of cuda weight to evict in
         with self.timer("4_identify_cuda_slot") as timer:
-            slots = torch.nonzero(self.cached_idx_map == -1).squeeze(1)[:cpu_row_idxs.numel()]
+            slots = torch.nonzero(self.cached_idx_map == -1).squeeze(1)[
+                : cpu_row_idxs.numel()
+            ]
 
         # TODO wait for optimize
         with self.timer("5_evict_in") as timer:
             # Here also allocate extra memory on CUDA. #cpu_row_idxs
             if self.buffer_size > 0:
-                self.limit_buff_index_copyer.index_copy(0,
-                                                        src_index=cpu_row_idxs_copy,
-                                                        tgt_index=slots,
-                                                        src=self.weight.view(self.num_embeddings, -1),
-                                                        tgt=self.cuda_cached_weight.view(self.cuda_row_num, -1))
+                self.limit_buff_index_copyer.index_copy(
+                    0,
+                    src_index=cpu_row_idxs_copy,
+                    tgt_index=slots,
+                    src=self.weight.view(self.num_embeddings, -1),
+                    tgt=self.cuda_cached_weight.view(self.cuda_row_num, -1),
+                )
             else:
                 if self._async_copy:
                     _wait_for_data(evict_in_rows_gpu, self._memcpy_stream)
@@ -486,14 +567,19 @@ class CachedParamMgr(torch.nn.Module):
                         # narrow index select to a subset of self.weight
                         # tmp = torch.narrow(self.weight.view(self.num_embeddings, -1), 0, min(cpu_row_idxs).cpu(), max(cpu_row_idxs) - min(cpu_row_idxs) + 1)
                         # evict_in_rows_gpu = tmp.index_select(0, cpu_row_idxs_copy - min(cpu_row_idxs).cpu())
-                        evict_in_rows_gpu = self.weight.view(self.num_embeddings,
-                                                             -1).index_select(0, cpu_row_idxs_copy).pin_memory()
+                        evict_in_rows_gpu = (
+                            self.weight.view(self.num_embeddings, -1)
+                            .index_select(0, cpu_row_idxs_copy)
+                            .pin_memory()
+                        )
 
                     with self.timer("5_2_evict_in_gpu_to_cpu_copy") as timer:
                         evict_in_rows_gpu = evict_in_rows_gpu.cuda()
 
                     with self.timer("5_3_evict_in_index_copy") as timer:
-                        self.cuda_cached_weight.view(self.cuda_row_num, -1).index_copy_(0, slots, evict_in_rows_gpu)
+                        self.cuda_cached_weight.view(self.cuda_row_num, -1).index_copy_(
+                            0, slots, evict_in_rows_gpu
+                        )
 
         with self.timer("6_update_cache") as timer:
             self.cached_idx_map[slots] = cpu_row_idxs
@@ -516,10 +602,13 @@ class CachedParamMgr(torch.nn.Module):
         """
         deprecated
         evict one row from cuda to cpu.
-        Returns: 
+        Returns:
         (int) : the slot id be evicted.
         """
-        mask = torch.logical_or(torch.isin(self.cached_idx_map, self.evict_backlist), self.cached_idx_map == -1)
+        mask = torch.logical_or(
+            torch.isin(self.cached_idx_map, self.evict_backlist),
+            self.cached_idx_map == -1,
+        )
         buf = self.cached_idx_map[mask].clone()
         idx = torch.nonzero(mask).squeeze(1)
         self.cached_idx_map.index_fill_(0, idx, -1)
@@ -535,8 +624,12 @@ class CachedParamMgr(torch.nn.Module):
         self.cached_idx_map.index_copy_(0, idx, buf)
 
         with Timer() as timer:
-            cuda_tensor = torch.narrow(self.cuda_cached_weight.view(-1), 0, max_offset * self.embedding_dim,
-                                       self.embedding_dim).view(1, self.embedding_dim)
+            cuda_tensor = torch.narrow(
+                self.cuda_cached_weight.view(-1),
+                0,
+                max_offset * self.embedding_dim,
+                self.embedding_dim,
+            ).view(1, self.embedding_dim)
             self.cpu_weight_data(max_gpu_row_idx).data.copy_(cuda_tensor)
 
         # update inverted_cached_idx, min_slot_id is evicted from cuda
@@ -568,8 +661,12 @@ class CachedParamMgr(torch.nn.Module):
         slot_offset = slot_id
         # copy payload from cpu to cuda
         with Timer() as timer:
-            cuda_tensor = torch.narrow(self.cuda_cached_weight.view(-1), 0, slot_offset * self.embedding_dim,
-                                       self.embedding_dim).view(1, self.embedding_dim)
+            cuda_tensor = torch.narrow(
+                self.cuda_cached_weight.view(-1),
+                0,
+                slot_offset * self.embedding_dim,
+                self.embedding_dim,
+            ).view(1, self.embedding_dim)
             cuda_tensor.data.copy_(self.cpu_weight_data(row_id))
 
         # update the inverted_cached_idx

@@ -2,8 +2,13 @@ import torch
 import torch.nn.functional as F
 from typing import List, Optional, Iterator, Tuple, Union
 
-from oslo.torch.nn.parallel.data_parallel._coloddp.layers.base_embedding import BaseEmbeddingBag
-from oslo.torch.nn.parallel.data_parallel._coloddp.layers.cache_mgr import CachedParamMgr, EvictionStrategy
+from oslo.torch.nn.parallel.data_parallel._coloddp.layers.base_embedding import (
+    BaseEmbeddingBag,
+)
+from oslo.torch.nn.parallel.data_parallel._coloddp.layers.cache_mgr import (
+    CachedParamMgr,
+    EvictionStrategy,
+)
 from torch.nn.parameter import Parameter
 
 
@@ -27,35 +32,46 @@ class CachedEmbeddingBag(BaseEmbeddingBag):
         include_last_offset (bool, optional): if True, offsets has one additional element, where the last element is equivalent to the size of indices. This matches the CSR format.. Defaults to False.
         dtype (torch.dtype, optional): data type of the cpu weight initialization. Defaults to None meaning float32.
         device (torch.device, optional): device type to the cpu weight. Defaults to None meaning cpu.
-        cache_ratio (float, float): cache ratio of the #cuda_weight_row / #cpu_weight_row 
-        ids_freq_mapping (Union[List, torch.Tensor], optional): the frequency of each embedding vector occures in dataset. Defaults to None.
+        cache_ratio (float, float): cache ratio of the #cuda_weight_row / #cpu_weight_row
+        ids_freq_mapping (Union[List, torch.Tensor], optional): the frequency of each embedding vector occurs in dataset. Defaults to None.
         warmup_ratio (float, optional): the ratio of cuda cache is warmuped with. Defaults to 0.7.
         buffer_size (int, optional): the max number of vectors in transmitter buffer. If set to 0, the buffer is not used. Defaults to 0.
         pin_weight (bool, optional): pin the cpu weight. Defaults to False.
         evict_strategy (EvictionStrategy, optional): evict strategy of the software cache. Defaults to EvictionStrategy.DATASET.
     """
 
-    def __init__(self,
-                 num_embeddings: int,
-                 embedding_dim: int,
-                 padding_idx: int = None,
-                 max_norm: float = None,
-                 norm_type: float = 2.,
-                 scale_grad_by_freq: bool = False,
-                 sparse: bool = False,
-                 _weight: Optional[torch.Tensor] = None,
-                 mode: str = 'mean',
-                 include_last_offset: bool = False,
-                 dtype: Optional[torch.dtype] = None,
-                 device: Optional[torch.device] = None,
-                 cache_ratio: float = 0.01,
-                 ids_freq_mapping: Optional[Union[List, torch.Tensor]] = None,
-                 warmup_ratio: float = 0.7,
-                 buffer_size: int = 0,
-                 pin_weight: bool = False,
-                 evict_strategy: EvictionStrategy = EvictionStrategy.LFU):
-        super(CachedEmbeddingBag, self).__init__(num_embeddings, embedding_dim, padding_idx, max_norm, norm_type,
-                                                 scale_grad_by_freq, sparse, mode, include_last_offset)
+    def __init__(
+        self,
+        num_embeddings: int,
+        embedding_dim: int,
+        padding_idx: int = None,
+        max_norm: float = None,
+        norm_type: float = 2.0,
+        scale_grad_by_freq: bool = False,
+        sparse: bool = False,
+        _weight: Optional[torch.Tensor] = None,
+        mode: str = "mean",
+        include_last_offset: bool = False,
+        dtype: Optional[torch.dtype] = None,
+        device: Optional[torch.device] = None,
+        cache_ratio: float = 0.01,
+        ids_freq_mapping: Optional[Union[List, torch.Tensor]] = None,
+        warmup_ratio: float = 0.7,
+        buffer_size: int = 0,
+        pin_weight: bool = False,
+        evict_strategy: EvictionStrategy = EvictionStrategy.LFU,
+    ):
+        super(CachedEmbeddingBag, self).__init__(
+            num_embeddings,
+            embedding_dim,
+            padding_idx,
+            max_norm,
+            norm_type,
+            scale_grad_by_freq,
+            sparse,
+            mode,
+            include_last_offset,
+        )
 
         assert cache_ratio <= 1.0, f"cache ratio {cache_ratio} must less than 1.0"
         self.evict_strategy = evict_strategy
@@ -63,42 +79,55 @@ class CachedEmbeddingBag(BaseEmbeddingBag):
             _weight = self._weight_alloc(dtype, device)
         cuda_row_num = int(num_embeddings * cache_ratio)
         # configure weight & cache
-        self._preprocess(_weight, cuda_row_num, ids_freq_mapping, warmup_ratio, buffer_size, pin_weight)
+        self._preprocess(
+            _weight,
+            cuda_row_num,
+            ids_freq_mapping,
+            warmup_ratio,
+            buffer_size,
+            pin_weight,
+        )
         self.cache_op = True
 
     def set_cache_mgr_async_copy(self, flag):
         self.cache_weight_mgr._async_copy = flag
 
     def _weight_alloc(self, dtype, device):
-        weight = torch.empty(self.num_embeddings, self.embedding_dim, dtype=dtype, device=device)
+        weight = torch.empty(
+            self.num_embeddings, self.embedding_dim, dtype=dtype, device=device
+        )
         with torch.no_grad():
             weight.data.uniform_(-1 / self.num_embeddings, 1 / self.num_embeddings)
             if self.padding_idx is not None:
                 weight[self.padding_idx].fill_(0)
         return weight
 
-    def _preprocess(self,
-                    weight,
-                    cuda_row_num: int,
-                    ids_freq_mapping: Optional[List[int]] = None,
-                    warmup_ratio=0.7,
-                    buffer_size=50_000,
-                    pin_weight=False):
+    def _preprocess(
+        self,
+        weight,
+        cuda_row_num: int,
+        ids_freq_mapping: Optional[List[int]] = None,
+        warmup_ratio=0.7,
+        buffer_size=50_000,
+        pin_weight=False,
+    ):
         """
-        Called after initialized. 
+        Called after initialized.
         Reorder the weight rows according to the ids_freq_mapping.
         Then, let the weights of the Module be managed by a CachedParamMgr.
-        
+
         Args:
             cuda_row_num (int): number of rows can be hosted in CUDA memory
             ids_freq_mapping (List[int]): a list, idx is id number, value is freq
             warmup_ratio (float): the amount of rows preloaded in cuda cache
         """
-        self.cache_weight_mgr = CachedParamMgr(weight,
-                                               cuda_row_num,
-                                               buffer_size,
-                                               pin_weight,
-                                               evict_strategy=self.evict_strategy)
+        self.cache_weight_mgr = CachedParamMgr(
+            weight,
+            cuda_row_num,
+            buffer_size,
+            pin_weight,
+            evict_strategy=self.evict_strategy,
+        )
         self.cache_weight_mgr.reorder(ids_freq_mapping, warmup_ratio)
 
     def forward(self, input, offsets=None, per_sample_weights=None, shape_hook=None):
@@ -106,9 +135,19 @@ class CachedEmbeddingBag(BaseEmbeddingBag):
             with torch.no_grad():
                 input = self.cache_weight_mgr.prepare_ids(input)
 
-        embeddings = F.embedding_bag(input.cuda(), self.cache_weight_mgr.cuda_cached_weight, offsets, self.max_norm,
-                                     self.norm_type, self.scale_grad_by_freq, self.mode, self.sparse,
-                                     per_sample_weights, self.include_last_offset, self.padding_idx)
+        embeddings = F.embedding_bag(
+            input.cuda(),
+            self.cache_weight_mgr.cuda_cached_weight,
+            offsets,
+            self.max_norm,
+            self.norm_type,
+            self.scale_grad_by_freq,
+            self.mode,
+            self.sparse,
+            per_sample_weights,
+            self.include_last_offset,
+            self.padding_idx,
+        )
         if shape_hook is not None:
             embeddings = shape_hook(embeddings)
         return embeddings
@@ -117,8 +156,10 @@ class CachedEmbeddingBag(BaseEmbeddingBag):
     def weight(self):
         return self.cache_weight_mgr.weight
 
-    def named_parameters(self, prefix: str = '', recurse: bool = True) -> Iterator[Tuple[str, Parameter]]:
-        yield 'weight', self.cache_weight_mgr.cuda_cached_weight
+    def named_parameters(
+        self, prefix: str = "", recurse: bool = True
+    ) -> Iterator[Tuple[str, Parameter]]:
+        yield "weight", self.cache_weight_mgr.cuda_cached_weight
 
     def parameters(self, recurse: bool = True) -> Iterator[Parameter]:
         yield self.cache_weight_mgr.cuda_cached_weight
@@ -126,8 +167,7 @@ class CachedEmbeddingBag(BaseEmbeddingBag):
     def set_cache_op(self, cache_op: bool = True):
         self.cache_op = cache_op
 
-
-############################# Perf Log ###################################
+    ############################# Perf Log ###################################
 
     @property
     def num_hits_history(self):
@@ -144,14 +184,22 @@ class CachedEmbeddingBag(BaseEmbeddingBag):
     @property
     def swap_in_bandwidth(self):
         if self.cache_weight_mgr._cpu_to_cuda_numel > 0:
-            return self.cache_weight_mgr._cpu_to_cuda_numel * self.cache_weight_mgr.elem_size_in_byte / 1e6 / \
-                   self.cache_weight_mgr._cpu_to_cuda_elpase
+            return (
+                self.cache_weight_mgr._cpu_to_cuda_numel
+                * self.cache_weight_mgr.elem_size_in_byte
+                / 1e6
+                / self.cache_weight_mgr._cpu_to_cuda_elpase
+            )
         else:
             return 0
 
     @property
     def swap_out_bandwidth(self):
         if self.cache_weight_mgr._cuda_to_cpu_numel > 0:
-            return self.cache_weight_mgr._cuda_to_cpu_numel * self.cache_weight_mgr.elem_size_in_byte / 1e6 / \
-                   self.cache_weight_mgr._cuda_to_cpu_elapse
+            return (
+                self.cache_weight_mgr._cuda_to_cpu_numel
+                * self.cache_weight_mgr.elem_size_in_byte
+                / 1e6
+                / self.cache_weight_mgr._cuda_to_cpu_elapse
+            )
         return 0

@@ -38,7 +38,9 @@ def check_colo_module(module: torch.nn.Module, pg: ProcessGroup, recursive=True)
         for param_name in param_names:
             param = module.get_parameter(param_name)
             if not isinstance(param, ColoParameter):
-                raise Exception(f'Invalid ColoParameter spec: {param} in {module} is not a ColoParameter.')
+                raise Exception(
+                    f"Invalid ColoParameter spec: {param} in {module} is not a ColoParameter."
+                )
             if param.has_compute_spec():
                 cur_compute_pattern = param.compute_spec.compute_pattern
                 if compute_pattern is None:
@@ -46,7 +48,8 @@ def check_colo_module(module: torch.nn.Module, pg: ProcessGroup, recursive=True)
                 else:
                     if cur_compute_pattern != compute_pattern:
                         raise Exception(
-                            f'Invalid ColoParameter spec: Params in {module} have different compute_pattern.')
+                            f"Invalid ColoParameter spec: Params in {module} have different compute_pattern."
+                        )
             else:
                 continue
 
@@ -54,7 +57,8 @@ def check_colo_module(module: torch.nn.Module, pg: ProcessGroup, recursive=True)
             colo_module.register(compute_pattern, pg)
             if not colo_module.has_compute_pattern(compute_pattern):
                 raise Exception(
-                    f'Invalid ColoParameter spec: ComputePattern {compute_pattern} in {module} is not allowed.')
+                    f"Invalid ColoParameter spec: ComputePattern {compute_pattern} in {module} is not allowed."
+                )
 
             match_specs = False
             allowed_specs = colo_module.get_dist_specs(compute_pattern)
@@ -74,17 +78,21 @@ def check_colo_module(module: torch.nn.Module, pg: ProcessGroup, recursive=True)
                     match_specs = True
                     break
             if match_specs == False:
-                raise Exception(f'Invalid ColoParameter spec: Params in {module} are incorrectly sharded.')
+                raise Exception(
+                    f"Invalid ColoParameter spec: Params in {module} are incorrectly sharded."
+                )
     if recursive == True:
         for submodule in module.children():
             check_colo_module(submodule, pg=pg, recursive=True)
 
 
-def init_colo_module(module: torch.nn.Module,
-                     compute_spec: ComputeSpec,
-                     pg: ProcessGroup,
-                     recursive=True,
-                     mode='default'):
+def init_colo_module(
+    module: torch.nn.Module,
+    compute_spec: ComputeSpec,
+    pg: ProcessGroup,
+    recursive=True,
+    mode="default",
+):
     compute_pattern = compute_spec.compute_pattern
     if is_colo_module(module):
         # for each param
@@ -96,7 +104,9 @@ def init_colo_module(module: torch.nn.Module,
         # a set for modules which update at least one param in the init process.
         # these modules need to be checked whether all params still match one of the valid compute pattern.
         modules_update_param = {module}
-        for param_name, dist_spec in colo_module.get_dist_specs_with_mode(compute_pattern, mode=mode).items():
+        for param_name, dist_spec in colo_module.get_dist_specs_with_mode(
+            compute_pattern, mode=mode
+        ).items():
             if dist_spec is None:
                 continue
             param = module.get_parameter(param_name)

@@ -46,7 +46,8 @@ def _cast_float(args, dtype: torch.dtype):
     elif isinstance(args, dict):
         args = {k: _cast_float(v, dtype) for k, v in args.items()}
     return args
-        
+
+
 def DistributedDataParallel(
     module,
     parallel_context,
@@ -65,12 +66,12 @@ def DistributedDataParallel(
         # dim=dim,
         # broadcast_buffers=broadcast_buffers,
         # process_group=parallel_context.get_group(ParallelMode.DATA),
-        # bucket_cap_mb=bucket_cap_mb,        
+        # bucket_cap_mb=bucket_cap_mb,
         # find_unused_parameters=find_unused_parameters,
         # check_reduction=check_reduction,
         # gradient_as_bucket_view=gradient_as_bucket_view,
         # static_graph=static_graph,cket_cap_mb,
-        parallel_context = parallel_context,
+        parallel_context=parallel_context,
     )
 
     add_wrapper(
@@ -78,6 +79,7 @@ def DistributedDataParallel(
     )
     setattr(module, "forward", ddp.forward)
     return module
+
 
 class _DistributedDataParallel(torch.nn.Module):
     """Distributed data parallel for ColoTensor. Nested ColoDDP is not supported now.
@@ -125,7 +127,6 @@ class _DistributedDataParallel(torch.nn.Module):
                 p.register_hook(partial(self.grad_handle, p))
         # self.register_backward_hook(partial(self.backward_hook))
 
-
     def parameters(self, recurse: bool = True):
         return self.module.parameters(recurse)
 
@@ -151,7 +152,6 @@ class _DistributedDataParallel(torch.nn.Module):
         self.outputs = self.module(*args, **kwargs)
         return self.outputs
 
-
     # @staticmethod
     # def backward_hook(self, grad_input, grad_output):
     #     print('model backward')
@@ -170,9 +170,8 @@ class _DistributedDataParallel(torch.nn.Module):
     #                 continue
     #             if p.grad.device.type != "cpu":
     #                 p.grad = p._saved_grad
-            
+
     #     return grad_input
-        
 
     def backward(self, loss: torch.Tensor):
         loss.backward()
@@ -187,9 +186,8 @@ class _DistributedDataParallel(torch.nn.Module):
             if p.grad.device.type != "cpu":
                 p.grad = p._saved_grad
 
-
     def grad_handle(self, p, grad):
-        print('grand_handle')
+        print("grand_handle")
         if grad.device.type != "cpu":
             empty_grad = torch.empty_like(grad)
             free_storage(empty_grad)
