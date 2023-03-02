@@ -89,8 +89,8 @@ setup(
     description="OSLO: Open Source framework for Large-scale transformer Optimization",
     long_description_content_type="text/markdown",
     url="https://github.com/eleutherai/oslo",
-    author="TUNiB OSLO Team",
-    author_email="contact@tunib.ai",
+    author="OSLO Team",
+    author_email="contact@eleuther.ai",
     install_requires=INSTALL_REQUIRES,
     packages=find_packages(
         include=["oslo", "oslo.*"],
