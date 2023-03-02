@@ -120,7 +120,6 @@ class _DistributedDataParallel(OsloParallelWrapper):
                 p.register_hook(partial(self.grad_handle, p))
 
     def forward(self, *args, **kwargs):
-        self.module.zero_grad(set_to_none=True)
         args = (arg.requires_grad_().clone() for arg in args)
         args = BackwardFunction.apply(self, *args)
         return self.module_forward(*args, **kwargs)
@@ -183,7 +182,6 @@ class _DistributedDataParallel(OsloParallelWrapper):
                     else:
                         p._saved_grad.requires_grad_(False)
                     p._saved_grad.zero_()
-
 
     def parallelize(self):
         self.module_forward = copy.copy(self.module.forward)
