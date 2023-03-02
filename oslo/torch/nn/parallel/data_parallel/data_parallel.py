@@ -18,8 +18,8 @@ from oslo.torch.nn.parallel.utils import (
     add_wrapper,
     OsloParallelWrapper,
 )
-from ._reducer import Reducer
-from ._utils import is_ddp_ignored
+from oslo.torch.nn.parallel.data_parallel._reducer import Reducer
+from oslo.torch.nn.parallel.data_parallel._utils import is_ddp_ignored
 
 
 def free_storage(data: torch.Tensor) -> None:
@@ -109,9 +109,6 @@ class _DistirbutedDataParallelWrapper(OsloParallelWrapper):
 
     def forward(self, *args, **kwargs):
         return self.module_forward(*args, **kwargs)
-
-    def deparallelize(self):
-        self.module.deparallelize()
 
     def parallelize(self):
         self.module = _DistributedDataParallel(

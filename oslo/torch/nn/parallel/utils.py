@@ -69,8 +69,6 @@ def parallelize(model: nn.Module, parallel_context: ParallelContext):
             if hasattr(wrapper, "parallelize"):
                 wrapper.parallelize()
                 setattr(model, "forward", wrapper.forward)
-                if hasattr(wrapper, "backward"):
-                    setattr(model, "backward", wrapper.backward)
 
     for parameter in model.parameters():
         if hasattr(parameter, "oslo_parallel"):
