@@ -62,7 +62,7 @@ def DistributedDataParallel(
     bucket_cap_mb: int = 25,
     rebuild_bucket: bool = True,
 ):
-    ddp = _DistirbutedDataParallelWrapper(
+    ddp = _DistributedDataParallel(
         module=module,
         parallel_context=parallel_context,
         bucket_cap_mb=bucket_cap_mb,
@@ -78,7 +78,7 @@ def DistributedDataParallel(
     return module
 
 
-class _DistirbutedDataParallelWrapper(OsloParallelWrapper):
+class _DistributedDataParallel(OsloParallelWrapper):
     """Distributed data parallel wrapper for Oslo.
     Example:
         >>> from oslo.torch.nn.parallel import DistributedDataParallel as DDP
@@ -102,37 +102,6 @@ class _DistirbutedDataParallelWrapper(OsloParallelWrapper):
         rebuild_bucket: bool = True,
     ) -> None:
         super().__init__(parallelism_priority=99)
-        self.module = module
-        self.parallel_context = get_parallel_context(module, parallel_context)
-        self.bucket_cap_mb = bucket_cap_mb
-        self.rebuild_bucket = rebuild_bucket
-
-    def forward(self, *args, **kwargs):
-        return self.module_forward(*args, **kwargs)
-
-    def parallelize(self):
-        self.module = _DistributedDataParallel(
-            self.module, self.parallel_context, self.bucket_cap_mb, self.rebuild_bucket
-        )
-        self.module_forward = copy.copy(self.module.forward)
-
-
-class _DistributedDataParallel(nn.Module):
-    """Distributed data parallel for Oslo.
-
-    Args:
-    module (nn.Module): PyTorch module object
-    parallel_context (ParallelContext): process group object
-    """
-
-    def __init__(
-        self,
-        module: torch.nn.Module,
-        parallel_context: ParallelContext = None,
-        bucket_cap_mb: int = 25,
-        rebuild_bucket: bool = True,
-    ) -> None:
-        super().__init__()
         self.module = module
         self.module.zero_grad = self.zero_grad
         self.module_forward = module.forward
@@ -227,3 +196,6 @@ class _DistributedDataParallel(nn.Module):
         self, state_dict: "OrderedDict[str, torch.Tensor]", strict: bool = True
     ):
         return self.module.load_state_dict(state_dict, strict)
+
+    def parallelize(self):
+        pass
