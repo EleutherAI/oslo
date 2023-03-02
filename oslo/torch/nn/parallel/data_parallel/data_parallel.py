@@ -41,6 +41,21 @@ def _cast_float(args, dtype: torch.dtype):
     return args
 
 
+class BackwardFunction(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, module, *args):
+        if not isinstance(module, _DistributedDataParallel):
+            raise ValueError
+        ctx.module = module
+        ctx.mark_dirty(*args)
+        return args
+
+    @staticmethod
+    def backward(ctx, *grad_outputs):
+        ctx.module._backward()
+        return (None,) + grad_outputs
+
+
 def DistributedDataParallel(
     module: nn.Module,
     parallel_context: ParallelContext,
@@ -95,9 +110,6 @@ class _DistirbutedDataParallelWrapper(OsloParallelWrapper):
     def forward(self, *args, **kwargs):
         return self.module_forward(*args, **kwargs)
 
-    def backward(self, *args, **kwargs):
-        return self.module_backward(*args, **kwargs)
-
     def deparallelize(self):
         self.module.deparallelize()
 
@@ -106,7 +118,6 @@ class _DistirbutedDataParallelWrapper(OsloParallelWrapper):
             self.module, self.parallel_context, self.bucket_cap_mb, self.rebuild_bucket
         )
         self.module_forward = copy.copy(self.module.forward)
-        self.module_backward = copy.copy(self.module.backward)
 
 
 class _DistributedDataParallel(nn.Module):
@@ -126,10 +137,11 @@ class _DistributedDataParallel(nn.Module):
     ) -> None:
         super().__init__()
         self.module = module
+        self.module.zero_grad = self.zero_grad
         self.module_forward = module.forward
+
         self.comm_stream: torch.cuda.Stream = torch.cuda.Stream()
         assert parallel_context
-
         self.parallel_context = get_parallel_context(module, parallel_context)
         self.dp_world_size = self.parallel_context.get_world_size(ParallelMode.DATA)
 
@@ -144,29 +156,13 @@ class _DistributedDataParallel(nn.Module):
     def parameters(self, recurse: bool = True):
         return self.module.parameters(recurse)
 
-    def named_parameters(self, prefix: str = "", recurse: bool = True):
-        return self.module.named_parameters(prefix, recurse)
-
-    def named_buffers(self, prefix: str = "", recurse: bool = True):
-        return self.module.named_buffers(prefix, recurse)
-
-    def named_children(self):
-        return self.module.named_children()
-
-    def named_modules(
-        self,
-        memo: Optional[Set[torch.nn.Module]] = None,
-        prefix: str = "",
-        remove_duplicate: bool = True,
-    ):
-        return self.module.named_modules(memo, prefix, remove_duplicate)
-
     def forward(self, *args, **kwargs):
         self.module.zero_grad(set_to_none=True)
+        args = (arg.requires_grad_().clone() for arg in args)
+        args = BackwardFunction.apply(self, *args)
         return self.module_forward(*args, **kwargs)
 
-    def backward(self, loss: torch.Tensor):
-        loss.backward()
+    def _backward(self):
         with torch.cuda.stream(self.comm_stream):
             self.reducer.flush()
         torch.cuda.current_stream().wait_stream(self.comm_stream)
@@ -213,7 +209,7 @@ class _DistributedDataParallel(nn.Module):
             p._saved_grad = grad
 
     def zero_grad(self, set_to_none: bool = False) -> None:
-        self.module.zero_grad(set_to_none=True)
+        super().zero_grad(set_to_none=True)
         for p in self.module.parameters():
             if getattr(p, "_saved_grad", None) is not None:
                 if set_to_none:
