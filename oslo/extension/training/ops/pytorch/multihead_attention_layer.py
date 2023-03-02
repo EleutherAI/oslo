@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from itertools import zip_longest
 import math
 import copy
 
@@ -99,11 +100,15 @@ class LSMultiheadAttentionLayer(nn.Module):
     def __init__(
         self,
         config,
+        initial_weights=None, 
+        initial_biases=None
     ):
         super(LSMultiheadAttentionLayer, self).__init__()
         self.config = copy.deepcopy(config)
         self.config.layer_id = LSMultiheadAttentionLayer.layer_id
         LSMultiheadAttentionLayer.layer_id += 1
+
+        self.quant_mode = False
 
         if self.config.local_rank >= 0:
             torch.cuda.set_device(self.config.local_rank)
@@ -142,6 +147,40 @@ class LSMultiheadAttentionLayer(nn.Module):
             self.config.is_post_ln,
         )
 
+        hs = self.config.hidden_size
+        ims = self.config.intermediate_size
+        self.hs = hs
+        self.ims = ims
+        self.para_offset = LSMultiheadAttentionLayer.gen_offset(hs, ims)
+        self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
+
+        if initial_weights is None or initial_biases is None:
+            self.init_transformer_weights()
+            return
+
+        # For testing only.
+        qkv_w = [ele.detach().clone() for ele in initial_weights[:3]]
+        qkv_w = torch.cat(qkv_w, dim=0)
+        weights = [qkv_w] + [copy_para(ele) for ele in initial_weights[3:]]
+
+        qkv_b = [ele.detach().clone() for ele in initial_biases[:3]]
+        qkv_b = torch.cat(qkv_b, dim=0)
+        biases = [qkv_b] + [copy_para(ele) for ele in initial_biases[3:]]
+
+        idx = 0
+        for w, b in zip_longest(weights, biases):
+            if w is not None:
+                cur_para = self._get_weights(idx)
+                assert cur_para.numel() == w.numel()
+                cur_para.copy_(w.view(-1))
+                idx += 1
+
+            if b is not None:
+                cur_para = self._get_weights(idx)
+                assert cur_para.numel() == b.numel()
+                cur_para.copy_(b.view(-1))
+                idx += 1
+
     @staticmethod
     def get_config(**kwargs):
         @dataclass
@@ -160,6 +199,9 @@ class LSMultiheadAttentionLayer(nn.Module):
             is_post_ln: bool  # post layer norm
             fp16: bool  # fp16 presion
             local_rank: int  # rank in local node
+            quant_mode: bool
+            training: bool = True
+            is_grad_enabled: bool = True
 
         return Config(**kwargs)
 

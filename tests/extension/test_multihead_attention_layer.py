@@ -20,10 +20,11 @@ def test_multihead_attention_layer():
             hidden_dropout_ratio=0.2,  # dropout ration before residual
             pre_or_postLayerNorm=False,  # pre layer norm or post
             activation_fn='relu',  # relu or gelu
-            mask_future_tokens=False  # mask future tokens
-            is_post_ln=False  # post layer norm
-            fp16=False  # fp16 presion
-            local_rank=0  # rank in local node
+            mask_future_tokens=False, # mask future tokens
+            is_post_ln=False,  # post layer norm
+            fp16=False,  # fp16 presion
+            local_rank=0,  # rank in local node
+            quant_mode=False
         )
     
     ls_multihead_attention_layer = LSMultiheadAttentionLayer(config)
