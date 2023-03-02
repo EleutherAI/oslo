@@ -119,9 +119,6 @@ class _DistributedDataParallel(OsloParallelWrapper):
             if p.requires_grad:
                 p.register_hook(partial(self.grad_handle, p))
 
-    def parameters(self, recurse: bool = True):
-        return self.module.parameters(recurse)
-
     def forward(self, *args, **kwargs):
         self.module.zero_grad(set_to_none=True)
         args = (arg.requires_grad_().clone() for arg in args)
