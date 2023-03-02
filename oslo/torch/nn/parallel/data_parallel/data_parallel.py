@@ -198,4 +198,4 @@ class _DistributedDataParallel(OsloParallelWrapper):
         return self.module.load_state_dict(state_dict, strict)
 
     def parallelize(self):
-        pass
+        self.module_forward = copy.copy(self.module.forward)
