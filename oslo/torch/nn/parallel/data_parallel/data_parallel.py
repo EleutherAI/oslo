@@ -138,6 +138,7 @@ class _DistributedDataParallel(nn.Module):
         super().__init__()
         self.module = module
         self.module.zero_grad = self.zero_grad
+        self.module.backward = self._backward
         self.module_forward = module.forward
 
         self.comm_stream: torch.cuda.Stream = torch.cuda.Stream()
@@ -157,9 +158,8 @@ class _DistributedDataParallel(nn.Module):
         return self.module.parameters(recurse)
 
     def forward(self, *args, **kwargs):
-        self.module.zero_grad(set_to_none=True)
-        args = (arg.requires_grad_().clone() for arg in args)
-        args = BackwardFunction.apply(self, *args)
+        # args = (arg.requires_grad_().clone() for arg in args)
+        # args = BackwardFunction.apply(self, *args)
         return self.module_forward(*args, **kwargs)
 
     def _backward(self):
