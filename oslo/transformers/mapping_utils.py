@@ -1,5 +1,6 @@
 import importlib
 
+from oslo.torch.nn.parallel.expert_parallel.mapping import Front, Behind
 from oslo.torch.nn.parallel.tensor_parallel import Other, Column, Row, Update, Head
 
 
@@ -231,5 +232,89 @@ class _TensorParallelMapping(_ParallelMapping):
                 "qa_outputs",
                 gather_output=True,
             ),
+        ],
+    }
+
+
+class _ExpertParallelMapping(_ParallelMapping):
+    __MAPPING__ = {
+        "Albert": [
+            Front("ffn", layer="albert_layer_groups.albert_layers", enc_name="encoder"),
+            Behind(
+                "ffn_output",
+                layer="albert_layer_groups.albert_layers",
+                enc_name="encoder",
+            ),
+        ],
+        "Bart": [
+            Front(
+                "fc1",
+                layer="layers",
+                enc_name="encoder",
+                dec_name="decoder",
+            ),
+            Behind("fc2", layer="layers", enc_name="encoder", dec_name="decoder"),
+        ],
+        "Bert": [
+            Front("intermediate.dense", layer="layer", enc_name="encoder"),
+            Behind("output.dense", layer="layer", enc_name="encoder"),
+        ],
+        "Blenderbot": [
+            Front("fc1", layer="layers", enc_name="encoder", dec_name="decoder"),
+            Behind("fc2", layer="layers", enc_name="encoder", dec_name="decoder"),
+        ],
+        "BlenderbotSmall": [
+            Front(
+                "fc1",
+                layer="layers",
+                enc_name="encoder",
+                dec_name="decoder",
+            ),
+            Behind("fc2", layer="layers", enc_name="encoder", dec_name="decoder"),
+        ],
+        "T5": [
+            Front(
+                "DenseReluDense.wi",
+                layer="block",
+                enc_name="encoder",
+                dec_name="decoder",
+            ),
+            Behind(
+                "DenseReluDense.wo",
+                layer="block",
+                enc_name="encoder",
+                dec_name="decoder",
+            ),
+        ],
+        "GPT2": [
+            Front(
+                "mlp.c_fc",
+                reverse=True,
+                layer="h",
+                dec_name="h",
+            ),
+            Behind(
+                "mlp.c_proj",
+                reverse=True,
+                layer="h",
+                dec_name="h",
+            ),
+        ],
+        "GPTNeo": [
+            Front("c_fc", layer="h", dec_name="h"),
+            Behind("c_proj", layer="h", dec_name="h"),
+        ],
+        "GPTNeoX": [Front("dense_h_to_4h"), Behind("dense_4h_to_h")],
+        "GPTJ": [
+            Front("fc_in", layer="h", dec_name="h"),
+            Behind("fc_out", layer="h", dec_name="h"),
+        ],
+        "Electra": [
+            Front("intermediate.dense", layer="layer", enc_name="encoder"),
+            Behind("output.dense", layer="layer", enc_name="encoder"),
+        ],
+        "Roberta": [
+            Front("intermediate.dense", layer="layer", enc_name="encoder"),
+            Behind("output.dense", layer="layer", enc_name="encoder"),
         ],
     }

@@ -18,8 +18,8 @@ from oslo.torch.nn.parallel.utils import (
     add_wrapper,
     OsloParallelWrapper,
 )
-from ._reducer import Reducer
-from ._utils import is_ddp_ignored
+from oslo.torch.nn.parallel.data_parallel._reducer import Reducer
+from oslo.torch.nn.parallel.data_parallel._utils import is_ddp_ignored
 
 
 def free_storage(data: torch.Tensor) -> None:
@@ -62,7 +62,7 @@ def DistributedDataParallel(
     bucket_cap_mb: int = 25,
     rebuild_bucket: bool = True,
 ):
-    ddp = _DistirbutedDataParallelWrapper(
+    ddp = _DistributedDataParallel(
         module=module,
         parallel_context=parallel_context,
         bucket_cap_mb=bucket_cap_mb,
@@ -78,7 +78,7 @@ def DistributedDataParallel(
     return module
 
 
-class _DistirbutedDataParallelWrapper(OsloParallelWrapper):
+class _DistributedDataParallel(OsloParallelWrapper):
     """Distributed data parallel wrapper for Oslo.
     Example:
         >>> from oslo.torch.nn.parallel import DistributedDataParallel as DDP
@@ -88,7 +88,7 @@ class _DistirbutedDataParallelWrapper(OsloParallelWrapper):
         >>> olso.ready(model, parallel_context)
         >>> logits = model(x)
         >>> loss = criterion(logits, labels)
-        >>> model.backward(loss)
+        >>> loss.backward()
     Args:
         module (nn.Module): PyTorch module object
         parallel_context (ParallelContext): process group object
@@ -103,42 +103,7 @@ class _DistirbutedDataParallelWrapper(OsloParallelWrapper):
     ) -> None:
         super().__init__(parallelism_priority=99)
         self.module = module
-        self.parallel_context = get_parallel_context(module, parallel_context)
-        self.bucket_cap_mb = bucket_cap_mb
-        self.rebuild_bucket = rebuild_bucket
-
-    def forward(self, *args, **kwargs):
-        return self.module_forward(*args, **kwargs)
-
-    def deparallelize(self):
-        self.module.deparallelize()
-
-    def parallelize(self):
-        self.module = _DistributedDataParallel(
-            self.module, self.parallel_context, self.bucket_cap_mb, self.rebuild_bucket
-        )
-        self.module_forward = copy.copy(self.module.forward)
-
-
-class _DistributedDataParallel(nn.Module):
-    """Distributed data parallel for Oslo.
-
-    Args:
-    module (nn.Module): PyTorch module object
-    parallel_context (ParallelContext): process group object
-    """
-
-    def __init__(
-        self,
-        module: torch.nn.Module,
-        parallel_context: ParallelContext = None,
-        bucket_cap_mb: int = 25,
-        rebuild_bucket: bool = True,
-    ) -> None:
-        super().__init__()
-        self.module = module
         self.module.zero_grad = self.zero_grad
-        self.module.backward = self._backward
         self.module_forward = module.forward
 
         self.comm_stream: torch.cuda.Stream = torch.cuda.Stream()
@@ -154,12 +119,9 @@ class _DistributedDataParallel(nn.Module):
             if p.requires_grad:
                 p.register_hook(partial(self.grad_handle, p))
 
-    def parameters(self, recurse: bool = True):
-        return self.module.parameters(recurse)
-
     def forward(self, *args, **kwargs):
-        # args = (arg.requires_grad_().clone() for arg in args)
-        # args = BackwardFunction.apply(self, *args)
+        args = (arg.requires_grad_().clone() for arg in args)
+        args = BackwardFunction.apply(self, *args)
         return self.module_forward(*args, **kwargs)
 
     def _backward(self):
@@ -221,12 +183,5 @@ class _DistributedDataParallel(nn.Module):
                         p._saved_grad.requires_grad_(False)
                     p._saved_grad.zero_()
 
-    def state_dict(self, destination=None, prefix="", keep_vars=False):
-        return self.module.state_dict(
-            destination=destination, prefix=prefix, keep_vars=keep_vars
-        )
-
-    def load_state_dict(
-        self, state_dict: "OrderedDict[str, torch.Tensor]", strict: bool = True
-    ):
-        return self.module.load_state_dict(state_dict, strict)
+    def parallelize(self):
+        self.module_forward = copy.copy(self.module.forward)
