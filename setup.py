@@ -1,10 +1,15 @@
 # Copyright 2021 TUNiB Inc.
 
+<<<<<<< HEAD
 import platform
+=======
+import os
+>>>>>>> 88dcca0... revert to oslo 1.1.2
 import sys
 
 from setuptools import find_packages, setup
 
+<<<<<<< HEAD
 python_min_version = (3, 6, 0)
 python_min_version_str = ".".join(map(str, python_min_version))
 pytorch_min_version = (1, 11, 0)
@@ -73,12 +78,32 @@ if not torch.cuda.is_available():
     )
 
 VERSION = {}  # type: ignore
+=======
+install_requires = [
+    "dacite",
+    "torch",
+    "transformers",
+]
 
+CPP_DEFAULT = 0 if sys.platform == "win32" else 1
+CPP_AVAILABLE = int(os.getenv("CPP_AVAILABLE", CPP_DEFAULT))
+
+assert CPP_AVAILABLE in [0, 1], (
+    f"environment variable CPP_AVAILABLE must be 0 or 1. "
+    f"but yours is {CPP_AVAILABLE}."
+)
+
+if CPP_AVAILABLE == 1:
+    install_requires += [
+        "ninja",  # for kernel fusion
+        "pybind11",  # for kernel fusion
+    ]
+>>>>>>> 88dcca0... revert to oslo 1.1.2
+
+VERSION = {}  # type: ignore
 with open("oslo/__version__.py", "r") as version_file:
     exec(version_file.read(), VERSION)
 
-with open("requirements.txt", "r") as requirements_file:
-    INSTALL_REQUIRES = requirements_file.read().splitlines()
 
 with open("README.md", "r", encoding="utf-8") as README:
     long_description = README.read()
@@ -91,12 +116,18 @@ setup(
     url="https://github.com/eleutherai/oslo",
     author="TUNiB OSLO Team",
     author_email="contact@tunib.ai",
+<<<<<<< HEAD
     install_requires=INSTALL_REQUIRES,
     packages=find_packages(
         include=["oslo", "oslo.*"],
         exclude=("tests", "tutorial", "docs"),
     ),
     python_requires=">={}".format(python_min_version_str),
+=======
+    install_requires=install_requires,
+    packages=find_packages(include=["oslo", "oslo.*"], exclude="tests"),
+    python_requires=">=3.6.0",
+>>>>>>> 88dcca0... revert to oslo 1.1.2
     classifiers=[
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
