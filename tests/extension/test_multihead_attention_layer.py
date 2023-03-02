@@ -11,8 +11,13 @@ def test_multihead_attention_layer():
     # Create a multihead attention layer layer.
     config = LSMultiheadAttentionLayer.get_config(
             max_batch_tokens=3,
-            padding_idx=10,
-            epsilon=0.0,
+            max_seq_len=16,
+            hidden_size=128,  # size of transformer hidden layers
+            nhead=8,  # number of heads in attention
+            attn_prob_dropout_ratio=0.2,  # attention score dropout ratio
+            hidden_dropout_ratio=0.2,  # dropout ration before residual
+            pre_or_postLayerNorm=False,  # pre layer norm or post
+            mask_future_tokens=False,  # mask future tokens
             fp16=False,
             local_rank=0,
         )

@@ -6,7 +6,7 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
-from oslo.extension.training.ops.pytorch.builder import TransformerBuilder
+from oslo.extension.training.ops.pytorch.builder import LayerBuilder
 from oslo.extension.training.ops.pytorch.quantization import (
     weight_quant_config,
     act_quant_config,
@@ -20,7 +20,7 @@ from oslo.extension.training.ops.pytorch.util import (
 
 
 
-transformer_cuda_module = None
+layer_cuda_module = None
 
 
 _all_layer_grads = dict()
@@ -35,7 +35,7 @@ class LSMultiheadAttentionLayer(Function):
         parameters,
         config,
     ):
-        cuda_module = transformer_cuda_module
+        cuda_module = layer_cuda_module
         forward_func = (
             cuda_module.multihead_attention_layer_fw_fp16
             if config.fp16
@@ -63,7 +63,7 @@ class LSMultiheadAttentionLayer(Function):
     def backward(ctx, grad_output):
         assert ctx.config.training
 
-        cuda_module = transformer_cuda_module
+        cuda_module = layer_cuda_module
         backward_func = (
             cuda_module.multihead_attention_layer_bw_fp16
             if ctx.config.fp16
@@ -109,12 +109,12 @@ class LSMultiheadAttentionLayer(nn.Module):
             torch.cuda.set_device(self.config.local_rank)
 
         # Load cuda modules if needed
-        global transformer_cuda_module
-        if transformer_cuda_module is None:
-            transformer_cuda_module = TransformerBuilder().load()
+        global layer_cuda_module
+        if layer_cuda_module is None:
+            layer_cuda_module = LayerBuilder().load()
 
         # create the layer in cuda kernels.
-        cuda_module = transformer_cuda_module
+        cuda_module = layer_cuda_module
         create_layer_func = (
             cuda_module.create_multihead_attention_layer_new_fp16
             if self.config.fp16
@@ -132,13 +132,11 @@ class LSMultiheadAttentionLayer(nn.Module):
             self.config.max_seq_len,
             self.config.hidden_dim,
             self.config.num_heads,
-            self.config.intermediate_size,
             self.config.attn_prob_dropout_ratio,
-            self.config.activation_dropout_ratio,
             self.config.hidden_dropout_ratio,
             self.config.pre_or_postLayerNorm,
-            self.config.activation_fn,
             self.config.mask_future_tokens,
+            self.config.is_post_ln,
         )
 
     @staticmethod
@@ -146,10 +144,17 @@ class LSMultiheadAttentionLayer(nn.Module):
         @dataclass
         class Config:
             max_batch_tokens: int  # max batch token numbers
-            padding_idx: int  # padding token id in vocabulary
-            epsilon: float  # label smoothing factor
+            max_seq_len: int  # max sequence length
+            hidden_size: int  # size of transformer hidden layers
+            nhead: int  # number of heads in attention
+            attn_prob_dropout_ratio: float  # attention score dropout ratio
+            hidden_dropout_ratio: float  # dropout ration before residual
+            pre_or_postLayerNorm: bool  # pre layer norm or post
+            mask_future_tokens: bool  # mask future tokens
             fp16: bool  # fp16 presion
             local_rank: int  # rank in local node
+            activation_fn: str = "relu"  # relu or gelu
+            is_post_ln: bool = False  # post layer norm
 
         return Config(**kwargs)
 
@@ -253,14 +258,14 @@ class LSMultiheadAttentionLayer(nn.Module):
         )
         if self.config.layer_id in _all_layer_grads:
             return
-        global transformer_cuda_module
-        cuda_module = transformer_cuda_module
+        global layer_cuda_module
+        cuda_module = layer_cuda_module
         if self.config.fp16:
             func = cuda_module.assign_layer_weight_grad_fp16
         else:
             func = cuda_module.assign_layer_weight_grad_fp32
         grad = torch.zeros_like(param)
-        func(param, grad, "TransformerEncoderLayer", self.config.layer_id)
+        func(param, grad, "MultiheadAttentionLayer", self.config.layer_id)
         _all_layer_grads[self.config.layer_id] = grad
 
     def state_dict(self, destination=None, prefix="", keep_vars=False):
