@@ -43,12 +43,11 @@ def _cast_float(args, dtype: torch.dtype):
 
 class BackwardFunction(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, module, *args):
+    def forward(ctx, module, dummy):
         if not isinstance(module, _DistributedDataParallel):
             raise ValueError
         ctx.module = module
-        ctx.mark_dirty(*args)
-        return args
+        return dummy
 
     @staticmethod
     def backward(ctx, *grad_outputs):
@@ -120,8 +119,13 @@ class _DistributedDataParallel(OsloParallelWrapper):
                 p.register_hook(partial(self.grad_handle, p))
 
     def forward(self, *args, **kwargs):
-        args = (arg.requires_grad_().clone() for arg in args)
-        args = BackwardFunction.apply(self, *args)
+        dummy = BackwardFunction.apply(
+            self, torch.tensor(0.0).requires_grad_().to(torch.cuda.current_device())
+        )
+        for arg in args:
+            if torch.is_floating_point(arg):
+                arg += dummy
+                break
         return self.module_forward(*args, **kwargs)
 
     def _backward(self):

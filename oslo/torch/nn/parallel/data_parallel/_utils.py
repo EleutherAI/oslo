@@ -6,6 +6,7 @@ import torch
 def is_ddp_ignored(p):
     return getattr(p, "_ddp_to_ignore", False)
 
+
 def free_storage(data: torch.Tensor) -> None:
     """Free underlying storage of a Tensor."""
     if data.storage().size() > 0:
@@ -13,6 +14,7 @@ def free_storage(data: torch.Tensor) -> None:
         # is the sole occupant of the Storage.
         assert data.storage_offset() == 0
         data.storage().resize_(0)
+
 
 def _cast_float(args, dtype: torch.dtype):
     if isinstance(args, torch.Tensor) and torch.is_floating_point(args):
