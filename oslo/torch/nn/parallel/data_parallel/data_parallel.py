@@ -184,15 +184,6 @@ class _DistributedDataParallel(OsloParallelWrapper):
                         p._saved_grad.requires_grad_(False)
                     p._saved_grad.zero_()
 
-    def state_dict(self, destination=None, prefix="", keep_vars=False):
-        return self.module.state_dict(
-            destination=destination, prefix=prefix, keep_vars=keep_vars
-        )
-
-    def load_state_dict(
-        self, state_dict: "OrderedDict[str, torch.Tensor]", strict: bool = True
-    ):
-        return self.module.load_state_dict(state_dict, strict)
 
     def parallelize(self):
         self.module_forward = copy.copy(self.module.forward)
