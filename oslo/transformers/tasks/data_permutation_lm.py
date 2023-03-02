@@ -170,13 +170,13 @@ class DataCollatorForPermutationLM(object):
         perm_mask = torch.zeros((labels.size(0), labels.size(1), labels.size(1)), dtype=torch.float32)
 
         for i in range(labels.size(0)):
-             # Generate permutation indices i.e. sample a random factorisation order for the sequence. This will
+            # Generate permutation indices i.e. sample a random factorisation order for the sequence. This will
             # determine which tokens a given token can attend to (encoded in `perm_mask`).
             # Note: Length of token sequence being permuted has to be less than or equal to reused sequence length
             # (see documentation for `mems`), otherwise information may leak through due to reuse. In this implementation,
             # we assume that reused length is half of sequence length and permutation length is equal to reused length.
             # This requires that the sequence length be even.
-            
+
             # Create a linear factorisation order
             perm_index = torch.arange(labels.size(1))
             # Split this into two halves, assuming that half the sequence is reused each time
