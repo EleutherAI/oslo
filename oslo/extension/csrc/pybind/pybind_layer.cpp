@@ -474,6 +474,87 @@ torch::Tensor quant_linear_layer_fw(const int layer_id,
   return outputs;
 }
 
+template <typename T>
+int create_multihead_attention_layer(
+    int layer_id, int max_batch_tokens, int max_seq_len, int hidden_dim,
+    int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
+    float activation_dropout_ratio, float hidden_dropout_ratio,
+    bool pre_or_postLayerNorm, std::string activation_fn,
+    bool mask_future_tokens) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  Context::Instance().set_stream(stream);
+  auto layer = std::make_shared<MultiheadAttentionLayer<T>>(
+      layer_id, max_batch_tokens, max_seq_len, hidden_dim, num_heads,
+      intermediate_size, attn_prob_dropout_ratio, activation_dropout_ratio,
+      hidden_dropout_ratio, pre_or_postLayerNorm, activation_fn,
+      mask_future_tokens);
+
+  s_transformer_encoder_layers[layer_id] = layer;
+
+  std::string dtype = (std::is_same<T, __half>::value) ? "half" : "float";
+
+  std::cout << "Encoder layer #" << layer_id << " is created with date type ["
+            << dtype << "]." << std::endl;
+
+  return 0;
+}
+
+template <typename T>
+std::vector<torch::Tensor> transformer_encoder_layer_fw(
+    int layer_id, const torch::Tensor &input, const torch::Tensor &input_mask,
+    bool training_mode, bool prelayernorm, bool quant_mode) {
+  CHECK_INPUT(input);
+  CHECK_INPUT(input_mask);
+
+  const T *input_ptr = (const T *)input.data_ptr();
+  const T *input_mask_ptr = (const T *)input_mask.data_ptr();
+
+  auto output = torch::empty_like(input);
+  T *out_ptr = (T *)output.data_ptr();
+
+  std::shared_ptr<TransformerEncoderLayer<T>> layer =
+      std::static_pointer_cast<TransformerEncoderLayer<T>>(
+          s_transformer_encoder_layers[layer_id]);
+  layer->set_cur_batch_shape(input.size(0), input.size(1));
+  layer->SetTrainingMode(training_mode);
+  layer->SetQuantMode(quant_mode);
+  layer->Forward(input_ptr, input_mask_ptr, out_ptr);
+
+  return {output};
+}
+
+template <typename T>
+std::vector<torch::Tensor> transformer_encoder_layer_bw(
+    int layer_id, const torch::Tensor &grad_dec_output,
+    const torch::Tensor &output, const torch::Tensor &input,
+    const torch::Tensor &input_mask) {
+  auto g_output = grad_dec_output.contiguous();
+  CHECK_INPUT(g_output);
+  CHECK_INPUT(output);
+  CHECK_INPUT(input);
+  CHECK_INPUT(input_mask);
+
+  auto grad_input = torch::empty_like(input);
+
+  // inputs.
+  const T *grad_dec_output_ptr = (const T *)g_output.data_ptr();
+  const T *input_ptr = (const T *)input.data_ptr();
+  const T *output_ptr = (const T *)output.data_ptr();
+  const T *input_mask_ptr = (const T *)input_mask.data_ptr();
+
+  // outputs.
+  T *grad_input_ptr = (T *)grad_input.data_ptr();
+
+  std::shared_ptr<TransformerEncoderLayer<T>> layer =
+      std::static_pointer_cast<TransformerEncoderLayer<T>>(
+          s_transformer_encoder_layers[layer_id]);
+  layer->set_cur_batch_shape(g_output.size(0), g_output.size(1));
+  layer->Backward(grad_dec_output_ptr, input_ptr, output_ptr, input_mask_ptr,
+                  grad_input_ptr);
+
+  return {grad_input};
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("transformer_encoder_layer_fw_fp32",
         &transformer_encoder_layer_fw<float>,
