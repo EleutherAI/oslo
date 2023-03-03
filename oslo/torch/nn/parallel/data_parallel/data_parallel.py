@@ -68,10 +68,13 @@ class _DistributedDataParallel(OsloParallelWrapper):
         >>> from oslo.torch.nn.parallel import DistributedDataParallel as DDP
         >>> model = torch.nn.Linear(20, 1)
         >>> model = DDP(model, parallel_context)
+        >>> optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
         >>> olso.ready(model, parallel_context)
+        >>> model.zero_grad()
         >>> logits = model(x)
         >>> loss = criterion(logits, labels)
         >>> loss.backward()
+        >>> optimizer.step()
     Args:
         module (nn.Module): PyTorch module object
         parallel_context (ParallelContext): process group object
