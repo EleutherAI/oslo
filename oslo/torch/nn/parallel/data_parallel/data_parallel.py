@@ -171,4 +171,3 @@ class _DistributedDataParallel(OsloParallelWrapper):
                     else:
                         p._saved_grad.requires_grad_(False)
                     p._saved_grad.zero_()
-
