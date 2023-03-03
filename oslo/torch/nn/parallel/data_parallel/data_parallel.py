@@ -1,10 +1,9 @@
 import copy
-from collections import OrderedDict
 from functools import partial
-from typing import Dict, List, Optional, Set
 
 import torch
 import torch.nn as nn
+from torch.autograd import Variable
 
 try:
     from torch.nn.modules.module import _EXTRA_STATE_KEY_SUFFIX
@@ -41,21 +40,6 @@ def _cast_float(args, dtype: torch.dtype):
     return args
 
 
-class BackwardFunction(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, module, *args):
-        if not isinstance(module, _DistributedDataParallel):
-            raise ValueError
-        ctx.module = module
-        ctx.mark_dirty(*args)
-        return args
-
-    @staticmethod
-    def backward(ctx, *grad_outputs):
-        ctx.module._backward()
-        return (None,) + grad_outputs
-
-
 def DistributedDataParallel(
     module: nn.Module,
     parallel_context: ParallelContext,
@@ -83,12 +67,14 @@ class _DistributedDataParallel(OsloParallelWrapper):
     Example:
         >>> from oslo.torch.nn.parallel import DistributedDataParallel as DDP
         >>> model = torch.nn.Linear(20, 1)
-        >>>
         >>> model = DDP(model, parallel_context)
+        >>> optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
         >>> olso.ready(model, parallel_context)
+        >>> model.zero_grad()
         >>> logits = model(x)
         >>> loss = criterion(logits, labels)
         >>> loss.backward()
+        >>> optimizer.step()
     Args:
         module (nn.Module): PyTorch module object
         parallel_context (ParallelContext): process group object
@@ -104,7 +90,6 @@ class _DistributedDataParallel(OsloParallelWrapper):
         super().__init__(parallelism_priority=99)
         self.module = module
         self.module.zero_grad = self.zero_grad
-        self.module_forward = module.forward
 
         self.comm_stream: torch.cuda.Stream = torch.cuda.Stream()
         assert parallel_context
@@ -113,16 +98,19 @@ class _DistributedDataParallel(OsloParallelWrapper):
 
         self.reducer = Reducer(bucket_cap_mb)
         self.rebuild_bucket = rebuild_bucket
+
+        last_backward = True
         for p in module.parameters():
             if is_ddp_ignored(p):
                 continue
             if p.requires_grad:
-                p.register_hook(partial(self.grad_handle, p))
+                p.register_hook(
+                    partial(self.grad_handle, p, last_backward=last_backward)
+                )
+                last_backward = False
 
-    def forward(self, *args, **kwargs):
-        args = (arg.requires_grad_().clone() for arg in args)
-        args = BackwardFunction.apply(self, *args)
-        return self.module_forward(*args, **kwargs)
+    def parallelize(self):
+        self.forward = copy.copy(self.module.forward)
 
     def _backward(self):
         with torch.cuda.stream(self.comm_stream):
@@ -136,7 +124,7 @@ class _DistributedDataParallel(OsloParallelWrapper):
             if p.grad.device.type != "cpu":
                 p.grad = p._saved_grad
 
-    def grad_handle(self, p, grad):
+    def grad_handle(self, p, grad, last_backward=False):
         if grad.device.type != "cpu":
             empty_grad = torch.empty_like(grad)
             free_storage(empty_grad)
@@ -152,6 +140,12 @@ class _DistributedDataParallel(OsloParallelWrapper):
                 grad.record_stream(self.comm_stream)
             else:
                 _DistributedDataParallel._save_grad(p, grad)
+
+            # Queue a callback on the first parameter to flush the reducer.
+            # This callback is triggered after all gradients' calculation is completed.
+            if last_backward:
+                Variable._execution_engine.queue_callback(self._backward)
+
             return empty_grad
 
         else:
@@ -182,6 +176,3 @@ class _DistributedDataParallel(OsloParallelWrapper):
                     else:
                         p._saved_grad.requires_grad_(False)
                     p._saved_grad.zero_()
-
-    def parallelize(self):
-        self.module_forward = copy.copy(self.module.forward)
