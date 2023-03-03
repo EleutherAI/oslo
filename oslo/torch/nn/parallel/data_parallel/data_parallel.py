@@ -87,7 +87,6 @@ class _DistributedDataParallel(OsloParallelWrapper):
         super().__init__(parallelism_priority=99)
         self.module = module
         self.module.zero_grad = self.zero_grad
-        self.module_forward = module.forward
 
         self.comm_stream: torch.cuda.Stream = torch.cuda.Stream()
         assert parallel_context
@@ -96,6 +95,7 @@ class _DistributedDataParallel(OsloParallelWrapper):
 
         self.reducer = Reducer(bucket_cap_mb)
         self.rebuild_bucket = rebuild_bucket
+
         last_backward = True
         for p in module.parameters():
             if is_ddp_ignored(p):
