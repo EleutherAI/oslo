@@ -8,7 +8,7 @@ import torch
 import torch.multiprocessing as mp
 import torch.nn as nn
 from oslo.torch.distributed.parallel_context import ParallelContext
-from oslo.utils import get_free_port, set_seed
+from oslo.torch.utils import get_free_port, set_seed
 from oslo.torch.nn.parallel.data_parallel.zero import ZeroRedundancyOptimizer
 from torch.testing import assert_close
 from oslo.torch.nn.parallel import TensorParallel
