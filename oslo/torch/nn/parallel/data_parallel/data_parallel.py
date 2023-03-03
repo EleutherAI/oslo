@@ -141,6 +141,8 @@ class _DistributedDataParallel(OsloParallelWrapper):
             else:
                 _DistributedDataParallel._save_grad(p, grad)
 
+            # Queue a callback on the first parameter to flush the reducer.
+            # This callback is triggered after all gradients' calculation is completed.
             if last_backward:
                 Variable._execution_engine.queue_callback(self._backward)
 
