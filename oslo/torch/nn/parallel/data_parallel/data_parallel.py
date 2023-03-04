@@ -89,7 +89,6 @@ class _DistributedDataParallel(OsloParallelWrapper):
     ) -> None:
         super().__init__(parallelism_priority=99)
         self.module = module
-        self.module.zero_grad = self.zero_grad
 
         self.comm_stream: torch.cuda.Stream = torch.cuda.Stream()
         assert parallel_context
@@ -111,6 +110,7 @@ class _DistributedDataParallel(OsloParallelWrapper):
 
     def parallelize(self):
         self.forward = copy.copy(self.module.forward)
+        self.module.zero_grad = self.zero_grad
 
     def _backward(self):
         with torch.cuda.stream(self.comm_stream):
