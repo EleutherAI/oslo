@@ -27,7 +27,7 @@ layer_cuda_module = None
 _all_layer_grads = dict()
 
 
-class LSMultiheadAttentionFunc(Function):
+class LSMultiheadAttentionLayer(Function):
     @staticmethod
     def forward(
         ctx,
@@ -51,6 +51,8 @@ class LSMultiheadAttentionFunc(Function):
             input,
             input_mask,
             config.training,
+            config.pre_layer_norm,
+            config.quant_mode,
         )
 
         if config.is_grad_enabled and config.training:
@@ -203,26 +205,18 @@ class LSMultiheadAttentionLayer(nn.Module):
 
         return Config(**kwargs)
 
-    @staticmethod
-    def gen_offset(hidden_size, intermediate_size):
-        hs, ims = hidden_size, intermediate_size
-        sizes = [
-            hs * hs * 3,  # attn_qkvw
-            hs * 3,  # attn_qkvb
-            hs * hs,  # attn_ow
-            hs,  # attn_ob
-            hs,  # attn_nw
-            hs,  # attn_nb
-            hs * ims,  # inter_w
-            ims,  # inter_b
-            hs * ims,  # output_w
-            hs,  # output_b
-            hs,  # ffn_nw
-            hs,  # ffn_nb
-            12,  # clip_max
-        ]
-        offsets = calc_offset(sizes)
-        return offsets
+    def forward(self, inputs, targets, **kwargs):
+        self.config.training = self.training
+        self.config.is_grad_enabled = torch.is_grad_enabled()
+        bs, sl = inputs.size()[:2]
+        if bs * sl > self.config.max_batch_tokens:
+            raise ValueError(
+                f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."
+            )
+        loss, nll_loss = LSMultiheadAttentionLayer.apply(
+            self.config, inputs, targets, **kwargs
+        )
+        return loss, nll_loss
 
     def _get_weights(self, i):
         return self.para.data.narrow(
@@ -363,7 +357,7 @@ class LSMultiheadAttentionLayer(nn.Module):
             assert bs == encoder_padding_mask.size(
                 0
             ) and sl == encoder_padding_mask.size(1)
-        output = LSMultiheadAttentionFunc.apply(
+        output = LSMultiheadAttentionLayer.apply(
             hidden_states,
             encoder_padding_mask,
             self.para,
