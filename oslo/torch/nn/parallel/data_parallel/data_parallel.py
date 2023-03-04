@@ -30,14 +30,19 @@ def free_storage(data: torch.Tensor) -> None:
         data.storage().resize_(0)
 
 
-def _cast_float(args, dtype: torch.dtype):
-    if isinstance(args, torch.Tensor) and torch.is_floating_point(args):
-        args = args.to(dtype)
-    elif isinstance(args, (list, tuple)):
-        args = type(args)(_cast_float(t, dtype) for t in args)
-    elif isinstance(args, dict):
-        args = {k: _cast_float(v, dtype) for k, v in args.items()}
-    return args
+class BackwardFunction(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, module, inputs):
+        ctx.module = module
+        return inputs
+
+    @staticmethod
+    def backward(ctx, *grad_outputs):
+        ctx.module._pre_backward()
+        # Queue a callback on the first parameter to flush the reducer.
+        # This callback is triggered after all gradients' calculation is completed.
+        Variable._execution_engine.queue_callback(ctx.module._post_backward)
+        return (None,) + grad_outputs
 
 
 def DistributedDataParallel(
@@ -98,21 +103,23 @@ class _DistributedDataParallel(OsloParallelWrapper):
         self.reducer = Reducer(bucket_cap_mb)
         self.rebuild_bucket = rebuild_bucket
 
-        last_backward = True
         for p in module.parameters():
             if is_ddp_ignored(p):
                 continue
             if p.requires_grad:
-                p.register_hook(
-                    partial(self.grad_handle, p, last_backward=last_backward)
-                )
-                last_backward = False
+                p.register_hook(partial(self.grad_handle, p))
 
     def parallelize(self):
-        self.forward = copy.copy(self.module.forward)
+        self._forward = copy.copy(self.module.forward)
         self.module.zero_grad = self.zero_grad
 
-    def _backward(self):
+    def forward(self, *args, **kwargs):
+        return BackwardFunction.apply(self, self._forward(*args, **kwargs))
+
+    def _pre_backward(self):
+        pass
+
+    def _post_backward(self):
         with torch.cuda.stream(self.comm_stream):
             self.reducer.flush()
         torch.cuda.current_stream().wait_stream(self.comm_stream)
@@ -124,7 +131,7 @@ class _DistributedDataParallel(OsloParallelWrapper):
             if p.grad.device.type != "cpu":
                 p.grad = p._saved_grad
 
-    def grad_handle(self, p, grad, last_backward=False):
+    def grad_handle(self, p, grad):
         if grad.device.type != "cpu":
             empty_grad = torch.empty_like(grad)
             free_storage(empty_grad)
@@ -140,11 +147,6 @@ class _DistributedDataParallel(OsloParallelWrapper):
                 grad.record_stream(self.comm_stream)
             else:
                 _DistributedDataParallel._save_grad(p, grad)
-
-            # Queue a callback on the first parameter to flush the reducer.
-            # This callback is triggered after all gradients' calculation is completed.
-            if last_backward:
-                Variable._execution_engine.queue_callback(self._backward)
 
             return empty_grad
 
