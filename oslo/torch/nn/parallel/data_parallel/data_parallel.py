@@ -4,6 +4,7 @@ from functools import partial
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+import torch.distributed as dist
 
 try:
     from torch.nn.modules.module import _EXTRA_STATE_KEY_SUFFIX
@@ -151,13 +152,11 @@ class _DistributedDataParallel(OsloParallelWrapper):
             return empty_grad
 
         else:
-            # TODO(jiaruifang) fixme
-            # self.process_group.set_cpu_groups()  # TODO
-            # dist.all_reduce(
-            #     grad, group=self.process_group.cpu_dp_process_group()
-            # )  # TODO
-            # return grad
-            raise NotImplementedError
+            # You must model.to('cpu') after oslo.ready() to use cpu.
+            dist.all_reduce(
+                grad, group=self.parallel_context.get_cpu_group(ParallelMode.DATA)
+            )
+            return grad
 
     @staticmethod
     def _save_grad(p, grad):
