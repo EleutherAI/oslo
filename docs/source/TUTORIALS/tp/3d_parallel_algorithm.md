@@ -1,6 +1,6 @@
 # 3D parallel Algorithm
 
-[https://arxiv.org/pdf/2105.14450.pdf](https://arxiv.org/pdf/2105.14450.pdf)
+* Paper: [https://arxiv.org/pdf/2105.14450.pdf](https://arxiv.org/pdf/2105.14450.pdf)
 
 ![E4D02BEB-A5BB-461D-9B62-213A61DB5B74.jpeg](3d_image/E4D02BEB-A5BB-461D-9B62-213A61DB5B74.jpeg)
 

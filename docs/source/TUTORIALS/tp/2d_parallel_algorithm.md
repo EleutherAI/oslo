@@ -1,6 +1,8 @@
 # 2D parallel (SUMMA) algorithm
 
-[https://arxiv.org/pdf/2104.05343.pdf](https://arxiv.org/pdf/2104.05343.pdf)
+* Paper : [https://arxiv.org/pdf/2104.05343.pdf](https://arxiv.org/pdf/2104.05343.pdf)
+
+![image.png](2d_image/2d.png)
 
 The use of 1D tensor parallelism can lead to high memory consumption in large-scale models because it does not partition activations. 
 

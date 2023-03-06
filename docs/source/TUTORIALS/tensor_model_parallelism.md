@@ -180,7 +180,7 @@ oslo.ready(model, parallel_context)
 
 In this tutorial, I used `datasets` library of Hugging Face.
 
-```
+``` python
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 
