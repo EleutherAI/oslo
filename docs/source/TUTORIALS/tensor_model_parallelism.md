@@ -251,7 +251,7 @@ There are three types of training methods are supported by oslo.
     torchrun --nnodes=2 --node_rank=1 --nproc_per_node=4 --master_addr=${YOUR_NODE_ADDRESS} --master_port=${PORT} YOUR_SCRIPT.py
     ```
     
-2. Slurm : Slurm using SBATCH file, and then running sbatch sbatch_[file.](http://file.py)sh command.
+2. Slurm : Slurm using SBATCH file, and then running sbatch sbatch_file.sh command.
     
     ```bash
     #!/bin/bash
