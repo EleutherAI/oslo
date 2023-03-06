@@ -106,7 +106,7 @@ oslo.ready(model, parallel_context)
 
 [2D parallel (SUMMA) algorithm](tp/2d_parallel_algorithm.md)
 
-[2.5D parallel (SUMMA-2.5) algorithm](tp/2_5D_parallel_algorithm.md)
+[2.5D parallel (SUMMA-2.5) algorithm](tp/2p5d_parallel_algorithm.md)
 
 [3D parallel Algorithm](tp/3d_parallel_algorithm.md)
 
