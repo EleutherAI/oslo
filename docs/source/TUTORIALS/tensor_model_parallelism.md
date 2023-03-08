@@ -102,13 +102,9 @@ oslo.ready(model, parallel_context)
 
 ### 1.2.1 Tensor Parallel Algorithms
 
-[1D parallel algorithm (same as Megatron-LM)](tp/1d_parallel_algorithm.md)
-
-[2D parallel (SUMMA) algorithm](tp/2d_parallel_algorithm.md)
-
-[2.5D parallel (SUMMA-2.5) algorithm](tp/2p5d_parallel_algorithm.md)
-
-[3D parallel Algorithm](tp/3d_parallel_algorithm.md)
+You can find the details of the algorithms in the CONCEPTS section.
+see here: 
+- [Concept of Tensor Parallel Algorithms](CONCEPTS/CONCEPTS.md#tensor-parallel-algorithms)
 
 ### 1.3. Do inference as usual
 
