@@ -40,7 +40,7 @@ class BackwardFunction(torch.autograd.Function):
     @staticmethod
     def backward(ctx, *grad_outputs):
         ctx.module._pre_backward()
-        # Queue a callback on the first parameter to flush the reducer.
+        # Enqueue a callback to flush the reducer.
         # This callback is triggered after all gradients' calculation is completed.
         Variable._execution_engine.queue_callback(ctx.module._post_backward)
         return (None,) + grad_outputs
