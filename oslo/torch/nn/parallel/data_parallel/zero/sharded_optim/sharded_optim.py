@@ -8,7 +8,7 @@ from torch.optim import Optimizer
 from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.distributed.parallel_context import ParallelContext
 
-from ._utils import (
+from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim._utils import (
     calculate_global_norm_from_list,
     compute_norm,
     flatten,
