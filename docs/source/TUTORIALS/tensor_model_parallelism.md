@@ -1,5 +1,5 @@
 # Tensor Model Parallelism Tutorial
-![260461C3-EA3B-405C-9B34-05BA3C781161.png](tp/260461C3-EA3B-405C-9B34-05BA3C781161.png)
+![260461C3-EA3B-405C-9B34-05BA3C781161.png](image/260461C3-EA3B-405C-9B34-05BA3C781161.png)
 
 **Tensor Model Parallelism**
  makes it possible to train larger models by partitioning the parameter tensors into multiple dimensions. We also support 2D, 2.5D, and 3D tensor partitioning which make tensor parallel training more efficient unlike Megatron-LM which simply splits parameters into single dimensions such as rows and columns.

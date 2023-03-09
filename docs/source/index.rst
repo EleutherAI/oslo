@@ -30,7 +30,7 @@ Documents
 ====================
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: CONCEPTS
 
    CONCEPTS/parallel_context
