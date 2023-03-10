@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath("."))
 sys.path.append(os.path.abspath(".."))
 project = "OSLO"
 copyright = "2023, EleutherAI"
-author = "TUNiB"
+author = "EleutherAI"
 extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.doctest",
