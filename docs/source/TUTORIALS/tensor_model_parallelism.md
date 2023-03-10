@@ -159,6 +159,9 @@ tokenizer.pad_token = tokenizer.eos_token
 ```python
 # model = defined in section 2.2
 
+from oslo import ParallelContext
+from oslo.torch.nn.parallel import TensorParallel
+
 tp_size = 4
 tp_depth = 1
 
@@ -166,11 +169,11 @@ parallel_context = ParallelContext.from_torch(
     data_parallel_size=1,
     pipeline_parallel_size=1,
     tensor_parallel_size=tp_size,
-    tensor_parallel_mode=ParallelMode.TENSOR_2P5D,
+    tensor_parallel_mode=ParallelMode.TENSOR_1D,
     tensor_parallel_depth=tp_depth,
 )
+model = TensorParallel(model, parallel_context)
 oslo.ready(model, parallel_context)
-
 ```
 
 ### 2.4. Load dataset and create dataloader

@@ -12,10 +12,13 @@ Using `ParallelMode.TENSOR_1D` as a parameter of `tensor_parallel_mode`.
 
 `tp_size` is must be **2^n of natural number.**
 
-Also, you should `tp_depth` to **1.**(tp_depth only used in 2.5d)
+Also, you **should not give any value** to `tensor_parallel_depth` (tp_depth only used in 2.5d).
 
 ```python
 # model = defined in section 2.2
+
+from oslo import ParallelContext
+from oslo.torch.nn.parallel import TensorParallel
 
 tp_size = 8
 tp_depth = 1
@@ -25,7 +28,7 @@ parallel_context = ParallelContext.from_torch(
     pipeline_parallel_size=1,
     tensor_parallel_size=tp_size,
     tensor_parallel_mode=ParallelMode.TENSOR_3D,
-    tensor_parallel_depth=tp_depth,
 )
+model = TensorParallel(model, parallel_context)
 oslo.ready(model, parallel_context)
 ```
