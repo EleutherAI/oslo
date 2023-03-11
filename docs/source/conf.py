@@ -25,7 +25,6 @@ extensions = [
 ]
 myst_enable_extensions = [
     "amsmath",
-    "attrs_inline",
     "colon_fence",
     "deflist",
     "dollarmath",
@@ -39,8 +38,9 @@ myst_enable_extensions = [
     "substitution",
     "tasklist",
 ]
-imgmath_image_format = 'svg'
+imgmath_image_format = 'png'
 mathjax_path = "https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
+imgmath_embed = True
 templates_path = ["_templates"]
 source_suffix = [".rst", ".md"]
 master_doc = "index"
