@@ -1,6 +1,6 @@
 # 2.5D parallel (SUMMA-2.5) algorithm
 
-* Paper: [https://arxiv.org/pdf/2105.14500.pdf](https://arxiv.org/pdf/2105.14500.pdf)
+* Paper : [https://arxiv.org/pdf/2105.14500.pdf](https://arxiv.org/pdf/2105.14500.pdf)
 
 ![image.png](2p5d_image/2p5d.png)
 

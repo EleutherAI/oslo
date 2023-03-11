@@ -21,10 +21,27 @@ extensions = [
     "sphinx.ext.ifconfig",
     "sphinx.ext.viewcode",
     "sphinx.ext.githubpages",
-    "recommonmark",
+    "myst_parser",
 ]
+myst_enable_extensions = [
+    "amsmath",
+    "attrs_inline",
+    "colon_fence",
+    "deflist",
+    "dollarmath",
+    "fieldlist",
+    "html_admonition",
+    "html_image",
+    "linkify",
+    "replacements",
+    "smartquotes",
+    "strikethrough",
+    "substitution",
+    "tasklist",
+]
+imgmath_image_format = 'svg'
+mathjax_path = "https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
 templates_path = ["_templates"]
-
 source_suffix = [".rst", ".md"]
 master_doc = "index"
 language = None
