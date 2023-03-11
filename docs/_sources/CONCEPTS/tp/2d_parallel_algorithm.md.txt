@@ -1,20 +1,19 @@
 # 2D parallel (SUMMA) algorithm
-
-* Paper : [https://arxiv.org/pdf/2104.05343.pdf](https://arxiv.org/pdf/2104.05343.pdf)
+- Authors: Kichang Yang, Kevin Ko
+- Paper : [https://arxiv.org/pdf/2104.05343.pdf](https://arxiv.org/pdf/2104.05343.pdf)
 
 ![image.png](2d_image/2d.png)
 
-The use of 1D tensor parallelism can lead to high memory consumption in large-scale models because it does not partition activations. 
-
-To address this issue, a more efficient 2D tensor parallelism algorithm based on SUMMA was introduced. This algorithm evenly distributes computation and memory load. 
-
-For instance, when computing a linear layer $Y = XA$, the input $X$ and weight $A$ are split into four sub-matrices and the calculation is done in two steps, broadcasting rows and columns of $X$ and $A$ in turn. 
-
+The use of 1D tensor parallelism can lead to high memory consumption in large-scale models because it does not partition activations.
+To address this issue, a more efficient 2D tensor parallelism algorithm based on SUMMA was introduced. This algorithm evenly distributes computation and memory load.
+For instance, when computing a linear layer $Y = XA$, the input $X$ and weight $A$ are split into four sub-matrices and the calculation is done in two steps, broadcasting rows and columns of $X$ and $A$ in turn.
 The result is a matrix $Y$ that is the product of $X$ and $A$.
 
 ## Usage
 
-Using `ParallelMode.TENSOR_2D` as a parameter of `tensor_parallel_mode`.
+Use `ParallelMode.TENSOR_2D` as a parameter of `tensor_parallel_mode`.
+Also, you should input `tp_depth` to **1.**
+(`tp_depth` is a parameter only for 2.5D tensor parallelism)
 ```python
 from oslo import ParallelContext
 from oslo.torch.nn.parallel import TensorParallel

@@ -1,8 +1,10 @@
 # Tensor Model Parallelism Tutorial
+- Authors: Kichang Yang, Kevin Ko
+
 ![260461C3-EA3B-405C-9B34-05BA3C781161.png](image/260461C3-EA3B-405C-9B34-05BA3C781161.png)
 
 **Tensor Model Parallelism**
- makes it possible to train larger models by partitioning the parameter tensors into multiple dimensions. We also support 2D, 2.5D, and 3D tensor partitioning which make tensor parallel training more efficient unlike Megatron-LM which simply splits parameters into single dimensions such as rows and columns.
+makes it possible to train larger models by partitioning the parameter tensors into multiple dimensions. We also support 2D, 2.5D, and 3D tensor partitioning which make tensor parallel training more efficient unlike Megatron-LM which simply splits parameters into single dimensions such as rows and columns.
 
 ### Table of contents  
 - [Tensor Model Parallelism Tutorial](#tensor-model-parallelism-tutorial)
@@ -57,7 +59,6 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 model = AutoModelForCausalLM.from_pretrained("gpt2")
 tokenizer = AutoTokenizer.from_pretrained("gpt2")
-
 ```
 
 ### 1.2. Parallelize the model
@@ -86,6 +87,7 @@ Here is some explain about arguments to parallel_context.
 ```python
 import oslo
 from oslo import ParallelContext
+from oslo.torch.nn.parallel import TensorParallel
 
 tp_size = 4
 tp_depth = 1
@@ -94,9 +96,10 @@ parallel_context = ParallelContext.from_torch(
     data_parallel_size=1,
     pipeline_parallel_size=1,
     tensor_parallel_size=tp_size,
-    tensor_parallel_mode=ParallelMode.TENSOR_2P5D,
+    tensor_parallel_mode=ParallelMode.TENSOR_1D,
     tensor_parallel_depth=tp_depth,
 )
+model = TensorParallel(model, parallel_context)
 oslo.ready(model, parallel_context)
 
 ```
@@ -148,10 +151,8 @@ model = AutoModelForCausalLM.from_pretrained("gpt2")
 optimizer = Adam(model.parameters(), lr=3e-5)
 tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
-# Add pad token for batch training
-# GPT2 tokenizer doesn't have pad token.
+# Add pad token for batch training because GPT2 tokenizer doesn't have pad token.
 tokenizer.pad_token = tokenizer.eos_token
-
 ```
 
 ### 2.3. Parallelize the model
@@ -178,7 +179,7 @@ oslo.ready(model, parallel_context)
 
 ### 2.4. Load dataset and create dataloader
 
-In this tutorial, I used `datasets` library of Hugging Face.
+In this tutorial, We're going to use `datasets` library of Hugging Face.
 
 ``` python
 from datasets import load_dataset
@@ -187,7 +188,6 @@ from torch.utils.data import DataLoader
 datasets = load_dataset("squad").data["train"]["context"]
 datasets = [str(_) for _ in datasets[: TRAIN_STEP * BATCH_SIZE]]
 dataloader = DataLoader(datasets, batch_size=BATCH_SIZE, shuffle=True)
-
 ```
 
 ### 2.5. Do training as usual
@@ -209,7 +209,6 @@ for step, batch in enumerate(dataloader):
     loss = model(**input_batch, labels=input_batch["input_ids"]).loss
     loss.backward()
     optimizer.step()
-
 ```
 
 ### 2.6. Save the parallelized model
@@ -232,8 +231,8 @@ Here is the modified code in section 2.6 for save checkpoints to merged version.
 ```python
 # Save the merged model using `save_pretrained`
 model.save_pretrained(
-	save_directory="./parallel_ckpt",
-	merge_checkpoints=True # Different point in Section 2.6
+    save_directory="./parallel_ckpt",
+    merge_checkpoints=True # Different point in Section 2.6
 )
 ```
 

@@ -1,6 +1,6 @@
 # 1D parallel algorithm (same as Megatron-LM)
-
-* Paper : [https://arxiv.org/pdf/1909.08053.pdf](https://arxiv.org/pdf/1909.08053.pdf)
+- Authors: Kichang Yang, Kevin Ko
+- Paper : [https://arxiv.org/pdf/1909.08053.pdf](https://arxiv.org/pdf/1909.08053.pdf)
 
 ![98C5FDF3-0DB1-4A2F-8E99-F0EFFB453B0B.jpeg](1d_image/98C5FDF3-0DB1-4A2F-8E99-F0EFFB453B0B.jpeg)
 
@@ -8,7 +8,8 @@ Tensor parallelism is a technique that partitions model weights across multiple 
 
 ## Usage
 
-Using `ParallelMode.TENSOR_1D` as a parameter of `tensor_parallel_mode`. Also, you should `tp_depth` to **1.**(tp_depth only used in 2.5d)
+Use `ParallelMode.TENSOR_1D` as a parameter of `tensor_parallel_mode`. 
+Also, you should input `tp_depth` to **1.**(`tp_depth` is a parameter only for 2.5D tensor parallelism)
 
 ```python
 # model = defined in section 2.2
