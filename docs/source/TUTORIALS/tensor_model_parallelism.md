@@ -101,7 +101,6 @@ parallel_context = ParallelContext.from_torch(
 )
 model = TensorParallel(model, parallel_context)
 oslo.ready(model, parallel_context)
-
 ```
 
 ### 1.2.1 Tensor Parallel Algorithms
@@ -120,7 +119,6 @@ Likewise, you can write the code as usual.
 text = "I don't want a lot for Christmas. There is just one thing"
 tokens = tokenizer(text, return_tensors="pt").to("cuda")
 print(tokenizer.decode(model.generate(**tokens, num_beams=3)[0]))
-
 ```
 
 ```
@@ -138,7 +136,6 @@ BATCH_SIZE = 4
 SEQ_LEN = 64
 SAVE_INTERVAL = 50
 TRAIN_STEP = 100
-
 ```
 
 ### 2.2. Create model, optimizer and tokenizer
