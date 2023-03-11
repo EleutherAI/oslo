@@ -98,6 +98,7 @@ parallel_context = ParallelContext.from_torch(
     tensor_parallel_depth=tp_depth,
 )
 oslo.ready(model, parallel_context)
+
 ```
 
 ### 1.2.1 Tensor Parallel Algorithms
@@ -158,6 +159,9 @@ tokenizer.pad_token = tokenizer.eos_token
 ```python
 # model = defined in section 2.2
 
+from oslo import ParallelContext
+from oslo.torch.nn.parallel import TensorParallel
+
 tp_size = 4
 tp_depth = 1
 
@@ -165,11 +169,11 @@ parallel_context = ParallelContext.from_torch(
     data_parallel_size=1,
     pipeline_parallel_size=1,
     tensor_parallel_size=tp_size,
-    tensor_parallel_mode=ParallelMode.TENSOR_2P5D,
+    tensor_parallel_mode=ParallelMode.TENSOR_1D,
     tensor_parallel_depth=tp_depth,
 )
+model = TensorParallel(model, parallel_context)
 oslo.ready(model, parallel_context)
-
 ```
 
 ### 2.4. Load dataset and create dataloader
@@ -212,7 +216,7 @@ for step, batch in enumerate(dataloader):
 
 We support `save_pretrained`  method, and this is similar with [save_pretrained](https://huggingface.co/docs/transformers/main_classes/model#transformers.PreTrainedModel.save_pretrained) in the Transformers.
 So, it can be used with the same argument with [save_pretrained](https://huggingface.co/docs/transformers/main_classes/model#transformers.PreTrainedModel.save_pretrained).
-Then, the checkpoints like `pytorch_model_tp_${TP_RANK}_pp_${PP_RANK}.bin` will be saved in your local path.
+Then, the checkpoints like `pytorch_model_tp_${TP_RANK}_pp_${PP_RANK}_ep_${EP_RANK}.bin` will be saved in your local path.
 
 ```python
 # Save the parallelized model using `save_pretrained`
@@ -228,8 +232,8 @@ Here is the modified code in section 2.6 for save checkpoints to merged version.
 ```python
 # Save the merged model using `save_pretrained`
 model.save_pretrained(
-		save_directory="./parallel_ckpt",
-		merge_checkpoints=True # Different point in Section 2.6
+	save_directory="./parallel_ckpt",
+	merge_checkpoints=True # Different point in Section 2.6
 )
 ```
 

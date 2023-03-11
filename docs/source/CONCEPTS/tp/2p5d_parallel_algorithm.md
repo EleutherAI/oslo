@@ -1,6 +1,6 @@
 # 2.5D parallel (SUMMA-2.5) algorithm
 
-* Paper: [https://arxiv.org/pdf/2105.14500.pdf](https://arxiv.org/pdf/2105.14500.pdf)
+* Paper : [https://arxiv.org/pdf/2105.14500.pdf](https://arxiv.org/pdf/2105.14500.pdf)
 
 ![image.png](2p5d_image/2p5d.png)
 
@@ -13,8 +13,11 @@ Using `ParallelMode.TENSOR_2p5D` as a parameter of `tensor_parallel_mode`. Also,
 ```python
 # model = defined in section 2.2
 
-tp_size = 4
-tp_depth = 1
+from oslo import ParallelContext
+from oslo.torch.nn.parallel import TensorParallel
+
+tp_size = 8
+tp_depth = 2
 
 parallel_context = ParallelContext.from_torch(
     data_parallel_size=1,
@@ -23,5 +26,6 @@ parallel_context = ParallelContext.from_torch(
     tensor_parallel_mode=ParallelMode.TENSOR_2p5D,
     tensor_parallel_depth=tp_depth,
 )
+model = TensorParallel(model, parallel_context)
 oslo.ready(model, parallel_context)
 ```
