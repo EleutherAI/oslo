@@ -1,16 +1,14 @@
 
 <!DOCTYPE html>
 
-<html lang="en">
+<html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tensor Model Parallelism Tutorial &#8212; OSLO  documentation</title>
     
-  <!-- Loaded before other Sphinx assets -->
-  <link href="../_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
-<link href="../_static/styles/pydata-sphinx-theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+  <link href="../_static/css/theme.css" rel="stylesheet">
+  <link href="../_static/css/index.ff1ffe594081f20da1ef19478df9384b.css" rel="stylesheet">
 
     
   <link rel="stylesheet"
@@ -20,44 +18,31 @@
   <link rel="preload" as="font" type="font/woff2" crossorigin
     href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
-    <link rel="stylesheet" href="../_static/styles/sphinx-book-theme.css?digest=5115cc725059bd94278eecd172e13a965bf8f5a9" type="text/css" />
     
-  <!-- Pre-loaded scripts that we'll load fully later -->
-  <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf">
+      
 
-    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/sphinx-book-theme.css?digest=84ace793992934648b4de8eed757e5a2" type="text/css" />
+    
+  <link rel="preload" as="script" href="../_static/js/index.be7d3bbb2ef33a8344ce.js">
+
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script src="../_static/jquery.js"></script>
     <script src="../_static/underscore.js"></script>
-    <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
     <script src="../_static/doctools.js"></script>
-    <script src="../_static/sphinx_highlight.js"></script>
-    <script src="../_static/scripts/sphinx-book-theme.js?digest=9c920249402e914e316237a7dbc6769907cce411"></script>
+    <script src="../_static/sphinx-book-theme.9d8b4a8b9bb19db25eeaddc40d639ba2.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="prev" title="Concept of Tensor Model Parallelism" href="../CONCEPTS/tensor_model_parallelism.html" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="docsearch:language" content="en">
+    <meta name="docsearch:language" content="None">
     
 
     <!-- Google Analytics -->
     
   </head>
-  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="60">
-<!-- Checkboxes to toggle the left sidebar -->
-<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
-<label class="overlay overlay-navbar" for="__navigation">
-    <div class="visually-hidden">Toggle navigation sidebar</div>
-</label>
-<!-- Checkboxes to toggle the in-page toc -->
-<input type="checkbox" class="sidebar-toggle" name="__page-toc" id="__page-toc" aria-label="Toggle in-page Table of Contents">
-<label class="overlay overlay-pagetoc" for="__page-toc">
-    <div class="visually-hidden">Toggle in-page Table of Contents</div>
-</label>
-<!-- Headers at the top -->
-<div class="announcement header-item noprint"></div>
-<div class="header header-item noprint"></div>
-
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
     
     <div class="container-fluid" id="banner"></div>
 
@@ -66,10 +51,14 @@
     <div class="container-xl">
       <div class="row">
           
-<!-- Sidebar -->
-<div class="bd-sidebar noprint" id="site-navigation">
-    <div class="bd-sidebar__content">
-        <div class="bd-sidebar__top"><div class="navbar-brand-box">
+<!-- Checkboxes to toggle the left sidebar -->
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
+<label class="overlay" for="__navigation">
+    <div class="visually-hidden">Toggle navigation sidebar</div>
+</label>
+<div class="col-12 col-md-3 bd-sidebar site-navigation " id="site-navigation">
+    
+        <div class="navbar-brand-box">
     <a class="navbar-brand text-wrap" href="../index.html">
       
       
@@ -82,7 +71,7 @@
   <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
 </form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
     <div class="bd-toc-item active">
-        <p aria-level="2" class="caption" role="heading">
+        <p class="caption">
  <span class="caption-text">
   CONCEPTS
  </span>
@@ -99,7 +88,7 @@
   </a>
  </li>
 </ul>
-<p aria-level="2" class="caption" role="heading">
+<p class="caption">
  <span class="caption-text">
   TUTORIALS
  </span>
@@ -113,135 +102,74 @@
 </ul>
 
     </div>
-</nav></div>
-        <div class="bd-sidebar__bottom">
-             <!-- To handle the deprecated key -->
-            
-            <div class="navbar_extra_footer">
-            Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
+</nav> <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
+</div>
+
+</div>
+
+
+          
+
+
+          
+<!-- This is an invisible pixel that we watch to see if we've scrolled. -->
+<div class="sbt-scroll-pixel-helper"></div>
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="topbar container-xl fixed-top">
+    <div class="topbar-contents row">
+        <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
+        <div class="col pl-md-4 topbar-main">
+            <div class="topbar-left">
+                
+                <label class="nav-toggle-button" for="__navigation">
+                    <div class="visually-hidden">Toggle navigation</div>
+                    <i class="fas fa-bars"></i>
+                </label>
+                
             </div>
             
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="../_sources/TUTORIALS/tensor_model_parallelism.md.txt"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.md</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+                onclick="printPdf(this)" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
+            <!-- Source interaction buttons -->
+
+            <!-- Full screen (wrap in <a> to have style consistency -->
+
+<a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+        data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+        title="Fullscreen mode"><i
+            class="fas fa-expand"></i></button></a>
+
+            <!-- Launch buttons -->
+
         </div>
-    </div>
-    <div id="rtd-footer-container"></div>
-</div>
 
-
-          
-
-
-          
-<!-- A tiny helper pixel to detect if we've scrolled -->
-<div class="sbt-scroll-pixel-helper"></div>
-<!-- Main content -->
-<div class="col py-0 content-container">
-    
-    <div class="header-article row sticky-top noprint">
-        
-
-
-
-<div class="col py-1 d-flex header-article-main">
-    <div class="header-article__left">
-        
-        <label for="__navigation"
-  class="headerbtn"
-  data-toggle="tooltip"
-data-placement="right"
-title="Toggle navigation"
->
-  
-
-<span class="headerbtn__icon-container">
-  <i class="fas fa-bars"></i>
-  </span>
-
-</label>
-
-        
-    </div>
-    <div class="header-article__right">
-<button onclick="toggleFullScreen()"
-  class="headerbtn"
-  data-toggle="tooltip"
-data-placement="bottom"
-title="Fullscreen mode"
->
-  
-
-<span class="headerbtn__icon-container">
-  <i class="fas fa-expand"></i>
-  </span>
-
-</button>
-
-<div class="menu-dropdown menu-dropdown-download-buttons">
-  <button class="headerbtn menu-dropdown__trigger"
-      aria-label="Download this page">
-      <i class="fas fa-download"></i>
-  </button>
-  <div class="menu-dropdown__content">
-    <ul>
-      <li>
-        <a href="../_sources/TUTORIALS/tensor_model_parallelism.md.txt"
-   class="headerbtn"
-   data-toggle="tooltip"
-data-placement="left"
-title="Download source file"
->
-  
-
-<span class="headerbtn__icon-container">
-  <i class="fas fa-file"></i>
-  </span>
-<span class="headerbtn__text-container">.md</span>
-</a>
-
-      </li>
-      
-      <li>
-        
-<button onclick="printPdf(this)"
-  class="headerbtn"
-  data-toggle="tooltip"
-data-placement="left"
-title="Print to PDF"
->
-  
-
-<span class="headerbtn__icon-container">
-  <i class="fas fa-file-pdf"></i>
-  </span>
-<span class="headerbtn__text-container">.pdf</span>
-</button>
-
-      </li>
-      
-    </ul>
-  </div>
-</div>
-<label for="__page-toc"
-  class="headerbtn headerbtn-page-toc"
-  
->
-  
-
-<span class="headerbtn__icon-container">
-  <i class="fas fa-list"></i>
-  </span>
-
-</label>
-
-    </div>
-</div>
-
-<!-- Table of contents -->
-<div class="col-md-3 bd-toc show noprint">
-    <div class="tocsection onthispage pt-5 pb-3">
-        <i class="fas fa-list"></i> Contents
-    </div>
-    <nav id="bd-toc-nav" aria-label="Page">
-        <ul class="visible nav section-nav flex-column">
+        <!-- Table of contents -->
+        <div class="d-none d-md-block col-md-2 bd-toc show noprint">
+            
+            <div class="tocsection onthispage pt-5 pb-3">
+                <i class="fas fa-list"></i> Contents
+            </div>
+            <nav id="bd-toc-nav" aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
  <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#table-of-contents">
    Table of contents
@@ -330,11 +258,12 @@ title="Print to PDF"
  </li>
 </ul>
 
-    </nav>
-</div>
+            </nav>
+        </div>
     </div>
-    <div class="article row">
-        <div class="col pl-md-3 pl-lg-5 content-container">
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
             <!-- Table of contents that is only displayed when printing the page -->
             <div id="jb-print-docs-body" class="onlyprint">
                 <h1>Tensor Model Parallelism Tutorial</h1>
@@ -439,58 +368,60 @@ title="Print to PDF"
                     </div>
                 </div>
             </div>
-            <main id="main-content" role="main">
-                
+            
               <div>
                 
-  <section class="tex2jax_ignore mathjax_ignore" id="tensor-model-parallelism-tutorial">
-<h1>Tensor Model Parallelism Tutorial<a class="headerlink" href="#tensor-model-parallelism-tutorial" title="Permalink to this heading"></a></h1>
+  <div class="section" id="tensor-model-parallelism-tutorial">
+<h1>Tensor Model Parallelism Tutorial<a class="headerlink" href="#tensor-model-parallelism-tutorial" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><p>Authors: Kichang Yang, Kevin Ko</p></li>
+</ul>
 <p><img alt="260461C3-EA3B-405C-9B34-05BA3C781161.png" src="../_images/260461C3-EA3B-405C-9B34-05BA3C781161.png" /></p>
 <p><strong>Tensor Model Parallelism</strong>
- makes it possible to train larger models by partitioning the parameter tensors into multiple dimensions. We also support 2D, 2.5D, and 3D tensor partitioning which make tensor parallel training more efficient unlike Megatron-LM which simply splits parameters into single dimensions such as rows and columns.</p>
-<section id="table-of-contents">
-<h2>Table of contents<a class="headerlink" href="#table-of-contents" title="Permalink to this heading"></a></h2>
+makes it possible to train larger models by partitioning the parameter tensors into multiple dimensions. We also support 2D, 2.5D, and 3D tensor partitioning which make tensor parallel training more efficient unlike Megatron-LM which simply splits parameters into single dimensions such as rows and columns.</p>
+<div class="section" id="table-of-contents">
+<h2>Table of contents<a class="headerlink" href="#table-of-contents" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
-<li><p><span class="xref myst">Tensor Model Parallelism Tutorial</span></p>
+<li><p><a class="reference external" href="#tensor-model-parallelism-tutorial">Tensor Model Parallelism Tutorial</a></p>
 <ul>
-<li><p><span class="xref myst">Table of contents</span></p></li>
-<li><p><span class="xref myst">0. Distributed Launcher</span></p></li>
-<li><p><span class="xref myst">1. Inference</span></p>
+<li><p><a class="reference external" href="#table-of-contents">Table of contents</a></p></li>
+<li><p><a class="reference external" href="#0-distributed-launcher">0. Distributed Launcher</a></p></li>
+<li><p><a class="reference external" href="#1-inference">1. Inference</a></p>
 <ul>
-<li><p><span class="xref myst">1.1. Create model and tokenizer</span></p></li>
-<li><p><span class="xref myst">1.2. Parallelize the model</span></p></li>
-<li><p><span class="xref myst">1.2.1 Tensor Parallel Algorithms</span></p></li>
-<li><p><span class="xref myst">1.3. Do inference as usual</span></p></li>
+<li><p><a class="reference external" href="#11-create-model-and-tokenizer">1.1. Create model and tokenizer</a></p></li>
+<li><p><a class="reference external" href="#12-parallelize-the-model">1.2. Parallelize the model</a></p></li>
+<li><p><a class="reference external" href="#121-tensor-parallel-algorithms">1.2.1 Tensor Parallel Algorithms</a></p></li>
+<li><p><a class="reference external" href="#13-do-inference-as-usual">1.3. Do inference as usual</a></p></li>
 </ul>
 </li>
-<li><p><span class="xref myst">2. Training</span></p>
+<li><p><a class="reference external" href="#2-training">2. Training</a></p>
 <ul>
-<li><p><span class="xref myst">2.1. Initialize some variables</span></p></li>
-<li><p><span class="xref myst">2.2. Create model, optimizer and tokenizer</span></p></li>
-<li><p><span class="xref myst">2.3. Parallelize the model</span></p></li>
-<li><p><span class="xref myst">2.4. Load dataset and create dataloader</span></p></li>
-<li><p><span class="xref myst">2.5. Do training as usual</span></p></li>
-<li><p><span class="xref myst">2.6. Save the parallelized model</span></p>
+<li><p><a class="reference external" href="#21-initialize-some-variables">2.1. Initialize some variables</a></p></li>
+<li><p><a class="reference external" href="#22-create-model-optimizer-and-tokenizer">2.2. Create model, optimizer and tokenizer</a></p></li>
+<li><p><a class="reference external" href="#23-parallelize-the-model">2.3. Parallelize the model</a></p></li>
+<li><p><a class="reference external" href="#24-load-dataset-and-create-dataloader">2.4. Load dataset and create dataloader</a></p></li>
+<li><p><a class="reference external" href="#25-do-training-as-usual">2.5. Do training as usual</a></p></li>
+<li><p><a class="reference external" href="#26-save-the-parallelized-model">2.6. Save the parallelized model</a></p>
 <ul>
-<li><p><span class="xref myst">2.6.1. Merging Checkpoints</span></p></li>
-</ul>
-</li>
-</ul>
-</li>
-<li><p><span class="xref myst">Appendix. Multi-node Training</span></p></li>
+<li><p><a class="reference external" href="#261-merging-checkpoints">2.6.1. Merging Checkpoints</a></p></li>
 </ul>
 </li>
 </ul>
-</section>
-<section id="distributed-launcher">
-<h2>0. Distributed Launcher<a class="headerlink" href="#distributed-launcher" title="Permalink to this heading"></a></h2>
+</li>
+<li><p><a class="reference external" href="#appendix-multi-node-training">Appendix. Multi-node Training</a></p></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="distributed-launcher">
+<h2>0. Distributed Launcher<a class="headerlink" href="#distributed-launcher" title="Permalink to this headline">¶</a></h2>
 <p>This tutorial must be launched using distributed launcher.</p>
 <p>If you have 4 GPUs:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>torchrun --nproc_per_node<span class="o">=</span><span class="m">4</span> YOUR_SCRIPT.py
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>torchrun<span class="w"> </span>--nproc_per_node<span class="o">=</span><span class="m">4</span><span class="w"> </span>YOUR_SCRIPT.py
 </pre></div>
 </div>
 <p>If you installed Slurm in your environments, the following works the same.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>srun --num_gpus<span class="o">=</span><span class="m">4</span> YOUR_SCRIPT.py
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>srun<span class="w"> </span>--num_gpus<span class="o">=</span><span class="m">4</span><span class="w"> </span>YOUR_SCRIPT.py
 </pre></div>
 </div>
 <p>For more information of the distributed launchers, refer to:</p>
@@ -498,23 +429,22 @@ title="Print to PDF"
 <li><p><a class="reference external" href="https://pytorch.org/docs/stable/distributed.html">Pytorch documents</a></p></li>
 <li><p><a class="reference external" href="https://www.deepspeed.ai/getting-started/#launching-deepspeed-training">DeepSpeed documents</a></p></li>
 </ul>
-</section>
-<section id="inference">
-<h2>1. Inference<a class="headerlink" href="#inference" title="Permalink to this heading"></a></h2>
+</div>
+<div class="section" id="inference">
+<h2>1. Inference<a class="headerlink" href="#inference" title="Permalink to this headline">¶</a></h2>
 <p>How to use the tensor model parallelism for inference?</p>
-<section id="create-model-and-tokenizer">
-<h3>1.1. Create model and tokenizer<a class="headerlink" href="#create-model-and-tokenizer" title="Permalink to this heading"></a></h3>
+<div class="section" id="create-model-and-tokenizer">
+<h3>1.1. Create model and tokenizer<a class="headerlink" href="#create-model-and-tokenizer" title="Permalink to this headline">¶</a></h3>
 <p>Warning : model must be assigned in cpu, <strong>not</strong> <strong>CUDA</strong></p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">AutoModelForCausalLM</span><span class="p">,</span> <span class="n">AutoTokenizer</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">AutoModelForCausalLM</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">&quot;gpt2&quot;</span><span class="p">)</span>
 <span class="n">tokenizer</span> <span class="o">=</span> <span class="n">AutoTokenizer</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">&quot;gpt2&quot;</span><span class="p">)</span>
-
 </pre></div>
 </div>
-</section>
-<section id="parallelize-the-model">
-<h3>1.2. Parallelize the model<a class="headerlink" href="#parallelize-the-model" title="Permalink to this heading"></a></h3>
+</div>
+<div class="section" id="parallelize-the-model">
+<h3>1.2. Parallelize the model<a class="headerlink" href="#parallelize-the-model" title="Permalink to this headline">¶</a></h3>
 <p>You can parallelize the model you defined is only 2 steps required.</p>
 <p>Just making define <code class="docutils literal notranslate"><span class="pre">parallel_context</span></code> , and call <code class="docutils literal notranslate"><span class="pre">oslo.ready</span></code> function.</p>
 <p><code class="docutils literal notranslate"><span class="pre">parallel_context</span></code> Is the variable for define the method how to parallelize to oslo.</p>
@@ -541,6 +471,7 @@ title="Print to PDF"
 </ul>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">oslo</span>
 <span class="kn">from</span> <span class="nn">oslo</span> <span class="kn">import</span> <span class="n">ParallelContext</span>
+<span class="kn">from</span> <span class="nn">oslo.torch.nn.parallel</span> <span class="kn">import</span> <span class="n">TensorParallel</span>
 
 <span class="n">tp_size</span> <span class="o">=</span> <span class="mi">4</span>
 <span class="n">tp_depth</span> <span class="o">=</span> <span class="mi">1</span>
@@ -549,24 +480,25 @@ title="Print to PDF"
     <span class="n">data_parallel_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
     <span class="n">pipeline_parallel_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
     <span class="n">tensor_parallel_size</span><span class="o">=</span><span class="n">tp_size</span><span class="p">,</span>
-    <span class="n">tensor_parallel_mode</span><span class="o">=</span><span class="n">ParallelMode</span><span class="o">.</span><span class="n">TENSOR_2P5D</span><span class="p">,</span>
+    <span class="n">tensor_parallel_mode</span><span class="o">=</span><span class="n">ParallelMode</span><span class="o">.</span><span class="n">TENSOR_1D</span><span class="p">,</span>
     <span class="n">tensor_parallel_depth</span><span class="o">=</span><span class="n">tp_depth</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">TensorParallel</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">parallel_context</span><span class="p">)</span>
 <span class="n">oslo</span><span class="o">.</span><span class="n">ready</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">parallel_context</span><span class="p">)</span>
 
 </pre></div>
 </div>
-</section>
-<section id="tensor-parallel-algorithms">
-<h3>1.2.1 Tensor Parallel Algorithms<a class="headerlink" href="#tensor-parallel-algorithms" title="Permalink to this heading"></a></h3>
+</div>
+<div class="section" id="tensor-parallel-algorithms">
+<h3>1.2.1 Tensor Parallel Algorithms<a class="headerlink" href="#tensor-parallel-algorithms" title="Permalink to this headline">¶</a></h3>
 <p>You can find the details of the algorithms in the CONCEPTS section.
 see here:</p>
 <ul class="simple">
-<li><p><span class="xref myst">Concept of Tensor Parallel Algorithms</span></p></li>
+<li><p><a class="reference external" href="CONCEPTS/CONCEPTS.md#tensor-parallel-algorithms">Concept of Tensor Parallel Algorithms</a></p></li>
 </ul>
-</section>
-<section id="do-inference-as-usual">
-<h3>1.3. Do inference as usual<a class="headerlink" href="#do-inference-as-usual" title="Permalink to this heading"></a></h3>
+</div>
+<div class="section" id="do-inference-as-usual">
+<h3>1.3. Do inference as usual<a class="headerlink" href="#do-inference-as-usual" title="Permalink to this headline">¶</a></h3>
 <p>This is an example of text generation.
 In addition to this, it can be used in various tasks such as sequence classification or masked lm.
 Likewise, you can write the code as usual.</p>
@@ -579,13 +511,13 @@ Likewise, you can write the code as usual.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">I</span> <span class="n">don</span><span class="s1">&#39;t want a lot for Christmas. There is just one thing I want to ...</span>
 </pre></div>
 </div>
-</section>
-</section>
-<section id="training">
-<h2>2. Training<a class="headerlink" href="#training" title="Permalink to this heading"></a></h2>
+</div>
+</div>
+<div class="section" id="training">
+<h2>2. Training<a class="headerlink" href="#training" title="Permalink to this headline">¶</a></h2>
 <p>How to use the tensor model parallelism for training?</p>
-<section id="initialize-some-variables">
-<h3>2.1. Initialize some variables<a class="headerlink" href="#initialize-some-variables" title="Permalink to this heading"></a></h3>
+<div class="section" id="initialize-some-variables">
+<h3>2.1. Initialize some variables<a class="headerlink" href="#initialize-some-variables" title="Permalink to this headline">¶</a></h3>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">BATCH_SIZE</span> <span class="o">=</span> <span class="mi">4</span>
 <span class="n">SEQ_LEN</span> <span class="o">=</span> <span class="mi">64</span>
 <span class="n">SAVE_INTERVAL</span> <span class="o">=</span> <span class="mi">50</span>
@@ -593,9 +525,9 @@ Likewise, you can write the code as usual.</p>
 
 </pre></div>
 </div>
-</section>
-<section id="create-model-optimizer-and-tokenizer">
-<h3>2.2. Create model, optimizer and tokenizer<a class="headerlink" href="#create-model-optimizer-and-tokenizer" title="Permalink to this heading"></a></h3>
+</div>
+<div class="section" id="create-model-optimizer-and-tokenizer">
+<h3>2.2. Create model, optimizer and tokenizer<a class="headerlink" href="#create-model-optimizer-and-tokenizer" title="Permalink to this headline">¶</a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">torch.optim</span> <span class="kn">import</span> <span class="n">Adam</span>
 <span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">AutoModelForCausalLM</span><span class="p">,</span> <span class="n">AutoTokenizer</span>
 
@@ -603,15 +535,13 @@ Likewise, you can write the code as usual.</p>
 <span class="n">optimizer</span> <span class="o">=</span> <span class="n">Adam</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="mf">3e-5</span><span class="p">)</span>
 <span class="n">tokenizer</span> <span class="o">=</span> <span class="n">AutoTokenizer</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">&quot;gpt2&quot;</span><span class="p">)</span>
 
-<span class="c1"># Add pad token for batch training</span>
-<span class="c1"># GPT2 tokenizer doesn&#39;t have pad token.</span>
+<span class="c1"># Add pad token for batch training because GPT2 tokenizer doesn&#39;t have pad token.</span>
 <span class="n">tokenizer</span><span class="o">.</span><span class="n">pad_token</span> <span class="o">=</span> <span class="n">tokenizer</span><span class="o">.</span><span class="n">eos_token</span>
-
 </pre></div>
 </div>
-</section>
-<section id="id1">
-<h3>2.3. Parallelize the model<a class="headerlink" href="#id1" title="Permalink to this heading"></a></h3>
+</div>
+<div class="section" id="id1">
+<h3>2.3. Parallelize the model<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># model = defined in section 2.2</span>
 
 <span class="kn">from</span> <span class="nn">oslo</span> <span class="kn">import</span> <span class="n">ParallelContext</span>
@@ -631,22 +561,21 @@ Likewise, you can write the code as usual.</p>
 <span class="n">oslo</span><span class="o">.</span><span class="n">ready</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">parallel_context</span><span class="p">)</span>
 </pre></div>
 </div>
-</section>
-<section id="load-dataset-and-create-dataloader">
-<h3>2.4. Load dataset and create dataloader<a class="headerlink" href="#load-dataset-and-create-dataloader" title="Permalink to this heading"></a></h3>
-<p>In this tutorial, I used <code class="docutils literal notranslate"><span class="pre">datasets</span></code> library of Hugging Face.</p>
+</div>
+<div class="section" id="load-dataset-and-create-dataloader">
+<h3>2.4. Load dataset and create dataloader<a class="headerlink" href="#load-dataset-and-create-dataloader" title="Permalink to this headline">¶</a></h3>
+<p>In this tutorial, We’re going to use <code class="docutils literal notranslate"><span class="pre">datasets</span></code> library of Hugging Face.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">datasets</span> <span class="kn">import</span> <span class="n">load_dataset</span>
 <span class="kn">from</span> <span class="nn">torch.utils.data</span> <span class="kn">import</span> <span class="n">DataLoader</span>
 
 <span class="n">datasets</span> <span class="o">=</span> <span class="n">load_dataset</span><span class="p">(</span><span class="s2">&quot;squad&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;train&quot;</span><span class="p">][</span><span class="s2">&quot;context&quot;</span><span class="p">]</span>
 <span class="n">datasets</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">_</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">datasets</span><span class="p">[:</span> <span class="n">TRAIN_STEP</span> <span class="o">*</span> <span class="n">BATCH_SIZE</span><span class="p">]]</span>
 <span class="n">dataloader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span><span class="n">datasets</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">BATCH_SIZE</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-
 </pre></div>
 </div>
-</section>
-<section id="do-training-as-usual">
-<h3>2.5. Do training as usual<a class="headerlink" href="#do-training-as-usual" title="Permalink to this heading"></a></h3>
+</div>
+<div class="section" id="do-training-as-usual">
+<h3>2.5. Do training as usual<a class="headerlink" href="#do-training-as-usual" title="Permalink to this headline">¶</a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">step</span><span class="p">,</span> <span class="n">batch</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">dataloader</span><span class="p">):</span>
     <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
 
@@ -663,12 +592,11 @@ Likewise, you can write the code as usual.</p>
     <span class="n">loss</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="o">**</span><span class="n">input_batch</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">input_batch</span><span class="p">[</span><span class="s2">&quot;input_ids&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">loss</span>
     <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
     <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
-
 </pre></div>
 </div>
-</section>
-<section id="save-the-parallelized-model">
-<h3>2.6. Save the parallelized model<a class="headerlink" href="#save-the-parallelized-model" title="Permalink to this heading"></a></h3>
+</div>
+<div class="section" id="save-the-parallelized-model">
+<h3>2.6. Save the parallelized model<a class="headerlink" href="#save-the-parallelized-model" title="Permalink to this headline">¶</a></h3>
 <p>We support <code class="docutils literal notranslate"><span class="pre">save_pretrained</span></code>  method, and this is similar with <a class="reference external" href="https://huggingface.co/docs/transformers/main_classes/model#transformers.PreTrainedModel.save_pretrained">save_pretrained</a> in the Transformers.
 So, it can be used with the same argument with <a class="reference external" href="https://huggingface.co/docs/transformers/main_classes/model#transformers.PreTrainedModel.save_pretrained">save_pretrained</a>.
 Then, the checkpoints like <code class="docutils literal notranslate"><span class="pre">pytorch_model_tp_${TP_RANK}_pp_${PP_RANK}_ep_${EP_RANK}.bin</span></code> will be saved in your local path.</p>
@@ -676,30 +604,30 @@ Then, the checkpoints like <code class="docutils literal notranslate"><span clas
 <span class="n">model</span><span class="o">.</span><span class="n">save_pretrained</span><span class="p">(</span><span class="n">save_directory</span><span class="o">=</span><span class="s2">&quot;./parallel_ckpt&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<section id="merging-checkpoints">
-<h4>2.6.1. Merging Checkpoints<a class="headerlink" href="#merging-checkpoints" title="Permalink to this heading"></a></h4>
+<div class="section" id="merging-checkpoints">
+<h4>2.6.1. Merging Checkpoints<a class="headerlink" href="#merging-checkpoints" title="Permalink to this headline">¶</a></h4>
 <p>If you want save your models with merged status, you just only pass one more arguments <code class="docutils literal notranslate"><span class="pre">merge_checkpoints=True</span></code> to <code class="docutils literal notranslate"><span class="pre">save_pretrained</span></code> function.</p>
 <p>Here is the modified code in section 2.6 for save checkpoints to merged version.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Save the merged model using `save_pretrained`</span>
 <span class="n">model</span><span class="o">.</span><span class="n">save_pretrained</span><span class="p">(</span>
-	<span class="n">save_directory</span><span class="o">=</span><span class="s2">&quot;./parallel_ckpt&quot;</span><span class="p">,</span>
-	<span class="n">merge_checkpoints</span><span class="o">=</span><span class="kc">True</span> <span class="c1"># Different point in Section 2.6</span>
+    <span class="n">save_directory</span><span class="o">=</span><span class="s2">&quot;./parallel_ckpt&quot;</span><span class="p">,</span>
+    <span class="n">merge_checkpoints</span><span class="o">=</span><span class="kc">True</span> <span class="c1"># Different point in Section 2.6</span>
 <span class="p">)</span>
 </pre></div>
 </div>
-</section>
-</section>
-</section>
-<section id="appendix-multi-node-training">
-<h2>Appendix. Multi-node Training<a class="headerlink" href="#appendix-multi-node-training" title="Permalink to this heading"></a></h2>
+</div>
+</div>
+</div>
+<div class="section" id="appendix-multi-node-training">
+<h2>Appendix. Multi-node Training<a class="headerlink" href="#appendix-multi-node-training" title="Permalink to this headline">¶</a></h2>
 <p>There are three types of training methods are supported by oslo.</p>
-<ol class="arabic">
+<ol>
 <li><p>torch distributed ( torchrun, recommended )</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Node #1</span>
-torchrun --nnodes<span class="o">=</span><span class="m">2</span> --node_rank<span class="o">=</span><span class="m">0</span> --nproc_per_node<span class="o">=</span><span class="m">4</span> --master_addr<span class="o">=</span><span class="si">${</span><span class="nv">YOUR_NODE_ADDRESS</span><span class="si">}</span> --master_port<span class="o">=</span><span class="si">${</span><span class="nv">PORT</span><span class="si">}</span> YOUR_SCRIPT.py
+torchrun<span class="w"> </span>--nnodes<span class="o">=</span><span class="m">2</span><span class="w"> </span>--node_rank<span class="o">=</span><span class="m">0</span><span class="w"> </span>--nproc_per_node<span class="o">=</span><span class="m">4</span><span class="w"> </span>--master_addr<span class="o">=</span><span class="si">${</span><span class="nv">YOUR_NODE_ADDRESS</span><span class="si">}</span><span class="w"> </span>--master_port<span class="o">=</span><span class="si">${</span><span class="nv">PORT</span><span class="si">}</span><span class="w"> </span>YOUR_SCRIPT.py
 
 <span class="c1"># Node #2</span>
-torchrun --nnodes<span class="o">=</span><span class="m">2</span> --node_rank<span class="o">=</span><span class="m">1</span> --nproc_per_node<span class="o">=</span><span class="m">4</span> --master_addr<span class="o">=</span><span class="si">${</span><span class="nv">YOUR_NODE_ADDRESS</span><span class="si">}</span> --master_port<span class="o">=</span><span class="si">${</span><span class="nv">PORT</span><span class="si">}</span> YOUR_SCRIPT.py
+torchrun<span class="w"> </span>--nnodes<span class="o">=</span><span class="m">2</span><span class="w"> </span>--node_rank<span class="o">=</span><span class="m">1</span><span class="w"> </span>--nproc_per_node<span class="o">=</span><span class="m">4</span><span class="w"> </span>--master_addr<span class="o">=</span><span class="si">${</span><span class="nv">YOUR_NODE_ADDRESS</span><span class="si">}</span><span class="w"> </span>--master_port<span class="o">=</span><span class="si">${</span><span class="nv">PORT</span><span class="si">}</span><span class="w"> </span>YOUR_SCRIPT.py
 </pre></div>
 </div>
 </li>
@@ -717,31 +645,29 @@ torchrun --nnodes<span class="o">=</span><span class="m">2</span> --node_rank<sp
 <span class="c1">#SBATCH --gres=gpu:4             # number of gpus per node</span>
 <span class="c1">#SBATCH --mem=64gb</span>
 
-<span class="nb">export</span> <span class="nv">HOSTNAMES</span><span class="o">=</span><span class="sb">`</span>scontrol show hostnames <span class="s2">&quot;</span><span class="nv">$SLURM_JOB_NODELIST</span><span class="s2">&quot;</span><span class="sb">`</span>
-<span class="nb">export</span> <span class="nv">MASTER_ADDR</span><span class="o">=</span><span class="k">$(</span>scontrol show hostnames <span class="s2">&quot;</span><span class="nv">$SLURM_JOB_NODELIST</span><span class="s2">&quot;</span> <span class="p">|</span> head -n <span class="m">1</span><span class="k">)</span>
-<span class="nb">export</span> <span class="nv">MASTER_PORT</span><span class="o">=</span><span class="si">${</span><span class="nv">PORT</span><span class="si">}</span>
-<span class="nb">export</span> <span class="nv">COUNT_NODE</span><span class="o">=</span><span class="sb">`</span>scontrol show hostnames <span class="s2">&quot;</span><span class="nv">$SLURM_JOB_NODELIST</span><span class="s2">&quot;</span> <span class="p">|</span> wc -l<span class="sb">`</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">HOSTNAMES</span><span class="o">=</span><span class="sb">`</span>scontrol<span class="w"> </span>show<span class="w"> </span>hostnames<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SLURM_JOB_NODELIST</span><span class="s2">&quot;</span><span class="sb">`</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">MASTER_ADDR</span><span class="o">=</span><span class="k">$(</span>scontrol<span class="w"> </span>show<span class="w"> </span>hostnames<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SLURM_JOB_NODELIST</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-n<span class="w"> </span><span class="m">1</span><span class="k">)</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">MASTER_PORT</span><span class="o">=</span><span class="si">${</span><span class="nv">PORT</span><span class="si">}</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">COUNT_NODE</span><span class="o">=</span><span class="sb">`</span>scontrol<span class="w"> </span>show<span class="w"> </span>hostnames<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SLURM_JOB_NODELIST</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>wc<span class="w"> </span>-l<span class="sb">`</span>
 
-python YOUR_SCRIPT.py
+python<span class="w"> </span>YOUR_SCRIPT.py
 </pre></div>
 </div>
 <p>And then, run</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sbatch sbatch_file.py
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sbatch<span class="w"> </span>sbatch_file.py
 </pre></div>
 </div>
 </li>
 </ol>
-</section>
-</section>
+</div>
+</div>
 
 
               </div>
               
-            </main>
-            <footer class="footer-article noprint">
-                
-    <!-- Previous / next buttons -->
-<div class='prev-next-area'>
+            
+                <!-- Previous / next buttons -->
+<div class='prev-next-area'> 
     <a class='left-prev' id="prev-link" href="../CONCEPTS/tensor_model_parallelism.html" title="previous page">
         <i class="fas fa-angle-left"></i>
         <div class="prev-next-info">
@@ -750,28 +676,24 @@ python YOUR_SCRIPT.py
         </div>
     </a>
 </div>
-            </footer>
+            
         </div>
     </div>
-    <div class="footer-content row">
-        <footer class="col footer"><p>
-  
-    By EleutherAI<br/>
-  
-      &copy; Copyright 2023, EleutherAI.<br/>
-</p>
-        </footer>
-    </div>
+    <footer class="footer">
+  <p>
     
-</div>
+      By EleutherAI<br/>
+    
+        &copy; Copyright 2023, EleutherAI.<br/>
+  </p>
+</footer>
+</main>
 
 
       </div>
     </div>
   
-  <!-- Scripts loaded after <body> so the DOM is not blocked -->
-  <script src="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf"></script>
-
+  <script src="../_static/js/index.be7d3bbb2ef33a8344ce.js"></script>
 
   </body>
 </html>

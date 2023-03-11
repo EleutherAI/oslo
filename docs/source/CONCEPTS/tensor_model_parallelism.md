@@ -1,15 +1,13 @@
 # Concept of Tensor Model Parallelism
+- Authors: Kichang Yang, Kevin Ko
 
 **Tensor Model Parallelism** makes it possible to train larger models by partitioning the parameter tensors into multiple dimensions.
-We also support 2D, 2.5D, and 3D tensor partitioning which make tensor parallel training more efficient unlike Megatron-LM which simply splits parameters into single dimensions such as rows and columns.
+We support 1D, 2D, 2.5D, and 3D tensor partitioning algorithms which make tensor parallel training more efficient.
 
 ## Tensor Parallel Algorithms
 - [1D parallel algorithm (same as Megatron-LM)](tp/1d_parallel_algorithm.md)
-
 - [2D parallel (SUMMA) algorithm](tp/2d_parallel_algorithm.md)
-
 - [2.5D parallel (SUMMA-2.5) algorithm](tp/2p5d_parallel_algorithm.md)
-
 - [3D parallel Algorithm](tp/3d_parallel_algorithm.md)
 
 ### References
