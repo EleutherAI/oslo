@@ -1,5 +1,5 @@
 # 3D parallel Algorithm
-- Authors: Kichang Yang, Kevin Ko
+- Authors: Kichang Yang, Kevin Ko, Minho Ryu
 - Paper : [https://arxiv.org/pdf/2105.14450.pdf](https://arxiv.org/pdf/2105.14450.pdf)
 
 ![E4D02BEB-A5BB-461D-9B62-213A61DB5B74.jpeg](3d_image/E4D02BEB-A5BB-461D-9B62-213A61DB5B74.jpeg)
@@ -8,9 +8,7 @@
 
 ## Usage
 
-Use `ParallelMode.TENSOR_3D` as a parameter of `tensor_parallel_mode`.
-`tp_size` must be **2^n of natural number.**
-Also, you should input `tp_depth` to **1.** (`tp_depth` is a parameter only for 2.5D tensor parallelism)
+Use `ParallelMode.TENSOR_3D` as a parameter of `tensor_parallel_mode`. `tp_size` should be a **cubic of positive integer**.
 
 ```python
 # model = defined in section 2.2
