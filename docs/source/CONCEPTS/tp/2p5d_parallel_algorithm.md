@@ -1,5 +1,5 @@
 # 2.5D parallel (SUMMA-2.5) algorithm
-- Authors: Kichang Yang, Kevin Ko
+- Authors: Kichang Yang, Kevin Ko, Minho Ryu
 - Paper : [https://arxiv.org/pdf/2105.14500.pdf](https://arxiv.org/pdf/2105.14500.pdf)
 
 ![image.png](2p5d_image/2p5d.png)
@@ -8,8 +8,8 @@ The 2D parallelism algorithm has lower memory cost than 1D parallelism, but can 
 
 ## Usage
 
-Use `ParallelMode.TENSOR_2p5D` as a parameter of `tensor_parallel_mode`. 
-Also, you should input `tp_depth` to more than **1**. If you use 1, This is identical to 2D algorithm.
+Use `ParallelMode.TENSOR_2p5D` as the parameter for `tensor_parallel_mode`. `tp_size` should be a multiple of `tp_depth`. 
+It is recommended to set `tp_depth` to more than 1, as the algorithm becomes identical to the 2D algorithm if `tp_depth` is 1.
 
 ```python
 # model = defined in section 2.2

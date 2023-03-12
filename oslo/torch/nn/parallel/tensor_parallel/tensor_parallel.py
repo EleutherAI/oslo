@@ -43,7 +43,7 @@ def get_divisible_by(parallel_context: ParallelContext):
         )
     else:
         raise ValueError(
-            "currently, only 1D, 2D, 2.5D tensor parallelism is supported."
+            "currently, only 1D, 2D, 2.5D, 3D tensor parallelism is supported."
         )
     return divisible_by
 

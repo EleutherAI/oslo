@@ -1,5 +1,5 @@
 # 2D parallel (SUMMA) algorithm
-- Authors: Kichang Yang, Kevin Ko
+- Authors: Kichang Yang, Kevin Ko, Minho Ryu
 - Paper : [https://arxiv.org/pdf/2104.05343.pdf](https://arxiv.org/pdf/2104.05343.pdf)
 
 ![image.png](2d_image/2d.png)
@@ -11,9 +11,8 @@ The result is a matrix $Y$ that is the product of $X$ and $A$.
 
 ## Usage
 
-Use `ParallelMode.TENSOR_2D` as a parameter of `tensor_parallel_mode`.
-Also, you should input `tp_depth` to **1.**
-(`tp_depth` is a parameter only for 2.5D tensor parallelism)
+Use `ParallelMode.TENSOR_2D` as a parameter of `tensor_parallel_mode`. Since the algorithm splits model along both rows and columns, `tp_size` should be a **square of positive integer**.
+
 ```python
 from oslo import ParallelContext
 from oslo.torch.nn.parallel import TensorParallel
