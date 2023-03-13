@@ -3,4 +3,6 @@ from oslo.torch.nn.parallel.data_parallel.data_parallel import (
 )
 from oslo.torch.nn.parallel.data_parallel.zero import *
 
-__ALL__ = ["DistributedDataParallel", "ZeroRedundancyOptimizer"]
+from oslo.torch.nn.parallel.data_parallel._utils import set_params_to_ignore
+
+__ALL__ = ["DistributedDataParallel", "ZeroRedundancyOptimizer", "set_params_to_ignore"]
