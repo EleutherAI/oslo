@@ -376,6 +376,11 @@ void assign_layer_weight_grad(const torch::Tensor &weights,
         std::static_pointer_cast<TransformerDecoderLayer<T1, T2>>(
             Context::get_pybind_layer("TransformerDecoderLayer", layer_id));
     layer->load_para_and_grad(wptr, gptr);
+  } else if (layer_name == "MultiheadAttentionLayer") {
+    std::shared_ptr<MultiheadAttentionLayer<T1, T2>> layer =
+        std::static_pointer_cast<MultiheadAttentionLayer<T1, T2>>(
+            Context::get_pybind_layer("MultiheadAttentionLayer", layer_id));
+    layer->load_para_and_grad(wptr, gptr);
   } else {
     printf("Error! layer_name %s is unsupported!\n", layer_name.c_str());
     exit(-1);

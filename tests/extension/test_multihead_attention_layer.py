@@ -28,10 +28,11 @@ def test_multihead_attention_layer():
         )
     
     ls_multihead_attention_layer = LSMultiheadAttentionLayer(config)
+    ls_multihead_attention_layer.cuda()
 
     # Create some dummy data.
     y_pred = torch.tensor([[[0.1, 0.2, 0.7], [0.2, 0.3, 0.5]]]).cuda()
-    y_true = torch.tensor([[2, 1]]).cuda()
+    y_true = torch.tensor([[0, 1]]).cuda()
 
     output = ls_multihead_attention_layer(y_pred, y_true)
     print(output)

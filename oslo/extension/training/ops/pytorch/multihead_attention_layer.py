@@ -27,7 +27,7 @@ layer_cuda_module = None
 _all_layer_grads = dict()
 
 
-class LSMultiheadAttentionLayer(Function):
+class LSMultiheadAttentionFunc(Function):
     @staticmethod
     def forward(
         ctx,
@@ -205,6 +205,27 @@ class LSMultiheadAttentionLayer(nn.Module):
 
         return Config(**kwargs)
 
+    @staticmethod
+    def gen_offset(hidden_size, intermediate_size):
+        hs, ims = hidden_size, intermediate_size
+        sizes = [
+            hs * hs * 3, # attn_qkvw
+            hs * 3,     # attn_qkvb
+            hs * hs,    # attn_ow
+            hs,     # attn_ob
+            hs,     # attn_nw
+            hs,     # attn_nb
+            hs * ims,   # inter_w
+            ims,    # inter_b
+            hs * ims,   # output_w
+            hs,     #output_b
+            hs,     #ffn_nw
+            hs,     #ffn_nb
+            12,     # clip_max
+        ]
+        offsets = calc_offset(sizes)
+        return offsets
+
     def forward(self, inputs, targets, **kwargs):
         self.config.training = self.training
         self.config.is_grad_enabled = torch.is_grad_enabled()
@@ -357,7 +378,7 @@ class LSMultiheadAttentionLayer(nn.Module):
             assert bs == encoder_padding_mask.size(
                 0
             ) and sl == encoder_padding_mask.size(1)
-        output = LSMultiheadAttentionLayer.apply(
+        output = LSMultiheadAttentionFunc.apply(
             hidden_states,
             encoder_padding_mask,
             self.para,
