@@ -19,6 +19,8 @@ from oslo.extension.training.ops.pytorch.util import (
     calc_offset,
 )
 
+from transformers import PretrainedConfig
+
 
 
 layer_cuda_module = None
@@ -50,10 +52,7 @@ class LSMultiheadAttentionFunc(Function):
             config.layer_id,
             input,
             input_mask,
-            config.training,
-            config.pre_layer_norm,
-            config.quant_mode,
-        )
+            config.training)
 
         if config.is_grad_enabled and config.training:
             ctx.save_for_backward(output, input, input_mask)
@@ -105,12 +104,21 @@ class LSMultiheadAttentionLayer(nn.Module):
     ):
         super(LSMultiheadAttentionLayer, self).__init__()
         self.config = copy.deepcopy(config)
+        if isinstance(self.config, PretrainedConfig):
+            self.config.max_batch_tokens = self.config.max_position_embeddings * 128 # 일단 default batch size로 128로 설정
+            self.config.activation_dropout_ratio = self.config.hidden_dropout_prob  # 이 둘이 같다고 가정
+            self.config.fp16 = False
+            self.config.local_rank = 0
+            self.config.pre_or_postLayerNorm = False
+            self.config.mask_future_tokens = False
+            self.config.is_post_ln = False
+
         self.config.layer_id = LSMultiheadAttentionLayer.layer_id
         LSMultiheadAttentionLayer.layer_id += 1
 
         self.quant_mode = False
 
-        if self.config.local_rank >= 0:
+        if self.config.local_rank is not None and self.config.local_rank >= 0:
             torch.cuda.set_device(self.config.local_rank)
 
         # Load cuda modules if needed
@@ -126,23 +134,23 @@ class LSMultiheadAttentionLayer(nn.Module):
             else cuda_module.create_multihead_attention_layer_new_fp32
         )
 
-        # int layer_id, int max_batch_tokens, int max_seq_len, int hidden_dim,
-        # int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
-        # float activation_dropout_ratio, float hidden_dropout_ratio,
-        # bool pre_or_postLayerNorm, std::string activation_fn,
+        # int layer_id, int max_batch_tokens, int max_position_embeddings, int hidden_size,
+        # int num_heads, int intermediate_size, float attention_probs_dropout_prob,
+        # float activation_dropout_ratio, float hidden_dropout_prob,
+        # bool pre_or_postLayerNorm, std::string hidden_act,
         # bool mask_future_tokens, bool is_post_ln
         create_layer_func(
             self.config.layer_id,
             self.config.max_batch_tokens,
-            self.config.max_seq_len,
+            self.config.max_position_embeddings,
             self.config.hidden_size,
-            self.config.nhead,
+            self.config.num_attention_heads,
             self.config.intermediate_size,
-            self.config.attn_prob_dropout_ratio,
+            self.config.attention_probs_dropout_prob,
             self.config.activation_dropout_ratio,
-            self.config.hidden_dropout_ratio,
+            self.config.hidden_dropout_prob,
             self.config.pre_or_postLayerNorm,
-            self.config.activation_fn,
+            self.config.hidden_act,
             self.config.mask_future_tokens,
             self.config.is_post_ln,
         )
@@ -186,20 +194,20 @@ class LSMultiheadAttentionLayer(nn.Module):
         @dataclass
         class Config:
             max_batch_tokens: int  # max batch token numbers
-            max_seq_len: int  # max sequence length
+            max_position_embeddings: int  # max sequence length
             hidden_size: int  # size of transformer hidden layers
-            nhead: int  # number of heads in attention
+            num_attention_heads: int  # number of heads in attention
             intermediate_size: int # size of intermediate layer
-            attn_prob_dropout_ratio: float  # attention score dropout ratio
+            attention_probs_dropout_prob: float  # attention score dropout ratio
             activation_dropout_ratio: float # activation dropout ratio
-            hidden_dropout_ratio: float  # dropout ration before residual
+            hidden_dropout_prob: float  # dropout ration before residual
             pre_or_postLayerNorm: bool  # pre layer norm or post
-            activation_fn: str  # relu or gelu
+            hidden_act: str  # relu or gelu
             mask_future_tokens: bool  # mask future tokens
             is_post_ln: bool  # post layer norm
             fp16: bool  # fp16 presion
-            local_rank: int  # rank in local node
-            quant_mode: bool
+            local_rank: int = 0 # rank in local node
+            quant_mode: bool = False
             training: bool = True
             is_grad_enabled: bool = True
 
@@ -225,19 +233,6 @@ class LSMultiheadAttentionLayer(nn.Module):
         ]
         offsets = calc_offset(sizes)
         return offsets
-
-    def forward(self, inputs, targets, **kwargs):
-        self.config.training = self.training
-        self.config.is_grad_enabled = torch.is_grad_enabled()
-        bs, sl = inputs.size()[:2]
-        if bs * sl > self.config.max_batch_tokens:
-            raise ValueError(
-                f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."
-            )
-        loss, nll_loss = LSMultiheadAttentionLayer.apply(
-            self.config, inputs, targets, **kwargs
-        )
-        return loss, nll_loss
 
     def _get_weights(self, i):
         return self.para.data.narrow(
@@ -368,13 +363,16 @@ class LSMultiheadAttentionLayer(nn.Module):
                 f"Batch token numbers {bs * sl} exceeds the limit"
                 f" {self.config.max_batch_tokens}."
             )
-        if sl > self.config.max_seq_len:
+        if sl > self.config.max_position_embeddings:
             raise ValueError(
-                f"Sequence length {sl} exceeds the limit {self.config.max_seq_len}."
+                f"Sequence length {sl} exceeds the limit {self.config.max_position_embeddings}."
             )
         if len(encoder_padding_mask.size()) == 1:
             assert bs == 1 and sl == encoder_padding_mask.size(0)
         else:
+            assert self.config.is_decoder == False, "Not yet support that is_decoder is True"
+            encoder_padding_mask = encoder_padding_mask.squeeze()
+
             assert bs == encoder_padding_mask.size(
                 0
             ) and sl == encoder_padding_mask.size(1)
@@ -385,7 +383,7 @@ class LSMultiheadAttentionLayer(nn.Module):
             self.config,
         )
 
-        return output.to(self.para)
+        return (output.to(self.para),)
 
     def disable_quant(self):
         self.quant_mode = False
