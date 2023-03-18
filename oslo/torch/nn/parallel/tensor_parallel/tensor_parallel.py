@@ -101,6 +101,10 @@ class _TensorParallel(OsloParallelWrapper):
         ), "model object must have `get_input_embeddings` method."
 
         module = model.get_input_embeddings()
+        if not hasattr(module, "weight"):
+            model.weight = None
+            return model
+
         vocab_size, embedding_dim = module.weight.size()
         new_vocab_size = vocab_size
 

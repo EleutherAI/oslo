@@ -35,7 +35,7 @@ class _ParallelMapping(object):
             transformers = importlib.import_module("transformers")
             cls = getattr(transformers, f"{model_name}PreTrainedModel", None)
             if cls is None:
-                cls = getattr(transformers, f"{model_name}PretrainedModel", None)
+                cls = getattr(transformers, f"{model_name}", None)
             return cls
         except ImportError:
             return None
@@ -55,7 +55,7 @@ class _ParallelMapping(object):
             transformers = importlib.import_module("oslo.transformers")
             cls = getattr(transformers, f"{model_name}PreTrainedModel", None)
             if cls is None:
-                cls = getattr(transformers, f"{model_name}PretrainedModel", None)
+                cls = getattr(transformers, f"{model_name}", None)
             return cls
         except ImportError:
             return None
@@ -232,6 +232,15 @@ class _TensorParallelMapping(_ParallelMapping):
                 "qa_outputs",
                 gather_output=True,
             ),
+        ],
+        "ViTForImageClassification": [
+            Column("query", "key", "value", gather_output=True),
+            Column("intermediate.dense"),
+            Row("output.dense", gather_output=True),
+            Column("attention.output.dense", gather_output=True),
+            Other("position_embeddings", "cls_token", gather_output=True),
+            Update(""),
+            Head("classifier", gather_output=True),
         ],
     }
 
