@@ -290,7 +290,7 @@ title="Print to PDF"
 <p>The 2D parallelism algorithm has lower memory cost than 1D parallelism, but can increase communication. To address this, a 2.5D tensor parallelism algorithm based on 2.5D SUMMA was proposed, which reduces communication by using more devices. This algorithm involves splitting the input and weight matrices into smaller sub-matrices, and applying the SUMMA algorithm to each sub-matrix. The output is then computed by combining the results of each sub-matrix. This approach can be used for linear layers and other tensor operations.</p>
 <section id="usage">
 <h2>Usage<a class="headerlink" href="#usage" title="Permalink to this heading"></a></h2>
-<p>Use <code class="docutils literal notranslate"><span class="pre">ParallelMode.TENSOR_2p5D</span></code> as the parameter for <code class="docutils literal notranslate"><span class="pre">tensor_parallel_mode</span></code>. <code class="docutils literal notranslate"><span class="pre">tp_size</span></code> should be a multiple of <code class="docutils literal notranslate"><span class="pre">tp_depth</span></code>.
+<p>Use <code class="docutils literal notranslate"><span class="pre">ParallelMode.TENSOR_2P5D</span></code> as the parameter for <code class="docutils literal notranslate"><span class="pre">tensor_parallel_mode</span></code>. <code class="docutils literal notranslate"><span class="pre">tp_size</span></code> should be a multiple of <code class="docutils literal notranslate"><span class="pre">tp_depth</span></code>.
 It is recommended to set <code class="docutils literal notranslate"><span class="pre">tp_depth</span></code> to more than 1, as the algorithm becomes identical to the 2D algorithm if <code class="docutils literal notranslate"><span class="pre">tp_depth</span></code> is 1.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># model = defined in section 2.2</span>
 
@@ -304,7 +304,7 @@ It is recommended to set <code class="docutils literal notranslate"><span class=
     <span class="n">data_parallel_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
     <span class="n">pipeline_parallel_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
     <span class="n">tensor_parallel_size</span><span class="o">=</span><span class="n">tp_size</span><span class="p">,</span>
-    <span class="n">tensor_parallel_mode</span><span class="o">=</span><span class="n">ParallelMode</span><span class="o">.</span><span class="n">TENSOR_2p5D</span><span class="p">,</span>
+    <span class="n">tensor_parallel_mode</span><span class="o">=</span><span class="n">ParallelMode</span><span class="o">.</span><span class="n">TENSOR_2P5D</span><span class="p">,</span>
     <span class="n">tensor_parallel_depth</span><span class="o">=</span><span class="n">tp_depth</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">TensorParallel</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">parallel_context</span><span class="p">)</span>

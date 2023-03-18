@@ -529,14 +529,14 @@ makes it possible to train larger models by partitioning the parameter tensors i
 <ul>
 <li><p>TENSOR_1D : same as megatronLM</p></li>
 <li><p>TENSOR_2D : Using summa algorithm.</p></li>
-<li><p>TENSOR_2p5D : Using 2.5d summa algorithm ( much effective in Communication costs between layers. )</p></li>
+<li><p>TENSOR_2P5D : Using 2.5d summa algorithm ( much effective in Communication costs between layers. )</p></li>
 <li><p>TENSOR_3D : Using cubic-3d algorithm</p></li>
 </ul>
 </li>
 <li><p><code class="docutils literal notranslate"><span class="pre">tensor_parallel_depth</span></code> must be If the mode is…</p>
 <ul>
-<li><p>2p5D : same or lower than <code class="docutils literal notranslate"><span class="pre">tensor_parallel_size</span></code></p></li>
-<li><p>Not 2p5D : must be 1.</p></li>
+<li><p>2P5D : same or lower than <code class="docutils literal notranslate"><span class="pre">tensor_parallel_size</span></code></p></li>
+<li><p>Not 2P5D : must be 1.</p></li>
 </ul>
 </li>
 <li><p><code class="docutils literal notranslate"><span class="pre">pipeline_parallel_size</span></code> must be 1 if you want to use <code class="docutils literal notranslate"><span class="pre">tensor_parallel</span></code> algorithm ( mixing PP and PP will be supported in later version.)</p></li>
