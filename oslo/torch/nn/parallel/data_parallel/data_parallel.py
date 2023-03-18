@@ -110,15 +110,20 @@ class _DistributedDataParallel(OsloParallelWrapper):
         self.module.zero_grad = self.zero_grad
 
     def forward(self, *args, **kwargs):
-        # inputs must be `torch.Tensor` or collections that contains `torch.Tensor`
+        # inputs must be `torch.Tensor` or collections that contain `torch.Tensor`
         inputs = self._forward(*args, **kwargs)
         if isinstance(inputs, dict):
-            return type(inputs)({
-                k: v for k, v in zip(inputs.keys(), _BackwardFunction.apply(self, *inputs.values()))
-            })
+            return type(inputs)(
+                {
+                    k: v
+                    for k, v in zip(
+                        inputs.keys(), _BackwardFunction.apply(self, *inputs.values())
+                    )
+                }
+            )
 
         if isinstance(inputs, torch.Tensor):
-            inputs = (inputs, )
+            inputs = (inputs,)
         return _BackwardFunction.apply(self, *inputs)
 
     def _pre_backward(self):
