@@ -102,7 +102,7 @@ class _TensorParallel(OsloParallelWrapper):
 
         module = model.get_input_embeddings()
         if not hasattr(module, "weight"):
-            model.weight = None
+            module.weight = None
             return model
 
         vocab_size, embedding_dim = module.weight.size()

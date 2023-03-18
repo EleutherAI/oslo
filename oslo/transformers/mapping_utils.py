@@ -35,7 +35,7 @@ class _ParallelMapping(object):
             transformers = importlib.import_module("transformers")
             cls = getattr(transformers, f"{model_name}PreTrainedModel", None)
             if cls is None:
-                cls = getattr(transformers, f"{model_name}", None)
+                cls = getattr(transformers, model_name, None)
             return cls
         except ImportError:
             return None
@@ -55,7 +55,7 @@ class _ParallelMapping(object):
             transformers = importlib.import_module("oslo.transformers")
             cls = getattr(transformers, f"{model_name}PreTrainedModel", None)
             if cls is None:
-                cls = getattr(transformers, f"{model_name}", None)
+                cls = getattr(transformers, model_name, None)
             return cls
         except ImportError:
             return None
