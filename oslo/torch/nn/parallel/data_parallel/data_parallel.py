@@ -6,11 +6,6 @@ import torch.nn as nn
 from torch.autograd import Variable
 import torch.distributed as dist
 
-try:
-    from torch.nn.modules.module import _EXTRA_STATE_KEY_SUFFIX
-except ImportError:
-    _EXTRA_STATE_KEY_SUFFIX = "_extra_state"
-
 from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn.parallel.utils import (
@@ -31,9 +26,9 @@ def free_storage(data: torch.Tensor) -> None:
         data.storage().resize_(0)
 
 
-class BackwardFunction(torch.autograd.Function):
+class _BackwardFunction(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, module, inputs):
+    def forward(ctx, module, *inputs):
         ctx.module = module
         return inputs
 
@@ -75,7 +70,7 @@ class _DistributedDataParallel(OsloParallelWrapper):
         >>> model = torch.nn.Linear(20, 1)
         >>> model = DDP(model, parallel_context)
         >>> optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
-        >>> olso.ready(model, parallel_context)
+        >>> oslo.ready(model, parallel_context)
         >>> model.zero_grad()
         >>> logits = model(x)
         >>> loss = criterion(logits, labels)
@@ -115,7 +110,21 @@ class _DistributedDataParallel(OsloParallelWrapper):
         self.module.zero_grad = self.zero_grad
 
     def forward(self, *args, **kwargs):
-        return BackwardFunction.apply(self, self._forward(*args, **kwargs))
+        # inputs must be `torch.Tensor` or collections that contain `torch.Tensor`
+        inputs = self._forward(*args, **kwargs)
+        if isinstance(inputs, dict):
+            return type(inputs)(
+                {
+                    k: v
+                    for k, v in zip(
+                        inputs.keys(), _BackwardFunction.apply(self, *inputs.values())
+                    )
+                }
+            )
+
+        if isinstance(inputs, torch.Tensor):
+            inputs = (inputs,)
+        return _BackwardFunction.apply(self, *inputs)
 
     def _pre_backward(self):
         pass
