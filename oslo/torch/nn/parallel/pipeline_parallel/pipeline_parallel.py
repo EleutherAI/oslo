@@ -190,7 +190,7 @@ class _PipelineParallel(OsloParallelWrapper):
                 result = done.result()
                 set_result(i, result)
 
-                if isinstance(result, ModelOutput) and hasattr(result, "loss"):
+                if isinstance(result, ModelOutput) and result.get("loss", None) is not None:
                     result.loss = result.loss / self.num_micro_batches
 
                 yield result
