@@ -8,7 +8,7 @@ from oslo.torch.distributed import ParallelMode
 
 
 # TODO
-def is_model_parallel_parameter(p: torch.Tensor):
+def is_model_parallel_parameter(p: torch.Tensor) -> bool:
     """
     Check if a parameter is parallel in either Pipeline or Tensor mode.
 
@@ -18,9 +18,9 @@ def is_model_parallel_parameter(p: torch.Tensor):
     Returns:
         bool: True if the parameter is parallel in either mode, False otherwise.
     """
-    parallel_mode = getattr(p, "oslo_parallel", dict())
-    return (
-        ParallelMode.PIPELINE in parallel_mode or ParallelMode.TENSOR in parallel_mode
+    parallel_mode = getattr(p, "oslo_parallel", {})
+    return ParallelMode.PIPELINE in parallel_mode or any(
+        key.startswith("tensor") for key in parallel_mode
     )
 
 
