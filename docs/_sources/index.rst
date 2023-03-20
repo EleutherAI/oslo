@@ -34,6 +34,7 @@ Documents
    :caption: CONCEPTS
 
    CONCEPTS/parallel_context
+   CONCEPTS/data_parallelism
    CONCEPTS/tensor_model_parallelism
 
 .. toctree::
