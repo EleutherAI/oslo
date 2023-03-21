@@ -165,7 +165,7 @@ set_seed(42)
 data_parallel_size = 1
 parallel_context = ParallelContext.from_torch(
     data_parallel_size=data_parallel_size,
-    pipeline_parallel_size=4,
+    pipeline_parallel_size=2,
     tensor_parallel_size=1,
 )
 
@@ -222,9 +222,9 @@ parallelize(wrapper_pp, parallel_context)
 #         m.register_full_backward_hook(print_location_backward_hook)
 #
 #
-if torch.distributed.get_rank() == 7:
-    for k, v in _MODULE_DEVICE_LOCATIONS.items():
-        print(f"{k}: {v}")
+# if torch.distributed.get_rank() == 7:
+#     for k, v in _MODULE_DEVICE_LOCATIONS.items():
+#         print(f"{k}: {v}")
 
 
 def run():
@@ -268,7 +268,7 @@ def run():
             ):
                 loss_pp = out_pp.loss
                 loss_pp = loss_pp / num_micro_batches
-                loss_pp.backward()
+                # loss_pp.backward()
 
                 cum_loss_pp += loss_pp.detach().item()
 

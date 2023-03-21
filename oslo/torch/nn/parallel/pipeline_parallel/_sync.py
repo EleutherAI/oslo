@@ -4,6 +4,31 @@ from torch.distributed import rpc
 
 from oslo.torch.distributed.parallel_mode import ParallelMode
 
+
+_RECV_QUEUES = dict()
+
+
+_JOBS = set()
+
+
+def register_job(job):
+    _JOBS.add(job)
+
+
+# TODO; support TP
+def select_job():
+    while len(_JOBS) <= 0:
+        time.sleep(0.05)
+
+    job = list(sorted(_JOBS))[0]
+    _JOBS.remove(job)
+    return job
+
+
+def reset_job_queue():
+    _JOBS.clear()
+
+
 # for watching whether every backward work is done or not
 _JOBS_REQUIRE_BACKWARD = set()
 

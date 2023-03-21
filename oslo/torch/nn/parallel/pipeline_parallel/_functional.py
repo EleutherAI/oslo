@@ -2,6 +2,7 @@ import torch
 from torch.cuda.amp import custom_fwd, custom_bwd
 from torch.distributed import rpc
 
+from oslo.torch.distributed import ParallelMode
 from oslo.torch.nn.parallel.pipeline_parallel._buffers import (
     get_original_forward_function,
     save_activation,
@@ -14,7 +15,174 @@ from oslo.torch.nn.parallel.pipeline_parallel._messages import (
 from oslo.torch.nn.parallel.pipeline_parallel._sync import (
     register_job_requires_backward,
     notify_backward_job_done,
+    _RECV_QUEUES,
 )
+from oslo.torch.nn.parallel.pipeline_parallel._job import (
+    Job, Metadata
+)
+from oslo.torch.nn.parallel.pipeline_parallel._comm import (
+    send_data, KEY_NAME, VALUE_NAME, META_NAME
+)
+
+
+funcs = dict()
+
+
+def remote_request(
+        src,
+        dst,
+        unique_key,
+        queue,
+        args_stub,
+        kwargs_stub,
+        is_forward,
+        is_grad_enabled,
+        is_training,
+        is_fp16,
+        func_name,
+        tensors,
+        parallel_context,
+        parallel_mode=ParallelMode.PIPELINE,
+):
+    # TODO; make the code below efficient
+    data = dict()
+    value = {
+        "args_stub": args_stub,
+        "kwargs_stub": kwargs_stub,
+        "tensors": tensors,
+    }
+    meta = {
+        "is_request": True,
+        "is_forward": is_forward,
+        "is_training": is_training,
+        "is_grad_enabled": is_grad_enabled,
+        "is_fp16": is_fp16,
+        "func_name": func_name,
+        "src": src,
+        "dst": dst,
+    }
+
+    data[VALUE_NAME] = value
+    data[KEY_NAME] = unique_key
+    data[META_NAME] = meta
+
+    # send
+    send_data(
+        data=data,
+        src_rank=src,
+        dst_rank=dst,
+        parallel_context=parallel_context,
+        parallel_mode=parallel_mode
+    )
+
+    # register queue for recv
+    _RECV_QUEUES[unique_key] = queue
+
+
+def send_results(
+        src,
+        dst,
+        data,
+        parallel_context,
+        parallel_mode=ParallelMode.PIPELINE,
+):
+    # send
+    send_data(
+        data=data,
+        src_rank=src,
+        dst_rank=dst,
+        parallel_context=parallel_context,
+        parallel_mode=parallel_mode
+    )
+
+
+def start_job(job: Job):
+    tensors = job.tensors
+    unique_key = job.unique_key
+    args_stub = job.args_stub
+    kwargs_stub = job.kwargs_stub
+    meta: Metadata = job.meta
+
+    if meta.is_request:
+        if meta.is_forward:
+            result_stub, tensors = launch_forward(
+                func_name=meta.func_name,
+                unique_key=unique_key,
+                args_stub=args_stub,
+                kwargs_stub=kwargs_stub,
+                is_training=meta.is_training,
+                is_grad_enabled=meta.is_grad_enabled,
+                *tensors,
+            )
+
+            # reverse
+            src, dst = meta.dst, meta.src
+
+            # make data
+            data = dict()
+            value = {
+                "args_stub": result_stub[0],
+                "kwargs_stub": result_stub[1],
+                "tensors": tensors,
+            }
+            new_meta = {
+                "is_request": False,
+                "is_forward": meta.is_forward,
+                "is_training": meta.is_training,
+                "is_grad_enabled": meta.is_grad_enabled,
+                "is_fp16": meta.is_fp16,
+                "func_name": meta.func_name,
+                "src": dst,
+                "dst": src,
+            }
+
+            data[VALUE_NAME] = value
+            data[KEY_NAME] = unique_key
+            data[META_NAME] = new_meta
+
+            # return; send to other device
+            send_fn = funcs["send"]
+            send_fn(
+                src=dst,
+                dst=src,
+                data=data,
+            )
+
+        else:   # backward
+            pass
+
+    # data receive
+    else:
+        queue = _RECV_QUEUES[unique_key]
+        result_stub = [args_stub, kwargs_stub]
+        queue.put(
+            (result_stub, tensors)
+        )
+
+
+def launch_forward(
+        func_name,
+        unique_key,
+        is_training,
+        is_grad_enabled,
+        args_stub,
+        kwargs_stub,
+        *tensors,
+):
+    (args, kwargs), _ = unpack_tensor_stub([args_stub, kwargs_stub], tensors)
+
+    forward_fn = get_original_forward_function(func_name)
+    with torch.set_grad_enabled(is_grad_enabled):
+        result = forward_fn(*args, **kwargs)
+
+    result_stub, tensors = pack_tensor_stub(result, [])
+    need_activation_save = (
+            any([t.requires_grad for t in tensors]) and is_training and is_grad_enabled
+    )
+    if need_activation_save:
+        save_activation(unique_key, tensors)
+
+    return result_stub, tensors
 
 
 def remote_module_forward(
