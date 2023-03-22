@@ -4,7 +4,7 @@ from typing import Deque, Dict, Iterable, List, Optional, Set, Tuple
 import torch
 
 from .chunk import Chunk, ChunkFullError, TensorState
-from colossalai.tensor import ColoTensor
+from oslo.torch.nn.parallel.data_parallel.zero.hetero_manager.tensor import DistributedTensor
 from oslo.torch.nn.parallel.data_parallel.zero.utils import get_current_device
 
 
@@ -33,7 +33,7 @@ class ChunkManager:
         self.total_mem: Dict[str, int] = {'cpu': 0, 'cuda': 0}
 
     def register_tensor(self,
-                        tensor: ColoTensor,
+                        tensor: DistributedTensor,
                         group_type: str,
                         config_key: int,
                         cpu_offload: bool = False,
@@ -50,7 +50,7 @@ class ChunkManager:
             pin_memory: whether the chunk is pinned in the cpu memory
         """
         assert tensor not in self.tensor_chunk_map
-        assert isinstance(tensor, ColoTensor), "Please feed ColoTensor to this ChunkManager"
+        assert isinstance(tensor, DistributedTensor), "Please feed DistributedTensor to this ChunkManager"
         assert config_key in self.dp_degree_chunk_size_dict
 
         chunk_size = self.dp_degree_chunk_size_dict[config_key]
@@ -72,12 +72,12 @@ class ChunkManager:
 
             if tensor.numel() > chunk_size:
                 chunk_size = tensor.numel()
-                dp_size = tensor.process_group.dp_world_size()
+                dp_size = tensor.get_dp_world_size()
                 chunk_size = chunk_size + (-chunk_size % dp_size)
 
             chunk = Chunk(
                 chunk_size=chunk_size,
-                process_group=tensor.process_group,
+                parallel_context=tensor.parallel_context,
                 dtype=tensor.dtype,
                 cpu_shard_init=cpu_offload,
                 pin_memory=pin_memory,

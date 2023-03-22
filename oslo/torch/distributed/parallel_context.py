@@ -156,6 +156,21 @@ class ParallelContext(object):
         >>> # get prev global rank
         >>> parallel_context.get_prev_global_rank(ParallelMode.DATA)
     """
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    @classmethod
+    def get_context(cls) -> Optional["ParallelContext"]:
+        """Get parallel context.
+
+        Returns:
+            Optional[ParallelContext]: parallel context
+        """
+        return cls._instance
 
     @classmethod
     def from_torch(
