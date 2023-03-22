@@ -156,6 +156,7 @@ class ParallelContext(object):
         >>> # get prev global rank
         >>> parallel_context.get_prev_global_rank(ParallelMode.DATA)
     """
+
     _instance = None
 
     def __new__(cls):

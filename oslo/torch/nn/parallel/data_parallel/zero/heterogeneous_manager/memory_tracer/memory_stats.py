@@ -6,7 +6,6 @@ from .param_runtime_order import OrderedParamGenerator
 
 
 class MemStats(object):
-
     def __init__(self) -> None:
         """
         Store the non model data statistics used for Gemini and ZeroOptimizer.
@@ -59,7 +58,7 @@ class MemStats(object):
         time step.
 
         Args:
-            param_list (List[torch.nn.Parameter]): a list of torch paramters.
+            param_list (List[torch.nn.Parameter]): a list of torch parameters.
         """
         for p in param_list:
             if p not in self._param_step_dict:
@@ -92,17 +91,17 @@ class MemStats(object):
             return self._param_runtime_order
 
     def non_model_data_list(self, device_type: str) -> List[int]:
-        if device_type == 'cuda':
+        if device_type == "cuda":
             return self._non_model_data_cuda_list
-        elif device_type == 'cpu':
+        elif device_type == "cpu":
             return self._non_model_data_cpu_list
         else:
             raise TypeError
 
     def max_non_model_data(self, device_type: str) -> float:
-        if device_type == 'cuda':
+        if device_type == "cuda":
             return max(self._non_model_data_cuda_list)
-        elif device_type == 'cpu':
+        elif device_type == "cpu":
             return max(self._non_model_data_cpu_list)
         else:
             raise TypeError

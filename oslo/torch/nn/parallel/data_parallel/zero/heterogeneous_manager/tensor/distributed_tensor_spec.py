@@ -9,12 +9,15 @@ from .compute_spec import ComputeSpec
 
 @dataclass
 class DistributedTensorSpec:
-    """ DistributedTensorSpec
-    
+    """DistributedTensorSpec
+
     A data class for specifications of the `DistributedTensor`.
     It contains attributes of `ProcessGroup`, `DistributedSpec`, `ComputeSpec`.
     The latter two attributes are optional. If not set, they are default value is `Replicate()` and `None`.
     """
+
     parallel_context: ParallelContext
-    dist_attr: Optional[DistributedSpec] = DistributedSpec(DistributedPlacementPattern.REPLICATE)
+    dist_attr: Optional[DistributedSpec] = DistributedSpec(
+        DistributedPlacementPattern.REPLICATE
+    )
     compute_attr: Optional[ComputeSpec] = None

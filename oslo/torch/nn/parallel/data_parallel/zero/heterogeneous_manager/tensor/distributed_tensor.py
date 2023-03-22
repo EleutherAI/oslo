@@ -23,7 +23,7 @@ def _get_my_nowrap_functions() -> Set[Callable]:
         Tensor._base.__get__,
         Tensor.grad.__get__,
         Tensor._grad.__get__,
-        Tensor.data.__get__,    # make .data returns torch.Tensor rather than DistributedTensor
+        Tensor.data.__get__,  # make .data returns torch.Tensor rather than DistributedTensor
     }
 
 
@@ -55,7 +55,7 @@ def _get_spec_from_args(args, kwargs) -> DistributedTensorSpec:
 
 
 class DistributedTensor(torch.Tensor):
-    """ Data Structure for Tensor in Oslo. It is a subclass of torch.Tensor.
+    """Data Structure for Tensor in Oslo. It is a subclass of torch.Tensor.
 
     The DistributedTensor can be initialized with a PyTorch tensor in the following ways.
 
@@ -72,10 +72,13 @@ class DistributedTensor(torch.Tensor):
         data (torch.Tensor): a torch tensor used as the payload the DistributedTensor.
         spec (DistributedTensorSpec, optional): the tensor spec of initialization. Defaults to DistributedTensorSpec(ReplicaSpec()).
     """
-    torch_major = int(torch.__version__.split('.')[0])
-    torch_minor = int(torch.__version__.split('.')[1])
 
-    def __new__(cls, data: torch.Tensor, spec: DistributedTensorSpec) -> 'DistributedTensor':
+    torch_major = int(torch.__version__.split(".")[0])
+    torch_minor = int(torch.__version__.split(".")[1])
+
+    def __new__(
+        cls, data: torch.Tensor, spec: DistributedTensorSpec
+    ) -> "DistributedTensor":
         """
         The signature of the __new__ has to be consistent with the torch.Tensor.
 
@@ -90,7 +93,9 @@ class DistributedTensor(torch.Tensor):
             data = torch.empty(0)
         return torch.Tensor._make_subclass(cls, data, data.requires_grad)
 
-    def __init__(self, data: torch.Tensor, spec: Optional[DistributedTensorSpec] = None) -> None:
+    def __init__(
+        self, data: torch.Tensor, spec: Optional[DistributedTensorSpec] = None
+    ) -> None:
         # If not set spec, use a DP process group and replicate dist spec
         if spec is None:
             self.has_initialized = False
@@ -114,7 +119,7 @@ class DistributedTensor(torch.Tensor):
     def is_model_data(self) -> bool:
         return self._type == TensorType.MODEL
 
-    def get_parallel_context(self) -> 'ParallelContext':
+    def get_parallel_context(self) -> "ParallelContext":
         return self.parallel_context
 
     def set_parallel_context(self, parallel_context: ParallelContext):
@@ -126,14 +131,19 @@ class DistributedTensor(torch.Tensor):
             parallel_context (ParallelContext): target parallel_context
 
         """
-        assert isinstance(parallel_context, ParallelContext), f"parallel_context as type {type(parallel_context)} is invalid"
+        assert isinstance(
+            parallel_context, ParallelContext
+        ), f"parallel_context as type {type(parallel_context)} is invalid"
         # if the new parallel_context is the same as the old parallel_context, just returns
         if self.parallel_context == parallel_context:
             return
-        assert self.parallel_context.get_world_size(ParallelMode.TENSOR) == 1 or self.parallel_context.get_world_size(ParallelMode.DATA) == 1, \
-            "Can not set_parallel_context on a DistributedTensor whose parallel_context is both tp > 1 and world group > 1"
-        assert self.dist_spec.placement.value == 'r', \
-            "Can not set_parallel_context on a DistributedTensor whose dist spec is not Replica"
+        assert (
+            self.parallel_context.get_world_size(ParallelMode.TENSOR) == 1
+            or self.parallel_context.get_world_size(ParallelMode.DATA) == 1
+        ), "Can not set_parallel_context on a DistributedTensor whose parallel_context is both tp > 1 and world group > 1"
+        assert (
+            self.dist_spec.placement.value == "r"
+        ), "Can not set_parallel_context on a DistributedTensor whose dist spec is not Replica"
 
         self.parallel_context = parallel_context
 
@@ -180,9 +190,12 @@ class DistributedTensor(torch.Tensor):
             # we have to capture the `backward` function
             # and make sure that it does not in `torch._C.DisableTorchFunction()` context
             if func is torch.Tensor.backward:
-                assert len(args) == 1    # only has 1 paramter
+                assert len(args) == 1  # only has 1 parameter
                 backward_tensor = torch.Tensor(args[0])
-                tensor_kwargs = {k: torch.Tensor(v) if torch.is_tensor(v) else v for k, v in kwargs.items()}
+                tensor_kwargs = {
+                    k: torch.Tensor(v) if torch.is_tensor(v) else v
+                    for k, v in kwargs.items()
+                }
                 return backward_tensor.backward(**tensor_kwargs)
 
         with torch._C.DisableTorchFunction():
@@ -209,12 +222,20 @@ class DistributedTensor(torch.Tensor):
         Args:
             dist_spec (DistributedSpec): the target dist. spec.
         """
-        assert self.grad_fn is None, "Current tensor has grad_fn and it can't get converted"
+        assert (
+            self.grad_fn is None
+        ), "Current tensor has grad_fn and it can't get converted"
         with DistributedSpecManager.no_grad():
-            self.data = DistributedSpecManager.handle_trans_spec(self.data, self.dist_spec, dist_spec, self.parallel_context)
+            self.data = DistributedSpecManager.handle_trans_spec(
+                self.data, self.dist_spec, dist_spec, self.parallel_context
+            )
         self.dist_spec = dist_spec
 
-    def redistribute(self, dist_spec: DistributedSpec, parallel_context: Optional[ParallelContext] = None) -> 'DistributedTensor':
+    def redistribute(
+        self,
+        dist_spec: DistributedSpec,
+        parallel_context: Optional[ParallelContext] = None,
+    ) -> "DistributedTensor":
         """redistribute
         Redistribute the tensor among processes. The rule is like this:
 
@@ -224,7 +245,7 @@ class DistributedTensor(torch.Tensor):
         2. If the parallel_context is not not None and not equal to the current process group.
         First, convert the tensor as replicated among the TP process group.
         Second, reset the process group to the new parallel_context.
-        Third, conver the tensor (new replicated both among the tp process group) to the new dist_spec.
+        Third, convert the tensor (new replicated both among the tp process group) to the new dist_spec.
 
         Args:
             dist_spec (DistributedSpec): the new dist spec.
@@ -233,15 +254,25 @@ class DistributedTensor(torch.Tensor):
         Returns:
             DistributedTensor: a redistributed DistributedTensor
         """
-        if parallel_context is not None and parallel_context != self.get_parallel_context():
+        if (
+            parallel_context is not None
+            and parallel_context != self.get_parallel_context()
+        ):
             # if the parallel_context is not equal, convert the current tensor to replicated
             handled = self.redistribute(ReplicaSpec())
         else:
             handled = self
             parallel_context = self.parallel_context
 
-        ret = DistributedSpecManager.handle_trans_spec(handled, handled.dist_spec, dist_spec, parallel_context)
-        return DistributedTensor.from_torch_tensor(ret, DistributedTensorSpec(parallel_context=parallel_context, dist_attr=dist_spec))
+        ret = DistributedSpecManager.handle_trans_spec(
+            handled, handled.dist_spec, dist_spec, parallel_context
+        )
+        return DistributedTensor.from_torch_tensor(
+            ret,
+            DistributedTensorSpec(
+                parallel_context=parallel_context, dist_attr=dist_spec
+            ),
+        )
 
     def to_replicate_(self):
         """to_replicate_
@@ -250,7 +281,7 @@ class DistributedTensor(torch.Tensor):
         """
         self._redistribute(dist_spec=ReplicaSpec())
 
-    def to_replicate(self) -> 'DistributedTensor':
+    def to_replicate(self) -> "DistributedTensor":
         """to_replicate
 
         converting dist spec of the tensor to ReplicaSpec()
@@ -258,7 +289,9 @@ class DistributedTensor(torch.Tensor):
         return self.redistribute(ReplicaSpec())
 
     @staticmethod
-    def from_torch_tensor(tensor: torch.Tensor, spec: Optional[DistributedTensorSpec] = None) -> 'DistributedTensor':
+    def from_torch_tensor(
+        tensor: torch.Tensor, spec: Optional[DistributedTensorSpec] = None
+    ) -> "DistributedTensor":
         """from_torch_tensor
 
         A static method builds a `DistributedTensor` from a PyTorch Tensor.
@@ -280,7 +313,14 @@ class DistributedTensor(torch.Tensor):
         else:
             with torch._C.DisableTorchFunction():
                 data = self.data.clone()
-            tensor = DistributedTensor(data, spec=copy(DistributedTensorSpec(self.parallel_context, self.dist_spec, self.compute_spec)))
+            tensor = DistributedTensor(
+                data,
+                spec=copy(
+                    DistributedTensorSpec(
+                        self.parallel_context, self.dist_spec, self.compute_spec
+                    )
+                ),
+            )
             memo[id(self)] = tensor
             return tensor
 
@@ -315,25 +355,34 @@ class DistributedTensor(torch.Tensor):
             return size_list[args[0]]
 
     def numel_global(self):
-        """Returns the number of elements in the tensor when it's replicated.
-        """
+        """Returns the number of elements in the tensor when it's replicated."""
         return reduce(operator.mul, self.size_global(), 1)
 
     # Some API for dist spec check
 
     def is_replicate(self):
-        return self.dist_spec.placement == DistributedPlacementPattern.REPLICATE \
-               or (len(self.dist_spec.num_partitions) == 1
-                   and self.dist_spec.num_partitions[0] == 1) \
-               or (self.parallel_context.get_world_size(ParallelMode.TENSOR) == 1)
+        return (
+            self.dist_spec.placement == DistributedPlacementPattern.REPLICATE
+            or (
+                len(self.dist_spec.num_partitions) == 1
+                and self.dist_spec.num_partitions[0] == 1
+            )
+            or (self.parallel_context.get_world_size(ParallelMode.TENSOR) == 1)
+        )
 
     def is_shard_1dcol(self):
-        return self.dist_spec.placement == DistributedPlacementPattern.SHARD \
-               and len(self.dist_spec.dims) == 1 and self.dist_spec.dims[0] == -1
+        return (
+            self.dist_spec.placement == DistributedPlacementPattern.SHARD
+            and len(self.dist_spec.dims) == 1
+            and self.dist_spec.dims[0] == -1
+        )
 
     def is_shard_1drow(self):
-        return self.dist_spec.placement == DistributedPlacementPattern.SHARD \
-               and len(self.dist_spec.dims) == 1 and self.dist_spec.dims[0] == 0
+        return (
+            self.dist_spec.placement == DistributedPlacementPattern.SHARD
+            and len(self.dist_spec.dims) == 1
+            and self.dist_spec.dims[0] == 0
+        )
 
     def is_sharded(self):
         return self.dist_spec.placement == DistributedPlacementPattern.SHARD

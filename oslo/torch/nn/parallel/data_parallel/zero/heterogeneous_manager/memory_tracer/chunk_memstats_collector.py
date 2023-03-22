@@ -3,7 +3,9 @@ from typing import Optional
 
 from .memory_monitor import SyncCudaMemoryMonitor
 
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import ChunkManager
+from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import (
+    ChunkManager,
+)
 
 from .memory_stats import MemStats
 
@@ -20,7 +22,9 @@ class ChunkMemStatsCollector:
         memstats (Optional[MemStats], optional): memory statistics collected by RMT. Defaults to None.
     """
 
-    def __init__(self, chunk_manager: ChunkManager, memstats: Optional[MemStats] = None) -> None:
+    def __init__(
+        self, chunk_manager: ChunkManager, memstats: Optional[MemStats] = None
+    ) -> None:
         self._mem_monitor = SyncCudaMemoryMonitor()
         self._sampling_time = []
 
@@ -44,12 +48,19 @@ class ChunkMemStatsCollector:
         Returns:
             int: max non model data memory usage of current sampling period
         """
-        assert not self._start_flag, 'Cannot get mem stats info during collection phase.'
-        assert self._step_total > 0, 'Cannot get mem stats info before collection phase.'
-        assert len(self._memstats.non_model_data_list(device_type)) > self._step_idx, \
-            f"{len(self._memstats.non_model_data_list(device_type))} should be > than step idx {self._step_idx}, "\
-                f"step total {self._step_total}"
-        next_non_model_data = self._memstats.non_model_data_list(device_type)[self._step_idx]
+        assert (
+            not self._start_flag
+        ), "Cannot get mem stats info during collection phase."
+        assert (
+            self._step_total > 0
+        ), "Cannot get mem stats info before collection phase."
+        assert len(self._memstats.non_model_data_list(device_type)) > self._step_idx, (
+            f"{len(self._memstats.non_model_data_list(device_type))} should be > than step idx {self._step_idx}, "
+            f"step total {self._step_total}"
+        )
+        next_non_model_data = self._memstats.non_model_data_list(device_type)[
+            self._step_idx
+        ]
         self._step_idx = (self._step_idx + 1) % self._step_total
         return next_non_model_data
 
@@ -64,16 +75,16 @@ class ChunkMemStatsCollector:
     def finish_collection(self):
         self.sample_overall_data()
         # self._step_total = len(self._sampling_time)
-        self._step_total = len(self._memstats.non_model_data_list('cuda'))
+        self._step_total = len(self._memstats.non_model_data_list("cuda"))
         self._start_flag = False
-        print(f'finish_collection {self._step_total}')
+        print(f"finish_collection {self._step_total}")
 
     def record_model_data_volume(self) -> None:
         """
-        record model data volumn on cuda and cpu.
+        record model data volume on cuda and cpu.
         """
         if self._start_flag and not self.use_outside_memstats:
-            cuda_mem = self._chunk_manager.total_mem['cuda']
+            cuda_mem = self._chunk_manager.total_mem["cuda"]
             self._memstats.record_max_cuda_model_data(cuda_mem)
 
     def sample_overall_data(self) -> None:
@@ -98,4 +109,7 @@ class ChunkMemStatsCollector:
 
     @property
     def cuda_margin_mem(self) -> float:
-        return get_device_memory_capacity(get_current_device()) - self._memstats.max_overall_cuda
+        return (
+            get_device_memory_capacity(get_current_device())
+            - self._memstats.max_overall_cuda
+        )

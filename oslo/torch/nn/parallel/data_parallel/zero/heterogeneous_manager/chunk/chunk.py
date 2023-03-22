@@ -19,12 +19,17 @@ class TensorState(Enum):
     READY_FOR_REDUCE = 4
 
 
-STATE_TRANS = ((TensorState.FREE, TensorState.HOLD), (TensorState.FREE, TensorState.COMPUTE),
-               (TensorState.HOLD, TensorState.FREE), (TensorState.HOLD, TensorState.COMPUTE), (TensorState.COMPUTE,
-                                                                                               TensorState.HOLD),
-               (TensorState.COMPUTE, TensorState.HOLD_AFTER_BWD), (TensorState.HOLD_AFTER_BWD, TensorState.COMPUTE),
-               (TensorState.HOLD_AFTER_BWD, TensorState.READY_FOR_REDUCE), (TensorState.READY_FOR_REDUCE,
-                                                                            TensorState.HOLD))
+STATE_TRANS = (
+    (TensorState.FREE, TensorState.HOLD),
+    (TensorState.FREE, TensorState.COMPUTE),
+    (TensorState.HOLD, TensorState.FREE),
+    (TensorState.HOLD, TensorState.COMPUTE),
+    (TensorState.COMPUTE, TensorState.HOLD),
+    (TensorState.COMPUTE, TensorState.HOLD_AFTER_BWD),
+    (TensorState.HOLD_AFTER_BWD, TensorState.COMPUTE),
+    (TensorState.HOLD_AFTER_BWD, TensorState.READY_FOR_REDUCE),
+    (TensorState.READY_FOR_REDUCE, TensorState.HOLD),
+)
 
 
 @dataclass
@@ -55,14 +60,16 @@ def alloc_storage(tensor: torch.Tensor) -> None:
 class Chunk:
     _total_number = 0
 
-    def __init__(self,
-                 chunk_size: int,
-                 parallel_context: ParallelContext,
-                 dtype: torch.dtype,
-                 init_device: Optional[torch.device] = None,
-                 cpu_shard_init: bool = False,
-                 keep_gathered: bool = False,
-                 pin_memory: bool = False) -> None:
+    def __init__(
+        self,
+        chunk_size: int,
+        parallel_context: ParallelContext,
+        dtype: torch.dtype,
+        init_device: Optional[torch.device] = None,
+        cpu_shard_init: bool = False,
+        keep_gathered: bool = False,
+        pin_memory: bool = False,
+    ) -> None:
         """
         Chunk: A container owning a piece of contiguous memory space for tensors
         Here we use all-gather operation to gather the whole chunk.
@@ -103,9 +110,11 @@ class Chunk:
         device = init_device or get_current_device()
 
         # chunk_temp is a global chunk, which only exists during building the chunks.
-        self.chunk_temp = torch.zeros(chunk_size, dtype=dtype, device=device)    # keep all zero
+        self.chunk_temp = torch.zeros(
+            chunk_size, dtype=dtype, device=device
+        )  # keep all zero
 
-        self.cuda_global_chunk = None    # we force cuda_global_chunk located in CUDA
+        self.cuda_global_chunk = None  # we force cuda_global_chunk located in CUDA
 
         # cuda local chunk, which is sharded on GPUs
         self.cuda_shard = None
@@ -118,7 +127,9 @@ class Chunk:
         # configure the init device of the shard
         # no-offload default: fp16, fp32 -> CUDA
         # offload default: fp16, fp32 -> CPU
-        self.shard_device = torch.device("cpu") if cpu_shard_init else get_current_device()
+        self.shard_device = (
+            torch.device("cpu") if cpu_shard_init else get_current_device()
+        )
 
         self.chunk_mem = self.chunk_size * self.chunk_temp.element_size()
         self.shard_mem = self.chunk_mem // self.pg_size
@@ -138,7 +149,7 @@ class Chunk:
         # they are treated the same as that of the parameters in DDP during training.
         self.keep_gathered = keep_gathered
         if self.keep_gathered:
-            pin_memory = False    # since this chunk is gathered, it doesn't need to pin
+            pin_memory = False  # since this chunk is gathered, it doesn't need to pin
 
         # if pin_memory is True, we allocate a piece of CPU pin-memory
         # for it all the time
@@ -164,7 +175,7 @@ class Chunk:
 
         if self.chunk_temp is not None:
             # this chunk is not closed
-            if self.chunk_temp.device.type == 'cuda':
+            if self.chunk_temp.device.type == "cuda":
                 cuda_memory += self.chunk_mem
             else:
                 cpu_memory += self.chunk_mem
@@ -184,11 +195,11 @@ class Chunk:
             return self.chunk_temp.device.type
         else:
             if self.is_gathered:
-                return 'cuda'
+                return "cuda"
             elif self.cuda_shard is not None:
-                return 'cuda'
+                return "cuda"
             else:
-                return 'cpu'
+                return "cpu"
 
     @property
     def payload(self) -> torch.Tensor:
@@ -221,8 +232,11 @@ class Chunk:
         if self.keep_gathered:
             return False
         else:
-            return self.tensor_state_cnter[TensorState.HOLD] + \
-                   self.tensor_state_cnter[TensorState.HOLD_AFTER_BWD] == self.num_tensors
+            return (
+                self.tensor_state_cnter[TensorState.HOLD]
+                + self.tensor_state_cnter[TensorState.HOLD_AFTER_BWD]
+                == self.num_tensors
+            )
 
     @property
     def can_reduce(self):
@@ -230,27 +244,28 @@ class Chunk:
 
     @property
     def has_inf_or_nan(self) -> bool:
-        """Check if the chunk has inf or nan values on CUDA.
-        """
+        """Check if the chunk has inf or nan values on CUDA."""
         if self.is_gathered:
-            valid_tensor = self.cuda_global_chunk[:self.utilized_size]
+            valid_tensor = self.cuda_global_chunk[: self.utilized_size]
         else:
-            assert self.cuda_shard is not None    # only check on CUDA
-            valid_tensor = self.cuda_shard[:self.valid_end]
+            assert self.cuda_shard is not None  # only check on CUDA
+            valid_tensor = self.cuda_shard[: self.valid_end]
 
-        return torch.isinf(valid_tensor).any().item() | torch.isnan(valid_tensor).any().item()
+        return (
+            torch.isinf(valid_tensor).any().item()
+            | torch.isnan(valid_tensor).any().item()
+        )
 
     def set_l2_norm(self) -> None:
-        """Record l2 norm of this chunks on CUDA.
-        """
+        """Record l2 norm of this chunks on CUDA."""
         assert self.l2_norm is None, "you are calculating the l2 norm twice"
         if self.is_gathered:
-            valid_tensor = self.cuda_global_chunk[:self.utilized_size]
+            valid_tensor = self.cuda_global_chunk[: self.utilized_size]
         else:
-            assert self.cuda_shard is not None    # calculate on CUDA
-            valid_tensor = self.cuda_shard[:self.valid_end]
+            assert self.cuda_shard is not None  # calculate on CUDA
+            valid_tensor = self.cuda_shard[: self.valid_end]
         chunk_l2_norm = valid_tensor.data.float().norm(2)
-        self.l2_norm = chunk_l2_norm.item()**2
+        self.l2_norm = chunk_l2_norm.item() ** 2
 
     def append_tensor(self, tensor: torch.Tensor):
         """Add a tensor to the chunk.
@@ -267,20 +282,27 @@ class Chunk:
         if new_utilized_size > self.chunk_size:
             raise ChunkFullError
 
-        self.chunk_temp[self.utilized_size:new_utilized_size].copy_(tensor.data.flatten())
-        assert type(self.chunk_temp) == torch.Tensor, "copy_tensor_to_chunk_slice must use a torch tensor"
-        tensor.data = self.chunk_temp[self.utilized_size:new_utilized_size].view(tensor.shape)
+        self.chunk_temp[self.utilized_size : new_utilized_size].copy_(
+            tensor.data.flatten()
+        )
+        assert (
+            type(self.chunk_temp) == torch.Tensor
+        ), "copy_tensor_to_chunk_slice must use a torch tensor"
+        tensor.data = self.chunk_temp[self.utilized_size : new_utilized_size].view(
+            tensor.shape
+        )
 
         # record all the information about the tensor
         self.num_tensors += 1
         tensor_state = TensorState.HOLD
-        self.tensors_info[tensor] = TensorInfo(tensor_state, self.utilized_size, new_utilized_size)
+        self.tensors_info[tensor] = TensorInfo(
+            tensor_state, self.utilized_size, new_utilized_size
+        )
         self.tensor_state_cnter[tensor_state] += 1
         self.utilized_size = new_utilized_size
 
     def close_chunk(self):
-        """Close the chunk. Any tensor can't be appended to a closed chunk later.
-        """
+        """Close the chunk. Any tensor can't be appended to a closed chunk later."""
         # sanity check
         assert self.chunk_temp is not None
 
@@ -290,7 +312,7 @@ class Chunk:
         elif self.utilized_size < self.shard_end:
             self.valid_end = self.utilized_size - self.shard_begin
 
-        if self.chunk_temp.device.type == 'cpu':
+        if self.chunk_temp.device.type == "cpu":
             self.cuda_global_chunk = self.chunk_temp.to(get_current_device())
             self.__update_tensors_ptr()
         else:
@@ -302,12 +324,14 @@ class Chunk:
         if self.keep_gathered:
             return
 
-        if self.pin_memory or self.shard_device.type == 'cpu':
-            self.cpu_shard = torch.empty(self.shard_size, dtype=self.dtype, pin_memory=self.pin_memory)
+        if self.pin_memory or self.shard_device.type == "cpu":
+            self.cpu_shard = torch.empty(
+                self.shard_size, dtype=self.dtype, pin_memory=self.pin_memory
+            )
             self.cpu_shard.copy_(self.cuda_shard)
-            self.cpu_vis_flag = True    # cpu_shard has been visited
+            self.cpu_vis_flag = True  # cpu_shard has been visited
 
-        if self.shard_device.type == 'cpu':
+        if self.shard_device.type == "cpu":
             self.cuda_shard = None
 
     def shard_move(self, device: torch.device, force_copy: bool = False):
@@ -322,12 +346,12 @@ class Chunk:
         # when the current chunk is not synchronized with the optimizer
         # just use another way for the movement
         if not self.optim_sync_flag:
-            assert device.type == 'cuda', "each chunk should first be moved to CUDA"
+            assert device.type == "cuda", "each chunk should first be moved to CUDA"
             self.__paired_shard_move()
             self.optim_sync_flag = True
             return
 
-        if device.type == 'cuda':
+        if device.type == "cuda":
             assert device == get_current_device(), "can't move chunk to another device"
 
             if self.cuda_shard:
@@ -337,7 +361,7 @@ class Chunk:
 
             if not self.pin_memory:
                 self.cpu_shard = None
-        elif device.type == 'cpu':
+        elif device.type == "cpu":
             if self.cuda_shard is None:
                 return
 
@@ -354,8 +378,7 @@ class Chunk:
             raise NotImplementedError
 
     def access_chunk(self):
-        """Make the chunk usable for the parameters inside it. It's an operation done in CUDA.
-        """
+        """Make the chunk usable for the parameters inside it. It's an operation done in CUDA."""
         # sanity check
         assert self.chunk_temp is None
 
@@ -364,8 +387,7 @@ class Chunk:
         self.__update_tensors_ptr()
 
     def release_chunk(self):
-        """Release the usable chunk. It's an operation done in CUDA.
-        """
+        """Release the usable chunk. It's an operation done in CUDA."""
         # sanity check
         assert self.chunk_temp is None
 
@@ -373,8 +395,7 @@ class Chunk:
             self.__scatter()
 
     def reduce(self):
-        """Reduce scatter all the gradients. It's an operation done in CUDA.
-        """
+        """Reduce scatter all the gradients. It's an operation done in CUDA."""
         # sanity check
         assert self.is_gathered
 
@@ -387,16 +408,22 @@ class Chunk:
             # we use all-reduce here
             dist.all_reduce(self.cuda_global_chunk, group=self.torch_pg)
         else:
-            self.cuda_shard = torch.empty(self.shard_size, dtype=self.dtype, device=get_current_device())
+            self.cuda_shard = torch.empty(
+                self.shard_size, dtype=self.dtype, device=get_current_device()
+            )
 
-            input_list = list(torch.chunk(self.cuda_global_chunk, chunks=self.pg_size, dim=0))
+            input_list = list(
+                torch.chunk(self.cuda_global_chunk, chunks=self.pg_size, dim=0)
+            )
             dist.reduce_scatter(self.cuda_shard, input_list, group=self.torch_pg)
 
             free_storage(self.cuda_global_chunk)
             self.is_gathered = False
         self.__update_tensors_state(TensorState.HOLD)
 
-    def tensor_trans_state(self, tensor: torch.Tensor, tensor_state: TensorState) -> None:
+    def tensor_trans_state(
+        self, tensor: torch.Tensor, tensor_state: TensorState
+    ) -> None:
         """
         Make a transition of the tensor into the next state.
 
@@ -415,32 +442,36 @@ class Chunk:
             return
         self.__update_one_tensor_info(self.tensors_info[tensor], tensor_state)
 
-    def copy_tensor_to_chunk_slice(self, tensor: torch.Tensor, data_slice: torch.Tensor) -> None:
+    def copy_tensor_to_chunk_slice(
+        self, tensor: torch.Tensor, data_slice: torch.Tensor
+    ) -> None:
         """
         Copy data slice to the memory space indexed by the input tensor in the chunk.
 
         Args:
-            tensor (torch.Tensor): the tensor used to retrive meta information
+            tensor (torch.Tensor): the tensor used to retrieve meta information
             data_slice (torch.Tensor): the tensor to be copied to the chunk
         """
         # sanity check
         assert self.is_gathered
 
         tensor_info = self.tensors_info[tensor]
-        self.cuda_global_chunk[tensor_info.offset:tensor_info.end].copy_(data_slice.data.flatten())
-        tensor.data = self.cuda_global_chunk[tensor_info.offset:tensor_info.end].view(tensor.shape)
+        self.cuda_global_chunk[tensor_info.offset : tensor_info.end].copy_(
+            data_slice.data.flatten()
+        )
+        tensor.data = self.cuda_global_chunk[tensor_info.offset : tensor_info.end].view(
+            tensor.shape
+        )
 
     def get_valid_length(self) -> int:
-        """Get the valid length of the chunk's payload.
-        """
+        """Get the valid length of the chunk's payload."""
         if self.keep_gathered:
             return self.utilized_size
         else:
             return self.valid_end
 
-    def init_pair(self, friend_chunk: 'Chunk') -> None:
-        """Initialize the paired chunk.
-        """
+    def init_pair(self, friend_chunk: "Chunk") -> None:
+        """Initialize the paired chunk."""
         if self.paired_chunk is None and friend_chunk.paired_chunk is None:
             self.paired_chunk = friend_chunk
             friend_chunk.paired_chunk = self
@@ -449,8 +480,7 @@ class Chunk:
             assert friend_chunk.paired_chunk is self
 
     def optim_update(self) -> None:
-        """Update the fp16 chunks via their fp32 chunks. It's used by the optimizer.
-        """
+        """Update the fp16 chunks via their fp32 chunks. It's used by the optimizer."""
         # sanity check
         assert self.paired_chunk is not None
 
@@ -459,15 +489,15 @@ class Chunk:
             assert friend_chunk.is_gathered is True
             self.cuda_global_chunk.copy_(friend_chunk.cuda_global_chunk)
             self.optim_sync_flag = True
-        elif friend_chunk.device_type == 'cuda' and self.device_type == 'cuda':
+        elif friend_chunk.device_type == "cuda" and self.device_type == "cuda":
             self.cuda_shard.copy_(friend_chunk.cuda_shard)
             self.optim_sync_flag = True
             self.cpu_vis_flag = False
         else:
             # optim_sync_flag is set to False
             # see shard_move function for more details
-            assert friend_chunk.device_type == 'cpu'
-            assert self.device_type == 'cpu'
+            assert friend_chunk.device_type == "cpu"
+            assert self.device_type == "cpu"
             self.optim_sync_flag = False
             self.cpu_vis_flag = False
 
@@ -480,7 +510,9 @@ class Chunk:
             assert self.cuda_shard is not None
 
             alloc_storage(self.cuda_global_chunk)
-            gather_list = list(torch.chunk(input=self.cuda_global_chunk, chunks=self.pg_size, dim=0))
+            gather_list = list(
+                torch.chunk(input=self.cuda_global_chunk, chunks=self.pg_size, dim=0)
+            )
             dist.all_gather(gather_list, self.cuda_shard, self.torch_pg)
 
             self.cuda_shard = None
@@ -494,9 +526,13 @@ class Chunk:
             # sanity check
             assert self.cuda_shard is None
 
-            self.cuda_shard = torch.empty(self.shard_size, dtype=self.dtype, device=self.cuda_global_chunk.device)
+            self.cuda_shard = torch.empty(
+                self.shard_size, dtype=self.dtype, device=self.cuda_global_chunk.device
+            )
 
-            self.cuda_shard.copy_(self.cuda_global_chunk[self.shard_begin:self.shard_end])
+            self.cuda_shard.copy_(
+                self.cuda_global_chunk[self.shard_begin : self.shard_end]
+            )
 
             free_storage(self.cuda_global_chunk)
             self.is_gathered = False
@@ -522,14 +558,20 @@ class Chunk:
         assert type(self.cuda_global_chunk) == torch.Tensor
 
         for tensor, tensor_info in self.tensors_info.items():
-            tensor.data = self.cuda_global_chunk[tensor_info.offset:tensor_info.end].view(tensor.shape)
+            tensor.data = self.cuda_global_chunk[
+                tensor_info.offset : tensor_info.end
+            ].view(tensor.shape)
 
-    def __update_one_tensor_info(self, tensor_info: TensorInfo, next_state: TensorState):
+    def __update_one_tensor_info(
+        self, tensor_info: TensorInfo, next_state: TensorState
+    ):
         self.tensor_state_cnter[tensor_info.state] -= 1
         tensor_info.state = next_state
         self.tensor_state_cnter[tensor_info.state] += 1
 
-    def __update_tensors_state(self, next_state: TensorState, prev_state: Optional[TensorState] = None):
+    def __update_tensors_state(
+        self, next_state: TensorState, prev_state: Optional[TensorState] = None
+    ):
         for tensor_info in self.tensors_info.values():
             if prev_state is None or tensor_info.state == prev_state:
                 self.__update_one_tensor_info(tensor_info, next_state)
@@ -543,38 +585,54 @@ class Chunk:
     def __repr__(self, detailed: bool = True):
         output = [
             "Chunk Information:\n",
-            "\tchunk size: {}, chunk dtype: {}, process group size: {}\n".format(self.chunk_size, self.dtype,
-                                                                                 self.pg_size),
+            "\tchunk size: {}, chunk dtype: {}, process group size: {}\n".format(
+                self.chunk_size, self.dtype, self.pg_size
+            ),
             "\t# of tensors: {}, utilized size: {}, utilized percentage: {:.2f}\n".format(
-                self.num_tensors, self.utilized_size, self.utilized_size / self.chunk_size)
+                self.num_tensors,
+                self.utilized_size,
+                self.utilized_size / self.chunk_size,
+            ),
         ]
 
-        def print_tensor(tensor, prefix=''):
-            output.append("{}shape: {}, dtype: {}, device: {}\n".format(prefix, tensor.shape, tensor.dtype,
-                                                                        tensor.device))
+        def print_tensor(tensor, prefix=""):
+            output.append(
+                "{}shape: {}, dtype: {}, device: {}\n".format(
+                    prefix, tensor.shape, tensor.dtype, tensor.device
+                )
+            )
 
         if self.chunk_temp is not None:
             output.append("\tchunk temp:\n")
-            print_tensor(tensor=self.chunk_temp, prefix='\t\t')
+            print_tensor(tensor=self.chunk_temp, prefix="\t\t")
 
-        if self.cuda_global_chunk is not None and self.cuda_global_chunk.storage().size() > 0:
+        if (
+            self.cuda_global_chunk is not None
+            and self.cuda_global_chunk.storage().size() > 0
+        ):
             output.append("\tchunk total:\n")
-            print_tensor(tensor=self.cuda_global_chunk, prefix='\t\t')
+            print_tensor(tensor=self.cuda_global_chunk, prefix="\t\t")
 
         if self.cuda_shard is not None:
             output.append("\tcuda shard:\n")
-            print_tensor(tensor=self.cuda_shard, prefix='\t\t')
+            print_tensor(tensor=self.cuda_shard, prefix="\t\t")
 
         if self.cpu_shard is not None:
             output.append("\tcpu shard:\n")
-            print_tensor(tensor=self.cpu_shard, prefix='\t\t')
+            print_tensor(tensor=self.cpu_shard, prefix="\t\t")
 
         memory_info = self.memory_usage
-        output.append("\tmemory usage: cuda {}, cpu {}\n".format(memory_info['cuda'], memory_info['cpu']))
+        output.append(
+            "\tmemory usage: cuda {}, cpu {}\n".format(
+                memory_info["cuda"], memory_info["cpu"]
+            )
+        )
 
         if detailed:
             output.append("\ttensor state monitor:\n")
             for st in TensorState:
-                output.append("\t\t# of {}: {}\n".format(st, self.tensor_state_cnter[st]))
+                output.append(
+                    "\t\t# of {}: {}\n".format(st, self.tensor_state_cnter[st])
+                )
 
-        return ''.join(output)
+        return "".join(output)

@@ -1,9 +1,9 @@
-
 from abc import abstractmethod
 
 import json
 from time import time
 import torch
+
 
 class MemoryMonitor:
     """Base class for all types of memory monitor.

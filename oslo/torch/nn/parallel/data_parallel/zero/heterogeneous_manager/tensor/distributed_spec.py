@@ -2,12 +2,12 @@ from enum import Enum
 from typing import List
 
 
-__all__ = ['ReplicaSpec', 'ShardSpec']
+__all__ = ["ReplicaSpec", "ShardSpec"]
 
 
 class DistributedPlacementPattern(Enum):
-    REPLICATE = 'r'
-    SHARD = 's'
+    REPLICATE = "r"
+    SHARD = "s"
 
 
 class DistributedSpec:
@@ -20,12 +20,14 @@ class DistributedSpec:
     The API for users should be `ShardSpec` and `ReplicaSpec`.
 
     Args:
-        dist_placement_pattern (DistributedPlacementPattern): 
+        dist_placement_pattern (DistributedPlacementPattern):
             The pattern describing how tensors are distributed among processes.
             The dist_placement_pattern is picked from a limited set, now including two patterns: replicate and shard.
     """
 
-    def __init__(self, dist_placement_pattern: DistributedPlacementPattern, **meta_info):
+    def __init__(
+        self, dist_placement_pattern: DistributedPlacementPattern, **meta_info
+    ):
         self.placement = dist_placement_pattern
         self.__dict__.update(meta_info)
 
@@ -33,10 +35,10 @@ class DistributedSpec:
         return self.__dict__ == other.__dict__
 
     def __repr__(self) -> str:
-        attr_list = [f'{attr}={str(value)}' for attr, value in self.__dict__.items()]
+        attr_list = [f"{attr}={str(value)}" for attr, value in self.__dict__.items()]
         attr_str = ", ".join(attr_list)
         return f"DistributedSpec({attr_str})"
-    
+
 
 def ReplicaSpec() -> DistributedSpec:
     """ReplicaSpec
@@ -66,4 +68,8 @@ def ShardSpec(dims: List[int], num_partitions: List[int]) -> DistributedSpec:
     """
     assert isinstance(dims, list) and isinstance(num_partitions, list)
     assert len(dims) == len(num_partitions)
-    return DistributedSpec(DistributedPlacementPattern.SHARD, dims=tuple(dims), num_partitions=tuple(num_partitions))
+    return DistributedSpec(
+        DistributedPlacementPattern.SHARD,
+        dims=tuple(dims),
+        num_partitions=tuple(num_partitions),
+    )
