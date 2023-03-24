@@ -301,7 +301,7 @@ document.write(`
 <p>Use <code class="docutils literal notranslate"><span class="pre">ParallelMode.TENSOR_3D</span></code> as a parameter of <code class="docutils literal notranslate"><span class="pre">tensor_parallel_mode</span></code>. <code class="docutils literal notranslate"><span class="pre">tp_size</span></code> should be a <strong>cubic of positive integer</strong>.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># model = defined in section 2.2</span>
 
-<span class="kn">from</span> <span class="nn">oslo</span> <span class="kn">import</span> <span class="n">ParallelContext</span>
+<span class="kn">from</span> <span class="nn">oslo</span> <span class="kn">import</span> <span class="n">ParallelContext</span><span class="p">,</span> <span class="n">ParallelMode</span>
 <span class="kn">from</span> <span class="nn">oslo.torch.nn.parallel</span> <span class="kn">import</span> <span class="n">TensorParallel</span>
 
 <span class="n">tp_size</span> <span class="o">=</span> <span class="mi">8</span>
