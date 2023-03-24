@@ -223,18 +223,14 @@ class _TensorParallel2D(nn.Module):
     def _slice_patch_embedding(self, module):
         # TODO: Refactor and fixed logic to return the same value as TENSOR_1D
 
-        module_forward = module.forward
-
-        def forward(*args, **kwargs):
-            return scatter(
-                module_forward(*args, **kwargs),
-                -1,
-                self.parallel_context,
-                parallel_mode=ParallelMode.TENSOR_2D_ROW,
-            )
-
-        module.forward = forward
-
+        module_forward = copy.copy(module.forward)
+        module.forward = lambda *args, **kwargs: scatter(
+            module_forward(*args, **kwargs),
+            -1,
+            self.parallel_context,
+            parallel_mode=ParallelMode.TENSOR_2D_ROW,
+        )
+        
         row_rank = self.parallel_context.get_local_rank(ParallelMode.TENSOR_2D_ROW)
         col_rank = self.parallel_context.get_local_rank(ParallelMode.TENSOR_2D_COL)
 
