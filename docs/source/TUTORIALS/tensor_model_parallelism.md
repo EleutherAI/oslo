@@ -1,5 +1,5 @@
 # Tensor Model Parallelism Tutorial
-- Authors: Kichang Yang, Kevin Ko
+- Authors: Kichang Yang, Kevin Ko, Minho Ryu
 
 ![260461C3-EA3B-405C-9B34-05BA3C781161.png](image/260461C3-EA3B-405C-9B34-05BA3C781161.png)
 
@@ -86,7 +86,7 @@ Here is some explain about arguments to parallel_context.
 
 ```python
 import oslo
-from oslo import ParallelContext
+from oslo import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel import TensorParallel
 
 tp_size = 4
@@ -157,7 +157,7 @@ tokenizer.pad_token = tokenizer.eos_token
 ```python
 # model = defined in section 2.2
 
-from oslo import ParallelContext
+from oslo import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel import TensorParallel
 
 tp_size = 4
