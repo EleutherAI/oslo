@@ -90,7 +90,7 @@ class HeterogeneousMemoryManager:
         else:
             assert (
                 not self._warmup
-            ), "Gemini Manager has memstats after warm up! Now is during warmup."
+            ), "HeterogeneousMemory has memstats after warm up! Now is during warmup."
             return self._mem_stats_collector._memstats
 
     def pre_iter(self, *args):
