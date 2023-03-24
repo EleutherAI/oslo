@@ -13,7 +13,7 @@ Use `ParallelMode.TENSOR_3D` as a parameter of `tensor_parallel_mode`. `tp_size`
 ```python
 # model = defined in section 2.2
 
-from oslo import ParallelContext
+from oslo import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel import TensorParallel
 
 tp_size = 8
