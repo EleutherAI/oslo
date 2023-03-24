@@ -101,11 +101,15 @@ class _TensorParallel2D(nn.Module):
                     setattr(module, elem.name, reduced_arg)
 
     def _parallelize_embedding(self):
+        from transformers.models.vit.modeling_vit import ViTEmbeddings
+
         for module_name, module in self.module.named_modules():
             if isinstance(module, nn.Embedding):
                 self._slice_embedding(
                     module=module,
                 )
+            elif isinstance(module, ViTEmbeddings):
+                self._slice_patch_embedding(module=module)
 
     def _parallelize_linear(self):
         for module_name, module in self.module.named_modules():
@@ -212,6 +216,33 @@ class _TensorParallel2D(nn.Module):
             module.weight.oslo_parallel[ParallelMode.TENSOR_2D_COL] = col_rank
         else:
             module.weight.oslo_parallel = {
+                ParallelMode.TENSOR_2D_ROW: row_rank,
+                ParallelMode.TENSOR_2D_COL: col_rank,
+            }
+
+    def _slice_patch_embedding(self, module):
+        # TODO: Refactor and fixed logic to return the same value as TENSOR_1D
+
+        module_forward = module.forward
+
+        def forward(*args, **kwargs):
+            return scatter(
+                module_forward(*args, **kwargs),
+                -1,
+                self.parallel_context,
+                parallel_mode=ParallelMode.TENSOR_2D_ROW,
+            )
+
+        module.forward = forward
+
+        row_rank = self.parallel_context.get_local_rank(ParallelMode.TENSOR_2D_ROW)
+        col_rank = self.parallel_context.get_local_rank(ParallelMode.TENSOR_2D_COL)
+
+        if hasattr(module, "oslo_parallel"):
+            module.oslo_parallel[ParallelMode.TENSOR_2D_ROW] = row_rank
+            module.oslo_parallel[ParallelMode.TENSOR_2D_COL] = col_rank
+        else:
+            module.oslo_parallel = {
                 ParallelMode.TENSOR_2D_ROW: row_rank,
                 ParallelMode.TENSOR_2D_COL: col_rank,
             }
