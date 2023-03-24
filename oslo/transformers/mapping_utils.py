@@ -234,12 +234,10 @@ class _TensorParallelMapping(_ParallelMapping):
             ),
         ],
         "ViTForImageClassification": [
-            Column("query", "key", "value", gather_output=True),
-            Column("intermediate.dense"),
-            Row("output.dense", gather_output=True),
-            Column("attention.output.dense", gather_output=True),
+            Column("query", "key", "value", "intermediate.dense"),
+            Row("output.dense"),
             Other("position_embeddings", "cls_token", gather_output=True),
-            Update(""),
+            Update("num_attention_heads", "all_head_size"),
             Head("classifier", gather_output=True),
         ],
     }
