@@ -14,7 +14,7 @@ It is recommended to set `tp_depth` to more than 1, as the algorithm becomes ide
 ```python
 # model = defined in section 2.2
 
-from oslo import ParallelContext
+from oslo import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel import TensorParallel
 
 tp_size = 8

@@ -14,7 +14,7 @@ The result is a matrix $Y$ that is the product of $X$ and $A$.
 Use `ParallelMode.TENSOR_2D` as a parameter of `tensor_parallel_mode`. Since the algorithm splits model along both rows and columns, `tp_size` should be a **square of positive integer**.
 
 ```python
-from oslo import ParallelContext
+from oslo import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel import TensorParallel
 
 tp_size = 4
