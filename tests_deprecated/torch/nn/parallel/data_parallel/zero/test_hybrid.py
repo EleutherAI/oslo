@@ -12,22 +12,21 @@ from oslo.torch.utils import get_free_port, set_seed
 from oslo.torch.nn.parallel.data_parallel.zero import ZeroRedundancyOptimizer
 from torch.testing import assert_close
 from oslo.torch.nn.parallel import TensorParallel
+from transformers import BertModel, BertTokenizer, BertConfig
 
 skip_if_dist_unavailable = pytest.mark.skipif(
     torch.cuda.device_count() < 2, reason="dist required"
 )
 
 
-class MlpModel(nn.Module):
+class BertWrapper(nn.Module):
     def __init__(self):
-        super(MlpModel, self).__init__()
-        self.linear1 = nn.Linear(128, 256)
-        self.linear2 = nn.Linear(256, 512)
+        super(BertWrapper, self).__init__()
+        self.bert = BertModel(BertConfig())
 
     def forward(self, x):
-        x = self.linear1(x)
-        x = self.linear2(x)
-        return x
+        outputs = self.bert(x)
+        return outputs.last_hidden_state
 
 
 def assert_shard_close(
@@ -58,7 +57,7 @@ def run(parallel_context: ParallelContext):
     local_rank = torch.distributed.get_rank()
 
     # create model
-    model = MlpModel().cuda()
+    model = BertWrapper().cuda()
     hybrid_model = TensorParallel(
         copy.deepcopy(model), parallel_context=parallel_context
     )
@@ -77,9 +76,15 @@ def run(parallel_context: ParallelContext):
         overlap_communication=True,
     )
 
+    # create tokenizer
+    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+
     # create data
     set_seed(2021 + local_rank)
-    input_data = torch.randn(32, 128).cuda()
+    input_text = ["This is a sample text."] * 32
+    input_data = tokenizer(
+        input_text, return_tensors="pt", padding=True, truncation=True
+    )["input_ids"].cuda()
 
     # zero-dp forward
     hybrid_output = hybrid_model(input_data)
