@@ -12,21 +12,23 @@ from oslo.torch.utils import get_free_port, set_seed
 from oslo.torch.nn.parallel.data_parallel.zero import ZeroRedundancyOptimizer
 from torch.testing import assert_close
 from oslo.torch.nn.parallel import TensorParallel
-from transformers import BertModel, BertTokenizer, BertConfig
+from transformers import DistilBertForSequenceClassification, DistilBertTokenizer
 
 skip_if_dist_unavailable = pytest.mark.skipif(
     torch.cuda.device_count() < 2, reason="dist required"
 )
 
 
-class BertWrapper(nn.Module):
+class DistilBertWrapper(nn.Module):
     def __init__(self):
-        super(BertWrapper, self).__init__()
-        self.bert = BertModel(BertConfig())
+        super(DistilBertWrapper, self).__init__()
+        self.distilbert = DistilBertForSequenceClassification.from_pretrained(
+            "distilbert-base-uncased"
+        )
 
     def forward(self, x):
-        outputs = self.bert(x)
-        return outputs.last_hidden_state
+        outputs = self.distilbert(x)
+        return outputs.logits
 
 
 def assert_shard_close(
@@ -57,7 +59,7 @@ def run(parallel_context: ParallelContext):
     local_rank = torch.distributed.get_rank()
 
     # create model
-    model = BertWrapper().cuda()
+    model = DistilBertWrapper().cuda()
     hybrid_model = TensorParallel(
         copy.deepcopy(model), parallel_context=parallel_context
     )
@@ -77,7 +79,7 @@ def run(parallel_context: ParallelContext):
     )
 
     # create tokenizer
-    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+    tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
 
     # create data
     set_seed(2021 + local_rank)
