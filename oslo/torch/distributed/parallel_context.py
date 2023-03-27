@@ -1,5 +1,6 @@
 import os
 import random
+import weakref
 from typing import List, Optional
 
 import numpy as np
@@ -159,11 +160,6 @@ class ParallelContext(object):
 
     _instance = None
 
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
     @classmethod
     def get_context(cls) -> Optional["ParallelContext"]:
         """Get parallel context.
@@ -171,7 +167,11 @@ class ParallelContext(object):
         Returns:
             Optional[ParallelContext]: parallel context
         """
-        return cls._instance
+        last_instance_ref = cls._instance
+        if last_instance_ref is not None:
+            last_instance = last_instance_ref()
+            return last_instance
+        return None
 
     @classmethod
     def from_torch(
@@ -482,6 +482,7 @@ class ParallelContext(object):
         # TODO; is this naming okay?
         self.pipeline_local_master_rank = None
         self.init_pipeline_rpc_workers()
+        ParallelContext._instance = weakref.ref(self)
 
     # sanity check
     @staticmethod
