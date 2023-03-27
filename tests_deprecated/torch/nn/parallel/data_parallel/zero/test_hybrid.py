@@ -19,18 +19,6 @@ skip_if_dist_unavailable = pytest.mark.skipif(
 )
 
 
-class DistilBertWrapper(nn.Module):
-    def __init__(self):
-        super(DistilBertWrapper, self).__init__()
-        self.distilbert = DistilBertForSequenceClassification.from_pretrained(
-            "distilbert-base-uncased"
-        )
-
-    def forward(self, x):
-        outputs = self.distilbert(x)
-        return outputs.logits
-
-
 def assert_shard_close(
     tensor: torch.Tensor,
     shard: torch.Tensor,
@@ -59,7 +47,9 @@ def run(parallel_context: ParallelContext):
     local_rank = torch.distributed.get_rank()
 
     # create model
-    model = DistilBertWrapper().cuda()
+    model = DistilBertForSequenceClassification.from_pretrained(
+        "distilbert-base-uncased"
+    ).cuda()
     hybrid_model = TensorParallel(
         copy.deepcopy(model), parallel_context=parallel_context
     )
@@ -89,8 +79,8 @@ def run(parallel_context: ParallelContext):
     )["input_ids"].cuda()
 
     # zero-dp forward
-    hybrid_output = hybrid_model(input_data)
-    zero_output = zero_model(input_data)
+    hybrid_output = hybrid_model(input_data).logits
+    zero_output = zero_model(input_data).logits
 
     assert torch.allclose(hybrid_output, zero_output)
 
