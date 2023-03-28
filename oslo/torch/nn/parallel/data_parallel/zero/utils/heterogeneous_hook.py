@@ -5,9 +5,15 @@ from typing import List
 
 import torch
 
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import TensorState
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.heterogeneous_manager import HeterogeneousMemoryManager
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.tensor.op_hook import DistributedParamOpHook
+from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import (
+    TensorState,
+)
+from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.heterogeneous_manager import (
+    HeterogeneousMemoryManager,
+)
+from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.tensor.op_hook import (
+    DistributedParamOpHook,
+)
 from oslo.torch.nn.parallel.data_parallel._utils import is_ddp_ignored
 
 
@@ -17,7 +23,6 @@ class TrainingPhase(Enum):
 
 
 class GeminiZeROHook(DistributedParamOpHook):
-
     def __init__(self, gemini_manager: HeterogeneousMemoryManager) -> None:
         super().__init__()
         self._gemini_manager = gemini_manager
@@ -40,7 +45,11 @@ class GeminiZeROHook(DistributedParamOpHook):
     def post_op(self, params):
         params = [p for p in params if not is_ddp_ignored(p)]
         for p in params:
-            tensor_state = TensorState.HOLD if self._training_phase == TrainingPhase.FORWARD or not p.requires_grad else TensorState.HOLD_AFTER_BWD
+            tensor_state = (
+                TensorState.HOLD
+                if self._training_phase == TrainingPhase.FORWARD or not p.requires_grad
+                else TensorState.HOLD_AFTER_BWD
+            )
             self._chunk_manager.trans_tensor_state(p, tensor_state)
 
     def pre_forward(self, params: List[torch.Tensor]) -> None:
@@ -62,7 +71,9 @@ class GeminiZeROHook(DistributedParamOpHook):
             self._training_phase = TrainingPhase.FORWARD
 
     @contextmanager
-    def switch_training_phase(self, training_phase: TrainingPhase = TrainingPhase.BACKWARD):
+    def switch_training_phase(
+        self, training_phase: TrainingPhase = TrainingPhase.BACKWARD
+    ):
         old_training_phase = self._training_phase
         try:
             self._training_phase = training_phase
@@ -71,4 +82,6 @@ class GeminiZeROHook(DistributedParamOpHook):
             self._training_phase = old_training_phase
 
     switch_to_backward = switch_training_phase
-    switch_to_forward = partial(switch_to_backward, training_phase=TrainingPhase.FORWARD)
+    switch_to_forward = partial(
+        switch_to_backward, training_phase=TrainingPhase.FORWARD
+    )

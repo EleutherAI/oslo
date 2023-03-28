@@ -13,7 +13,11 @@ from oslo.torch.nn.parallel.utils import (
     OsloParallelWrapper,
 )
 from oslo.torch.nn.parallel.data_parallel._reducer import Reducer
-from oslo.torch.nn.parallel.data_parallel._utils import free_storage, is_ddp_ignored, DistributedBackwardFunction
+from oslo.torch.nn.parallel.data_parallel._utils import (
+    free_storage,
+    is_ddp_ignored,
+    DistributedBackwardFunction,
+)
 
 
 def DistributedDataParallel(
@@ -92,7 +96,8 @@ class _DistributedDataParallel(OsloParallelWrapper):
                 {
                     k: v
                     for k, v in zip(
-                        outputs.keys(), DistributedBackwardFunction.apply(self, *outputs.values())
+                        outputs.keys(),
+                        DistributedBackwardFunction.apply(self, *outputs.values()),
                     )
                 }
             )
@@ -100,7 +105,7 @@ class _DistributedDataParallel(OsloParallelWrapper):
         if isinstance(outputs, torch.Tensor):
             outputs = (outputs,)
         return DistributedBackwardFunction.apply(self, *outputs)
-    
+
     def _pre_backward(self):
         pass
 

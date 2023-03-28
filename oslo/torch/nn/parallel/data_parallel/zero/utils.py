@@ -24,7 +24,9 @@ def get_temp_total_chunk_on_cuda(chunk: Chunk):
     else:
         shard_temp = chunk.cpu_shard.to(get_current_device())
 
-    total_temp = torch.zeros(chunk.chunk_size, dtype=chunk.dtype, device=get_current_device())
+    total_temp = torch.zeros(
+        chunk.chunk_size, dtype=chunk.dtype, device=get_current_device()
+    )
     gather_list = list(torch.chunk(input=total_temp, chunks=chunk.pg_size, dim=0))
     dist.all_gather(tensor_list=gather_list, tensor=shard_temp, group=chunk.torch_pg)
 

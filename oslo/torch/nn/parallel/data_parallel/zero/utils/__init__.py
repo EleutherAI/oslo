@@ -1,5 +1,5 @@
 from oslo.torch.nn.parallel.data_parallel.zero.utils.heterogeneous_hook import (
-    GeminiZeROHook
+    GeminiZeROHook,
 )
 
-__ALL__ = ['GeminiZeROHook']
+__ALL__ = ["GeminiZeROHook"]
