@@ -13,7 +13,6 @@ from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn.parallel.data_parallel._utils import (
     free_storage,
     is_ddp_ignored,
-    DistributedBackwardFunction,
 )
 from oslo.torch.nn.parallel.data_parallel.data_parallel import _DistributedDataParallel
 from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import (
@@ -43,7 +42,7 @@ from oslo.torch.nn.parallel.data_parallel.zero.utils import (
     get_temp_total_chunk_on_cuda,
 )
 from oslo.torch.nn.parallel.data_parallel.zero.utils.heterogeneous_hook import (
-    GeminiZeROHook,
+    HeterogeneousZeROHook,
 )
 
 
@@ -72,7 +71,7 @@ class FullyShardedDataParallel(_DistributedDataParallel):
     Args:
         module (torch.nn.Module): Module to apply ZeRO-DP.
         parallel_context (ParallelContext): process group object.
-        gemini_manager (HeterogeneousMemoryManager): Manages the chunk manager and heterogeneous memory space.
+        heterogeneous_manager (HeterogeneousMemoryManager): Manages the chunk manager and heterogeneous memory space.
             For more details, see the API reference of ``HeterogeneousMemoryManager``.
         pin_memory (bool): Chunks on CPU Memory use pin-memory.
         force_outputs_fp32 (bool): If set to True, outputs will be fp32. Otherwise, outputs will be fp16.
@@ -84,17 +83,17 @@ class FullyShardedDataParallel(_DistributedDataParallel):
     def __init__(
         self,
         module: torch.nn.Module,
-        gemini_manager: HeterogeneousMemoryManager,
+        heterogeneous_manager: HeterogeneousMemoryManager,
         parallel_context: ParallelContext = None,
         pin_memory: bool = False,
         force_outputs_fp32: bool = False,
         strict_ddp_mode: bool = False,
     ) -> None:
         super().__init__(module, parallel_context=parallel_context)
-        self.gemini_manager = gemini_manager
-        self.chunk_manager: ChunkManager = gemini_manager.chunk_manager
+        self.heterogeneous_manager = heterogeneous_manager
+        self.chunk_manager: ChunkManager = heterogeneous_manager.chunk_manager
         self.force_outputs_fp32 = force_outputs_fp32
-        self.param_op_hook = GeminiZeROHook(gemini_manager)
+        self.param_op_hook = HeterogeneousZeROHook(heterogeneous_manager)
         self.fp32_params: List[DistributedTensor] = list()
         self.fp16_params: List[DistributedParameter] = list()
         self.overflow_counter = 0
@@ -105,9 +104,9 @@ class FullyShardedDataParallel(_DistributedDataParallel):
         self._cast_buffers()
         self._logger = logging.get_logger(__name__)
 
-        if self.gemini_manager._premade_memstats_:
+        if self.heterogeneous_manager._premade_memstats_:
             # build chunk in param runtime visited order.
-            param_order = self.gemini_manager.memstats()._param_runtime_order
+            param_order = self.heterogeneous_manager.memstats()._param_runtime_order
         else:
             # build chunk in param initialized order.
             # Note: in this way, it can not get filter unused params during runtime.
@@ -118,7 +117,7 @@ class FullyShardedDataParallel(_DistributedDataParallel):
         self._init_chunks(
             param_order=param_order,
             strict_ddp_mode=strict_ddp_mode,
-            cpu_offload=self.gemini_manager.policy_name != "cuda",
+            cpu_offload=self.heterogeneous_manager.policy_name != "cuda",
             pin_memory=pin_memory,
         )
 
@@ -143,20 +142,20 @@ class FullyShardedDataParallel(_DistributedDataParallel):
             self.chunk_manager.move_chunk(chunk, self.grads_device[first_param])
         assert self.chunk_manager.accessed_mem == 0
         # reset all recorded attributes
-        self.gemini_manager.reset_attributes()
+        self.heterogeneous_manager.reset_attributes()
 
     def forward(self, *args, **kwargs):
         # check whether we are in a inference mode
         grad_flag = torch.is_grad_enabled()
         if not grad_flag:
             assert (
-                not self.gemini_manager.need_warmup
-                or not self.gemini_manager.is_warmup()
+                not self.heterogeneous_manager.need_warmup
+                or not self.heterogeneous_manager.is_warmup()
             ), "You should run a completed iteration as your warmup iter"
 
         args, kwargs = _cast_float(args, torch.half), _cast_float(kwargs, torch.half)
         self.module.zero_grad(set_to_none=True)
-        self.gemini_manager.pre_iter(*args)
+        self.heterogeneous_manager.pre_iter(*args)
         with DistributedParamOpHookManager.use_hooks(self.param_op_hook):
             outputs = super().forward(*args, **kwargs)
         # scatter chunks in the inference mode
@@ -183,7 +182,7 @@ class FullyShardedDataParallel(_DistributedDataParallel):
         # the label is used to check whether the parameter is correctly reduced
         for param in self.param2name:
             if not is_ddp_ignored(param):
-                setattr(param, "_gemini_reduced", False)
+                setattr(param, "_heterogeneous_reduced", False)
 
     def _post_backward(self):
         # reset the context for forward
@@ -193,7 +192,7 @@ class FullyShardedDataParallel(_DistributedDataParallel):
         if self.chunk_manager.accessed_mem != 0:
             error_params = ["Reduction failed at followed parameters:"]
             for param in self.param2name:
-                if not is_ddp_ignored(param) and not getattr(param, "_gemini_reduced"):
+                if not is_ddp_ignored(param) and not getattr(param, "_heterogeneous_reduced"):
                     error_params.append(self.param2name[param])
             error_str = "\n\t".join(error_params)
             raise RuntimeError(
@@ -203,9 +202,9 @@ class FullyShardedDataParallel(_DistributedDataParallel):
             )
         self._setup_grads_ptr()
         self._logger.debug(
-            f"comp cuda demand time: {self.gemini_manager._comp_cuda_demand_time}, layout time: {self.gemini_manager._layout_time}, evict time: {self.gemini_manager._evict_time}, CPU->CUDA vol: {self.gemini_manager._h2d_volume}B, CUDA->CPU vol: {self.gemini_manager._d2h_volume}"
+            f"comp cuda demand time: {self.heterogeneous_manager._comp_cuda_demand_time}, layout time: {self.heterogeneous_manager._layout_time}, evict time: {self.heterogeneous_manager._evict_time}, CPU->CUDA vol: {self.heterogeneous_manager._h2d_volume}B, CUDA->CPU vol: {self.heterogeneous_manager._d2h_volume}"
         )
-        self.gemini_manager.post_iter()
+        self.heterogeneous_manager.post_iter()
 
     def grad_handle(self, p, grad):
         empty_grad = torch.empty_like(grad)
@@ -636,7 +635,7 @@ class FullyShardedDataParallel(_DistributedDataParallel):
 
             self.fp16_params.append(p)
             self.fp32_params.append(fp32_p)
-            self.grads_device[p] = self.gemini_manager.default_device
+            self.grads_device[p] = self.heterogeneous_manager.default_device
 
         self.chunk_manager.close_all_groups()
 

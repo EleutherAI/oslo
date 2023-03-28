@@ -22,11 +22,11 @@ class TrainingPhase(Enum):
     BACKWARD = 1
 
 
-class GeminiZeROHook(DistributedParamOpHook):
-    def __init__(self, gemini_manager: HeterogeneousMemoryManager) -> None:
+class HeterogeneousZeROHook(DistributedParamOpHook):
+    def __init__(self, heterogeneous_manager: HeterogeneousMemoryManager) -> None:
         super().__init__()
-        self._gemini_manager = gemini_manager
-        self._chunk_manager = gemini_manager.chunk_manager
+        self._heterogeneous_manager = heterogeneous_manager
+        self._chunk_manager = heterogeneous_manager.chunk_manager
         self._training_phase = TrainingPhase.FORWARD
 
     def pre_op(self, params):
@@ -34,13 +34,13 @@ class GeminiZeROHook(DistributedParamOpHook):
         chunks = self._chunk_manager.get_chunks(params)
         for p in params:
             self._chunk_manager.trans_tensor_state(p, TensorState.COMPUTE)
-        self._gemini_manager.sample_overall_data()
-        self._gemini_manager.adjust_layout(chunks)
+        self._heterogeneous_manager.sample_overall_data()
+        self._heterogeneous_manager.adjust_layout(chunks)
         for chunk in chunks:
             self._chunk_manager.access_chunk(chunk)
 
         # record cuda model data of the current OP
-        self._gemini_manager.record_model_data_volume()
+        self._heterogeneous_manager.record_model_data_volume()
 
     def post_op(self, params):
         params = [p for p in params if not is_ddp_ignored(p)]
