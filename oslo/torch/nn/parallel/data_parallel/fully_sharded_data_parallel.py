@@ -26,15 +26,15 @@ from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.heterogeneo
 from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_tracer.param_runtime_order import (
     OrderedParamGenerator,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.tensor.distributed_tensor import (
+from oslo.torch.nn.parallel.data_parallel.zero.tensor.distributed_tensor import (
     ReplicaSpec,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.tensor.distributed_parameter import (
+from oslo.torch.nn.parallel.data_parallel.zero.tensor.distributed_parameter import (
     DistributedParameter,
     DistributedTensor,
     DistributedTensorSpec,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.tensor.op_hook import (
+from oslo.torch.nn.parallel.data_parallel.zero.tensor.op_hook import (
     DistributedParamOpHookManager,
 )
 from oslo.torch.nn.parallel.data_parallel.zero.utils import (

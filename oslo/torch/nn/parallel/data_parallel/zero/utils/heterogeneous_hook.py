@@ -11,7 +11,7 @@ from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk impor
 from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.heterogeneous_manager import (
     HeterogeneousMemoryManager,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.tensor.op_hook import (
+from oslo.torch.nn.parallel.data_parallel.zero.tensor.op_hook import (
     DistributedParamOpHook,
 )
 from oslo.torch.nn.parallel.data_parallel._utils import is_ddp_ignored
