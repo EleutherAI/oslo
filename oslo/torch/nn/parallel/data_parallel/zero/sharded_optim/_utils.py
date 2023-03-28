@@ -16,7 +16,7 @@
 
 from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
 import torch.distributed as dist
-from torch._six import inf
+from torch import inf
 import math
 import torch
 from typing import Optional, Iterable, List, Union
