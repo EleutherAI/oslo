@@ -192,7 +192,9 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
         if self.chunk_manager.accessed_mem != 0:
             error_params = ["Reduction failed at followed parameters:"]
             for param in self.param2name:
-                if not is_ddp_ignored(param) and not getattr(param, "_heterogeneous_reduced"):
+                if not is_ddp_ignored(param) and not getattr(
+                    param, "_heterogeneous_reduced"
+                ):
                     error_params.append(self.param2name[param])
             error_str = "\n\t".join(error_params)
             raise RuntimeError(
