@@ -138,22 +138,7 @@ class FullyShardedDataParallel(_DistributedDataParallel):
         self.module.zero_grad(set_to_none=True)
         self.gemini_manager.pre_iter(*args)
         with DistributedParamOpHookManager.use_hooks(self.param_op_hook):
-            outputs = self.module(*args, **kwargs)
-
-        # TODO: refactor
-        if isinstance(outputs, dict):
-            outputs = type(outputs)(
-                {
-                    k: v
-                    for k, v in zip(
-                        outputs.keys(), DistributedBackwardFunction.apply(self, *outputs.values())
-                    )
-                }
-            )
-        elif isinstance(outputs, (list, tuple)):
-            DistributedBackwardFunction.apply(self, *outputs)
-        else:
-            DistributedBackwardFunction.apply(self, outputs)
+            outputs = super().forward(*args, **kwargs)
 
         # scatter chunks in the inference mode
         if not grad_flag:
