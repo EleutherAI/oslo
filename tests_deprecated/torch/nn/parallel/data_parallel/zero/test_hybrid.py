@@ -92,7 +92,7 @@ def run(parallel_context: ParallelContext):
     # check updated param
     for hp, zp in zip(hybrid_model.parameters(), zero_model.parameters()):
         assert assert_shard_close(
-            zp.data, hp.data, int(os.environ["RANK"]), int(os.environ["WORLD_SIZE"])
+            zp.data, hp.data, local_rank, torch.distributed.get_world_size()
         )
 
 
