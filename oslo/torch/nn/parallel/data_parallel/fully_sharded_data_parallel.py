@@ -62,7 +62,7 @@ def _cast_float(args, dtype: torch.dtype):
     return args
 
 
-class FullyShardedDataParallel(_DistributedDataParallel):
+class _FullyShardedDataParallel(_DistributedDataParallel):
     """Fully sharded data parallel for DistributedTensor.
     Warning: Nested ZeroDDP is not supported now.
     It is designed to be used with ChunkManager and HeterogeneousMemoryManager.
@@ -70,9 +70,9 @@ class FullyShardedDataParallel(_DistributedDataParallel):
 
     Args:
         module (torch.nn.Module): Module to apply ZeRO-DP.
-        parallel_context (ParallelContext): process group object.
         heterogeneous_manager (HeterogeneousMemoryManager): Manages the chunk manager and heterogeneous memory space.
             For more details, see the API reference of ``HeterogeneousMemoryManager``.
+        parallel_context (ParallelContext): process group object.
         pin_memory (bool): Chunks on CPU Memory use pin-memory.
         force_outputs_fp32 (bool): If set to True, outputs will be fp32. Otherwise, outputs will be fp16.
             Defaults to False.
