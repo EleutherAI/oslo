@@ -44,22 +44,57 @@ class ChunkFullError(Exception):
 
 
 def is_storage_empty(tensor: torch.Tensor) -> bool:
+    """Check if the storage of the tensor is empty.
+
+    Args:
+        tensor (torch.Tensor): The tensor to check.
+
+    Returns:
+        bool: True if the storage is empty, False otherwise.
+    """
     return tensor.storage().size() == 0
 
 
 def free_storage(tensor: torch.Tensor) -> None:
+    """Free the storage of the tensor.
+
+    Args:
+        tensor (torch.Tensor): The tensor to free.
+    """
     if not is_storage_empty(tensor):
         tensor.storage().resize_(0)
 
 
 def alloc_storage(tensor: torch.Tensor) -> None:
+    """Allocate the storage of the tensor.
+
+    Args:
+        tensor (torch.Tensor): The tensor to allocate.
+    """
     if is_storage_empty(tensor):
         tensor.storage().resize_(tensor.numel())
 
 
 class Chunk:
     _total_number = 0
+    """
+    Chunk: A container owning a piece of contiguous memory space for tensors
+    Here we use all-gather operation to gather the whole chunk.
+    Currently, Chunk is exclusively used for DDP and ZeRO DDP and it doesn't support unused parameters.
+    It is designed to make the full use of communication and PCIE bandwidth.
 
+    Args:
+        chunk_size (int): the number of elements in the chunk
+        parallel_context (ParallelContext):
+            The parallel context object.
+        dtype (torch.dtype): the data type of the chunk
+        init_device (torch.device): 
+            optional, During the chunk construction process, where the tensor is stored.
+            The default value is None, which is the current GPU
+        cpu_shard_init (bool): a flag indicates the local chunk shard is resident on CPU.
+        keep_gathered (bool): optional, if True, this chunk is always gathered in CUDA memory
+        pin_memory (bool): optional, if True, this chunk always has a shard copied in pinned CPU memory
+    """
     def __init__(
         self,
         chunk_size: int,
@@ -70,23 +105,7 @@ class Chunk:
         keep_gathered: bool = False,
         pin_memory: bool = False,
     ) -> None:
-        """
-        Chunk: A container owning a piece of contiguous memory space for tensors
-        Here we use all-gather operation to gather the whole chunk.
-        Currently, Chunk is exclusively used for DDP and ZeRO DDP and it doesn't support unused parameters.
-        It is designed to make the full use of communication and PCIE bandwidth.
 
-        Args:
-            chunk_size (int): the number of elements in the chunk
-            parallel_context (ParallelContext):
-                The parallel context object.
-            dtype (torch.dtype): the data type of the chunk
-            init_device (torch.device): optional, During the chunk construction process, where the tensor is stored.
-                The default value is None, which is the current GPU
-            cpu_shard_init (bool): a flag indicates the local chunk shard is resident on CPU.
-            keep_gathered (bool): optional, if True, this chunk is always gathered in CUDA memory
-            pin_memory (bool): optional, if True, this chunk always has a shard copied in pinned CPU memory
-        """
         self.count_id = Chunk._total_number
         Chunk._total_number += 1
 
@@ -502,6 +521,7 @@ class Chunk:
             self.cpu_vis_flag = False
 
     def get_tensors(self) -> List[torch.Tensor]:
+        """Get the list of tensors in the chunk."""
         return list(self.tensors_info.keys())
 
     def __gather(self):

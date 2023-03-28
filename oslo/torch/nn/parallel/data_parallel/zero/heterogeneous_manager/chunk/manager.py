@@ -4,7 +4,7 @@ from typing import Deque, Dict, Iterable, List, Optional, Set, Tuple
 import torch
 
 from .chunk import Chunk, ChunkFullError, TensorState
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.tensor import (
+from oslo.torch.nn.parallel.data_parallel.zero.tensor import (
     DistributedTensor,
 )
 from oslo.torch.nn.parallel.data_parallel.zero.utils import get_current_device
@@ -20,7 +20,7 @@ class ChunkManager:
     """
 
     def __init__(
-        self, chunk_configuration, init_device: Optional[torch.device] = None
+        self, chunk_configuration: Dict[int, Dict], init_device: Optional[torch.device] = None
     ) -> None:
 
         self.device = init_device or get_current_device()
@@ -29,7 +29,6 @@ class ChunkManager:
         for k, v in self.kwargs_config.items():
             self.dp_degree_chunk_size_dict[k] = v.pop("chunk_size")
             v["init_device"] = self.device
-
         self.chunk_groups: Dict[str, Deque] = dict()
         self.tensor_chunk_map: Dict[torch.Tensor, Chunk] = dict()
         self.accessed_chunks: Set[Chunk] = set()
@@ -234,24 +233,29 @@ class ChunkManager:
         return self.chunk_groups[group_name]
 
     def __close_one_chunk(self, chunk: Chunk):
+        """Close one chunk."""
         self.__sub_memroy_usage(chunk.memory_usage)
         chunk.close_chunk()
         self.__add_memory_usage(chunk.memory_usage)
 
     def __sub_memroy_usage(self, usage: Dict[str, int]):
+        """Subtract memory usage from the total memory usage."""
         for k, v in usage.items():
             self.total_mem[k] -= v
 
     def __add_memory_usage(self, usage: Dict[str, int]):
+        """Add memory usage to the total memory usage."""
         for k, v in usage.items():
             self.total_mem[k] += v
 
     def __add_accessed_chunk(self, chunk: Chunk):
+        """Add a chunk to the accessed chunk list."""
         chunk.access_chunk()
         self.accessed_chunks.add(chunk)
         self.accessed_mem += chunk.chunk_mem
 
     def __sub_accessed_chunk(self, chunk: Chunk):
+        """Subtract a chunk from the accessed chunk list."""
         chunk.release_chunk()
         self.accessed_chunks.remove(chunk)
         self.accessed_mem -= chunk.chunk_mem

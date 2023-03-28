@@ -79,7 +79,7 @@ class ChunkMemStatsCollector:
         self._start_flag = False
         print(f"finish_collection {self._step_total}")
 
-    def record_model_data_volume(self) -> None:
+    def record_model_data_volume(self):
         """
         record model data volume on cuda and cpu.
         """
@@ -87,7 +87,7 @@ class ChunkMemStatsCollector:
             cuda_mem = self._chunk_manager.total_mem["cuda"]
             self._memstats.record_max_cuda_model_data(cuda_mem)
 
-    def sample_overall_data(self) -> None:
+    def sample_overall_data(self):
         """
         Sampling overall and non model data cuda memory statistics.
         """
@@ -101,7 +101,7 @@ class ChunkMemStatsCollector:
         if self._start_flag:
             self._sampling_time.append(time.time())
 
-    def clear(self) -> None:
+    def clear(self):
         self._memstats.clear()
         self._start_flag = False
         self._step_idx = 0

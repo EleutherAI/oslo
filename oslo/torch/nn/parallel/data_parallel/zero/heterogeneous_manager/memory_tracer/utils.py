@@ -12,6 +12,7 @@ from oslo.torch.distributed.parallel_mode import ParallelMode
 
 import torch.distributed as dist
 
+
 _GLOBAL_CUDA_MEM_FRACTION = 1.0
 _GLOBAL_CPU_MEM_CAPACITY = -1
 

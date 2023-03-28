@@ -4,7 +4,7 @@ import torch
 
 from .distributed_tensor import DistributedTensor
 from .const import TensorType
-from .op_hook import DistributedParamOpHookManager
+from .param_op_hook import DistributedParamOpHookManager
 from .distributed_tensor_spec import DistributedTensorSpec
 
 def filter_distributed_parameters(*args, **kwargs):

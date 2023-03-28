@@ -6,10 +6,11 @@ from .param_runtime_order import OrderedParamGenerator
 
 
 class MemStats(object):
+    """
+    Store the non model data statistics used for heterogeneous memory manager and Zero optimizer.
+    """
     def __init__(self) -> None:
-        """
-        Store the non model data statistics used for Gemini and ZeroOptimizer.
-        """
+
         # (preop_step, List[param])
         self._step_param_dict = dict()
         # (param, List[preop_step])
@@ -35,30 +36,50 @@ class MemStats(object):
         self._non_model_data_cpu_list = []
 
     def calc_max_cuda_non_model_data(self):
+        """
+        Calculate the maximum CUDA non-model data and store it in the step_nmd_dict.
+        """
         if self._prev_overall_cuda != -1 and self._prev_md_cuda != -1:
             max_cuda_non_model_data = self._prev_overall_cuda - self._prev_md_cuda
             self._step_nmd_dict[self._preop_step - 1] = max_cuda_non_model_data
             # compatibility of the old version.
             self._non_model_data_cuda_list.append(max_cuda_non_model_data)
 
-    def record_max_cuda_model_data(self, val):
+    def record_max_cuda_model_data(self, val: int):
+        """
+        Record the maximum CUDA model data.
+
+        Args:
+            val (int): The maximum CUDA model data value.
+        """
         self._prev_md_cuda = val
 
-    def record_max_cuda_overall_data(self, val):
+    def record_max_cuda_overall_data(self, val: int):
+        """
+        Record the maximum CUDA overall data.
+
+        Args:
+            val (int): The maximum CUDA overall data value.
+        """
         self._prev_overall_cuda = val
         self._max_overall_cuda = max(self._max_overall_cuda, val)
 
     @property
-    def max_overall_cuda(self):
+    def max_overall_cuda(self) -> int:
+        """
+        Get the maximum overall CUDA data.
+
+        Returns:
+            int: The maximum overall CUDA data value.
+        """
         return self._max_overall_cuda
 
-    def increase_preop_step(self, param_list: List[torch.nn.Parameter]):
+    def increase_preop_step(self, param_list: List[torch.nn.Parameter]) -> None:
         """
-        the time step is increased. param list is used between current and the next
-        time step.
+        Increase the pre-operation time step and store the list of parameters used between the current and next time steps.
 
         Args:
-            param_list (List[torch.nn.Parameter]): a list of torch parameters.
+            param_list (List[torch.nn.Parameter]): A list of torch parameters.
         """
         for p in param_list:
             if p not in self._param_step_dict:
@@ -71,7 +92,7 @@ class MemStats(object):
 
     def param_used_step(self, param: torch.nn.Parameter) -> Optional[List[int]]:
         """param_used_step
-        get the timestep list using the param
+        Get the timestep list using the param
 
         Args:
             param (torch.nn.Parameter): a torch param
@@ -84,13 +105,34 @@ class MemStats(object):
         else:
             return self._param_step_dict[param]
 
-    def param_order(self):
+    def param_order(self) -> OrderedParamGenerator:
+        """
+        Get the parameter order from the param_runtime_order object.
+
+        Returns:
+            OrderedParamGenerator: The OrderedParamGenerator object.
+
+        Raises:
+            RuntimeError: If the param_runtime_order is empty.
+        """
         if self._param_runtime_order.is_empty():
             raise RuntimeError
         else:
             return self._param_runtime_order
 
     def non_model_data_list(self, device_type: str) -> List[int]:
+        """
+        Get the non-model data list for the specified device type.
+
+        Args:
+            device_type (str): The device type, either "cuda" or "cpu".
+
+        Returns:
+            List[int]: A list of non-model data.
+
+        Raises:
+            TypeError: If the device_type is not "cuda" or "cpu".
+        """
         if device_type == "cuda":
             return self._non_model_data_cuda_list
         elif device_type == "cpu":
@@ -99,6 +141,18 @@ class MemStats(object):
             raise TypeError
 
     def max_non_model_data(self, device_type: str) -> float:
+        """
+        Get the maximum non-model data for the specified device type.
+
+        Args:
+            device_type (str): The device type, either "cuda" or "cpu".
+
+        Returns:
+            float: The maximum non-model data.
+
+        Raises:
+            TypeError: If the device_type is not "cuda" or "cpu".
+        """
         if device_type == "cuda":
             return max(self._non_model_data_cuda_list)
         elif device_type == "cpu":
@@ -107,6 +161,9 @@ class MemStats(object):
             raise TypeError
 
     def clear(self):
+        """
+        Clear all the data lists, dictionaries, and reset the pre-operation step value.
+        """
         self._model_data_cuda_list = []
         self._overall_cuda_list = []
 

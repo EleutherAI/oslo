@@ -4,8 +4,6 @@ from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_trac
 from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_tracer.memory_stats import (
     MemStats,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_tracer.param_runtime_order import (
-    ParamRuntimeOrder,
-)
+from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_tracer.param_runtime_order import OrderedParamGenerator
 
-__all__ = ["ChunkMemStatsCollector", "MemStats", "ParamRuntimeOrder"]
+__ALL__ = ["ChunkMemStatsCollector", "MemStats", "OrderedParamGenerator"]
