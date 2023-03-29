@@ -66,7 +66,7 @@ class SyncCudaMemoryMonitor(MemoryMonitor):
     It only records the maximum allocated CUDA memory from the start point to the finish point.
     """
 
-    def __init__(self, power: int = 10):
+    def __init__(self, *args, **kwargs):
         super().__init__()
 
     def start(self):

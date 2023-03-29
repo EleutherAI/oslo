@@ -1,5 +1,5 @@
 import time
-from typing import Optional
+from typing import Optional, List
 
 from .memory_monitor import SyncCudaMemoryMonitor
 
@@ -65,14 +65,23 @@ class ChunkMemStatsCollector:
         return next_non_model_data
 
     @property
-    def sampling_time(self):
+    def sampling_time(self) -> List[float]:
+        """Sampling time of each step.
+
+        Returns:
+            List[float]: sampling time of each step.
+        """
         return [t - self._sampling_time[0] for t in self._sampling_time]
 
     def start_collection(self):
+        """Start collection of memory statistics.
+        """
         self._start_flag = True
         self._mem_monitor.start()
 
     def finish_collection(self):
+        """Finish collection of memory statistics.
+        """
         self.sample_overall_data()
         # self._step_total = len(self._sampling_time)
         self._step_total = len(self._memstats.non_model_data_list("cuda"))
@@ -102,6 +111,7 @@ class ChunkMemStatsCollector:
             self._sampling_time.append(time.time())
 
     def clear(self):
+        """Clear memory statistics."""
         self._memstats.clear()
         self._start_flag = False
         self._step_idx = 0
@@ -109,6 +119,7 @@ class ChunkMemStatsCollector:
 
     @property
     def cuda_margin_mem(self) -> float:
+        """Margin memory on cuda device."""
         return (
             get_device_memory_capacity(get_current_device())
             - self._memstats.max_overall_cuda

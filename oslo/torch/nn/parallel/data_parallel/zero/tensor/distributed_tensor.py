@@ -95,7 +95,7 @@ class DistributedTensor(torch.Tensor):
 
     def __init__(
         self, data: torch.Tensor, spec: Optional[DistributedTensorSpec] = None
-    ) -> None:
+    ):
         # If not set spec, use a DP process group and replicate dist spec
         if spec is None:
             self.has_initialized = False

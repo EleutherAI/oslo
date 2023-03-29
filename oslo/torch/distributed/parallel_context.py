@@ -158,16 +158,20 @@ class ParallelContext(object):
         >>> parallel_context.get_prev_global_rank(ParallelMode.DATA)
     """
 
-    _instance = None
+    _instances : List["ParallelContext"]= []
 
     @classmethod
-    def get_context(cls) -> Optional["ParallelContext"]:
+    def get_context(cls, idx: int = -1) -> Optional["ParallelContext"]:
         """Get parallel context.
+
+        Args:
+            idx (int): index of parallel context
 
         Returns:
             Optional[ParallelContext]: parallel context
         """
-        last_instance_ref = cls._instance
+        assert idx < len(cls._instances), "Parallel context index out of range"
+        last_instance_ref = cls._instances[idx]
         if last_instance_ref is not None:
             last_instance = last_instance_ref()
             return last_instance
@@ -482,7 +486,7 @@ class ParallelContext(object):
         # TODO; is this naming okay?
         self.pipeline_local_master_rank = None
         self.init_pipeline_rpc_workers()
-        ParallelContext._instance = weakref.ref(self)
+        ParallelContext._instances.append(weakref.ref(self))
 
     # sanity check
     @staticmethod

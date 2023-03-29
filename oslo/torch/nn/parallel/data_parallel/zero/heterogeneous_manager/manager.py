@@ -64,6 +64,8 @@ class HeterogeneousMemoryManager:
         self._comp_cuda_demand_time = 0
 
     def reset_attributes(self):
+        """Reset the attributes of the manager.
+        """
         self._compute_idx = -1
         self._h2d_volume = 0
         self._d2h_volume = 0
@@ -73,13 +75,20 @@ class HeterogeneousMemoryManager:
 
     @property
     def need_warmup(self) -> bool:
+        """Check if the manager needs a warmup iteration.
+
+        Returns:
+            bool: True if the manager needs a warmup iteration.
+        """
         return self.policy_name in ("auto", "const")
 
+    @property
     def is_warmup(self):
+        """Check if the manager is in warmup iteration."""
         return self._warmup
 
     def memstats(self):
-        """memstats
+        """Memstats
 
         get the memory statistics during training.
         The stats could be collected by a runtime memory tracer, or collected by the HeterogeneousMemoryManager.
@@ -94,6 +103,7 @@ class HeterogeneousMemoryManager:
             return self._mem_stats_collector._memstats
 
     def pre_iter(self, *args):
+        """This function must be called when each iteration starts"""
         if self._mem_stats_collector and self._warmup:
             self._mem_stats_collector.start_collection()
 
@@ -104,9 +114,12 @@ class HeterogeneousMemoryManager:
         self._warmup = False
         self.reset_attributes()
 
-    def adjust_layout(self, chunks: Tuple[Chunk, ...]) -> None:
+    def adjust_layout(self, chunks: Tuple[Chunk, ...]):
         """Adjust the layout of stateful tensors according to the information provided
         by mem_stats_collector, which should belongs to a Sharded Model.
+
+        Args:
+            chunks (Tuple[Chunk, ...]): A tuple of chunks.
         """
         # find stateful tensor in state COMPUTE
         start = time()
@@ -132,7 +145,17 @@ class HeterogeneousMemoryManager:
     @functools.lru_cache(maxsize=None)
     def _get_layout_info(
         self, compute_idx: int, warmup: bool, chunks: Tuple[Chunk, ...]
-    ):
+    ) -> Tuple[int, Tuple[Chunk, ...]]:
+        """Get the layout information of the chunks.
+
+        Args:
+            compute_idx (int): The index of the compute list.
+            warmup (bool): Whether it is in the warmup iteration.
+            chunks (Tuple[Chunk, ...]): A tuple of chunks.
+
+        Returnes:
+            Tuple[int, Tuple[Chunk, ...]]: The cuda demand and the chunks that can be evicted.
+        """
         start = time()
         cuda_demand = 0
         for chunk in chunks:
@@ -150,37 +173,66 @@ class HeterogeneousMemoryManager:
         can_evict_chunks = self._chunk_manager.get_cuda_movable_chunks()
         return cuda_demand, can_evict_chunks
 
-    def _record_chunks_order(self, chunks: Tuple[Chunk, ...]) -> None:
+    def _record_chunks_order(self, chunks: Tuple[Chunk, ...]):
+        """Record the chunks order."""
         self._compute_idx += 1
         if self._warmup and self._placement_policy.need_mem_stats:
             self._compute_list.append(chunks)
 
     @property
-    def default_device(self):
+    def default_device(self) -> torch.device: 
+        """Get the default device.
+
+        Returns:
+            torch.device: The default device.
+        """
         return self._placement_policy.get_default_device()
 
     def sample_overall_data(self):
+        """Sample the overall data of the model.
+        """
         if self._mem_stats_collector:
             self._mem_stats_collector.sample_overall_data()
 
     def record_model_data_volume(self):
+        """Record the model data volume.
+        """
         if self._mem_stats_collector:
             self._mem_stats_collector.record_model_data_volume()
 
     @property
-    def chunk_manager(self):
+    def chunk_manager(self) -> ChunkManager:
+        """Get the chunk manager.
+
+        Returns:
+            ChunkManager: The chunk manager.
+        """
         return self._chunk_manager
 
     @property
     def cuda_margin_mem(self) -> Optional[float]:
+        """Get the cuda margin memory.
+
+        Returns:
+            Optional[float]: The cuda margin memory.
+        """
         if self._mem_stats_collector:
             return self._mem_stats_collector.cuda_margin_mem
         return None
 
     @property
     def is_cuda_margin_mem_avail(self) -> bool:
+        """Check if the cuda margin memory is available."""
         return self._placement_policy.need_mem_stats
 
     @staticmethod
     def get_default_device(policy_name: str) -> torch.device:
+        """Get the default device.
+
+        Args:
+            policy_name (str): The name of the placement policy.
+
+        Returns:
+            torch.device: The default device.
+        """
         return PlacementPolicyFactory.get_default_device(policy_name)
