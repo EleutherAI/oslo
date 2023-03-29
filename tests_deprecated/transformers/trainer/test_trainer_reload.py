@@ -35,7 +35,7 @@ valid_dataset = processed_dataset["validation"]
 data_collator = DataCollatorForSequenceClassification(processor)
 
 # Define trainer arguments
-reload_path = 'output/checkpoint-500'
+reload_path = "output/checkpoint-500"
 args = TrainingArguments.load_args(reload_path)
 
 # Define trainer
@@ -46,7 +46,7 @@ trainer = Trainer(
     train_dataset=train_dataset,
     eval_dataset=valid_dataset,
     data_collator=data_collator,
-    resume_from_checkpoint=reload_path
+    resume_from_checkpoint=reload_path,
 )
 
 # Train

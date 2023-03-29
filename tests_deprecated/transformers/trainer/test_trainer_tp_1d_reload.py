@@ -11,21 +11,29 @@ from oslo.transformers.tasks.data_sequence_classification import (
 from oslo.transformers.trainer import Trainer
 from oslo.transformers.training_args import TrainingArguments
 
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score
+from sklearn.metrics import (
+    accuracy_score,
+    precision_recall_fscore_support,
+    roc_auc_score,
+)
+
 
 def compute_metrics(pred):
     labels = pred.label_ids
     preds = pred.predictions.argmax(-1)
-    precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average='binary')
+    precision, recall, f1, _ = precision_recall_fscore_support(
+        labels, preds, average="binary"
+    )
     acc = accuracy_score(labels, preds)
     auc = roc_auc_score(labels, preds)
     return {
-        'accuracy': acc,
-        'f1': f1,
-        'precision': precision,
-        'recall': recall,
-        'auroc': auc
+        "accuracy": acc,
+        "f1": f1,
+        "precision": precision,
+        "recall": recall,
+        "auroc": auc,
     }
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -85,7 +93,7 @@ trainer = Trainer(
     train_dataset=train_dataset,
     eval_dataset=valid_dataset,
     data_collator=data_collator,
-    compute_metrics=compute_metrics
+    compute_metrics=compute_metrics,
 )
 
-trainer.train('output/checkpoint-3000')
+trainer.train("output/checkpoint-3000")

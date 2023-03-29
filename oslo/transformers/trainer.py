@@ -51,11 +51,12 @@ from transformers.trainer_utils import (
     TrainOutput,
     EvalPrediction,
     PREFIX_CHECKPOINT_DIR,
-    get_last_checkpoint
+    get_last_checkpoint,
 )
 
 import oslo
 from oslo.torch import ParallelMode
+
 # from oslo.torch.utils.extensions import save_pretrained as save_oslo_pretrained
 # from oslo.torch.utils.extensions import from_parallelized as from_oslo_parallelized
 from oslo.torch.nn.parallel import (
@@ -104,7 +105,9 @@ class Trainer:
         if load_args_from_saved:
             if resume_from_checkpoint and load_args_from_saved is not None:
                 load_args_path = (
-                    load_args_from_saved if isinstance(load_args_from_saved, str) else resume_from_checkpoint
+                    load_args_from_saved
+                    if isinstance(load_args_from_saved, str)
+                    else resume_from_checkpoint
                 )
                 args.load_args(load_args_path)
 
@@ -135,10 +138,7 @@ class Trainer:
             args.model_wrappers,
         )
 
-        if (
-            len(self.model_wrappers)
-            > 0
-        ):
+        if len(self.model_wrappers) > 0:
             self.place_model_on_device = False
         else:
             self.place_model_on_device = True
@@ -257,7 +257,9 @@ class Trainer:
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
             resume_from_checkpoint = get_last_checkpoint(args.output_dir)
             if resume_from_checkpoint is None:
-                raise ValueError(f"No valid checkpoint found in output directory ({args.output_dir})")
+                raise ValueError(
+                    f"No valid checkpoint found in output directory ({args.output_dir})"
+                )
 
         if resume_from_checkpoint is not None:
             self._load_from_checkpoint(resume_from_checkpoint)
@@ -287,17 +289,23 @@ class Trainer:
         steps_trained_progress_bar = None
 
         if resume_from_checkpoint is not None and os.path.isfile(
-                os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
+            os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
         ):
-            self.state = TrainerState.load_from_json(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
+            self.state = TrainerState.load_from_json(
+                os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
+            )
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:
-                steps_trained_in_current_epoch = self.state.global_step % (num_update_steps_per_epoch)
+                steps_trained_in_current_epoch = self.state.global_step % (
+                    num_update_steps_per_epoch
+                )
                 steps_trained_in_current_epoch *= args.gradient_accumulation_steps
             else:
                 steps_trained_in_current_epoch = 0
 
-            log_dist("  Continuing training from checkpoint, will skip to saved global_step")
+            log_dist(
+                "  Continuing training from checkpoint, will skip to saved global_step"
+            )
             log_dist(f"  Continuing training from epoch {epochs_trained}")
             log_dist(f"  Continuing training from global step {self.state.global_step}")
             if not args.ignore_data_skip:
@@ -307,8 +315,12 @@ class Trainer:
                     "flag to your launch command, but you will resume the training on data already seen by your model."
                 )
                 if self.is_local_process_zero():
-                    steps_trained_progress_bar = tqdm(total=steps_trained_in_current_epoch)
-                    steps_trained_progress_bar.set_description("Skipping the first batches")
+                    steps_trained_progress_bar = tqdm(
+                        total=steps_trained_in_current_epoch
+                    )
+                    steps_trained_progress_bar.set_description(
+                        "Skipping the first batches"
+                    )
 
         # Update the references
         self.callback_handler.model = self.model
@@ -341,7 +353,10 @@ class Trainer:
                 is_random_sampler = hasattr(train_dataloader, "sampler") and isinstance(
                     train_dataloader.sampler, RandomSampler
                 )
-                if version.parse(torch.__version__) < version.parse("1.11") or not is_random_sampler:
+                if (
+                    version.parse(torch.__version__) < version.parse("1.11")
+                    or not is_random_sampler
+                ):
                     # We just need to begin an iteration to create the randomization of the sampler.
                     # That was before PyTorch 1.11 however...
                     for _ in train_dataloader:
@@ -542,8 +557,12 @@ class Trainer:
             # self.model.from_parallelized(resume_from_checkpoint)
         else:
             if not os.path.isfile(os.path.join(resume_from_checkpoint, WEIGHTS_NAME)):
-                raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
-            state_dict = torch.load(os.path.join(resume_from_checkpoint, WEIGHTS_NAME), map_location="cpu")
+                raise ValueError(
+                    f"Can't find a valid checkpoint at {resume_from_checkpoint}"
+                )
+            state_dict = torch.load(
+                os.path.join(resume_from_checkpoint, WEIGHTS_NAME), map_location="cpu"
+            )
             self._load_state_dict_in_model(state_dict)
             del state_dict
 
@@ -621,7 +640,7 @@ class Trainer:
                 self.args, self.state, self.control
             )
 
-    def  _load_rng_state(self, checkpoint):
+    def _load_rng_state(self, checkpoint):
         if checkpoint is None:
             return
         local_rank = self.parallel_context.get_local_rank(ParallelMode.GLOBAL)
@@ -741,15 +760,26 @@ class Trainer:
         """If optimizer and scheduler states exist, load them."""
         if checkpoint is None:
             return
-        if os.path.isfile(os.path.join(checkpoint, OPTIMIZER_NAME)) and os.path.isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
+        if os.path.isfile(os.path.join(checkpoint, OPTIMIZER_NAME)) and os.path.isfile(
+            os.path.join(checkpoint, SCHEDULER_NAME)
+        ):
             self.optimizer.load_state_dict(
-                torch.load(os.path.join(checkpoint, OPTIMIZER_NAME), map_location=self.args.device)
+                torch.load(
+                    os.path.join(checkpoint, OPTIMIZER_NAME),
+                    map_location=self.args.device,
+                )
             )
             with warnings.catch_warnings(record=True) as caught_warnings:
-                self.lr_scheduler.load_state_dict(torch.load(os.path.join(checkpoint, SCHEDULER_NAME)))
+                self.lr_scheduler.load_state_dict(
+                    torch.load(os.path.join(checkpoint, SCHEDULER_NAME))
+                )
             reissue_pt_warnings(caught_warnings)
-            if self.do_grad_scaling and os.path.isfile(os.path.join(checkpoint, SCALER_NAME)):
-                self.scaler.load_state_dict(torch.load(os.path.join(checkpoint, SCALER_NAME)))
+            if self.do_grad_scaling and os.path.isfile(
+                os.path.join(checkpoint, SCALER_NAME)
+            ):
+                self.scaler.load_state_dict(
+                    torch.load(os.path.join(checkpoint, SCALER_NAME))
+                )
 
     def save_model(
         self,
@@ -866,7 +896,9 @@ class Trainer:
         metric_key_prefix: str = "eval",
     ) -> EvalLoopOutput:
         args = self.args
-        prediction_loss_only = prediction_loss_only if prediction_loss_only is not None else False
+        prediction_loss_only = (
+            prediction_loss_only if prediction_loss_only is not None else False
+        )
 
         model = self._wrap_model(self.model_wrappers, training=False)
 
@@ -1058,11 +1090,16 @@ class Trainer:
             all_inputs = nested_truncate(all_inputs, num_samples)
 
         # Metrics!
-        if self.compute_metrics is not None and all_preds is not None and all_labels is not None:
+        if (
+            self.compute_metrics is not None
+            and all_preds is not None
+            and all_labels is not None
+        ):
             metrics = self.compute_metrics(
-                EvalPrediction(predictions=all_preds,
-                               label_ids=all_labels,
-                               inputs=all_inputs))
+                EvalPrediction(
+                    predictions=all_preds, label_ids=all_labels, inputs=all_inputs
+                )
+            )
         else:
             metrics = {}
 

@@ -105,13 +105,10 @@ class TrainingArguments:
 
         - `True` if `metric_for_best_model` is set to a value that isn't `"loss"` or `"eval_loss"`.
         - `False` if `metric_for_best_model` is not set, or set to `"loss"` or `"eval_loss"`.
-<<<<<<< HEAD
     ignore_data_skip (`bool`, *optional*, defaults to `False`):
             When resuming training, whether or not to skip the epochs and batches to get the data loading at the same
             stage as in the previous training. If set to `True`, the training will begin faster (as that skipping step
             can take a long time) but will not yield the same results as the interrupted training would have.
-=======
->>>>>>> 3357dacd8bcb14671d7e1dc9833b1937bcb7c3ad
     label_smoothing_factor (`float`, *optional*, defaults to 0.0):
         The label smoothing factor to use. Zero means no label smoothing, otherwise the underlying onehot-encoded
         labels are changed from 0s and 1s to `label_smoothing_factor/num_labels` and `1 - label_smoothing_factor +
@@ -127,10 +124,6 @@ class TrainingArguments:
     save_on_each_node (`bool`, *optional*, defaults to `False`):
         When doing multi-node distributed training, whether to save models and checkpoints on each node, or only on
         the main one.
-<<<<<<< HEAD
-=======
-
->>>>>>> 3357dacd8bcb14671d7e1dc9833b1937bcb7c3ad
         This should not be activated when the different nodes use the same storage as the files will be saved with
         the same names for each node.
     bf16 (`bool`, *optional*, defaults to `False`):
@@ -268,15 +261,12 @@ class TrainingArguments:
             "help": "Whether the `metric_for_best_model` should be maximized or not."
         },
     )
-<<<<<<< HEAD
     ignore_data_skip: bool = field(
         default=False,
         metadata={
             "help": "When resuming training, whether or not to skip the first epochs and batches to get to the same training data."
         },
     )
-=======
->>>>>>> 3357dacd8bcb14671d7e1dc9833b1937bcb7c3ad
     label_smoothing_factor: float = field(
         default=0.0,
         metadata={
