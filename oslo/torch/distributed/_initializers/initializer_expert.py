@@ -6,7 +6,6 @@ from oslo.torch.distributed._initializers.initializer import (
 from oslo.torch.distributed.parallel_mode import ParallelMode
 
 
-# TODO : Need to Test
 class ExpertParallelGroupInitializer(ProcessGroupInitializer):
 
     BASE_ELEMENT = [
