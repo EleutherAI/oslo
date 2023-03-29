@@ -338,9 +338,6 @@ class TrainingArguments:
             self.parallel_context,
             self.model_wrappers,
         ) = self.set_oslo_config()
-        print(self.oslo_config)
-        print(self.parallel_context)
-        print(self.model_wrappers)
 
     def __str__(self):
         self_as_dict = {
@@ -403,13 +400,11 @@ class TrainingArguments:
         _tmp_parallel_context = self.parallel_context
         self.parallel_context = None
         args = copy.deepcopy(self)
-        print("save_args")
         torch.save(args, os.path.join(path, TRAINING_ARGS_NAME))
         self.parallel_context = _tmp_parallel_context
 
     @classmethod
     def load_args(cls, path):
-        print(os.path.join(path, TRAINING_ARGS_NAME))
         args = torch.load(os.path.join(path, TRAINING_ARGS_NAME))
         (
             args.oslo_config,
