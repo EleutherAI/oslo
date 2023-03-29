@@ -12,6 +12,7 @@ from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.utils import get_free_port
 from oslo.torch.nn.parallel.data_parallel.zero.utils import get_current_device
 
+import itertools
 
 skip_if_dist_unavailable = pytest.mark.skipif(
     torch.cuda.device_count() < 2, reason="dist required"
@@ -38,13 +39,14 @@ def check_euqal(param, param_cp):
     return torch.equal(temp, param_cp.data)
 
 
-def exam_chunk_basic(parallel_context, keep_gathered):
+def exam_chunk_basic(parallel_context, init_device, keep_gathered, pin_memory):
     world_size = torch.distributed.get_world_size()
     my_chunk = Chunk(chunk_size=1024,
                      parallel_context=parallel_context,
                      dtype=torch.float32,
-                     init_device=None,
+                     init_device=init_device,
                      keep_gathered=keep_gathered,
+                     pin_memory=pin_memory,
                      cpu_shard_init=True,)
 
     param_list = []
@@ -111,8 +113,13 @@ def run_dist(rank, world_size):
     os.environ["RANK"] = str(rank)
     os.environ["LOCAL_RANK"] = str(rank)
     parallel_context = ParallelContext.from_torch(data_parallel_size=world_size)
-    exam_chunk_basic(parallel_context, keep_gathered=False)
-    exam_chunk_basic(parallel_context, keep_gathered=True)
+
+    init_device = [None, torch.device('cpu')]
+    keep_gathered = [True, False]
+    pin_memory = [True, False]
+
+    for args in itertools.product(init_device, keep_gathered, pin_memory):
+        exam_chunk_basic(parallel_context, *args)
 
 
 @skip_if_dist_unavailable
