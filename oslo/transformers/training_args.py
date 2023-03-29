@@ -16,6 +16,7 @@ from oslo.transformers.oslo_init import (
 
 TRAINING_ARGS_NAME = "training_args.bin"
 
+
 @dataclass
 class TrainingArguments:
     """
@@ -332,11 +333,14 @@ class TrainingArguments:
                 "eval_loss",
             ]
 
-        self.oslo_config, self.parallel_context, self.model_wrappers = self.set_oslo_config()
+        (
+            self.oslo_config,
+            self.parallel_context,
+            self.model_wrappers,
+        ) = self.set_oslo_config()
         print(self.oslo_config)
         print(self.parallel_context)
         print(self.model_wrappers)
-
 
     def __str__(self):
         self_as_dict = {
@@ -392,16 +396,14 @@ class TrainingArguments:
             oslo_config = OsloTrainerConfig(self.oslo_config_path_or_dict)
         else:
             oslo_config = OsloTrainerConfig({})
-        parallel_context, model_wrappers = init_oslo_features(
-            oslo_config
-        )
+        parallel_context, model_wrappers = init_oslo_features(oslo_config)
         return oslo_config, parallel_context, model_wrappers
 
     def save_args(self, path):
         _tmp_parallel_context = self.parallel_context
         self.parallel_context = None
         args = copy.deepcopy(self)
-        print('save_args')
+        print("save_args")
         torch.save(args, os.path.join(path, TRAINING_ARGS_NAME))
         self.parallel_context = _tmp_parallel_context
 
@@ -409,7 +411,11 @@ class TrainingArguments:
     def load_args(cls, path):
         print(os.path.join(path, TRAINING_ARGS_NAME))
         args = torch.load(os.path.join(path, TRAINING_ARGS_NAME))
-        args.oslo_config, args.parallel_context, args.model_wrappers = args.set_oslo_config()
+        (
+            args.oslo_config,
+            args.parallel_context,
+            args.model_wrappers,
+        ) = args.set_oslo_config()
         return args
 
 
