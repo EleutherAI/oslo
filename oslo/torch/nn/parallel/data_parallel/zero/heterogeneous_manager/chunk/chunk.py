@@ -115,7 +115,7 @@ class Chunk:
         self.parallel_context = parallel_context
         self.torch_pg = parallel_context.get_group(ParallelMode.DATA)
         self.pg_size = parallel_context.get_world_size(ParallelMode.DATA)
-        self.pg_rank = parallel_context.get_ranks_in_group(ParallelMode.DATA)
+        self.pg_rank = parallel_context.get_local_rank(ParallelMode.DATA)
 
         # the chunk size should be divisible by the dp degree
         if not keep_gathered:

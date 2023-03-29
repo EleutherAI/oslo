@@ -38,7 +38,7 @@ class TransformDistributedSpec(torch.autograd.Function):
     distributed specifications are used in both forward and backward passes.
 
     Args:
-        ctx (torch.autograd.function.FunctionContext): The context for the autograd function.
+        ctx (torch.autograd.function.FunctionCtx): The context for the autograd function.
         tensor (torch.Tensor): The input tensor to be transformed.
         old_dist_spec (DistributedSpec): The original distributed specification of the tensor.
         dist_spec (DistributedSpec): The target distributed specification to transform the tensor.
@@ -52,7 +52,7 @@ class TransformDistributedSpec(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        ctx: torch.autograd.function.FunctionContext,
+        ctx: torch.autograd.function.FunctionCtx,
         tensor: torch.Tensor,
         old_dist_spec: DistributedSpec,
         dist_spec: DistributedSpec,
@@ -67,7 +67,7 @@ class TransformDistributedSpec(torch.autograd.Function):
         return forward_trans_func(tensor, old_dist_spec, dist_spec, parallel_context)
 
     @staticmethod
-    def backward(ctx: torch.autograd.function.FunctionContext, grad_outputs):
+    def backward(ctx: torch.autograd.function.FunctionCtx, grad_outputs):
         return (
             ctx.backward_trans_func(
                 grad_outputs, ctx.dist_spec, ctx.old_dist_spec, ctx.parallel_context
