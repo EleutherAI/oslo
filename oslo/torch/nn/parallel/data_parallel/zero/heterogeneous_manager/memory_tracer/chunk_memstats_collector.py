@@ -27,16 +27,11 @@ class ChunkMemStatsCollector:
     ) -> None:
         self._mem_monitor = SyncCudaMemoryMonitor()
         self._sampling_time = []
-
         self._start_flag = False
         self._step_idx = 0
         self._step_total = 0
-        if memstats is not None:
-            self.use_outside_memstats = True
-            self._memstats = memstats
-        else:
-            self.use_outside_memstats = False
-            self._memstats = MemStats()
+        self.use_outside_memstats = memstats is not None
+        self._memstats = memstats or MemStats()
         self._chunk_manager = chunk_manager
 
     def next_period_non_model_data_usage(self, device_type: str) -> int:
@@ -86,7 +81,6 @@ class ChunkMemStatsCollector:
         # self._step_total = len(self._sampling_time)
         self._step_total = len(self._memstats.non_model_data_list("cuda"))
         self._start_flag = False
-        print(f"finish_collection {self._step_total}")
 
     def record_model_data_volume(self):
         """
