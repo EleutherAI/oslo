@@ -413,9 +413,10 @@ class Trainer:
                 if (
                     ((step + 1) % args.gradient_accumulation_steps != 0)
                     and self.parallel_context.get_local_rank(ParallelMode.GLOBAL) != -1
-                    # and args._no_sync_in_gradient_accumulation # TODO: checking how oslo dp with gradient_accumulation works
                 ):
-                    # Avoid unnecessary synchronization since there will be no backward pass on this example.
+                    # TODO check whether DP support no_sync feature
+                    print("no_sync", self.parallel_context.get_local_rank(ParallelMode.GLOBAL))
+                    # Avoid unnecessary synchronization DDP since there will be no backward pass on this example.
                     with self.model.no_sync():
                         tr_loss_step = self.training_step(self.model, inputs)
                 else:
@@ -539,9 +540,7 @@ class Trainer:
             `torch.Tensor`: The tensor with training loss on this batch.
         """
         model.train()
-        # log_dist(f"Before self._prepare_inputs: \n{inputs}", rank=-1)
         inputs = self._prepare_inputs(inputs)
-        # log_dist(f"After self._prepare_inputs: \n{inputs}", rank=-1)
         if (
             self.args.oslo_config is not None
             and self.args.oslo_config.pipeline_parallelism
@@ -1486,9 +1485,11 @@ class Trainer:
         outputs = model(**inputs)
 
         if labels is not None:
-            if unwrap_model(model)._get_name() in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES.values():
+            if model._get_name() in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES.values():
+                print(f" label smmother with MODEL_FOR_CAUSAL_LM_MAPPING_NAMES")
                 loss = self.label_smoother(outputs, labels, shift_labels=True)
             else:
+                print(f" label smmother to smoothing outputs")
                 loss = self.label_smoother(outputs, labels)
         else:
             if isinstance(outputs, dict) and "loss" not in outputs:
