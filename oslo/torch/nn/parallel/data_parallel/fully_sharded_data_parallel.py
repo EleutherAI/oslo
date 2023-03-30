@@ -34,7 +34,7 @@ from oslo.torch.nn.parallel.data_parallel.zero.tensor.distributed_parameter impo
     DistributedTensor,
     DistributedTensorSpec,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.tensor.op_hook import (
+from oslo.torch.nn.parallel.data_parallel.zero.tensor.param_op_hook import (
     DistributedParamOpHookManager,
 )
 from oslo.torch.nn.parallel.data_parallel.zero.utils import (
