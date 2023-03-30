@@ -1,4 +1,5 @@
 import copy
+from contextlib import contextmanager
 from functools import partial
 
 import torch
@@ -17,16 +18,7 @@ from oslo.torch.nn.parallel.data_parallel._reducer import Reducer
 from oslo.torch.nn.parallel.data_parallel._utils import is_ddp_ignored
 
 
-def free_storage(data: torch.Tensor) -> None:
-    """Free underlying storage of a Tensor."""
-    if data.storage().size() > 0:
-        # Since we're modifying the Tensor's Storage directly, make sure the Tensor
-        # is the sole occupant of the Storage.
-        assert data.storage_offset() == 0
-        data.storage().resize_(0)
-
-
-class _BackwardFunction(torch.autograd.Function):
+class _DistributedBackwardFunction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, module, *inputs):
         ctx.module = module
@@ -64,7 +56,7 @@ def DistributedDataParallel(
 
 
 class _DistributedDataParallel(OsloParallelWrapper):
-    """Distributed data parallel wrapper for Oslo.
+    """Distributed data parallel wrapper for OSLO.
     Example:
         >>> from oslo.torch.nn.parallel import DistributedDataParallel as DDP
         >>> model = torch.nn.Linear(20, 1)
@@ -99,6 +91,8 @@ class _DistributedDataParallel(OsloParallelWrapper):
         self.reducer = Reducer(bucket_cap_mb)
         self.rebuild_bucket = rebuild_bucket
 
+        self.require_backward_grad_sync = True
+
         for p in module.parameters():
             if is_ddp_ignored(p):
                 continue
@@ -117,14 +111,14 @@ class _DistributedDataParallel(OsloParallelWrapper):
                 {
                     k: v
                     for k, v in zip(
-                        inputs.keys(), _BackwardFunction.apply(self, *inputs.values())
+                        inputs.keys(), _DistributedBackwardFunction.apply(self, *inputs.values())
                     )
                 }
             )
 
         if isinstance(inputs, torch.Tensor):
             inputs = (inputs,)
-        return _BackwardFunction.apply(self, *inputs)
+        return _DistributedBackwardFunction.apply(self, *inputs)
 
     def _pre_backward(self):
         pass
@@ -138,14 +132,12 @@ class _DistributedDataParallel(OsloParallelWrapper):
         for p in self.module.parameters():
             if is_ddp_ignored(p):
                 continue
-            if p.grad.device.type != "cpu":
-                p.grad = p._saved_grad
+            p.grad = p._saved_grad
 
     def grad_handle(self, p, grad):
         if grad.device.type != "cpu":
             empty_grad = torch.empty_like(grad)
-            free_storage(empty_grad)
-            if self.dp_world_size > 1:
+            if self.dp_world_size > 1 and self.require_backward_grad_sync:
                 grad = grad / self.dp_world_size
                 self.comm_stream.wait_stream(torch.cuda.current_stream())
                 with torch.cuda.stream(self.comm_stream):
@@ -161,10 +153,11 @@ class _DistributedDataParallel(OsloParallelWrapper):
             return empty_grad
 
         else:
-            # You must model.to('cpu') after oslo.ready() to use cpu.
-            dist.all_reduce(
-                grad, group=self.parallel_context.get_cpu_group(ParallelMode.DATA)
-            )
+            # You must assign the model to CPU after invoking ``oslo.ready()``.
+            if self.require_backward_grad_sync:
+                dist.all_reduce(
+                    grad, group=self.parallel_context.get_cpu_group(ParallelMode.DATA)
+                )
             return grad
 
     @staticmethod
@@ -186,3 +179,24 @@ class _DistributedDataParallel(OsloParallelWrapper):
                     else:
                         p._saved_grad.requires_grad_(False)
                     p._saved_grad.zero_()
+
+    @contextmanager
+    def no_sync(self):
+        """A context manager to disable gradient synchronizations across
+        processes. Within this context, gradients will be accumulated on module
+        variables, which will later be synchronized in the first
+        forward-backward pass exiting the context.
+        Example:
+            >>> from oslo.torch.nn.parallel import DistributedDataParallel as DDP
+            >>> model = DDP(model, parallel_context)
+            >>> with model.no_sync():
+            >>>     for input in inputs:
+            >>>         model(input).backward()  # no synchronization, accumulate grads
+            >>> model(another_input).backward()  # synchronize grads
+        """
+        old_require_backward_grad_sync = self.require_backward_grad_sync
+        self.require_backward_grad_sync = False
+        try:
+            yield
+        finally:
+            self.require_backward_grad_sync = old_require_backward_grad_sync
