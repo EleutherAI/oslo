@@ -154,7 +154,6 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             ), "You should run a completed iteration as your warmup iter"
 
         args, kwargs = _cast_float(args, torch.half), _cast_float(kwargs, torch.half)
-        self.module.zero_grad(set_to_none=True)
         self.heterogeneous_manager.pre_iter(*args)
         with DistributedParamOpHookManager.use_hooks(self.param_op_hook):
             outputs = super().forward(*args, **kwargs)
