@@ -20,7 +20,7 @@ from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk impor
     ChunkManager,
     TensorState,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.heterogeneous_manager import (
+from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.manager import (
     HeterogeneousMemoryManager,
 )
 from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_tracer.param_runtime_order import (
@@ -173,7 +173,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             p.grad = None
 
     def _pre_backward(self):
-        # set the context for backward
+        # set the context as backward
         self.param_op_hook.toggle_training_phase()
         self.__old_param_op_hooks = DistributedParamOpHookManager.hooks
         DistributedParamOpHookManager.hooks = self.param_op_hook

@@ -1,7 +1,7 @@
 import torch
 import torch.distributed as dist
 
-from heterogeneous_manager.heterogeneous_manager import Chunk
+from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import Chunk
 
 
 def get_current_device() -> torch.device:

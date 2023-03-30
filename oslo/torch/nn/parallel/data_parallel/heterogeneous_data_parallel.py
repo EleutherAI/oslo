@@ -6,7 +6,7 @@ from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import (
     init_chunk_manager,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.heterogeneous_manager import (
+from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.manager import (
     HeterogeneousMemoryManager,
 )
 from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_tracer import (

@@ -8,7 +8,7 @@ import torch
 from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import (
     TensorState,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.heterogeneous_manager import (
+from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.manager import (
     HeterogeneousMemoryManager,
 )
 from oslo.torch.nn.parallel.data_parallel.zero.tensor.op_hook import (
