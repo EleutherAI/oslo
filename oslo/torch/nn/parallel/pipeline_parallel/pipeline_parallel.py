@@ -1,9 +1,11 @@
 import concurrent.futures
 import copy
 import time
-from threading import Lock
+from threading import RLock
 from queue import Queue
 from functools import partial
+
+import pika
 
 import torch
 import torch.nn as nn
@@ -33,14 +35,16 @@ from oslo.torch.nn.parallel.pipeline_parallel._model_partitioner import ModelPar
 from oslo.torch.nn.parallel.pipeline_parallel._sync import (
     wait_other_ranks,
     make_unique_key,
+    initialize_job,
     select_job,
     reset_job_queue,
     set_result,
     get_result,
 )
 from oslo.torch.nn.parallel.pipeline_parallel._workers import (
-    workers
+    workers,
 )
+from oslo.torch.nn.parallel.pipeline_parallel._comm import infos
 from oslo.torch.nn.parallel.utils import (
     get_parallel_context,
     add_wrapper,
@@ -69,15 +73,6 @@ def PipelineParallel(
         parallel_context=parallel_context,
     )
     return module
-
-
-# function to launch self.module. needs this
-# function because torch.set_grad_enabled() is
-# thread local.
-def launch(fn, is_grad_enabled, *args, **kwargs):
-    with torch.set_grad_enabled(is_grad_enabled):
-        result = fn(*args, **kwargs)
-    return result
 
 
 class _PipelineParallel(OsloParallelWrapper):
@@ -122,6 +117,7 @@ class _PipelineParallel(OsloParallelWrapper):
         # TODO;
         funcs["request"] = partial(remote_request, parallel_context=parallel_context)
         funcs["send"] = partial(send_results, parallel_context=parallel_context)
+        infos["PC"] = parallel_context
 
     @torch.no_grad()
     def parallelize(self):
@@ -138,7 +134,10 @@ class _PipelineParallel(OsloParallelWrapper):
 
         self._recursive_replace_act(self.module)
         self._recursive_wrap(self, "")
-        self._lock = Lock()
+        self._lock = RLock()
+
+        infos["LOCK"] = self._lock
+
         self.pipe_rank = self.parallel_context.get_local_rank(ParallelMode.PIPELINE)
         self.tensor_rank = self.parallel_context.get_local_rank(ParallelMode.TENSOR)
 
@@ -178,49 +177,28 @@ class _PipelineParallel(OsloParallelWrapper):
 
             # enqueue jobs
             is_grad_enabled = torch.is_grad_enabled()
+            out_queue = Queue()
             for ind, kwargs_ in enumerate(new_kwargs):
-                future = self.worker.submit(
-                    launch, self.module_forward, is_grad_enabled, **kwargs_
+                initialize_job(
+                    fn=self.module_forward,
+                    is_grad_enabled=is_grad_enabled,
+                    unique_key=ind,
+                    out_queue=out_queue,
+                    **kwargs_,
                 )
-                futures.append(future)
 
-            for i, done in enumerate(concurrent.futures.as_completed(futures)):
-                result = done.result()
-                set_result(i, result)
+            for _ in range(self.num_micro_batches):
+                while out_queue.empty():
+                    time.sleep(0.05)
 
-                if isinstance(result, ModelOutput) and hasattr(result, "loss"):
-                    result.loss = result.loss / self.num_micro_batches
+                # TODO; order?
+                ind, result = out_queue.get()
 
                 yield result
 
         else:
-            # TODO; the code block below does not make
-            #  same number with rank 0. However, since
-            #  this result is a dummy, it does not cause
-            #  an error.
-            # forward pass end, wait results from master
-            for i in range(self.num_micro_batches):
-                rpc_dst = self.parallel_context.get_pipeline_rpc_worker_name(
-                    self.parallel_context.pipeline_local_master_rank
-                )
-                result = rpc.rpc_sync(
-                    to=rpc_dst,
-                    func=get_result,
-                    args=(i,),
-                )
-
-                # remove gradient of non-master result.
-                # without this, the users need to consider rank
-                # when calling loss.backward()
-                result, tensors = pack_tensor_stub(result, [])
-                for i_tensor in range(len(tensors)):
-                    tensors[i_tensor].grad = None
-                result, _ = unpack_tensor_stub(result, tensors)
-
-                yield result
-
-        # barrier; wait for all rank
-        wait_other_ranks(self.pipe_rank, self.parallel_context)
+            # TODO;
+            return None
 
         # TODO; seems like this is not necessary?
         torch.cuda.empty_cache()
@@ -271,8 +249,7 @@ class _PipelineParallel(OsloParallelWrapper):
                 is_training = self.training
                 need_activation_save = any([t.requires_grad for t in tensors])
 
-                with self._lock:
-                    unique_key = make_unique_key(location, self.pipe_rank)
+                unique_key = make_unique_key(location, self.pipe_rank)
 
                 if need_activation_save and is_training and is_grad_enabled:
                     # prepare backward
@@ -280,7 +257,7 @@ class _PipelineParallel(OsloParallelWrapper):
 
                 out_queue = Queue()
 
-                request_fn = funcs["remote"]
+                request_fn = funcs["request"]
                 request_fn(
                     src=current_device.index,
                     dst=module_device.index,

@@ -1,5 +1,6 @@
 from typing import Any
 
+import torch
 from torch.distributed import rpc
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
@@ -17,13 +18,17 @@ VALUE_NAME = "__VALUE__"
 META_NAME = "__META__"
 
 
+infos = dict()
+
+
 def send_data(
     data: Any,
     src_rank: int,
     dst_rank: int,
-    parallel_context: ParallelContext,
     parallel_mode: ParallelMode = ParallelMode.PIPELINE,
 ):
+    parallel_context = infos["PC"]
+
     # need to get global rank of dst device for rpc.
     # assumes that all ranks except `parallel_mode`
     # are same between src device and dst device
@@ -31,11 +36,24 @@ def send_data(
     ranks[parallel_mode] = dst_rank
 
     global_dst_rank = parallel_context.ranks2device(ranks)
+
+    infos["LOCK"].acquire()
+
     fut = rpc.rpc_async(
-        to=f"RPC_WORKER_{global_dst_rank}",
+        # to=f"RPC_WORKER_{global_dst_rank}",   # TODO; how to find global dst?
+        to=f"RPC_WORKER_{dst_rank}",
         func=recv_data,
-        args=(src_rank, dst_rank, parallel_context, parallel_mode),
+        args=(src_rank, dst_rank, parallel_mode),
     )
+
+    torch.cuda.set_device(
+        torch.distributed.get_rank()
+    )
+
+    # TODO; wait fut and run callback with recv_data fn
+
+    print(f"send? {src_rank} to {dst_rank}")
+    print(f"{torch.distributed.get_rank()=}, {torch.cuda.current_device()=}")
 
     _send(
         data,
@@ -45,17 +63,26 @@ def send_data(
         parallel_mode,
     )
 
-    fut.wait()
+    infos["LOCK"].release()
 
 
 def recv_data(
     src_rank: int,
     dst_rank: int,
-    parallel_context: ParallelContext,
     parallel_mode: ParallelMode = ParallelMode.PIPELINE,
 ):
+    parallel_context = infos["PC"]
 
-    # TODO; acquire lock
+    infos["LOCK"].acquire()
+
+    print(f"recv?? from {src_rank} to {dst_rank}")
+    print(f"{torch.distributed.get_rank()=}, {torch.cuda.current_device()=}")
+
+    torch.cuda.set_device(
+        torch.distributed.get_rank()
+    )
+
+    print(f"{torch.distributed.get_rank()=}, {torch.cuda.current_device()=}")
 
     data = _recv(
         src_rank,
@@ -64,7 +91,7 @@ def recv_data(
         parallel_mode,
     )
 
-    yield
+    print("recv!!")
 
     unique_key = data[KEY_NAME]
     value = data[VALUE_NAME]
@@ -84,8 +111,7 @@ def recv_data(
     job = Job(
         unique_key=unique_key,
         tensors=value["tensors"],
-        args_stub=value["args_stub"],
-        kwargs_stub=value["kwargs_stub"],
+        stub=value["stub"],
         meta=meta,
     )
 
@@ -94,3 +120,5 @@ def recv_data(
 
     # register job
     register_job(job)
+
+    infos["LOCK"].release()

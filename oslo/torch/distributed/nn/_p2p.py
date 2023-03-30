@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from typing import Any
 
 import torch
@@ -5,6 +7,12 @@ import torch.distributed as dist
 
 from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.distributed.parallel_mode import ParallelMode
+
+
+# TODO!!
+@dataclass
+class TensorStub(object):
+    id: int
 
 NoneType = type(None)
 
@@ -40,6 +48,7 @@ ID_TO_DTYPE = [
     NoneType,
     torch.Size,
     torch.Tensor,
+    TensorStub,
 ]
 
 DTYPE_TO_ID = {dtype: idx for idx, dtype in enumerate(ID_TO_DTYPE)}
@@ -65,6 +74,7 @@ class _P2P(object):
             NoneType: {"send": self._send_none, "recv": self._recv_none},
             torch.Size: {"send": self._send_size, "recv": self._recv_size},
             torch.Tensor: {"send": self._send_tensor, "recv": self._recv_tensor},
+            TensorStub: {"send": self._send_tensor_stub, "recv": self._recv_tensor_stub},
         }
 
     @staticmethod
@@ -221,6 +231,36 @@ class _P2P(object):
         data = torch.tensor([0], dtype=torch.long, device=_device())
         dist.recv(data, src=src_rank, group=group)
         return data.item()
+
+    def _send_tensor_stub(
+        self,
+        data: TensorStub,
+        dst_rank: int,
+        parallel_context: ParallelContext,
+        parallel_mode: ParallelMode = ParallelMode.PIPELINE,
+        send_type: bool = False,
+    ):
+        assert isinstance(data, TensorStub), f"wrong type: {data} must be {TensorStub} type."
+
+        if send_type is True:
+            self._send_type(TensorStub, parallel_context=parallel_context, dst_rank=dst_rank)
+
+        group = parallel_context.get_group(parallel_mode)
+        data = torch.tensor([data.id], dtype=torch.long, device=_device())
+        dist.send(data, dst=dst_rank, group=group)
+
+    @staticmethod
+    def _recv_tensor_stub(
+        src_rank: int,
+        parallel_context: ParallelContext,
+        parallel_mode: ParallelMode = ParallelMode.PIPELINE,
+    ):
+        group = parallel_context.get_group(parallel_mode)
+        data = torch.tensor([0], dtype=torch.long, device=_device())
+        dist.recv(data, src=src_rank, group=group)
+
+        data = TensorStub(data.item())
+        return data
 
     def _send_float(
         self,

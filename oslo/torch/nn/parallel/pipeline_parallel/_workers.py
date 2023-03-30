@@ -13,7 +13,7 @@ class JobSelection(Thread):
         while True:
             job = select_job()
 
-            _JOBS.put(job)     # TODO; make Job class
+            _JOBS.put(job)
 
 
 class Worker(Thread):

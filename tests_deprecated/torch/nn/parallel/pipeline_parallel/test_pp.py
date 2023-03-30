@@ -1,3 +1,4 @@
+import time
 from copy import deepcopy
 
 # for debugging
@@ -170,7 +171,7 @@ parallel_context = ParallelContext.from_torch(
 )
 
 current_device = torch.cuda.current_device()
-num_micro_batches = 4
+num_micro_batches = 2
 
 model_name = "gpt2"
 config = GPT2Config.from_pretrained(model_name)
@@ -266,15 +267,22 @@ def run():
             for ind, out_pp in enumerate(
                 wrapper_pp(**pp_inputs, labels=pp_inputs["input_ids"])
             ):
-                loss_pp = out_pp.loss
-                loss_pp = loss_pp / num_micro_batches
-                # loss_pp.backward()
 
-                cum_loss_pp += loss_pp.detach().item()
+                if out_pp is not None:
+                    loss_pp = out_pp.loss
+                    loss_pp = loss_pp / num_micro_batches
+                    # loss_pp.backward()
+
+                    cum_loss_pp += loss_pp.detach().item()
+
+                    print(f"{cum_loss_pp=}")
+
+                else:
+                    time.sleep(5.)
 
             out_no_pp = model_no_pp(**inputs, labels=inputs["input_ids"])
             loss_no_pp = out_no_pp.loss
-            loss_no_pp.backward()
+            # loss_no_pp.backward()
 
             if data_parallel_size > 1:
                 if dist.get_rank() == 4:  # TODO;

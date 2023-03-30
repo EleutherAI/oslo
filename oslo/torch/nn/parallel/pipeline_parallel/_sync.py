@@ -3,12 +3,24 @@ import time
 from torch.distributed import rpc
 
 from oslo.torch.distributed.parallel_mode import ParallelMode
+from oslo.torch.nn.parallel.pipeline_parallel._job import JobInitialization
 
 
 _RECV_QUEUES = dict()
 
 
 _JOBS = set()
+
+
+def initialize_job(fn, is_grad_enabled, unique_key, out_queue, **kwargs):
+    job = JobInitialization(
+        fn=fn,
+        is_grad_enabled=is_grad_enabled,
+        unique_key=unique_key,
+        out_queue=out_queue,
+        **kwargs,
+    )
+    register_job(job)
 
 
 def register_job(job):
