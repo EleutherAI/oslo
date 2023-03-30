@@ -42,7 +42,9 @@ from transformers.trainer_pt_utils import (
     nested_concat,
     nested_detach,
     reissue_pt_warnings,
+    LabelSmoother
 )
+from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
 from transformers.trainer_utils import (
     speed_metrics,
     denumpify_detensorize,
@@ -57,8 +59,6 @@ from transformers.trainer_utils import (
 import oslo
 from oslo.torch import ParallelMode
 
-# from oslo.torch.utils.extensions import save_pretrained as save_oslo_pretrained
-# from oslo.torch.utils.extensions import from_parallelized as from_oslo_parallelized
 from oslo.torch.nn.parallel import (
     PipelineParallel,
     TensorParallel,
@@ -131,7 +131,11 @@ class Trainer:
         self.parallel_context = None
         self.model_wrappers = []
 
-        self.label_smoother = None  # TODO: label_smoother
+        # Label smoothing
+        if self.args.label_smoothing_factor != 0:
+            self.label_smoother = LabelSmoother(epsilon=self.args.label_smoothing_factor)
+        else:
+            self.label_smoother = None
 
         self.parallel_context, self.model_wrappers = (
             args.parallel_context,
@@ -406,17 +410,16 @@ class Trainer:
                         args, self.state, self.control
                     )
 
-                # TODO _no_sync_in_gradient_accumulation
-                # if (
-                #     ((step + 1) % args.gradient_accumulation_steps != 0)
-                #     and args.local_rank != -1
-                #     and args._no_sync_in_gradient_accumulation
-                # ):
-                #     # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
-                #     with model.no_sync():
-                #         tr_loss_step = self.training_step(model, inputs)
-                # else:
-                tr_loss_step = self.training_step(self.model, inputs)
+                if (
+                    ((step + 1) % args.gradient_accumulation_steps != 0)
+                    and self.parallel_context.get_local_rank(ParallelMode.GLOBAL) != -1
+                    # and args._no_sync_in_gradient_accumulation # TODO: checking how oslo dp with gradient_accumulation works
+                ):
+                    # Avoid unnecessary synchronization since there will be no backward pass on this example.
+                    with self.model.no_sync():
+                        tr_loss_step = self.training_step(self.model, inputs)
+                else:
+                    tr_loss_step = self.training_step(self.model, inputs)
 
                 if torch.isnan(tr_loss_step) or torch.isinf(tr_loss_step):
                     # if loss is nan or inf simply add the average of previous logged losses
@@ -432,6 +435,18 @@ class Trainer:
                     and (step + 1) == steps_in_epoch
                 ):
                     # TODO Gradient Clipping
+                    if args.max_grad_norm is not None and args.max_grad_norm > 0:
+                        # TODO Reduce gradients first
+                        # self.scaler.unscale_(self.optimizer)
+                        # TODO check what kind of optimizer have clip_grad_norm?
+                        if hasattr(self.optimizer, "clip_grad_norm"):
+                            # Some optimizers (like the sharded optimizer) have a specific way to do gradient clipping
+                            self.optimizer.clip_grad_norm(args.max_grad_norm)
+                        else:
+                            nn.utils.clip_grad_norm_(
+                                self.model.parameters(), args.max_grad_norm,
+                            )
+
                     # Optimizer step
                     optimizer_was_run = True
                     if self.do_grad_scaling:
@@ -552,9 +567,6 @@ class Trainer:
 
         if len(self.args.model_wrappers) > 0:
             self.model.from_parallelized(resume_from_checkpoint)
-            # from_oslo_parallelized(self.model, resume_from_checkpoint)
-            # self.model.from_oslo_parallelized(resume_from_checkpoint)
-            # self.model.from_parallelized(resume_from_checkpoint)
         else:
             if not os.path.isfile(os.path.join(resume_from_checkpoint, WEIGHTS_NAME)):
                 raise ValueError(
@@ -1474,8 +1486,16 @@ class Trainer:
         outputs = model(**inputs)
 
         if labels is not None:
-            loss = self.label_smoother(outputs, labels)
+            if unwrap_model(model)._get_name() in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES.values():
+                loss = self.label_smoother(outputs, labels, shift_labels=True)
+            else:
+                loss = self.label_smoother(outputs, labels)
         else:
+            if isinstance(outputs, dict) and "loss" not in outputs:
+                raise ValueError(
+                    "The model did not return a loss from the inputs, only the following keys: "
+                    f"{','.join(outputs.keys())}. For reference, the inputs it received are {','.join(inputs.keys())}."
+                )
             # We don't use .loss here since the model may return tuples instead of ModelOutput.
             loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
 
