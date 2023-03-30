@@ -769,7 +769,6 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         else:
             position_ids = None
         
-        
         # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
         if inputs_embeds is not None and past_key_values is None:
             model_inputs = {"inputs_embeds": inputs_embeds}
