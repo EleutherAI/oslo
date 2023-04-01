@@ -13,15 +13,19 @@
 # limitations under the License.
 #
 # Modified by EleutherAI on 2023.
-
-from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
-import torch.distributed as dist
-from torch._six import inf
 import math
 import torch
+import torch.distributed as dist
+
+from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
 from typing import Optional, Iterable, List, Union
 from oslo.torch.distributed import ParallelMode
 
+# deprecated torch._six in torch 2.0.0 version 
+if int(torch.__version__.split(".")[0]) < 2:
+    from torch._six import inf
+else:
+    from torch import inf
 
 def is_model_parallel_parameter(p: torch.Tensor) -> bool:
     """
