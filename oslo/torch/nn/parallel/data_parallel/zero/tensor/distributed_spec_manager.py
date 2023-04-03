@@ -125,7 +125,7 @@ class DistributedSpecManager:
         DistributedSpecManager._sanity_check(old_dist_spec, dist_spec)
 
         chunk = tensor
-        idx = parallel_context.get_ranks_in_group(ParallelMode.TENSOR)
+        idx = parallel_context.get_local_rank(ParallelMode.TENSOR)
         num_parts = prod(dist_spec.num_partitions)
         for i, dim in enumerate(dist_spec.dims):
             num_parts //= dist_spec.num_partitions[i]
