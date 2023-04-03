@@ -97,7 +97,7 @@ class DistributedParameter(DistributedTensor, torch.nn.Parameter):
                 data = self.data.clone()
             tensor = DistributedParameter(data,
                                    self.requires_grad,
-                                   spec=DistributedTensorSpec(self.get_process_group(), self.dist_spec, self.compute_spec))
+                                   spec=DistributedTensorSpec(self.get_parallel_context(), self.dist_spec, self.compute_spec))
             memo[id(self)] = tensor
             return tensor
 
