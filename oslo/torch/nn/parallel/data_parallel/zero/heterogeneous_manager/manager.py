@@ -64,8 +64,7 @@ class HeterogeneousMemoryManager:
         self._comp_cuda_demand_time = 0
 
     def reset_attributes(self):
-        """Reset the attributes of the manager.
-        """
+        """Reset the attributes of the manager."""
         self._compute_idx = -1
         self._h2d_volume = 0
         self._d2h_volume = 0
@@ -153,7 +152,7 @@ class HeterogeneousMemoryManager:
             warmup (bool): Whether it is in the warmup iteration.
             chunks (Tuple[Chunk, ...]): A tuple of chunks.
 
-        Returnes:
+        Returns:
             Tuple[int, Tuple[Chunk, ...]]: The cuda demand and the chunks that can be evicted.
         """
         start = time()
@@ -180,7 +179,7 @@ class HeterogeneousMemoryManager:
             self._compute_list.append(chunks)
 
     @property
-    def default_device(self) -> torch.device: 
+    def default_device(self) -> torch.device:
         """Get the default device.
 
         Returns:
@@ -189,14 +188,12 @@ class HeterogeneousMemoryManager:
         return self._placement_policy.get_default_device()
 
     def sample_overall_data(self):
-        """Sample the overall data of the model.
-        """
+        """Sample the overall data of the model."""
         if self._mem_stats_collector:
             self._mem_stats_collector.sample_overall_data()
 
     def record_model_data_volume(self):
-        """Record the model data volume.
-        """
+        """Record the model data volume."""
         if self._mem_stats_collector:
             self._mem_stats_collector.record_model_data_volume()
 

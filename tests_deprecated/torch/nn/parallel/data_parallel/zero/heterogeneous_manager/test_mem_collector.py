@@ -5,6 +5,7 @@ from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_trac
     ChunkMemStatsCollector,
 )
 
+
 class TestChunkMemStatsCollector(unittest.TestCase):
     def setUp(self):
         self.mock_chunk_manager = MagicMock()
@@ -13,7 +14,7 @@ class TestChunkMemStatsCollector(unittest.TestCase):
         self.mock_memstats = MagicMock()
 
     def create_collector(self):
-        collector= ChunkMemStatsCollector(self.mock_chunk_manager)
+        collector = ChunkMemStatsCollector(self.mock_chunk_manager)
         collector._mem_monitor = self.mock_sync_cuda_memory_monitor
         collector._memstats = self.mock_memstats
         return collector

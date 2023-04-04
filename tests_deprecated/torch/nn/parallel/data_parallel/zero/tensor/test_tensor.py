@@ -3,9 +3,16 @@ import pytest
 from numpy import allclose
 
 from oslo.torch.utils import get_free_port
-from oslo.torch.nn.parallel.data_parallel.zero.tensor.distributed_spec import ShardSpec, ReplicaSpec
-from oslo.torch.nn.parallel.data_parallel.zero.tensor.distributed_tensor_spec import DistributedTensorSpec
-from oslo.torch.nn.parallel.data_parallel.zero.tensor.distributed_tensor import DistributedTensor
+from oslo.torch.nn.parallel.data_parallel.zero.tensor.distributed_spec import (
+    ShardSpec,
+    ReplicaSpec,
+)
+from oslo.torch.nn.parallel.data_parallel.zero.tensor.distributed_tensor_spec import (
+    DistributedTensorSpec,
+)
+from oslo.torch.nn.parallel.data_parallel.zero.tensor.distributed_tensor import (
+    DistributedTensor,
+)
 from oslo.torch.distributed.parallel_mode import ParallelMode
 import torch.multiprocessing as mp
 from functools import partial
@@ -25,7 +32,9 @@ def _run_tensor_shard_init(parallel_context):
     tensor_spec = DistributedTensorSpec(parallel_context, dist_attr=shard_attr)
     t = DistributedTensor.from_torch_tensor(t_ref.clone(), tensor_spec)
     t.set_dist_spec(ReplicaSpec())
-    assert t.shape == torch.Size((4 * tp_world_size, 5)), f"{t.shape} vs ({4 * tp_world_size, 5})"
+    assert t.shape == torch.Size(
+        (4 * tp_world_size, 5)
+    ), f"{t.shape} vs ({4 * tp_world_size, 5})"
 
 
 def _run_tensor_replicated_init(parallel_context):
@@ -41,7 +50,12 @@ def _run_view(parallel_context):
     tp_world_size = parallel_context.get_world_size(ParallelMode.TENSOR)
     t_ref = torch.randn(4, 5)
     t = DistributedTensor.from_torch_tensor(
-        t_ref, DistributedTensorSpec(parallel_context, dist_attr=ShardSpec(dims=[0], num_partitions=[tp_world_size])))
+        t_ref,
+        DistributedTensorSpec(
+            parallel_context,
+            dist_attr=ShardSpec(dims=[0], num_partitions=[tp_world_size]),
+        ),
+    )
 
     assert t.size_global()[0] == 4 * tp_world_size
     assert t.size_global(1) == 5
@@ -61,13 +75,17 @@ def _run_tensor_indexing(parallel_context):
 
 def _run_operand(parallel_context):
     t_ref = torch.randn(4, 5)
-    t = DistributedTensor.from_torch_tensor(t_ref.clone(), DistributedTensorSpec(parallel_context))
+    t = DistributedTensor.from_torch_tensor(
+        t_ref.clone(), DistributedTensorSpec(parallel_context)
+    )
     t_ref_res = t_ref + t_ref
     t_res = t + t
     assert isinstance(t_res, DistributedTensor)
     assert torch.allclose(t_ref_res, t_res)
     tp_world_size = parallel_context.get_world_size(ParallelMode.TENSOR)
-    t = DistributedTensor.from_torch_tensor(t_ref.clone(), DistributedTensorSpec(parallel_context))
+    t = DistributedTensor.from_torch_tensor(
+        t_ref.clone(), DistributedTensorSpec(parallel_context)
+    )
     t.set_dist_spec(ShardSpec([0], [tp_world_size]))
     t_new = torch.zeros_like(t)
     assert isinstance(t_new, DistributedTensor)
@@ -76,7 +94,9 @@ def _run_operand(parallel_context):
 
 def _run_wrapped_tensor_func(parallel_context):
     t_ref = torch.randn(4, 5)
-    t = DistributedTensor.from_torch_tensor(t_ref.clone(), DistributedTensorSpec(parallel_context))
+    t = DistributedTensor.from_torch_tensor(
+        t_ref.clone(), DistributedTensorSpec(parallel_context)
+    )
     # non-func attr
     assert t.is_cuda == t_ref.is_cuda
     # return 1 torch.Tensor
@@ -87,7 +107,9 @@ def _run_wrapped_tensor_func(parallel_context):
     # return >1 torch.Tensor
     assert isinstance(t, DistributedTensor)
     t_split1, t_split2 = t.split(2)
-    assert isinstance(t_split1, DistributedTensor) and isinstance(t_split2, DistributedTensor), f"{type(t_split1)} {type(t_split2)}"
+    assert isinstance(t_split1, DistributedTensor) and isinstance(
+        t_split2, DistributedTensor
+    ), f"{type(t_split1)} {type(t_split2)}"
 
 
 def _run_redistributed(parallel_context):
@@ -121,8 +143,10 @@ def _run_set_tensor_spec(parallel_context):
 def run_dist_tests(rank, world_size):
     os.environ["RANK"] = str(rank)
     os.environ["LOCAL_RANK"] = str(rank)
-    parallel_context = ParallelContext.from_torch(data_parallel_size=2, tensor_parallel_size=world_size//2)
-    
+    parallel_context = ParallelContext.from_torch(
+        data_parallel_size=2, tensor_parallel_size=world_size // 2
+    )
+
     _run_tensor_shard_init(parallel_context)
     _run_tensor_replicated_init(parallel_context)
     _run_view(parallel_context)

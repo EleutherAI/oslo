@@ -7,6 +7,7 @@ from .const import TensorType
 from .param_op_hook import DistributedParamOpHookManager
 from .distributed_tensor_spec import DistributedTensorSpec
 
+
 def filter_distributed_parameters(*args, **kwargs):
     param_list = []
 
@@ -15,7 +16,9 @@ def filter_distributed_parameters(*args, **kwargs):
             for e in element:
                 get_distributed_parameters(e)
         elif isinstance(element, dict):
-            raise RuntimeError("Found Dict: DistributedParameter can't deal with complicated arguments.")
+            raise RuntimeError(
+                "Found Dict: DistributedParameter can't deal with complicated arguments."
+            )
         elif isinstance(element, DistributedParameter):
             param_list.append(element)
         return
@@ -29,29 +32,31 @@ def filter_distributed_parameters(*args, **kwargs):
 
 
 def replace_args(args, kwargs, new_args):
-    args = new_args[:len(args)]
-    for k, v in zip(kwargs.keys(), new_args[len(args):]):
+    args = new_args[: len(args)]
+    for k, v in zip(kwargs.keys(), new_args[len(args) :]):
         kwargs[k] = v
     return tuple(args), kwargs
 
 
 class DistributedParameter(DistributedTensor, torch.nn.Parameter):
-    r"""A kind of DistributedTensor to be considered as a module parameter.
+    r"""A kind of DistributedTensor to be considered as a module parameter."""
 
-    """
-
-    def __new__(cls,
-                data: Optional[torch.Tensor] = None,
-                requires_grad: bool = True,
-                spec: DistributedTensorSpec = None) -> 'DistributedParameter':
+    def __new__(
+        cls,
+        data: Optional[torch.Tensor] = None,
+        requires_grad: bool = True,
+        spec: DistributedTensorSpec = None,
+    ) -> "DistributedParameter":
         if data is None:
             data = torch.empty(0)
         return torch.Tensor._make_subclass(cls, data, requires_grad)
 
-    def __init__(self,
-                 data: Optional[torch.Tensor] = None,
-                 requires_grad: bool = True,
-                 spec: DistributedTensorSpec = None) -> None:
+    def __init__(
+        self,
+        data: Optional[torch.Tensor] = None,
+        requires_grad: bool = True,
+        spec: DistributedTensorSpec = None,
+    ) -> None:
         DistributedTensor.__init__(self, data, spec)
         self._type = TensorType.MODEL
         # a list contains modules sharing this DistributedParameter with others.
@@ -62,9 +67,11 @@ class DistributedParameter(DistributedTensor, torch.nn.Parameter):
         return self._shared_param_modules
 
     @staticmethod
-    def from_torch_tensor(tensor: torch.Tensor,
-                          requires_grad: bool = True,
-                          spec: DistributedTensorSpec = None) -> 'DistributedParameter':
+    def from_torch_tensor(
+        tensor: torch.Tensor,
+        requires_grad: bool = True,
+        spec: DistributedTensorSpec = None,
+    ) -> "DistributedParameter":
         tensor = tensor.as_subclass(DistributedParameter)
         tensor.__init__(tensor, requires_grad=requires_grad, spec=spec)
         return tensor
@@ -75,13 +82,15 @@ class DistributedParameter(DistributedTensor, torch.nn.Parameter):
     @classmethod
     def __torch_function__(cls, func, types, args=..., kwargs=None):
         if DistributedParamOpHookManager.has_hook():
-            if not func.__name__.startswith('__'):
+            if not func.__name__.startswith("__"):
                 if kwargs is None:
                     kwargs = {}
                 params = filter_distributed_parameters(*args, **kwargs)
                 if len(params) > 0:
                     with torch._C.DisableTorchFunction():
-                        new_args = DistributedParamOpHookManager.pre_op(params, *args, *kwargs.values())
+                        new_args = DistributedParamOpHookManager.pre_op(
+                            params, *args, *kwargs.values()
+                        )
                     args, kwargs = replace_args(args, kwargs, new_args)
                     ret = super().__torch_function__(func, types, args, kwargs)
                     with torch._C.DisableTorchFunction():
@@ -95,9 +104,13 @@ class DistributedParameter(DistributedTensor, torch.nn.Parameter):
         else:
             with torch._C.DisableTorchFunction():
                 data = self.data.clone()
-            tensor = DistributedParameter(data,
-                                   self.requires_grad,
-                                   spec=DistributedTensorSpec(self.get_parallel_context(), self.dist_spec, self.compute_spec))
+            tensor = DistributedParameter(
+                data,
+                self.requires_grad,
+                spec=DistributedTensorSpec(
+                    self.get_parallel_context(), self.dist_spec, self.compute_spec
+                ),
+            )
             memo[id(self)] = tensor
             return tensor
 

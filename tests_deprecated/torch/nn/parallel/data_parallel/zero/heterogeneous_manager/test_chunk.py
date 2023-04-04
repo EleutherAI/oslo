@@ -6,7 +6,10 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import os
 
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import TensorState, Chunk
+from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import (
+    TensorState,
+    Chunk,
+)
 from oslo.torch.nn.parallel.data_parallel.zero.tensor import DistributedParameter
 from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.utils import get_free_port
@@ -41,20 +44,22 @@ def check_euqal(param, param_cp):
 
 def exam_chunk_basic(parallel_context, init_device, keep_gathered, pin_memory):
     world_size = torch.distributed.get_world_size()
-    my_chunk = Chunk(chunk_size=1024,
-                     parallel_context=parallel_context,
-                     dtype=torch.float32,
-                     init_device=init_device,
-                     keep_gathered=keep_gathered,
-                     pin_memory=pin_memory,
-                     cpu_shard_init=True,)
+    my_chunk = Chunk(
+        chunk_size=1024,
+        parallel_context=parallel_context,
+        dtype=torch.float32,
+        init_device=init_device,
+        keep_gathered=keep_gathered,
+        pin_memory=pin_memory,
+        cpu_shard_init=True,
+    )
 
     param_list = []
     param_cp_list = []
 
-    add_param(param_list, param_cp_list, 8, 8, 8, device='cuda')
+    add_param(param_list, param_cp_list, 8, 8, 8, device="cuda")
     add_param(param_list, param_cp_list, 4, 4)
-    add_param(param_list, param_cp_list, 4, 8, 2, device='cuda')
+    add_param(param_list, param_cp_list, 4, 8, 2, device="cuda")
     add_param(param_list, param_cp_list, 1, 1, 5)
 
     for param in param_list:
@@ -66,12 +71,12 @@ def exam_chunk_basic(parallel_context, init_device, keep_gathered, pin_memory):
 
     if keep_gathered is False:
         assert my_chunk.cpu_shard.size(0) == 1024 // world_size
-        assert my_chunk.device_type == 'cpu'
+        assert my_chunk.device_type == "cpu"
         assert my_chunk.can_move
         my_chunk.shard_move(get_current_device())
     else:
         assert my_chunk.cuda_global_chunk.size(0) == 1024
-        assert my_chunk.device_type == 'cuda'
+        assert my_chunk.device_type == "cuda"
         assert not my_chunk.can_move
 
     assert dist_sum(my_chunk.valid_end) == my_chunk.utilized_size
@@ -79,7 +84,7 @@ def exam_chunk_basic(parallel_context, init_device, keep_gathered, pin_memory):
     assert not flag, "has_inf_or_nan is {}".format(flag)
 
     my_chunk.access_chunk()
-    assert my_chunk.device_type == 'cuda'
+    assert my_chunk.device_type == "cuda"
     for param, param_cp in zip(param_list, param_cp_list):
         check_euqal(param, param_cp)
 
@@ -101,11 +106,11 @@ def exam_chunk_basic(parallel_context, init_device, keep_gathered, pin_memory):
 
     if keep_gathered is False:
         assert my_chunk.cuda_shard.size(0) == 1024 // world_size
-        assert my_chunk.device_type == 'cuda'
+        assert my_chunk.device_type == "cuda"
         assert my_chunk.can_move
     else:
         assert my_chunk.cuda_global_chunk.size(0) == 1024
-        assert my_chunk.device_type == 'cuda'
+        assert my_chunk.device_type == "cuda"
         assert not my_chunk.can_move
 
 
@@ -114,7 +119,7 @@ def run_dist(rank, world_size):
     os.environ["LOCAL_RANK"] = str(rank)
     parallel_context = ParallelContext.from_torch(data_parallel_size=world_size)
 
-    init_device = [None, torch.device('cpu')]
+    init_device = [None, torch.device("cpu")]
     keep_gathered = [True, False]
     pin_memory = [True, False]
 

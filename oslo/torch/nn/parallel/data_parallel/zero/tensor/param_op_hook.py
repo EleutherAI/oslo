@@ -38,6 +38,7 @@ class DistributedParamOpHookManager:
     Manage your param op hooks. It only has static methods.
     The only static method you should call is ``use_hooks(*hooks)``.
     """
+
     hooks: Tuple[DistributedParamOpHook, ...] = tuple()
 
     @staticmethod
@@ -109,7 +110,6 @@ class DistributedParamOpHookManager:
 
 
 class PreFwdPostBwd(torch.autograd.Function):
-
     @staticmethod
     def forward(ctx, params, *args):
         ctx.params = params
@@ -122,7 +122,6 @@ class PreFwdPostBwd(torch.autograd.Function):
 
 
 class PostFwdPreBwd(torch.autograd.Function):
-
     @staticmethod
     def forward(ctx, params, args):
         ctx.params = params
@@ -164,16 +163,20 @@ def _get_grad_args(*args):
     for obj in args:
         if _is_grad_tensor(obj):
             return args, None
-    # otherwise, the first arguement should be a tuple of grad tensors
+    # otherwise, the first argument should be a tuple of grad tensors
     # if there is no grad tensor, the backward of PreFwdPostBwd can't be triggered
     arg_zero = args[0]
     if not isinstance(arg_zero, tuple):
-        raise NotImplementedError("Some torch function is incompatible because of its complcated inputs.")
+        raise NotImplementedError(
+            "Some torch function is incompatible because of its complicated inputs."
+        )
     check_grad_flag = False
     for obj in arg_zero:
         check_grad_flag |= _is_grad_tensor(obj)
     if not check_grad_flag:
-        raise NotImplementedError("Some torch function is incompatible because of its complcated inputs.")
+        raise NotImplementedError(
+            "Some torch function is incompatible because of its complicated inputs."
+        )
     return arg_zero, args[1:]
 
 
@@ -181,7 +184,14 @@ def _get_distributed_tensors_info(*args) -> list:
     info = []
     for arg in args:
         if isinstance(arg, DistributedTensor):
-            info.append((arg.__class__, DistributedTensorSpec(arg.get_process_group(), arg.dist_spec, arg.compute_spec)))
+            info.append(
+                (
+                    arg.__class__,
+                    DistributedTensorSpec(
+                        arg.get_process_group(), arg.dist_spec, arg.compute_spec
+                    ),
+                )
+            )
         else:
             info.append(None)
     return info

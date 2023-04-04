@@ -69,14 +69,12 @@ class ChunkMemStatsCollector:
         return [t - self._sampling_time[0] for t in self._sampling_time]
 
     def start_collection(self):
-        """Start collection of memory statistics.
-        """
+        """Start collection of memory statistics."""
         self._start_flag = True
         self._mem_monitor.start()
 
     def finish_collection(self):
-        """Finish collection of memory statistics.
-        """
+        """Finish collection of memory statistics."""
         self.sample_overall_data()
         # self._step_total = len(self._sampling_time)
         self._step_total = len(self._memstats.non_model_data_list("cuda"))

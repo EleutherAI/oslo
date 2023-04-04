@@ -1,15 +1,18 @@
 import unittest
 from unittest.mock import patch
 
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_tracer.memory_monitor import SyncCudaMemoryMonitor
+from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_tracer.memory_monitor import (
+    SyncCudaMemoryMonitor,
+)
 
 
 class TestSyncCudaMemoryMonitor(unittest.TestCase):
-
     @patch("torch.cuda.synchronize")
     @patch("torch.cuda.reset_peak_memory_stats")
     @patch("torch.cuda.max_memory_allocated", return_value=1024)
-    def test_sync_cuda_memory_monitor_methods(self, mock_max_memory_allocated, mock_reset_peak_memory_stats, mock_synchronize):
+    def test_sync_cuda_memory_monitor_methods(
+        self, mock_max_memory_allocated, mock_reset_peak_memory_stats, mock_synchronize
+    ):
         # Create a SyncCudaMemoryMonitor instance
         sync_cuda_mem_monitor = SyncCudaMemoryMonitor()
 

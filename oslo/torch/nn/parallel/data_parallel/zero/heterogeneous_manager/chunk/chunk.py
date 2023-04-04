@@ -88,13 +88,14 @@ class Chunk:
         parallel_context (ParallelContext):
             The parallel context object.
         dtype (torch.dtype): the data type of the chunk
-        init_device (torch.device): 
+        init_device (torch.device):
             optional, During the chunk construction process, where the tensor is stored.
             The default value is None, which is the current GPU
         cpu_shard_init (bool): a flag indicates the local chunk shard is resident on CPU.
         keep_gathered (bool): optional, if True, this chunk is always gathered in CUDA memory
         pin_memory (bool): optional, if True, this chunk always has a shard copied in pinned CPU memory
     """
+
     def __init__(
         self,
         chunk_size: int,

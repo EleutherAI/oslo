@@ -1,5 +1,8 @@
 import torch
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_tracer.memory_stats import MemStats
+from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_tracer.memory_stats import (
+    MemStats,
+)
+
 
 def test_mem_stats():
     # initialize MemStats object

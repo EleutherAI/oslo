@@ -158,7 +158,7 @@ class ParallelContext(object):
         >>> parallel_context.get_prev_global_rank(ParallelMode.DATA)
     """
 
-    _instances : List["ParallelContext"]= []
+    _instances: List["ParallelContext"] = []
 
     @classmethod
     def get_context(cls, idx: int = -1) -> Optional["ParallelContext"]:

@@ -20,7 +20,9 @@ class ChunkManager:
     """
 
     def __init__(
-        self, chunk_configuration: Dict[int, Dict], init_device: Optional[torch.device] = None
+        self,
+        chunk_configuration: Dict[int, Dict],
+        init_device: Optional[torch.device] = None,
     ) -> None:
 
         self.device = init_device or get_current_device()

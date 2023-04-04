@@ -6,7 +6,10 @@ import torch.multiprocessing as mp
 from oslo.torch.utils import get_free_port
 from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.nn.parallel.data_parallel.zero.tensor import DistributedSpecManager
-from oslo.torch.nn.parallel.data_parallel.zero.tensor.distributed_spec import ShardSpec, ReplicaSpec
+from oslo.torch.nn.parallel.data_parallel.zero.tensor.distributed_spec import (
+    ShardSpec,
+    ReplicaSpec,
+)
 from functools import partial
 
 import os
@@ -27,15 +30,29 @@ def _manipulate_spec(parallel_context):
     row_spec = ShardSpec([0], [size])
     col_spec = ShardSpec([-1], [size])
     mat_spec = ShardSpec([0, 1], [depth, depth])
-    row_shard = DistributedSpecManager._shard_as(x, old_dist_spec, row_spec, parallel_context)
+    row_shard = DistributedSpecManager._shard_as(
+        x, old_dist_spec, row_spec, parallel_context
+    )
     assert torch.equal(x.chunk(size, 0)[rank], row_shard)
-    assert torch.equal(x, DistributedSpecManager._gather(row_shard, row_spec, parallel_context))
-    col_shard = DistributedSpecManager._all_to_all(row_shard, row_spec, col_spec, parallel_context)
+    assert torch.equal(
+        x, DistributedSpecManager._gather(row_shard, row_spec, parallel_context)
+    )
+    col_shard = DistributedSpecManager._all_to_all(
+        row_shard, row_spec, col_spec, parallel_context
+    )
     assert torch.equal(x.chunk(size, -1)[rank], col_shard)
-    assert torch.equal(x, DistributedSpecManager._gather(col_shard, col_spec, parallel_context))
-    mat_shard = DistributedSpecManager._shard_as(x, old_dist_spec, mat_spec, parallel_context)
-    assert torch.equal(x.chunk(depth, 0)[rank // depth].chunk(depth, 1)[rank % depth], mat_shard)
-    assert torch.equal(x, DistributedSpecManager._gather(mat_shard, mat_spec, parallel_context))
+    assert torch.equal(
+        x, DistributedSpecManager._gather(col_shard, col_spec, parallel_context)
+    )
+    mat_shard = DistributedSpecManager._shard_as(
+        x, old_dist_spec, mat_spec, parallel_context
+    )
+    assert torch.equal(
+        x.chunk(depth, 0)[rank // depth].chunk(depth, 1)[rank % depth], mat_shard
+    )
+    assert torch.equal(
+        x, DistributedSpecManager._gather(mat_shard, mat_spec, parallel_context)
+    )
 
 
 def _check_mem(parallel_context):
@@ -46,7 +63,9 @@ def _check_mem(parallel_context):
     assert torch.cuda.memory_allocated() == orig_mem
     old_dist_spec = ReplicaSpec()
     row_spec = ShardSpec([0], [size])
-    x.data = DistributedSpecManager._shard_as(x, old_dist_spec, row_spec, parallel_context)
+    x.data = DistributedSpecManager._shard_as(
+        x, old_dist_spec, row_spec, parallel_context
+    )
     assert x.size(0) == 32 // size and x.size(1) == 32
     assert torch.cuda.memory_allocated() == orig_mem // size
     x.data = DistributedSpecManager._gather(x, row_spec, parallel_context)

@@ -9,6 +9,7 @@ class MemStats(object):
     """
     Store the non model data statistics used for heterogeneous memory manager and Zero optimizer.
     """
+
     def __init__(self) -> None:
 
         # (preop_step, List[param])
