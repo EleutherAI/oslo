@@ -11,6 +11,7 @@ from oslo.torch.nn.modules.embedding import (
     VocabParallelEmbedding2D,
     Embedding2D,
     VocabUtility,
+    ViTEmbedding2D,
 )
 from oslo.torch.nn.modules.layer_norm import (
     LayerNorm2D,
@@ -221,27 +222,59 @@ class _TensorParallel2D(nn.Module):
             }
 
     def _slice_patch_embedding(self, module):
-        # TODO: Refactor and fixed logic to return the same value as TENSOR_1D
-
-        module_forward = copy.copy(module.forward)
-        module.forward = lambda *args, **kwargs: scatter(
-            module_forward(*args, **kwargs),
-            -1,
-            self.parallel_context,
-            parallel_mode=ParallelMode.TENSOR_2D_ROW,
-        )
-        
+        summa_dim = self.parallel_context.get_world_size(ParallelMode.TENSOR_2D_COL)
         row_rank = self.parallel_context.get_local_rank(ParallelMode.TENSOR_2D_ROW)
         col_rank = self.parallel_context.get_local_rank(ParallelMode.TENSOR_2D_COL)
 
-        if hasattr(module, "oslo_parallel"):
-            module.oslo_parallel[ParallelMode.TENSOR_2D_ROW] = row_rank
-            module.oslo_parallel[ParallelMode.TENSOR_2D_COL] = col_rank
-        else:
-            module.oslo_parallel = {
-                ParallelMode.TENSOR_2D_ROW: row_rank,
-                ParallelMode.TENSOR_2D_COL: col_rank,
-            }
+        patch_embed = module.patch_embeddings.projection
+        weight_list = patch_embed.weight.data.chunk(summa_dim, dim=0)
+        weight_list = [weight.chunk(summa_dim, dim=0) for weight in weight_list]
+        patch_embed.weight.data = weight_list[row_rank][col_rank].contiguous()
+        if patch_embed.bias is not None:
+            bias_list = patch_embed.bias.data.chunk(summa_dim, dim=0)
+            bias_list = [bias.chunk(summa_dim, dim=0) for bias in bias_list]
+            patch_embed.bias.data = bias_list[row_rank][col_rank].contiguous()
+
+        def module_forward(input):
+            from oslo.torch.distributed.nn.functional import all_gather
+
+            weight = all_gather(
+                patch_embed.weight,
+                dim=0,
+                parallel_context=self.parallel_context,
+                parallel_mode=ParallelMode.TENSOR_2D_COL,
+            )
+
+            bias = None
+            if patch_embed.bias is not None:
+                bias = all_gather(
+                    patch_embed.bias,
+                    dim=0,
+                    parallel_context=self.parallel_context,
+                    parallel_mode=ParallelMode.TENSOR_2D_COL,
+                )
+
+            return patch_embed._conv_forward(input, weight, bias)
+
+        patch_embed.forward = module_forward
+
+        pos_embed = module.position_embeddings
+        param_list = pos_embed.data.chunk(summa_dim, dim=-1)
+        param_list = [param.chunk(summa_dim, dim=-1) for param in param_list]
+        pos_embed.data = param_list[row_rank][col_rank].contiguous()
+
+        cls_token = module.cls_token
+        param_list = cls_token.data.chunk(summa_dim, dim=-1)
+        param_list = [param.chunk(summa_dim, dim=-1) for param in param_list]
+        cls_token.data = param_list[row_rank][col_rank].contiguous()
+
+        _update_module_arguments(
+            module=module,
+            parallel_context=self.parallel_context,
+            summa_dim=summa_dim,
+            orig_module=copy.deepcopy(module.__class__),
+        )
+        module.__class__ = ViTEmbedding2D
 
     def _slice_linear(self, module, reversed, fusion_degree, slice_bias):
         summa_dim = self.parallel_context.get_world_size(ParallelMode.TENSOR_2D_COL)
