@@ -1,5 +1,4 @@
 import copy
-from contextlib import contextmanager
 from functools import partial
 
 import torch
@@ -109,7 +108,8 @@ class _DistributedDataParallel(OsloParallelWrapper):
                 {
                     k: v
                     for k, v in zip(
-                        inputs.keys(), _DistributedBackwardFunction.apply(self, *inputs.values())
+                        inputs.keys(),
+                        _DistributedBackwardFunction.apply(self, *inputs.values()),
                     )
                 }
             )
