@@ -170,7 +170,9 @@ class ParallelContext(object):
         Returns:
             Optional[ParallelContext]: parallel context
         """
-        assert idx < len(cls._instances), "Parallel context index out of range"
+        if idx < 0:
+            idx += len(cls._instances)
+        assert 0 <= idx < len(cls._instances), "Parallel context index out of range"
         last_instance_ref = cls._instances[idx]
         if last_instance_ref is not None:
             last_instance = last_instance_ref()
