@@ -91,8 +91,6 @@ class _DistributedDataParallel(OsloParallelWrapper):
         self.reducer = Reducer(bucket_cap_mb)
         self.rebuild_bucket = rebuild_bucket
 
-        self.require_backward_grad_sync = True
-
         for p in module.parameters():
             if is_ddp_ignored(p):
                 continue
@@ -137,7 +135,7 @@ class _DistributedDataParallel(OsloParallelWrapper):
     def grad_handle(self, p, grad):
         if grad.device.type != "cpu":
             empty_grad = torch.empty_like(grad)
-            if self.dp_world_size > 1 and self.require_backward_grad_sync:
+            if self.dp_world_size > 1:
                 grad = grad / self.dp_world_size
                 self.comm_stream.wait_stream(torch.cuda.current_stream())
                 with torch.cuda.stream(self.comm_stream):
@@ -154,10 +152,9 @@ class _DistributedDataParallel(OsloParallelWrapper):
 
         else:
             # You must assign the model to CPU after invoking ``oslo.ready()``.
-            if self.require_backward_grad_sync:
-                dist.all_reduce(
-                    grad, group=self.parallel_context.get_cpu_group(ParallelMode.DATA)
-                )
+            dist.all_reduce(
+                grad, group=self.parallel_context.get_cpu_group(ParallelMode.DATA)
+            )
             return grad
 
     @staticmethod
@@ -179,24 +176,3 @@ class _DistributedDataParallel(OsloParallelWrapper):
                     else:
                         p._saved_grad.requires_grad_(False)
                     p._saved_grad.zero_()
-
-    @contextmanager
-    def no_sync(self):
-        """A context manager to disable gradient synchronizations across
-        processes. Within this context, gradients will be accumulated on module
-        variables, which will later be synchronized in the first
-        forward-backward pass exiting the context.
-        Example:
-            >>> from oslo.torch.nn.parallel import DistributedDataParallel as DDP
-            >>> model = DDP(model, parallel_context)
-            >>> with model.no_sync():
-            >>>     for input in inputs:
-            >>>         model(input).backward()  # no synchronization, accumulate grads
-            >>> model(another_input).backward()  # synchronize grads
-        """
-        old_require_backward_grad_sync = self.require_backward_grad_sync
-        self.require_backward_grad_sync = False
-        try:
-            yield
-        finally:
-            self.require_backward_grad_sync = old_require_backward_grad_sync
