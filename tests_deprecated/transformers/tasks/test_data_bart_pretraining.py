@@ -1,12 +1,15 @@
+import time 
 import torch
 from torch.utils.data import DataLoader
-
+from datasets import Dataset as Dt
+import os
 from oslo.torch.distributed import ParallelContext
 from oslo.transformers.tasks.data_bart_pretraining import (
     ProcessorForBartPretraining,
     DataCollatorForBartPretraining,
 )
-from tests.transformers.tasks.test_data_base import TestDataBinarization
+from tests_deprecated.transformers.tasks.test_data_base import TestDataBinarization
+from transformers import BartTokenizerFast
 
 try:
     from datasets import load_dataset
@@ -17,13 +20,17 @@ except ImportError:
 class TestDataBartPretraining(TestDataBinarization):
     def __init__(
         self,
-        model_name,
+        tokenizer,
+        model_name = 'facebook/bart-base',
         parallel_context=None,
         label_pad_token_id=-100,
+        max_seq_length = 512,
     ):
-        self.processor = ProcessorForBartPretraining(model_name)
+        self.processor = ProcessorForBartPretraining(tokenizer,max_seq_length=max_seq_length)
         self.data_collator = DataCollatorForBartPretraining(
-            self.processor, label_pad_token_id=label_pad_token_id
+            self.processor, label_pad_token_id=label_pad_token_id,
+            permute_sentence_ratio = 0.5, 
+            
         )
         if parallel_context is not None:
             self.sp_data_collator = DataCollatorForBartPretraining(
@@ -37,7 +44,6 @@ class TestDataBartPretraining(TestDataBinarization):
 
     def __call__(
         self,
-        max_length,
         dataset,
         mlm_probability=0.15,
         possion_lambda=3,
@@ -45,8 +51,7 @@ class TestDataBartPretraining(TestDataBinarization):
         batch_check_num_sample=2,
         batch_check_tokens=False,
     ):
-        self.processor._chunk_size = max_length - 1
-        self.processor._max_length = max_length
+
         self.data_collator.mlm_probability = mlm_probability
         self.data_collator.possion_lambda = possion_lambda
         if self.sp_data_collator:
@@ -56,15 +61,13 @@ class TestDataBartPretraining(TestDataBinarization):
         print(
             "---------- Test Start ----------",
             f"Model: {self.model_name}",
-            f"Max Length: {max_length}",
+            f"Max Seq Length: {self.processor._max_seq_length}",
             f"Batch size: {batch_size}",
             f"MLM probability: {mlm_probability}",
             f"Possion Lambda: {possion_lambda}",
             sep="\n",
         )
-        processed_dataset = dataset.map(
-            self.processor, batched=True, remove_columns=dataset["train"].column_names
-        )
+        processed_dataset = self.processor(dataset)
 
         if self.data_collator.tokenizer.pad_token is None:
             self.data_collator.tokenizer.add_special_tokens({"pad_token": "<|pad|>"})
@@ -86,14 +89,14 @@ class TestDataBartPretraining(TestDataBinarization):
         self._length_check(
             dataloader,
             "input_ids",
-            max_length,
+            self.processor._max_seq_length,
             must_be_equal_to_max_length=False,
         )
 
         self._length_check(
             dataloader,
             "labels",
-            max_length,
+            self.processor._max_seq_length,
             must_be_equal_to_max_length=True,
         )
 
@@ -110,8 +113,8 @@ class TestDataBartPretraining(TestDataBinarization):
         cnt, accum_mlm_prob = 0, 0
         for batch in dataloader:
             cnt += 1
-            batch_size_label, seq_length_label = batch["labels"].size()
-            batch_size_input, seq_length_input = batch["input_ids"].size()
+            batch_size_label, seq_length_label = batch["labels"].shape
+            batch_size_input, seq_length_input = batch["input_ids"].shape
 
             # Verify that the mask token ratio is aligned to a predetermined percentage
             num_pad_tokens = torch.sum(batch["input_ids"] == pad_token_id)
@@ -141,7 +144,7 @@ class TestDataBartPretraining(TestDataBinarization):
         sp_dataloader = DataLoader(
             processed_dataset["train"],
             batch_size=batch_size,
-            shuffle=False,
+            shuffle=True, 
             collate_fn=self.sp_data_collator,
         )
 
@@ -157,21 +160,24 @@ class TestDataBartPretraining(TestDataBinarization):
 
 
 if "__main__" == __name__:
-    dataset = load_dataset("glue", "sst2")
-    dataset = dataset.rename_column("sentence", "text")
-
-    # bart_test = TestDataBartPretraining("facebook/bart-base")
-    # bart_test(1024, dataset)
-    # bart_test(512, dataset, 0.2)
-    # bart_test(1024, dataset, 0.2, 4)
-    # bart_test(512, dataset, 0.2, 2, batch_size=4)
-    # bart_test(512, dataset, 0.3, batch_size=4)
-    # bart_test(256, dataset, batch_size=4)
-    # bart_test(256, dataset, 0.3, batch_size=4)
-    # bart_test(256, dataset, 0.3, 2, batch_size=4)
-
-    parallel_context = ParallelContext.from_torch(sequence_parallel_size=4)
-    bart_sp_test = TestDataBartPretraining(
-        "facebook/bart-base", parallel_context, label_pad_token_id=0
+    
+    # dataset = load_dataset("glue", "sst2")
+    dataset = load_dataset(
+            # data_args.dataset_name, ############ !!!!!!!!!!!!!!!!!!
+            'cnn_dailymail','3.0.0',
+            use_auth_token=None,
+            # use_auth_token=True if model_args.use_auth_token else None,
     )
-    bart_sp_test(253, dataset)
+    dataset = dataset.rename_column("article", "text")
+    # reduce dataset for time    
+    dataset['train'] = Dt.from_dict(dataset['train'][:4523])
+    dataset['validation'] = Dt.from_dict(dataset['train'][:555])
+    dataset['test'] = Dt.from_dict(dataset['train'][:555])
+    print(os.environ["MASTER_PORT"])
+    model_nm = "facebook/bart-base"
+    tokenizer = BartTokenizerFast.from_pretrained(model_nm)
+    parallel_context = ParallelContext.from_torch(sequence_parallel_size=1)
+    bart_sp_test = TestDataBartPretraining(
+        tokenizer,model_name = model_nm, parallel_context = parallel_context, label_pad_token_id=0,max_seq_length=256
+    )
+    bart_sp_test(dataset, batch_size = 4, batch_check_num_sample = 2)
