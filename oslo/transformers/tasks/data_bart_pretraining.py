@@ -113,7 +113,7 @@ class DataCollatorForBartPretraining(object):
         processor: ProcessorForBartPretraining,
         mask_ratio: float = 0.3,
         poisson_lambda: float = 3.0,
-        permute_sentence_ratio: bool = 0.8,
+        permute_sentence_ratio: bool = 0.5,
         decoder_start_token_id: Optional[int] = None,
         label_pad_token_id: int = -100,
         parallel_context: Optional[ParallelContext] = None
