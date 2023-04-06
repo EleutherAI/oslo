@@ -8,7 +8,7 @@ The 2D parallelism algorithm has lower memory cost than 1D parallelism, but can 
 
 ## Usage
 
-Use `ParallelMode.TENSOR_2p5D` as the parameter for `tensor_parallel_mode`. `tp_size` should be a multiple of `tp_depth`. 
+Use `ParallelMode.TENSOR_2P5D` as the parameter for `tensor_parallel_mode`. `tp_size` should be a multiple of `tp_depth`. 
 It is recommended to set `tp_depth` to more than 1, as the algorithm becomes identical to the 2D algorithm if `tp_depth` is 1.
 
 ```python
@@ -24,7 +24,7 @@ parallel_context = ParallelContext.from_torch(
     data_parallel_size=1,
     pipeline_parallel_size=1,
     tensor_parallel_size=tp_size,
-    tensor_parallel_mode=ParallelMode.TENSOR_2p5D,
+    tensor_parallel_mode=ParallelMode.TENSOR_2P5D,
     tensor_parallel_depth=tp_depth,
 )
 model = TensorParallel(model, parallel_context)

@@ -77,11 +77,11 @@ Here is some explain about arguments to parallel_context.
 - `tensor_parallel_mode` support 4 types of tensor parallel algorithm. For more details, see section 1.2.1
     - TENSOR_1D : same as megatronLM
     - TENSOR_2D : Using summa algorithm.
-    - TENSOR_2p5D : Using 2.5d summa algorithm ( much effective in Communication costs between layers. )
+    - TENSOR_2P5D : Using 2.5d summa algorithm ( much effective in Communication costs between layers. )
     - TENSOR_3D : Using cubic-3d algorithm
 - `tensor_parallel_depth` must be If the mode is…
-    - 2p5D : same or lower than `tensor_parallel_size`
-    - Not 2p5D : must be 1.
+    - 2P5D : same or lower than `tensor_parallel_size`
+    - Not 2P5D : must be 1.
 - `pipeline_parallel_size` must be 1 if you want to use `tensor_parallel` algorithm ( mixing PP and PP will be supported in later version.)
 
 ```python

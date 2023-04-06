@@ -1,5 +1,6 @@
 import os
 import random
+import weakref
 from typing import List, Optional
 
 import numpy as np
@@ -156,6 +157,27 @@ class ParallelContext(object):
         >>> # get prev global rank
         >>> parallel_context.get_prev_global_rank(ParallelMode.DATA)
     """
+
+    _instances: List["ParallelContext"] = []
+
+    @classmethod
+    def get_context(cls, idx: int = -1) -> Optional["ParallelContext"]:
+        """Get parallel context.
+
+        Args:
+            idx (int): index of parallel context
+
+        Returns:
+            Optional[ParallelContext]: parallel context
+        """
+        if idx < 0:
+            idx += len(cls._instances)
+        assert 0 <= idx < len(cls._instances), "Parallel context index out of range"
+        last_instance_ref = cls._instances[idx]
+        if last_instance_ref is not None:
+            last_instance = last_instance_ref()
+            return last_instance
+        return None
 
     @classmethod
     def from_torch(
@@ -466,6 +488,7 @@ class ParallelContext(object):
         # TODO; is this naming okay?
         self.pipeline_local_master_rank = None
         self.init_pipeline_rpc_workers()
+        ParallelContext._instances.append(weakref.ref(self))
 
     # sanity check
     @staticmethod
