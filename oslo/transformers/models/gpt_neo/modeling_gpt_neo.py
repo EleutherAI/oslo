@@ -29,11 +29,12 @@ try:
         find_pruneable_heads_and_indices,
         prune_conv1d_layer,
     )
-    from transfomers.models.gpt_neo.modeling_gpt_neo import (
+    from transformers.models.gpt_neo.modeling_gpt_neo import (
         GPTNeoConfig,
         load_tf_weights_in_gpt_neo,
     )
-    from transfomers import logging
+    from transformers import logging
+    from transformers.activations import ACT2FN
 except ImportError:
     print("You have to install `transformers` to use `oslo.transformers` modules")
 
@@ -78,7 +79,7 @@ class GPTNeoSelfAttention(nn.Module):
         self.k_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=False)
         self.v_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=False)
         self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=False)
-        self.out_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=True)
+        self.out_proj = onn.Linear(self.embed_dim, self.embed_dim, bias=True, skip_bias_add=True)
 
     def _split_heads(self, tensor, num_heads, attn_head_size):
         """
@@ -158,8 +159,8 @@ class GPTNeoSelfAttention(nn.Module):
         attn_output, attn_weights = self._attn(query, key, value, attention_mask, head_mask)
 
         attn_output = self._merge_heads(attn_output, self.num_heads, self.head_dim)
-        attn_output = self.out_proj(attn_output)
-        attn_output = self.resid_dropout(attn_output)
+        attn_output, bias = self.out_proj(attn_output)
+        attn_output = self.resid_dropout(attn_output, bias)
 
         outputs = (attn_output, present)
         if output_attentions:
@@ -206,16 +207,16 @@ class GPTNeoMLP(nn.Module):
     def __init__(self, intermediate_size, config):  # in MLP: intermediate_size= 4 * hidden_size
         super().__init__()
         embed_dim = config.hidden_size
-        self.c_fc = nn.Linear(embed_dim, intermediate_size) # Conv1d or Linear?
-        self.c_proj = nn.Linear(intermediate_size, embed_dim)
+        self.c_fc = onn.Linear(embed_dim, intermediate_size, skip_bias_add=True)
+        self.c_proj = onn.Linear(intermediate_size, embed_dim, skip_bias_add=True)
         self.act = F.fused_bias_gelu
         self.dropout = onn.FusedBiasDropout(float(config.resid_dropout))
 
     def forward(self, hidden_states):
-        hidden_states = self.c_fc(hidden_states)
-        hidden_states = self.act(hidden_states)
-        hidden_states = self.c_proj(hidden_states)
-        hidden_states = self.dropout(hidden_states)
+        hidden_states, bias = self.c_fc(hidden_states)
+        hidden_states = self.act(hidden_states, bias)
+        hidden_states, bias = self.c_proj(hidden_states)
+        hidden_states = self.dropout(hidden_states, bias)
         return hidden_states
 
 
@@ -284,7 +285,7 @@ class GPTNeoPreTrainedModel(PreTrainedModel, OsloModel):
 
     def _init_weights(self, module):
         """Initialize the weights."""
-        if isinstance(module, (nn.Linear,)):
+        if isinstance(module, (nn.Linear, onn.Linear)):
             # Slightly different from the TF version which uses truncated_normal for initialization
             # cf https://github.com/pytorch/pytorch/pull/5617
             module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
@@ -649,12 +650,6 @@ class GPTNeoForSequenceClassification(GPTNeoPreTrainedModel):
         # Initialize weights and apply final processing
         self.post_init()
 
-    @add_start_docstrings_to_model_forward(GPT_NEO_INPUTS_DOCSTRING)
-    @add_code_sample_docstrings(
-        checkpoint=_CHECKPOINT_FOR_DOC,
-        output_type=SequenceClassifierOutputWithPast,
-        config_class=_CONFIG_FOR_DOC,
-    )
     def forward(
         self,
         input_ids: Optional[torch.Tensor] = None,
