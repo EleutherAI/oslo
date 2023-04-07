@@ -3,7 +3,6 @@ from functools import partial
 
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 import torch.distributed as dist
 
 from oslo.torch.distributed.parallel_context import ParallelContext
@@ -14,31 +13,11 @@ from oslo.torch.nn.parallel.utils import (
     OsloParallelWrapper,
 )
 from oslo.torch.nn.parallel.data_parallel._reducer import Reducer
-from oslo.torch.nn.parallel.data_parallel._utils import is_ddp_ignored
-
-
-def free_storage(data: torch.Tensor) -> None:
-    """Free underlying storage of a Tensor."""
-    if data.storage().size() > 0:
-        # Since we're modifying the Tensor's Storage directly, make sure the Tensor
-        # is the sole occupant of the Storage.
-        assert data.storage_offset() == 0
-        data.storage().resize_(0)
-
-
-class _BackwardFunction(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, module, *inputs):
-        ctx.module = module
-        return inputs
-
-    @staticmethod
-    def backward(ctx, *grad_outputs):
-        ctx.module._pre_backward()
-        # Enqueue a callback to flush the reducer.
-        # This callback is triggered after all gradients' calculation is completed.
-        Variable._execution_engine.queue_callback(ctx.module._post_backward)
-        return (None,) + grad_outputs
+from oslo.torch.nn.parallel.data_parallel._utils import (
+    free_storage,
+    is_ddp_ignored,
+    DistributedBackwardFunction,
+)
 
 
 def DistributedDataParallel(
@@ -106,25 +85,26 @@ class _DistributedDataParallel(OsloParallelWrapper):
                 p.register_hook(partial(self.grad_handle, p))
 
     def parallelize(self):
-        self._forward = copy.copy(self.module.forward)
+        self.module_forward = copy.copy(self.module.forward)
         self.module.zero_grad = self.zero_grad
 
     def forward(self, *args, **kwargs):
-        # inputs must be `torch.Tensor` or collections that contain `torch.Tensor`
-        inputs = self._forward(*args, **kwargs)
-        if isinstance(inputs, dict):
-            return type(inputs)(
+        # outputs must be `torch.Tensor` or collections that contain `torch.Tensor`
+        outputs = self.module_forward(*args, **kwargs)
+        if isinstance(outputs, dict):
+            return type(outputs)(
                 {
                     k: v
                     for k, v in zip(
-                        inputs.keys(), _BackwardFunction.apply(self, *inputs.values())
+                        outputs.keys(),
+                        DistributedBackwardFunction.apply(self, *outputs.values()),
                     )
                 }
             )
 
-        if isinstance(inputs, torch.Tensor):
-            inputs = (inputs,)
-        return _BackwardFunction.apply(self, *inputs)
+        if isinstance(outputs, torch.Tensor):
+            outputs = (outputs,)
+        return DistributedBackwardFunction.apply(self, *outputs)
 
     def _pre_backward(self):
         pass
