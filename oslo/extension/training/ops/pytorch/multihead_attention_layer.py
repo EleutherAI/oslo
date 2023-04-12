@@ -105,8 +105,9 @@ class LSMultiheadAttentionLayer(nn.Module):
         super(LSMultiheadAttentionLayer, self).__init__()
         self.config = copy.deepcopy(config)
         if isinstance(self.config, PretrainedConfig):
-            self.config.max_batch_tokens = self.config.max_position_embeddings * 128 # 일단 default batch size로 128로 설정
+            self.config.max_batch_tokens = 4096 # 일단 default batch size로 128로 설정
             self.config.activation_dropout_ratio = self.config.hidden_dropout_prob  # 이 둘이 같다고 가정
+            self.config.attention_probs_dropout_prob = self.config.hidden_dropout_prob
             self.config.fp16 = False
             self.config.local_rank = 0
             self.config.pre_or_postLayerNorm = False
@@ -223,13 +224,6 @@ class LSMultiheadAttentionLayer(nn.Module):
             hs,     # attn_ob
             hs,     # attn_nw
             hs,     # attn_nb
-            hs * ims,   # inter_w
-            ims,    # inter_b
-            hs * ims,   # output_w
-            hs,     #output_b
-            hs,     #ffn_nw
-            hs,     #ffn_nb
-            12,     # clip_max
         ]
         offsets = calc_offset(sizes)
         return offsets
@@ -257,24 +251,6 @@ class LSMultiheadAttentionLayer(nn.Module):
 
         nn.init.ones_(self._get_weights(4))
         nn.init.zeros_(self._get_weights(5))
-
-        inter_w = self._get_weights(6).view(ims, hs)
-        nn.init.kaiming_uniform_(inter_w, math.sqrt(5.0))
-        bound = self.calc_bound(inter_w)
-        nn.init.uniform_(self._get_weights(7), -bound, bound)
-
-        output_w = self._get_weights(8).view(hs, ims)
-        nn.init.kaiming_uniform_(output_w, math.sqrt(5.0))
-        bound = self.calc_bound(output_w)
-        nn.init.uniform_(self._get_weights(9), -bound, bound)
-
-        nn.init.ones_(self._get_weights(10))
-        nn.init.zeros_(self._get_weights(11))
-
-        act_cmax = act_quant_config.amax.tolist()
-        wei_cmax = weight_quant_config.amax.tolist()
-        init_clip_max = torch.tensor([act_cmax, wei_cmax, act_cmax] * 4)
-        self._get_weights(12).copy_(init_clip_max)
 
     def params_dict(self):
         """
