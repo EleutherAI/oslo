@@ -5,7 +5,7 @@ from typing import List
 
 import torch
 
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import (
+from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
     TensorState,
 )
 from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager import (

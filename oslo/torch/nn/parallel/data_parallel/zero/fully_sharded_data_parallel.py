@@ -623,7 +623,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             if strict_ddp_mode:
                 if not p.is_replicate():
                     p.set_dist_spec(ReplicaSpec())
-                p.set_process_group(pg=ddp_pg)
+                p.set_parallel_context(pg=ddp_pg)
 
             # ignore the parameters with no gradient
             if not p.requires_grad:
@@ -637,13 +637,13 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             # create a fp32 parameter
             fp32_data = p.data.float()
             fp32_p = DistributedTensor(
-                fp32_data, spec=DistributedTensorSpec(p.process_group)
+                fp32_data, spec=DistributedTensorSpec(p.parallel_context)
             )
             # create a fp16 parameter
             p.data = p.data.half()
 
             # register the fp16 parameter and fp32 parameter in the chunk manager
-            dp_world_size = p.process_group.dp_world_size()
+            dp_world_size = p.parallel_context.get_world_size(ParallelMode.DATA)
             self.chunk_manager.register_tensor(
                 tensor=p,
                 group_type="fp16_param",

@@ -86,7 +86,7 @@ def _tensor_numel(local_param: DistributedParameter, strict_ddp_flag: bool) -> i
     Returns:
         int: the number of elements
     """
-    if strict_ddp_flag:
+    if strict_ddp_flag and type(local_param) is DistributedParameter:
         return local_param.numel_global()
     else:
         return local_param.numel()
@@ -101,6 +101,8 @@ def classify_params_by_dp_degree(
 
     Args:
         param_order (OrderedParamGenerator): the order of param be visied
+        strict_ddp_flag (bool, optional): whether to enable the strict ddp mode.
+            all parameters keep replicated in this mode.
 
     Returns:
         Dict[int, List[DistributedParameter]]: a dict contains the classification results.
@@ -108,13 +110,10 @@ def classify_params_by_dp_degree(
     """
     params_dict: Dict[int, List[DistributedParameter]] = dict()
     for param in param_order.generate():
-        assert isinstance(
-            param, DistributedParameter
-        ), "please replace model param with DistributedParameter"
         if is_ddp_ignored(param):
             continue
 
-        if strict_ddp_flag:
+        if strict_ddp_flag or type(param) is not DistributedParameter:
             param_key = dist.get_world_size()
         else:
             param_key = param.parallel_context.get_world_size(ParallelMode.DATA)

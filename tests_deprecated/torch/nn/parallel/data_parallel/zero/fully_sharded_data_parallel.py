@@ -8,6 +8,7 @@ from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.nn.parallel.data_parallel.zero.fully_sharded_data_parallel import (
     _FullyShardedDataParallel,
 )
+import copy
 
 
 class MlpModel(nn.Module):
@@ -29,8 +30,11 @@ def run_dist(rank, world_size):
 
     device = torch.device(f"cuda:{rank}" if torch.cuda.is_available() else "cpu")
 
-    model = MlpModel().to(device)
-    fsdp_model = _FullyShardedDataParallel(model, device, parallel_context)
+    model = MlpModel()
+    fsdp_model = _FullyShardedDataParallel(
+        copy.deepcopy(model), device, parallel_context
+    )
+    model = model.to(device)
 
     input_data = torch.randn(32, 128).to(device)
 
