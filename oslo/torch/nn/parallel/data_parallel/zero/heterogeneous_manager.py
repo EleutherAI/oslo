@@ -4,16 +4,20 @@ from typing import List, Optional, Tuple
 
 import torch
 
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import (
+from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
     Chunk,
     ChunkManager,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_tracer import (
+from oslo.torch.nn.parallel.data_parallel.zero.memory_tracer import (
     MemStats,
 )
 
-from .heterogeneous_manager.memory_tracer import ChunkMemStatsCollector
-from .placement_policy import PlacementPolicyFactory
+from oslo.torch.nn.parallel.data_parallel.zero.memory_tracer import (
+    ChunkMemStatsCollector,
+)
+from oslo.torch.nn.parallel.data_parallel.zero.placement_policy import (
+    PlacementPolicyFactory,
+)
 
 
 class HeterogeneousMemoryManager:
