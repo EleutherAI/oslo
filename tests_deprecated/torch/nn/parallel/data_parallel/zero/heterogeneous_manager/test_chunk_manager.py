@@ -4,7 +4,7 @@ import pytest
 import torch
 import torch.multiprocessing as mp
 
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import (
+from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
     ChunkManager,
 )
 from oslo.torch.nn.parallel.data_parallel.zero.tensor import (

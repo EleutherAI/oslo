@@ -6,7 +6,7 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import os
 
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import (
+from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
     TensorState,
     Chunk,
 )

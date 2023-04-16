@@ -1,5 +1,5 @@
 import torch
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_tracer.memory_stats import (
+from oslo.torch.nn.parallel.data_parallel.zero.memory_tracer.memory_stats import (
     MemStats,
 )
 
