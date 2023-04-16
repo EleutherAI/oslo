@@ -3,7 +3,7 @@ from typing import Optional, List
 
 from .memory_monitor import SyncCudaMemoryMonitor
 
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import (
+from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
     ChunkManager,
 )
 

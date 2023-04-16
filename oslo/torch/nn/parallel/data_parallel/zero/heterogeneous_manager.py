@@ -12,7 +12,7 @@ from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_trac
     MemStats,
 )
 
-from .memory_tracer import ChunkMemStatsCollector
+from .heterogeneous_manager.memory_tracer import ChunkMemStatsCollector
 from .placement_policy import PlacementPolicyFactory
 
 

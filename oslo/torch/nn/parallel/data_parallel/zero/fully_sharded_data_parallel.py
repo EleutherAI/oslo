@@ -1,7 +1,7 @@
 import itertools
 from collections import OrderedDict
 from functools import partial
-from typing import Dict, List
+from typing import Dict, List, Optional, Union
 
 import torch
 import torch.distributed as dist
@@ -15,15 +15,15 @@ from oslo.torch.nn.parallel.data_parallel._utils import (
     is_ddp_ignored,
 )
 from oslo.torch.nn.parallel.data_parallel.data_parallel import _DistributedDataParallel
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import (
+from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
     Chunk,
     ChunkManager,
     TensorState,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.manager import (
+from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager import (
     HeterogeneousMemoryManager,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_tracer.param_runtime_order import (
+from oslo.torch.nn.parallel.data_parallel.zero.memory_tracer.param_runtime_order import (
     OrderedParamGenerator,
 )
 from oslo.torch.nn.parallel.data_parallel.zero.tensor.distributed_tensor import (
@@ -41,10 +41,16 @@ from oslo.torch.nn.parallel.data_parallel.zero.utils import (
     get_current_device,
     get_temp_total_chunk_on_cuda,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.utils.heterogeneous_hook import (
+from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_hook import (
     HeterogeneousZeROHook,
 )
 
+from oslo.torch.nn.parallel.data_parallel.zero.memory_tracer import (
+    MemStats,
+)
+from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
+    init_chunk_manager,
+)
 
 try:
     from torch.nn.modules.module import _EXTRA_STATE_KEY_SUFFIX, _IncompatibleKeys
@@ -64,36 +70,54 @@ def _cast_float(args, dtype: torch.dtype):
 
 class _FullyShardedDataParallel(_DistributedDataParallel):
     """Fully sharded data parallel for DistributedTensor.
-    Warning: Nested ZeroDDP is not supported now.
+    Warning: Nested FullyShardedDataParallel is not supported now.
     It is designed to be used with ChunkManager and HeterogeneousMemoryManager.
     For more details, see the API reference of ``ChunkManager`` and ``HeterogeneousMemoryManager``.
 
     Args:
         module (torch.nn.Module): Module to apply ZeRO-DP.
-        heterogeneous_manager (HeterogeneousMemoryManager): Manages the chunk manager and heterogeneous memory space.
-            For more details, see the API reference of ``HeterogeneousMemoryManager``.
+        device (torch.device): Device to place the module.
         parallel_context (ParallelContext): process group object.
+        placement_policy (str): Placement policy for the chunks.
         pin_memory (bool): Chunks on CPU Memory use pin-memory.
         force_outputs_fp32 (bool): If set to True, outputs will be fp32. Otherwise, outputs will be fp16.
             Defaults to False.
         strict_ddp_mode (bool): If set to True, there is no tensor sharding, each tensor is replicated.
             Defaults to False. Users can set it to True, when they clearly know that they only need DDP.
+        search_range_mb (int): Search range for the chunk size. Defaults to 32.
+        hidden_dim (int): Hidden dimension for the chunk size search. Defaults to None.
+        min_chunk_size_mb (float): Minimum chunk size in MB. Defaults to 32.
+        memstats (MemStats): Memory statistics. Defaults to None.
     """
 
     def __init__(
         self,
         module: torch.nn.Module,
-        heterogeneous_manager: HeterogeneousMemoryManager,
+        device: torch.device,
         parallel_context: ParallelContext = None,
+        placement_policy: str = "cuda",
         pin_memory: bool = False,
         force_outputs_fp32: bool = False,
         strict_ddp_mode: bool = False,
+        search_range_mb: int = 32,
+        hidden_dim: Optional[int] = None,
+        min_chunk_size_mb: float = 32,
+        memstats: Optional[MemStats] = None,
     ) -> None:
         super().__init__(module, parallel_context=parallel_context)
-        self.heterogeneous_manager = heterogeneous_manager
-        self.chunk_manager: ChunkManager = heterogeneous_manager.chunk_manager
+        self.chunk_manager: ChunkManager = init_chunk_manager(
+            model=module,
+            init_device=device,
+            hidden_dim=hidden_dim,
+            search_range_mb=search_range_mb,
+            min_chunk_size_mb=min_chunk_size_mb,
+            strict_ddp_flag=strict_ddp_mode,
+        )
+        self.heterogeneous_manager = HeterogeneousMemoryManager(
+            placement_policy, self.chunk_manager, memstats
+        )
         self.force_outputs_fp32 = force_outputs_fp32
-        self.param_op_hook = HeterogeneousZeROHook(heterogeneous_manager)
+        self.param_op_hook = HeterogeneousZeROHook(self.heterogeneous_manager)
         self.fp32_params: List[DistributedTensor] = list()
         self.fp16_params: List[DistributedParameter] = list()
         self.overflow_counter = 0
@@ -592,6 +616,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
     ):
         ddp_pg = self.parallel_context.get_group(ParallelMode.DATA)
         for p in param_order.generate():
+            self._preprocess_param(p)
             assert isinstance(p, DistributedParameter)
 
             # gather sharded parameters in the strict ddp mode
@@ -654,3 +679,16 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             buffer.data = buffer.cuda()
             if torch.is_floating_point(buffer):
                 buffer.data = buffer.half()
+
+    def _preprocess_param(self, p: Union[nn.Parameter, DistributedParameter]):
+        """Convert parameter to DistributedParameter in-place.
+
+        Args:
+            p (Union[nn.Parameter, DistributedParameter]): parameter to be converted
+        """
+        if type(p) is DistributedParameter:
+            return
+        requires_grad = p.requires_grad
+
+        p.__class__ = DistributedParameter
+        p.__init__(p, requires_grad=requires_grad)
