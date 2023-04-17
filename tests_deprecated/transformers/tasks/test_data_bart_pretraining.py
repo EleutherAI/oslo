@@ -1,4 +1,4 @@
-import time 
+import time
 import torch
 from torch.utils.data import DataLoader
 from datasets import Dataset as Dt
@@ -21,26 +21,20 @@ class TestDataBartPretraining(TestDataBinarization):
     def __init__(
         self,
         tokenizer,
-        model_name = 'facebook/bart-base',
-        parallel_context=None,
+        model_name="facebook/bart-base",
         label_pad_token_id=-100,
-        max_seq_length = 512,
+        max_seq_length=512,
     ):
-        self.processor = ProcessorForBartPretraining(tokenizer,max_seq_length=max_seq_length)
-        self.data_collator = DataCollatorForBartPretraining(
-            self.processor, label_pad_token_id=label_pad_token_id,
-            permute_sentence_ratio = 0.5, 
-            
+        self.processor = ProcessorForBartPretraining(
+            tokenizer, max_seq_length=max_seq_length
         )
-        if parallel_context is not None:
-            self.sp_data_collator = DataCollatorForBartPretraining(
-                self.processor,
-                parallel_context=parallel_context,
-                label_pad_token_id=label_pad_token_id,
-            )
+        self.data_collator = DataCollatorForBartPretraining(
+            self.processor,
+            label_pad_token_id=label_pad_token_id,
+            permute_sentence_ratio=0.5,
+        )
         self.model_name = model_name
         self.tokenizer = self.processor._tokenizer
-        self.parallel_context = parallel_context
 
     def __call__(
         self,
@@ -54,9 +48,6 @@ class TestDataBartPretraining(TestDataBinarization):
 
         self.data_collator.mlm_probability = mlm_probability
         self.data_collator.possion_lambda = possion_lambda
-        if self.sp_data_collator:
-            self.sp_data_collator.mlm_probability = mlm_probability
-            self.sp_data_collator.possion_lambda = possion_lambda
 
         print(
             "---------- Test Start ----------",
@@ -102,9 +93,6 @@ class TestDataBartPretraining(TestDataBinarization):
 
         self.mask_ratio_check(dataloader)
 
-        if self.parallel_context is not None:
-            self._test_sp_collator(processed_dataset, batch_size)
-
         print("---------- Test Pass ----------\n")
 
     def mask_ratio_check(self, dataloader):
@@ -134,50 +122,27 @@ class TestDataBartPretraining(TestDataBinarization):
         print(f"MLM Probability: {avg_mlm_prob:.6f}")
         print("---- mask ratio test pass ----\n")
 
-    def _test_sp_collator(
-        self, processed_dataset, batch_size, num_samples=2, check_token=False
-    ):
-        if self.sp_data_collator.tokenizer.pad_token is None:
-            self.sp_data_collator.tokenizer.add_special_tokens({"pad_token": "<|pad|>"})
-            print("pad_token is set. (SP)")
-
-        sp_dataloader = DataLoader(
-            processed_dataset["train"],
-            batch_size=batch_size,
-            shuffle=True, 
-            collate_fn=self.sp_data_collator,
-        )
-
-        sp_batch = next(iter(sp_dataloader))
-        print("(SP batch check)")
-        self._batch_check(sp_batch, num_samples=num_samples, check_token=check_token)
-
-        for sp_batch in sp_dataloader:
-            for key, value in sp_batch.items():
-                print(f"{key} size: {value.size()}")
-
-        print("---- SP collator test pass ----\n")
-
 
 if "__main__" == __name__:
-    
+
     # dataset = load_dataset("glue", "sst2")
     dataset = load_dataset(
-            # data_args.dataset_name, ############ !!!!!!!!!!!!!!!!!!
-            'cnn_dailymail','3.0.0',
-            use_auth_token=None,
-            # use_auth_token=True if model_args.use_auth_token else None,
+        # data_args.dataset_name, ############ !!!!!!!!!!!!!!!!!!
+        "cnn_dailymail",
+        "3.0.0",
+        use_auth_token=None,
+        # use_auth_token=True if model_args.use_auth_token else None,
     )
     dataset = dataset.rename_column("article", "text")
-    # reduce dataset for time    
-    dataset['train'] = Dt.from_dict(dataset['train'][:4523])
-    dataset['validation'] = Dt.from_dict(dataset['train'][:555])
-    dataset['test'] = Dt.from_dict(dataset['train'][:555])
+    # reduce dataset for time
+    dataset["train"] = Dt.from_dict(dataset["train"][:4523])
+    dataset["validation"] = Dt.from_dict(dataset["train"][:555])
+    dataset["test"] = Dt.from_dict(dataset["train"][:555])
     print(os.environ["MASTER_PORT"])
     model_nm = "facebook/bart-base"
     tokenizer = BartTokenizerFast.from_pretrained(model_nm)
-    parallel_context = ParallelContext.from_torch(sequence_parallel_size=1)
-    bart_sp_test = TestDataBartPretraining(
-        tokenizer,model_name = model_nm, parallel_context = parallel_context, label_pad_token_id=0,max_seq_length=256
+    # parallel_context = ParallelContext.from_torch(sequence_parallel_size=1)
+    bart_test = TestDataBartPretraining(
+        tokenizer, model_name=model_nm, label_pad_token_id=0, max_seq_length=256
     )
-    bart_sp_test(dataset, batch_size = 4, batch_check_num_sample = 2)
+    bart_test(dataset, batch_size=4, batch_check_num_sample=2)
