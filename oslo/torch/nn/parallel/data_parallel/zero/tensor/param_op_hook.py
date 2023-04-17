@@ -188,7 +188,7 @@ def _get_distributed_tensors_info(*args) -> list:
                 (
                     arg.__class__,
                     DistributedTensorSpec(
-                        arg.get_process_group(), arg.dist_spec, arg.compute_spec
+                        arg.get_parallel_context(), arg.dist_spec, arg.compute_spec
                     ),
                 )
             )

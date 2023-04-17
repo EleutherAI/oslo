@@ -34,6 +34,7 @@ def run_dist(rank, world_size):
     fsdp_model = _FullyShardedDataParallel(
         copy.deepcopy(model), device, parallel_context
     )
+    fsdp_model.parallelize()
     model = model.to(device)
 
     input_data = torch.randn(32, 128).to(device)
