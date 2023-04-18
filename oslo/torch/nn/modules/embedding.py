@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
+from transformers.models.vit.modeling_vit import ViTConfig, ViTEmbeddings
 
 from oslo.torch.distributed import ParallelContext, ParallelMode
 
@@ -254,6 +255,67 @@ class VocabParallelEmbedding2D(nn.Embedding):
             parallel_mode=ParallelMode.TENSOR_2D_COL,
         )
         return output
+
+
+class ViTEmbedding2D(ViTEmbeddings):
+    def __init__(
+        self, config: ViTConfig, use_mask_token: bool = False, parallel_context=None
+    ) -> None:
+        assert parallel_context is not None, "parallel_context must be provided"
+        self.parallel_context = parallel_context
+        self.summa_dim = self.parallel_context.get_world_size(
+            ParallelMode.TENSOR_2D_COL
+        )
+
+        super().__init__(config, use_mask_token=use_mask_token)
+
+    def forward(
+        self,
+        pixel_values: torch.Tensor,
+        bool_masked_pos: Optional[torch.BoolTensor] = None,
+        interpolate_pos_encoding: bool = False,
+    ) -> torch.Tensor:
+        from oslo.torch.distributed.nn.functional import all_gather
+
+        batch_size, num_channels, height, width = pixel_values.shape
+        embeddings = self.patch_embeddings(
+            pixel_values, interpolate_pos_encoding=interpolate_pos_encoding
+        )
+
+        if bool_masked_pos is not None:
+            seq_length = embeddings.shape[1]
+            mask_tokens = self.mask_token.expand(batch_size, seq_length, -1)
+            # replace the masked visual tokens by mask_tokens
+            mask = bool_masked_pos.unsqueeze(-1).type_as(mask_tokens)
+            embeddings = embeddings * (1.0 - mask) + mask_tokens * mask
+
+        # add the [CLS] token to the embedded patch tokens
+        cls_token = all_gather(
+            self.cls_token,
+            dim=-1,
+            parallel_context=self.parallel_context,
+            parallel_mode=ParallelMode.TENSOR_2D_COL,
+        )
+        cls_tokens = cls_token.expand(batch_size, -1, -1)
+        embeddings = torch.cat((cls_tokens, embeddings), dim=1)
+
+        # add positional encoding to each token
+        if interpolate_pos_encoding:
+            embeddings = embeddings + self.interpolate_pos_encoding(
+                embeddings, height, width
+            )
+        else:
+            position_embeddings = all_gather(
+                self.position_embeddings,
+                dim=-1,
+                parallel_context=self.parallel_context,
+                parallel_mode=ParallelMode.TENSOR_2D_COL,
+            )
+            embeddings = embeddings + position_embeddings
+
+        embeddings = self.dropout(embeddings)
+
+        return embeddings
 
 
 class Embedding2p5D(nn.Embedding):
