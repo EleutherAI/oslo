@@ -106,7 +106,7 @@ class _DistributedDataParallel(OsloParallelWrapper):
         if single_output:
             inputs = (inputs,)
 
-        outputs = _DistributedBackwardFunction.apply(self, *inputs)
+        outputs = DistributedBackwardFunction.apply(self, *inputs)
         return outputs[0] if single_output else outputs
 
     def _pre_backward(self):
