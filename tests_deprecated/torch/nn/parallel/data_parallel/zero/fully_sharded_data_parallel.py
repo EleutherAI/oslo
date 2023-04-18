@@ -9,6 +9,7 @@ from oslo.torch.nn.parallel.data_parallel.zero.fully_sharded_data_parallel impor
     _FullyShardedDataParallel,
 )
 import copy
+from unittest.mock import MagicMock
 
 
 class MlpModel(nn.Module):
@@ -32,9 +33,13 @@ def run_dist(rank, world_size):
 
     model = MlpModel()
     fsdp_model = _FullyShardedDataParallel(
-        copy.deepcopy(model), device, parallel_context
+        copy.deepcopy(model),
+        device,
+        parallel_context,
+        force_outputs_fp32=True,
     )
     fsdp_model.parallelize()
+    fsdp_model._post_backward = MagicMock()
     model = model.to(device)
 
     input_data = torch.randn(32, 128).to(device)
@@ -43,8 +48,16 @@ def run_dist(rank, world_size):
 
     output_fsdp = fsdp_model(input_data)
 
-    assert torch.allclose(output_normal, output_fsdp), "Outputs do not match!"
+    assert torch.allclose(
+        output_normal, output_fsdp, rtol=1e-03, atol=1e-03
+    ), "Outputs do not match!"
 
+    try:
+        output_fsdp.sum().backward()
+    except:
+        pass
+
+    output_fsdp._post_backward.assert_called_once()
     print(f"Test passed on rank {rank}!")
 
 

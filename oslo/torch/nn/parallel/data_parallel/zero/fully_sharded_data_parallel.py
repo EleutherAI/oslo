@@ -199,7 +199,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
         # set the context as backward
         self.param_op_hook.toggle_training_phase()
         self.__old_param_op_hooks = DistributedParamOpHookManager.hooks
-        DistributedParamOpHookManager.hooks = self.param_op_hook
+        DistributedParamOpHookManager.hooks = [self.param_op_hook]
 
         # set a visit label for all parameters
         # the label is used to check whether the parameter is correctly reduced
