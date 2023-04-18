@@ -57,7 +57,7 @@ def run_dist(rank, world_size):
     except:
         pass
 
-    output_fsdp._post_backward.assert_called_once()
+    fsdp_model._post_backward.assert_called_once()
     print(f"Test passed on rank {rank}!")
 
 
