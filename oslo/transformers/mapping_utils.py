@@ -233,7 +233,7 @@ class _TensorParallelMapping(_ParallelMapping):
                 gather_output=True,
             ),
         ],
-        "ViTForImageClassification": [
+        "ViT": [
             Column("query", "key", "value", "intermediate.dense"),
             Row("output.dense"),
             Other("position_embeddings", "cls_token", gather_output=True),
