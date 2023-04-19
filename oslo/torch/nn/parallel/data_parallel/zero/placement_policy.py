@@ -5,14 +5,14 @@ from typing import Dict, List, Optional, Tuple, Type
 
 import torch
 
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import (
+from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
     Chunk,
     ChunkManager,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_tracer.utils import (
+from oslo.torch.nn.parallel.data_parallel.zero.memory_tracer.utils import (
     get_device_memory_capacity,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_tracer import (
+from oslo.torch.nn.parallel.data_parallel.zero.memory_tracer import (
     ChunkMemStatsCollector,
 )
 from oslo.torch.nn.parallel.data_parallel.zero.utils import get_current_device

@@ -85,14 +85,14 @@ class _DistributedDataParallel(OsloParallelWrapper):
                 p.register_hook(partial(self.grad_handle, p))
 
     def parallelize(self):
-        self.module_forward = copy.copy(self.module.forward)
+        self._forward = copy.copy(self.module.forward)
         self.module.zero_grad = self.zero_grad
 
     def forward(self, *args, **kwargs):
-        # outputs must be `torch.Tensor` or collections that contain `torch.Tensor`
-        outputs = self.module_forward(*args, **kwargs)
-        if isinstance(outputs, dict):
-            return type(outputs)(
+        # inputs must be `torch.Tensor` or collections that contain `torch.Tensor`
+        inputs = self._forward(*args, **kwargs)
+        if isinstance(inputs, dict):
+            return type(inputs)(
                 {
                     k: v
                     for k, v in zip(
@@ -102,9 +102,12 @@ class _DistributedDataParallel(OsloParallelWrapper):
                 }
             )
 
-        if isinstance(outputs, torch.Tensor):
-            outputs = (outputs,)
-        return DistributedBackwardFunction.apply(self, *outputs)
+        single_output = isinstance(inputs, torch.Tensor)
+        if single_output:
+            inputs = (inputs,)
+
+        outputs = DistributedBackwardFunction.apply(self, *inputs)
+        return outputs[0] if single_output else outputs
 
     def _pre_backward(self):
         pass

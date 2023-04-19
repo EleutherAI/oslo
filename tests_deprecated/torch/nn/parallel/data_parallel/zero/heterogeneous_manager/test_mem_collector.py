@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.memory_tracer.chunk_memstats_collector import (
+from oslo.torch.nn.parallel.data_parallel.zero.memory_tracer.chunk_memstats_collector import (
     ChunkMemStatsCollector,
 )
 

@@ -1,7 +1,10 @@
 import torch
 import torch.distributed as dist
 
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager.chunk import Chunk
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from oslo.torch.nn.parallel.data_parallel.zero.chunk import Chunk
 
 
 def get_current_device() -> torch.device:
@@ -15,7 +18,7 @@ def get_current_device() -> torch.device:
         return torch.device("cpu")
 
 
-def get_temp_total_chunk_on_cuda(chunk: Chunk):
+def get_temp_total_chunk_on_cuda(chunk: "Chunk") -> torch.Tensor:
     if chunk.is_gathered:
         return chunk.cuda_global_chunk
 
