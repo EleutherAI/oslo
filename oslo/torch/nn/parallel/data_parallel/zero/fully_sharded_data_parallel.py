@@ -86,7 +86,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             Defaults to False. Users can set it to True, when they clearly know that they only need DDP.
         search_range_mb (int): Search range for the chunk size. Defaults to 32.
         hidden_dim (int): Hidden dimension for the chunk size search. Defaults to None.
-        min_chunk_size_mb (float): Minimum chunk size in MB. Defaults to 32.
+        min_chunk_size_mb (int): Minimum chunk size in MB. Defaults to 32.
         memstats (MemStats): Memory statistics. Defaults to None.
     """
 
