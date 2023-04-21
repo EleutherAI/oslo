@@ -82,8 +82,8 @@ def save_pretrained(
                         use_residual=wrapper.use_residual,
                     )
 
-        model_to_save.load_state_dict(state_dict)
         oslo.ready(model_to_save, parallel_context=self.parallel_context)
+        model_to_save.load_state_dict(state_dict)
 
         if hasattr(model_to_save, "oslo_wrappers"):
             for parallel_mode, wrapper in model_to_save.oslo_wrappers.items():
