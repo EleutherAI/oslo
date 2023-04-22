@@ -5,6 +5,7 @@
 #include "triton/backend/backend_model_instance.h"
 #include "triton/backend/backend_output_responder.h"
 #include "triton/core/tritonbackend.h"
+#include "model_base.h"
 #include "bert.h"
 
 #ifdef NEW_ARCH
@@ -13,9 +14,7 @@
 #else
 #include "gpt.h"
 #include "transformer.h"
-#include "model_base.h"
 #include "quant_transformer.h"
-
 #endif
 
 namespace triton {
@@ -287,7 +286,9 @@ ModelInstanceState::ModelInstanceState(
       model_state_->RepositoryPath() + "/" + model_state_->ModelFileName();
   std::cout << file_name << std::endl;
 
+#ifdef LIGHTSEQ_cuda
   cudaSetDevice(DeviceId());
+#endif
   lightseq_model_ptr_ = std::shared_ptr<::lightseq::cuda::LSModel>(
       ::lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
           model_state->GetModelType(), file_name,

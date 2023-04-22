@@ -22,16 +22,16 @@ import logging
 import torch
 from torch import nn
 
-from oslo.extension.training.pytorch_quantization.tensor_quant import (
+from lightseq.training.pytorch_quantization.tensor_quant import (
     QuantDescriptor,
     tensor_quant,
     fake_tensor_quant,
 )
-from oslo.extension.training.pytorch_quantization.nn.modules.clip import Clip
+from lightseq.training.pytorch_quantization.nn.modules.clip import Clip
 
-from oslo.extension.training.pytorch_quantization import calib
+from lightseq.training.pytorch_quantization import calib
 
-import oslo.extension.training.pytorch_quantization.utils as quant_utils
+import lightseq.training.pytorch_quantization.utils as quant_utils
 
 __all__ = ["TensorQuantizer"]
 

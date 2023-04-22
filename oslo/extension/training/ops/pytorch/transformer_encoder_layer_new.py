@@ -5,9 +5,9 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
-from oslo.extension.training.ops.pytorch.layer_base import TransformerEncoderLayerBase
+from lightseq.training.ops.pytorch.layer_base import TransformerEncoderLayerBase
 from . import layer_cuda_module
-from oslo.extension.training.ops.pytorch.util import (
+from lightseq.training.ops.pytorch.util import (
     copy_para,
     state_dict,
     calc_offset,
@@ -135,14 +135,6 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
             idx += 1
 
         self.to(torch.device("cuda:0"), dtype=torch.half)
-
-        if self.config.fp16 and self.para.dtype != torch.half:
-            if hasattr(self, "para_16"):
-                self.para_16.copy_(self.para.to(torch.half))
-            else:
-                self.register_buffer("para_16", self.para.clone().detach().half())
-
-        self.assign_layer_weight_grad()
 
     @staticmethod
     def gen_offset(hidden_size, intermediate_size):
@@ -307,6 +299,15 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
         encoder_padding_mask = (
             (encoder_padding_mask * -1e8).type_as(hidden_states).contiguous()
         )
+
+        if self.config.fp16 and self.para.dtype != torch.half:
+            if hasattr(self, "para_16"):
+                self.para_16.copy_(self.para.to(torch.half))
+            else:
+                self.register_buffer("para_16", self.para.clone().detach().half())
+
+        self.assign_layer_weight_grad()
+
         bs, sl, dim = hidden_states.size()
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(

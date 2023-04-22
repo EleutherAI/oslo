@@ -9,12 +9,6 @@
 #include "linear_layer.h"
 #include "crf_layer.h"
 
-#ifdef FP16_MODE
-typedef __half OpType_;
-#else
-typedef float OpType_;
-#endif
-
 namespace lightseq {
 namespace cuda {
 
@@ -50,6 +44,7 @@ class BertCrf : public LSModel {
   std::vector<int> get_output_max_shape(int index) override;
   DataType get_input_dtype(int index) override;
   DataType get_output_dtype(int index) override;
+  void benchmark_mode(bool is_benchmark) override {}
 };
 
 LSMODEL_REGISTER(BertCrf);

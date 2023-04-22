@@ -6,14 +6,14 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
-from oslo.extension.training.ops.pytorch.layer_base import TransformerEncoderLayerBase
-from oslo.extension.training.ops.pytorch.builder import TransformerBuilder
-from oslo.extension.training.ops.pytorch.quantization import (
+from lightseq.training.ops.pytorch.layer_base import TransformerEncoderLayerBase
+from lightseq.training.ops.pytorch.builder import TransformerBuilder
+from lightseq.training.ops.pytorch.quantization import (
     weight_quant_config,
     act_quant_config,
     relu_quant_config,
 )
-from oslo.extension.training.ops.pytorch.util import (
+from lightseq.training.ops.pytorch.util import (
     copy_para,
     state_dict,
     calc_offset,

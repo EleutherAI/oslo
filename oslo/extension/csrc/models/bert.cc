@@ -2,7 +2,6 @@
 
 namespace lightseq {
 namespace cuda {
-
 Bert::Bert(const std::string weight_path, const int max_batch_size)
     : LSModel({"token_ids"}, {"encoder_output"}),
       _max_batch_size(max_batch_size) {
@@ -20,7 +19,7 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
   tw_.print_model_config();
 
   /* --- step.3 initial input Variable node --- */
-  inp_tokens = new Variable("inp_tokens");
+  inp_tokens = new Variable("inp_tokens", g_dtype<OpType_>());
 
   /* --- step.4 inital operator & layer --- */
   int max_batch_tokens = tw_._max_step * _max_batch_size;
@@ -29,6 +28,11 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
   launch_enc_emb_layer.reset(new LaunchEncEmbLayer<OpType_>(
       max_batch_tokens, tw_._padding_id, tw_._hidden_size, tw_._multilg_type));
   launch_enc_emb_layer->load_params(tw_.get_src_emb_wei(), 0);
+
+  // initial LayerNormalize layer
+  lyr_norm_layer.reset(new LyrNormalizeLayer<OpType_, OpType_>(
+      max_batch_tokens, tw_._hidden_size));
+  lyr_norm_layer->load_params(tw_.get_src_emb_wei(), 2);
 
   // initial TransformerEncoder layers
   float attn_prob_dropout_ratio = 0.0;
@@ -40,27 +44,28 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
         new TransformerEncoderLayer<OpType_, OpType_>(
             idx, max_batch_tokens, tw_._max_step, tw_._hidden_size,
             tw_._head_num, tw_._inner_size, attn_prob_dropout_ratio,
-            activation_dropout_ratio, hidden_dropout_ratio, true,
-            tw_._use_gelu ? "gelu" : "relu", false, tw_._is_post_ln));
+            activation_dropout_ratio, hidden_dropout_ratio, !tw_._is_post_ln,
+            tw_._use_gelu ? "gelu" : "relu", false));
     enc_wei_offset +=
         enc_layer_->load_params(tw_.get_enc_wei(), enc_wei_offset);
     enc_layer_vec.push_back(enc_layer_);
   }
 
-  // initial LayerNormalize layer
-  lyr_norm_layer.reset(new LyrNormalizeLayer<OpType_, OpType_>(
-      max_batch_tokens, tw_._hidden_size));
-  lyr_norm_layer->load_params(tw_.get_src_emb_wei(), 2);
+  printf("Finish initialize layers and assign weights!\n");
 
   /* --- step.5 construct network --- */
   std::tuple<Variable *, Variable *> enc_emb_outs =
       (*launch_enc_emb_layer)(inp_tokens);
   Variable *enc_emb = std::get<0>(enc_emb_outs);
   Variable *pad_mask = std::get<1>(enc_emb_outs);
+  enc_emb = (*lyr_norm_layer)(enc_emb);
   for (auto iter : enc_layer_vec) {
     enc_emb = (*iter)(enc_emb, pad_mask);
   }
-  bert_out = (*lyr_norm_layer)(enc_emb);
+  bert_out = enc_emb;
+  printf("Finish construct network!\n");
+
+  _context_ptr->build();
 }
 
 Bert::~Bert() {}
@@ -68,11 +73,10 @@ Bert::~Bert() {}
 void Bert::before_forward(int batch_size, int seq_len) {
   launch_enc_emb_layer->before_forward(batch_size, seq_len);
 
+  lyr_norm_layer->before_forward(batch_size, seq_len);
   for (auto iter : enc_layer_vec) {
     iter->before_forward(batch_size, seq_len);
   }
-
-  lyr_norm_layer->before_forward(batch_size * seq_len);
 }
 
 void Bert::Infer() {
@@ -82,12 +86,12 @@ void Bert::Infer() {
 
   /* --- notice that the order of forward should be the same with network --- */
   launch_enc_emb_layer->forward();
+  lyr_norm_layer->forward();
   for (auto iter : enc_layer_vec) {
     iter->forward();
   }
-  lyr_norm_layer->forward();
 
-  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
+  _context_ptr->synchronize();
 
   set_output_shape(0, {batch_size, seq_len, tw_._hidden_size});
 }
@@ -167,7 +171,6 @@ DataType Bert::get_output_dtype(int index) {
 #else
       return DataType::kFloat32;
 #endif
-
       break;
 
     default:
@@ -175,6 +178,5 @@ DataType Bert::get_output_dtype(int index) {
       break;
   }
 }
-
 }  // namespace cuda
 }  // namespace lightseq

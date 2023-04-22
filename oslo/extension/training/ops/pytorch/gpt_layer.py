@@ -1,10 +1,10 @@
 import torch
 
-from oslo.extension.training.ops.pytorch import TransformerBuilder
-from oslo.extension.training.ops.pytorch.transformer_encoder_layer import (
+from lightseq.training.ops.pytorch import TransformerBuilder
+from lightseq.training.ops.pytorch.transformer_encoder_layer import (
     LSTransformerEncoderLayer,
 )
-from oslo.extension.training.ops.pytorch.quantization import (
+from lightseq.training.ops.pytorch.quantization import (
     weight_quant_config,
     act_quant_config,
 )
@@ -25,8 +25,6 @@ class LSGptEncoderLayer(LSTransformerEncoderLayer):
 
         initial_biases: Optional: Only used for unit test
     """
-
-    layer_id = 0
 
     def __init__(self, config, initial_weights=None, initial_biases=None):
         super(LSGptEncoderLayer, self).__init__(

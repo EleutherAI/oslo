@@ -19,8 +19,8 @@
 import logging
 import torch
 
-from oslo.extension.training.pytorch_quantization.calib.calibrator import _Calibrator
-from oslo.extension.training.pytorch_quantization import utils as quant_utils
+from lightseq.training.pytorch_quantization.calib.calibrator import _Calibrator
+from lightseq.training.pytorch_quantization import utils as quant_utils
 
 logger = logging.getLogger(__name__)
 

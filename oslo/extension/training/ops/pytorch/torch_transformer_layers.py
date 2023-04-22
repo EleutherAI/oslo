@@ -12,8 +12,8 @@ import torch
 from torch import Tensor, nn
 from torch.nn import Parameter, LayerNorm, Dropout
 
-from oslo.extension.training.ops.pytorch import util
-from oslo.extension.training.ops.pytorch.layer_base import (
+from lightseq.training.ops.pytorch import util
+from lightseq.training.ops.pytorch.layer_base import (
     TransformerEmbeddingLayerBase,
     TransformerEncoderLayerBase,
     TransformerDecoderLayerBase,

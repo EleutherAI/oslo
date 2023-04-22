@@ -25,10 +25,10 @@ import logging
 
 import torch
 
-from oslo.extension.training.pytorch_quantization.calib.calibrator import _Calibrator
-from oslo.extension.training.pytorch_quantization.tensor_quant import fake_tensor_quant
-from oslo.extension.training.pytorch_quantization import nn as quant_nn
-from oslo.extension.training.pytorch_quantization import utils as quant_utils
+from lightseq.training.pytorch_quantization.calib.calibrator import _Calibrator
+from lightseq.training.pytorch_quantization.tensor_quant import fake_tensor_quant
+from lightseq.training.pytorch_quantization import nn as quant_nn
+from lightseq.training.pytorch_quantization import utils as quant_utils
 
 __all__ = ["HistogramCalibrator", "calibrate_weights"]
 

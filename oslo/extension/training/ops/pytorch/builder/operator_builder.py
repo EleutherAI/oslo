@@ -20,38 +20,34 @@ class OperatorBuilder(CUDAOpBuilder):
 
     def sources(self):
         return [
-            "csrc/kernels/cublas_wrappers.cu",
-            "csrc/kernels/transform_kernels.cu",
-            "csrc/kernels/transform_kernels_new.cu",
-            "csrc/kernels/dropout_kernels.cu",
-            "csrc/kernels/normalize_kernels.cu",
-            "csrc/kernels/softmax_kernels_new.cu",
-            "csrc/kernels/softmax_kernels.cu",
-            "csrc/kernels/general_kernels.cu",
-            "csrc/kernels/cuda_util.cu",
-            "csrc/kernels/embedding_kernels.cu",
-            "csrc/kernels/cross_entropy.cu",
+            "csrc/kernels/cuda/cublas_wrappers.cu",
+            "csrc/kernels/cuda/transform_kernels.cu",
+            "csrc/kernels/cuda/transform_kernels_new.cu",
+            "csrc/kernels/cuda/dropout_kernels.cu",
+            "csrc/kernels/cuda/normalize_kernels.cu",
+            "csrc/kernels/cuda/softmax_kernels_new.cu",
+            "csrc/kernels/cuda/softmax_kernels.cu",
+            "csrc/kernels/cuda/general_kernels.cu",
+            "csrc/kernels/cuda/cuda_util.cu",
+            "csrc/kernels/cuda/embedding_kernels.cu",
+            "csrc/kernels/cuda/cross_entropy.cu",
+            "csrc/lsflow/allocator.cpp",
             "csrc/lsflow/context.cpp",
             "csrc/lsflow/layer.cpp",
+            "csrc/lsflow/lsflow_util.cpp",
             "csrc/lsflow/manager.cpp",
             "csrc/lsflow/node.cpp",
+            "csrc/lsflow/operator.cpp",
+            "csrc/lsflow/shape.cpp",
             "csrc/lsflow/tensor.cpp",
-            "csrc/ops_new/bias_act_dropout.cpp",
-            "csrc/ops_new/bias_add_transform_20314.cpp",
-            "csrc/ops_new/bias_dropout_residual.cpp",
-            "csrc/ops_new/dropout.cpp",
-            "csrc/ops_new/feed_forward.cpp",
-            "csrc/ops_new/normalize_layer.cpp",
-            "csrc/ops_new/softmax.cpp",
-            "csrc/ops_new/strided_batch_gemm.cpp",
-            "csrc/ops_new/transform_0213.cpp",
-            "csrc/ops_new/crf.cpp",
+            "csrc/lsflow/variable.cpp",
+            "csrc/ops_new/split_head_op.cpp",
             "csrc/pybind/pybind_op.cpp",
         ]
 
     def include_paths(self):
         paths = [
-            "csrc/kernels/includes",
+            "csrc/kernels/cuda/includes",
             "csrc/ops_new/includes",
             "csrc/lsflow/includes",
         ]
@@ -74,4 +70,12 @@ class OperatorBuilder(CUDAOpBuilder):
         return args + self.compute_capability_args()
 
     def cxx_args(self):
-        return ["-O3", "-std=c++14", "-g", "-Wno-reorder", "-DONLY_OP=ON"]
+        return [
+            "-O3",
+            "-std=c++14",
+            "-g",
+            "-Wno-reorder",
+            "-DONLY_OP",
+            "-DPYBIND_INTERFACE",
+            "-DLIGHTSEQ_cuda",
+        ]

@@ -21,7 +21,7 @@ import torch
 from torch import nn
 from torch.nn.parameter import Parameter
 
-from oslo.extension.training.pytorch_quantization.nn import functional as QF
+from lightseq.training.pytorch_quantization.nn import functional as QF
 
 __all__ = ["Clip"]
 

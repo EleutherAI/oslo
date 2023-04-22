@@ -9,18 +9,12 @@
 #include "transformer_decoder_layer.h"
 #include "lyr_normalize_layer.h"
 #include "linear_layer.h"
-#include "sample_layer.h"
+#include "generator_layer.h"
 #include "encdec_kv_layer.h"
-
-#ifdef FP16_MODE
-typedef __half OpType_;
-#else
-typedef float OpType_;
-#endif
+#include "model_util.h"
 
 namespace lightseq {
 namespace cuda {
-
 class Transformer : public LSModel {
  private:
   TransformerWeight<OpType_> tw_;
@@ -32,11 +26,11 @@ class Transformer : public LSModel {
 
   LaunchDecEmbLayerPtr<OpType_> launch_dec_emb_layer;
   EncDecKvLayerPtr<OpType_, OpType_> _enc_kv_layer;
-  std::vector<TransformerDecoderLayerV2Ptr<OpType_, OpType_>> dec_layer_vec;
+  std::vector<TransformerDecoderLayerPtr<OpType_, OpType_>> dec_layer_vec;
   LyrNormalizeLayerPtr<OpType_, OpType_> dec_norm_layer;
   LinearLayerPtr<OpType_, OpType_> linear_layer;
 
-  SampleLayerPtr<OpType_> sample_layer;
+  GeneratorLayerPtr<OpType_> _generator_layer;
 
   ContextPtr context_ptr;
 
@@ -58,6 +52,7 @@ class Transformer : public LSModel {
   int _max_batch_size;
   bool _output_topk = true;
   bool _is_sampling;
+  GenerateMethod _generate_method;
 
   const std::set<std::string> kSamplingMethods = {"beam_search", "topk", "topp",
                                                   "topk_greedy"};
@@ -77,9 +72,9 @@ class Transformer : public LSModel {
   std::vector<int> get_output_max_shape(int index) override;
   DataType get_input_dtype(int index) override;
   DataType get_output_dtype(int index) override;
+  void benchmark_mode(bool is_benchmark) override {}
 };
 
 LSMODEL_REGISTER(Transformer);
-
 }  // namespace cuda
 }  // namespace lightseq

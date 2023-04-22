@@ -18,7 +18,7 @@
 
 from collections import namedtuple
 import torch
-from oslo.extension.training.pytorch_quantization import nn as quant_nn
+from lightseq.training.pytorch_quantization import nn as quant_nn
 
 # Definition of the named tuple that is used to store mapping of the quantized modules
 _quant_entry = namedtuple("quant_entry", "orig_mod mod_name replace_mod")

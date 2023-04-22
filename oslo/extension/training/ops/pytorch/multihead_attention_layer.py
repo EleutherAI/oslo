@@ -240,13 +240,13 @@ class LSMultiheadAttentionLayer(nn.Module):
 
     def init_transformer_weights(self):
         hs = self.config.hidden_size
-        ims = self.config.intermediate_size
-        attn_qkvw = self._get_weights(0).view(-1, hs)
-        nn.init.xavier_uniform_(attn_qkvw, 1.0 / math.sqrt(2.0))
-        bound = self.calc_bound(attn_qkvw)
-        nn.init.uniform_(self._get_weights(1), -bound, bound)
+        attn_qkvw = self._get_weights(0).view(3, hs, hs)
+        nn.init.normal_(attn_qkvw[0,:,:], mean=0.0, std=self.config.initializer_range)
+        nn.init.normal_(attn_qkvw[1,:,:], mean=0.0, std=self.config.initializer_range)
+        nn.init.normal_(attn_qkvw[2,:,:], mean=0.0, std=self.config.initializer_range)
+        nn.init.zeros_(self._get_weights(1))
 
-        nn.init.xavier_uniform_(self._get_weights(2).view(-1, hs), 1.0)
+        nn.init.normal_(self._get_weights(2).view(-1, hs), mean=0.0, std=self.config.initializer_range)
         nn.init.zeros_(self._get_weights(3))
 
         nn.init.ones_(self._get_weights(4))
@@ -352,6 +352,7 @@ class LSMultiheadAttentionLayer(nn.Module):
             assert bs == encoder_padding_mask.size(
                 0
             ) and sl == encoder_padding_mask.size(1)
+        encoder_padding_mask = torch.nan_to_num(encoder_padding_mask)
         output = LSMultiheadAttentionFunc.apply(
             hidden_states,
             encoder_padding_mask,

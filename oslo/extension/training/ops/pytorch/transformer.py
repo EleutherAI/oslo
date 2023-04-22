@@ -3,13 +3,13 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 
-from oslo.extension.training import (
+from lightseq.training import (
     LSTransformerEmbeddingLayer,
     LSTransformerEncoderLayer,
     LSTransformerDecoderLayer,
 )
-from oslo.extension.training.ops.pytorch.util import MODEL_ARCH
-from oslo.extension.training.ops.pytorch.quantization import QuantLinear
+from lightseq.training.ops.pytorch.util import MODEL_ARCH
+from lightseq.training.ops.pytorch.quantization import QuantLinear
 
 
 class LSTransformer(nn.Module):

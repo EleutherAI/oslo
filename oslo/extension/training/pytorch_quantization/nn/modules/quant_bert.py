@@ -29,8 +29,8 @@ import math
 import torch
 from torch import nn
 
-from oslo.extension.training.pytorch_quantization import nn as quant_nn
-from oslo.extension.training.pytorch_quantization.nn.modules.tensor_quantizer import (
+from lightseq.training.pytorch_quantization import nn as quant_nn
+from lightseq.training.pytorch_quantization.nn.modules.tensor_quantizer import (
     TensorQuantizer,
 )
 
