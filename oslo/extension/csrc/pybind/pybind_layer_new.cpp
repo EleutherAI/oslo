@@ -302,12 +302,10 @@ int create_multihead_attention_layer_new(
 
   Context::regist_pybind_layer("MultiheadAttentionLayer", layer_id, layer);
 
-  layer->before_forward(1, 32);
-
   std::string T1_dtype = (std::is_same<T1, __half>::value) ? "half" : "float";
   std::string T2_dtype = (std::is_same<T2, __half>::value) ? "half" : "float";
 
-  std::cout << "Encoder layer #" << layer_id << " is created with date type ["
+  std::cout << "MultiHead Attention layer #" << layer_id << " is created with date type ["
             << T1_dtype << ", " << T2_dtype << "]." << std::endl;
 
   return 0;
@@ -315,8 +313,7 @@ int create_multihead_attention_layer_new(
 
 template <typename T1, typename T2>
 std::vector<torch::Tensor> multihead_attention_layer_fw(
-    int layer_id, const torch::Tensor &input, const torch::Tensor &input_mask,
-    bool training_mode) {
+    int layer_id, const torch::Tensor &input, const torch::Tensor &input_mask) {
   CHECK_INPUT(input);
   CHECK_INPUT(input_mask);
 
@@ -333,8 +330,12 @@ std::vector<torch::Tensor> multihead_attention_layer_fw(
 
   Variable *inp_node = layer->input(0);
   inp_node->set_value(input_ptr);
+  inp_node->set_shape(
+      {size_t(input.size(0)), size_t(input.size(1)), size_t(input.size(2))});
   Variable *inp_mask_node = layer->input(1);
   inp_mask_node->set_value(input_mask_ptr);
+  inp_mask_node->set_shape(
+      {size_t(input_mask.size(0)), size_t(input_mask.size(1))});
 
   Variable *out_node = layer->output(0);
   out_node->set_value(out_ptr);
