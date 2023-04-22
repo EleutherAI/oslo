@@ -117,7 +117,7 @@ template <typename T>
 void torch_launch_attn_softmax_new(torch::Tensor &out, torch::Tensor &inp,
                                    const torch::Tensor &attn_mask,
                                    int batch_size, int nhead, int from_len,
-                                   int to_len, bool is_dec_self_attn,
+                                   int to_len, int kv_size, bool is_dec_self_attn,
                                    bool mask_future) {
   const T *attn_mask_ptr = rptr<T>(attn_mask);
   if (is_dec_self_attn) {
@@ -125,7 +125,7 @@ void torch_launch_attn_softmax_new(torch::Tensor &out, torch::Tensor &inp,
   }
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   launch_attn_softmax_new(rptr<T>(out), rptr<T>(inp), attn_mask_ptr, batch_size,
-                          nhead, from_len, to_len, mask_future, stream);
+                          nhead, from_len, to_len, kv_size, mask_future, stream);
   //     cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }

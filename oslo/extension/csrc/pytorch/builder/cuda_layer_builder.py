@@ -74,6 +74,7 @@ class CudaLayerBuilder(CUDAOpBuilder):
             "csrc/ops_new/includes",
             "csrc/lsflow/includes",
             "csrc/layers_new/includes",
+            "csrc/models/includes",
         ]
         cuda_major, cuda_minor = installed_cuda_version()
         if cuda_major < 11:
