@@ -16,7 +16,7 @@
 #
 
 
-"""``lightseq.training.pytorch_quantization.calib`` provides Calibrator classes that
+"""``oslo.extension.training.pytorch_quantization.calib`` provides Calibrator classes that
 collect data statistics and determine pytorch_quantization parameters.
 """
 

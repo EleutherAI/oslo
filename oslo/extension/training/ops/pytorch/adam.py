@@ -1,6 +1,6 @@
 import torch
 
-from lightseq.training.ops.pytorch.builder import AdamBuilder
+from oslo.extension.training.ops.pytorch.builder import AdamBuilder
 
 fused_adam_cuda = None
 

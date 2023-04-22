@@ -6,11 +6,11 @@ from torch import nn
 from torch.autograd import Function
 from torch.nn import functional as F
 
-from lightseq.training.ops.pytorch.quantization import (
+from oslo.extension.training.ops.pytorch.quantization import (
     weight_quant_config,
     act_quant_config,
 )
-from lightseq.training.ops.pytorch.builder import TransformerBuilder
+from oslo.extension.training.ops.pytorch.builder import TransformerBuilder
 
 transformer_cuda_module = None
 

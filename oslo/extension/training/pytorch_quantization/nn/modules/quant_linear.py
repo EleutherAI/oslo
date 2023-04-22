@@ -20,7 +20,7 @@
 from torch import nn
 from torch.nn import functional as F
 
-from lightseq.training.pytorch_quantization import tensor_quant
+from oslo.extension.training.pytorch_quantization import tensor_quant
 
 from . import _utils
 
@@ -40,9 +40,9 @@ class QuantLinear(nn.Linear, _utils.QuantMixin):
     default_quant_desc_weight are used.
 
     Keyword Arguments:
-        quant_desc_input: An instance of :class:`QuantDescriptor <lightseq.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
+        quant_desc_input: An instance of :class:`QuantDescriptor <oslo.extension.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
             Quantization descriptor of input.
-        quant_desc_wegiht: An instance of :class:`QuantDescriptor <lightseq.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
+        quant_desc_wegiht: An instance of :class:`QuantDescriptor <oslo.extension.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
             Quantization descriptor of weight.
 
     Raises:

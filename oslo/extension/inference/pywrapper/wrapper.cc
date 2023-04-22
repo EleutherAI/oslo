@@ -917,7 +917,7 @@ class PyQuantVit {
 };
 
 PYBIND11_MODULE(inference, m) {
-  m.attr("__name__") = "lightseq.inference";
+  m.attr("__name__") = "oslo.extension.inference";
   py::class_<lightseq::cuda::TransformerDecoder>(m, "TransformerDecoder")
       .def(py::init<const std::string, const int>(), py::arg("weight_path"),
            py::arg("max_batch_size"))

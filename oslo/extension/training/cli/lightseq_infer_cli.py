@@ -17,7 +17,7 @@ import torch
 from fairseq import checkpoint_utils, options, scoring, tasks, utils
 from fairseq.logging import progress_bar
 from fairseq.logging.meters import StopwatchMeter, TimeMeter
-import lightseq.inference as lsi
+import oslo.extension.inference as lsi
 
 
 def main(args):

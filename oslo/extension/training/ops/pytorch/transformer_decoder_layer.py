@@ -7,21 +7,21 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
-from lightseq.training.ops.pytorch import TransformerBuilder
-from lightseq.training.ops.pytorch.builder import TransformerBuilder
-from lightseq.training.ops.pytorch.util import (
+from oslo.extension.training.ops.pytorch import TransformerBuilder
+from oslo.extension.training.ops.pytorch.builder import TransformerBuilder
+from oslo.extension.training.ops.pytorch.util import (
     copy_para,
     state_dict,
     MODEL_ARCH,
     check_config,
     calc_offset,
 )
-from lightseq.training.ops.pytorch.quantization import (
+from oslo.extension.training.ops.pytorch.quantization import (
     weight_quant_config,
     act_quant_config,
     relu_quant_config,
 )
-from lightseq.training.ops.pytorch.layer_base import TransformerDecoderLayerBase
+from oslo.extension.training.ops.pytorch.layer_base import TransformerDecoderLayerBase
 
 transformer_cuda_module = TransformerBuilder().load()
 

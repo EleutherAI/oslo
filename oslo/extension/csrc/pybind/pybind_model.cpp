@@ -310,7 +310,7 @@ class PyGpt {
 }  // namespace lightseq
 
 PYBIND11_MODULE(inference, m) {
-  m.attr("__name__") = "lightseq.inference";
+  m.attr("__name__") = "oslo.extension.inference";
 
   py::class_<lightseq::cuda::PyTransformer>(m, "Transformer")
       .def(py::init<const std::string, const int>(), py::arg("weight_path"),

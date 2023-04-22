@@ -28,7 +28,7 @@ import torch.nn.functional as F
 from torch.nn.modules.utils import _single, _pair, _triple
 from torch.nn.modules.conv import _ConvTransposeNd
 
-from lightseq.training.pytorch_quantization import tensor_quant
+from oslo.extension.training.pytorch_quantization import tensor_quant
 
 from . import _utils
 
@@ -54,9 +54,9 @@ class _QuantConvNd(torch.nn.modules.conv._ConvNd, _utils.QuantMixin):
     Comments of original arguments can be found in torch.nn.modules.conv
 
     Arguments:
-        quant_desc_input: An instance of :class:`QuantDescriptor <lightseq.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
+        quant_desc_input: An instance of :class:`QuantDescriptor <oslo.extension.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
             Quantization descriptor of input.
-        quant_desc_weight: An instance of :class:`QuantDescriptor <lightseq.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
+        quant_desc_weight: An instance of :class:`QuantDescriptor <oslo.extension.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
             Quantization descriptor of weight.
 
     Raises:
@@ -354,9 +354,9 @@ class _QuantConvTransposeNd(torch.nn.modules.conv._ConvTransposeNd, _utils.Quant
     Comments of original arguments can be found in torch.nn.modules.conv
 
     Arguments:
-        quant_desc_input: An instance of :class:`QuantDescriptor <lightseq.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
+        quant_desc_input: An instance of :class:`QuantDescriptor <oslo.extension.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
             Quantization descriptor of input.
-        quant_desc_weight: An instance of :class:`QuantDescriptor <lightseq.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
+        quant_desc_weight: An instance of :class:`QuantDescriptor <oslo.extension.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
             Quantization descriptor of weight.
 
     Raises:

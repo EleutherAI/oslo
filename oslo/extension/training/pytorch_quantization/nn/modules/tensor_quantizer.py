@@ -22,16 +22,16 @@ import logging
 import torch
 from torch import nn
 
-from lightseq.training.pytorch_quantization.tensor_quant import (
+from oslo.extension.training.pytorch_quantization.tensor_quant import (
     QuantDescriptor,
     tensor_quant,
     fake_tensor_quant,
 )
-from lightseq.training.pytorch_quantization.nn.modules.clip import Clip
+from oslo.extension.training.pytorch_quantization.nn.modules.clip import Clip
 
-from lightseq.training.pytorch_quantization import calib
+from oslo.extension.training.pytorch_quantization import calib
 
-import lightseq.training.pytorch_quantization.utils as quant_utils
+import oslo.extension.training.pytorch_quantization.utils as quant_utils
 
 __all__ = ["TensorQuantizer"]
 
@@ -49,12 +49,12 @@ class TensorQuantizer(nn.Module):
         ``calib`` stage runs calibration
 
     Args:
-        quant_desc: An instance of :func:`QuantDescriptor <lightseq.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
+        quant_desc: An instance of :func:`QuantDescriptor <oslo.extension.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
         disabled: A boolean. If True, by pass the whole module returns input. Default False.
         if_quant: A boolean. If True, run main quantization body. Default True.
         if_clip: A boolean. If True, clip before quantization and learn amax. Default False.
         if_calib: A boolean. If True, run calibration. Not implemented yet. Settings of calibration will probably
-            go to :func:`QuantDescriptor <lightseq.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
+            go to :func:`QuantDescriptor <oslo.extension.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
 
     Raises:
 

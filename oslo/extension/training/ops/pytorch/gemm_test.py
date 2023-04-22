@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from copy import deepcopy
 from tqdm import tqdm
 
-from lightseq.training.ops.pytorch.builder import KernelBuilder
+from oslo.extension.training.ops.pytorch.builder import KernelBuilder
 
 cuda_module = KernelBuilder().load()
 
