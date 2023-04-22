@@ -103,6 +103,7 @@ class LSMultiheadAttentionLayer(nn.Module):
         initial_biases=None
     ):
         super(LSMultiheadAttentionLayer, self).__init__()
+
         self.config = copy.deepcopy(config)
         if isinstance(self.config, PretrainedConfig):
             self.config.max_batch_tokens = 4096 # 일단 default batch size로 128로 설정
@@ -155,6 +156,7 @@ class LSMultiheadAttentionLayer(nn.Module):
             self.config.mask_future_tokens,
             self.config.is_post_ln,
         )
+        self.assigned_layer_weight_grad = False
 
         hs = self.config.hidden_size
         ims = self.config.intermediate_size
@@ -178,17 +180,15 @@ class LSMultiheadAttentionLayer(nn.Module):
 
         idx = 0
         for w, b in zip_longest(weights, biases):
-            if w is not None:
-                cur_para = self._get_weights(idx)
-                assert cur_para.numel() == w.numel()
-                cur_para.copy_(w.view(-1))
-                idx += 1
+            cur_para = self._get_weights(idx)
+            assert cur_para.numel() == w.numel()
+            cur_para.copy_(w.view(-1))
+            idx += 1
 
-            if b is not None:
-                cur_para = self._get_weights(idx)
-                assert cur_para.numel() == b.numel()
-                cur_para.copy_(b.view(-1))
-                idx += 1
+            cur_para = self._get_weights(idx)
+            assert cur_para.numel() == b.numel()
+            cur_para.copy_(b.view(-1))
+            idx += 1
 
     @staticmethod
     def get_config(**kwargs):
@@ -244,6 +244,7 @@ class LSMultiheadAttentionLayer(nn.Module):
         nn.init.normal_(attn_qkvw[0,:,:], mean=0.0, std=self.config.initializer_range)
         nn.init.normal_(attn_qkvw[1,:,:], mean=0.0, std=self.config.initializer_range)
         nn.init.normal_(attn_qkvw[2,:,:], mean=0.0, std=self.config.initializer_range)
+
         nn.init.zeros_(self._get_weights(1))
 
         nn.init.normal_(self._get_weights(2).view(-1, hs), mean=0.0, std=self.config.initializer_range)
@@ -289,7 +290,10 @@ class LSMultiheadAttentionLayer(nn.Module):
         }
         return weight, bias
 
-    def __assign_layer_weight_grad(self):
+    def assign_layer_weight_grad(self):
+        if self.assigned_layer_weight_grad == True:
+            return
+        self.assigned_layer_weight_grad = True
         param = (
             self.para_16
             if self.config.fp16 and self.para.dtype != torch.half
@@ -320,8 +324,6 @@ class LSMultiheadAttentionLayer(nn.Module):
 
         self.config.training = self.training
         self.config.is_grad_enabled = torch.is_grad_enabled()
-        self.config.quant_mode = self.quant_mode
-
         hidden_states = hidden_states.contiguous()
         encoder_padding_mask = (
             (encoder_padding_mask * -1e8).type_as(hidden_states).contiguous()
@@ -332,7 +334,8 @@ class LSMultiheadAttentionLayer(nn.Module):
             else:
                 self.register_buffer("para_16", self.para.clone().detach().half())
 
-        self.__assign_layer_weight_grad()
+        self.assign_layer_weight_grad()
+
         bs, sl, dim = hidden_states.size()
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
@@ -346,7 +349,6 @@ class LSMultiheadAttentionLayer(nn.Module):
         if len(encoder_padding_mask.size()) == 1:
             assert bs == 1 and sl == encoder_padding_mask.size(0)
         else:
-            assert self.config.is_decoder == False, "Not yet support that is_decoder is True"
             encoder_padding_mask = encoder_padding_mask.squeeze()
 
             assert bs == encoder_padding_mask.size(
@@ -360,10 +362,4 @@ class LSMultiheadAttentionLayer(nn.Module):
             self.config,
         )
 
-        return (output.to(self.para),)
-
-    def disable_quant(self):
-        self.quant_mode = False
-
-    def enable_quant(self):
-        self.quant_mode = True
+        return output.to(self.para)

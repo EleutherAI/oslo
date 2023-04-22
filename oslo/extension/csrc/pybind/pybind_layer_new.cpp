@@ -293,10 +293,10 @@ int create_multihead_attention_layer_new(
   auto layer = std::make_shared<MultiheadAttentionLayer<T1, T2>>(
       layer_id, max_batch_tokens, max_seq_len, hidden_dim, num_heads,
       attn_prob_dropout_ratio, hidden_dropout_ratio,
-      pre_or_postLayerNorm, mask_future_tokens, is_post_ln);
+      is_post_ln, mask_future_tokens);
 
-  Variable *inp(new Variable("input"));
-  Variable *inp_mask(new Variable("inp_mask"));
+  Variable *inp(new Variable("input", g_dtype<T1>(), g_dtype<T2>()));
+  Variable *inp_mask(new Variable("inp_mask", g_dtype<T1>()));
 
   Variable* attn_out = (*layer)(inp, inp_mask);
 
