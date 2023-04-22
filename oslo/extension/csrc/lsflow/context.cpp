@@ -31,6 +31,10 @@ void Context::set_stream(cudaStream_t stream) {
 
 void Context::convert_into_train() { _status_type = StatusType::Training; }
 
+void Context::convert_into_inference() {
+  _status_type = StatusType::Inference;
+}
+
 void Context::convert_into_eval() {
   if (_status_type != StatusType::Inference)
     _status_type = StatusType::Evaluation;

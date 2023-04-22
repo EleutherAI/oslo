@@ -47,6 +47,13 @@ void set_global_context(int context_id) {
   Context::set_global_context(context_id);
 }
 
+void set_training_mode(bool is_training) {
+  if (is_training) 
+    Context::global_instance()->convert_into_train();
+  else
+    Context::global_instance()->convert_into_infer();
+}
+
 template <typename T1, typename T2>
 int create_transformer_encoder_layer_new(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_dim,
@@ -542,6 +549,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 
   m.def("create_global_context", &lightseq::create_global_context,
         "Create Lightseq Context");
+  m.def("set_training_mode", &lightseq::set_training_mode,
+        "Set Lightseq Training Mode");
   m.def("set_global_context", &lightseq::set_global_context,
         "Set Lightseq Context");
 

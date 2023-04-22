@@ -72,6 +72,7 @@ class Context {
   AllocatorPtr allocator() { return _allocator_ptr; }
 
   void convert_into_train();
+  void convert_into_inference();
   void convert_into_eval();
 
   // Create a process-level global object

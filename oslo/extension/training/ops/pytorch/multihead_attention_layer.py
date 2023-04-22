@@ -7,6 +7,8 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
+from oslo.extension.training.ops.pytorch.util import MODEL_ARCH, check_config
+
 from oslo.extension.training.ops.pytorch.builder import LayerBuilder
 from oslo.extension.training.ops.pytorch.quantization import (
     weight_quant_config,
@@ -51,8 +53,7 @@ class LSMultiheadAttentionFunc(Function):
         (output,) = forward_func(
             config.layer_id,
             input,
-            input_mask,
-            config.training)
+            input_mask)
 
         if config.is_grad_enabled and config.training:
             ctx.save_for_backward(output, input, input_mask)
@@ -212,7 +213,9 @@ class LSMultiheadAttentionLayer(nn.Module):
             training: bool = True
             is_grad_enabled: bool = True
 
-        return Config(**kwargs)
+        config = Config(**kwargs)
+        check_config(config)
+        return config
 
     @staticmethod
     def gen_offset(hidden_size, intermediate_size):
@@ -323,7 +326,13 @@ class LSMultiheadAttentionLayer(nn.Module):
         # masked value should be 1.0, unmasked value should be 0.0
 
         self.config.training = self.training
+        global layer_cuda_module
+        cuda_module = layer_cuda_module
+        cuda_module.set_training_mode(True)
+        
         self.config.is_grad_enabled = torch.is_grad_enabled()
+        self.config.quant_mode = self.quant_mode
+
         hidden_states = hidden_states.contiguous()
         encoder_padding_mask = (
             (encoder_padding_mask * -1e8).type_as(hidden_states).contiguous()
