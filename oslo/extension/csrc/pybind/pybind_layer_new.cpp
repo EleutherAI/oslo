@@ -51,7 +51,7 @@ void set_training_mode(bool is_training) {
   if (is_training) 
     Context::global_instance()->convert_into_train();
   else
-    Context::global_instance()->convert_into_infer();
+    Context::global_instance()->convert_into_inference();
 }
 
 template <typename T1, typename T2>
