@@ -13,7 +13,7 @@ class BaseProcessor(ABC):
     def __init__(self, tokenizer: PreTrainedTokenizerBase, max_seq_length: int) -> None:
         self._tokenizer = tokenizer
         self._max_seq_length = max_seq_length
-        self._chunk_size = max_seq_length -1
+        self._chunk_size = max_seq_length - 1
         self._buffer = []
 
     def save_tokenizer(self, path: str) -> None:

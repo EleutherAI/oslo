@@ -22,7 +22,7 @@ class TestDataBinarization:
                 print(f"key = {key}\nsize: {value.shape}\nvalue:{value[idx]}\n")
                 if key == "input_ids":
                     print(f"input_ids decode: {self.tokenizer.decode(value[idx])}\n")
-                elif key == "labels"  and (-100 not in value[idx]):
+                elif key == "labels" and (-100 not in value[idx]):
                     print(f"labels decode: {self.tokenizer.decode(value[idx])}\n")
             if check_token:
                 print(

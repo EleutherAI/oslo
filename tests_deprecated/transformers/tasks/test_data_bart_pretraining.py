@@ -143,6 +143,6 @@ if "__main__" == __name__:
     tokenizer = BartTokenizerFast.from_pretrained(model_nm)
     # parallel_context = ParallelContext.from_torch(sequence_parallel_size=1)
     bart_test = TestDataBartPretraining(
-        tokenizer, model_name=model_nm, label_pad_token_id=0, max_seq_length=256
+        tokenizer, model_name=model_nm, label_pad_token_id=-100, max_seq_length=256
     )
     bart_test(dataset, batch_size=4, batch_check_num_sample=2)
