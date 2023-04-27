@@ -16,8 +16,7 @@
 
 from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
 import torch.distributed as dist
-from torch._six import inf
-import math
+from math import sqrt, inf
 import torch
 from typing import Optional, Iterable, List, Union
 from oslo.torch.distributed import ParallelMode
@@ -86,7 +85,7 @@ def calculate_global_norm_from_list(norm_list: List[float]) -> float:
     total_norm = 0.0
     for norm in norm_list:
         total_norm += norm**2.0
-    return math.sqrt(total_norm)
+    return sqrt(total_norm)
 
 
 def reduce_tensor_dp_group(

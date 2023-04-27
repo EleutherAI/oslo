@@ -9,6 +9,7 @@ BATCH_DIMENSIONS_TP = {
     "decoder_token_type_ids": 0,
     "decoder_position_ids": 0,
     "decoder_inputs_embeds": 0,
+    "pixel_values": 0,
 }
 
 BATCH_DIMENSIONS_PP = {
