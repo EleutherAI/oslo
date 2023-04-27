@@ -47,7 +47,7 @@ oslo_init_dict_form = {
     },
     "tensor_parallelism": {
         "enable": True,
-        "parallel_size": 1,
+        "parallel_size": 2,
         "parallel_mode": "1d",
     },
     "pipeline_parallelism": {"enable": False, "parallel_size": 4},
@@ -82,6 +82,7 @@ args = TrainingArguments(
     # gradient_accumulation_steps=4,
     num_train_epochs=3,
     max_grad_norm=1.1,
+    skip_memory_metrics=False,
     seed=0,
     label_smoothing_factor=0.01,
     load_best_model_at_end=True,

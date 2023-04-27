@@ -137,7 +137,9 @@ class TrainingArguments:
 
             Will eventually default to `["labels"]` except if the model used is one of the `XxxForQuestionAnswering` in
             which case it will default to `["start_positions", "end_positions"]`.
-
+    skip_memory_metrics (`bool`, *optional*, defaults to `True`):
+            Whether to skip adding of memory profiler reports to metrics. This is skipped by default because it slows
+            down the training and evaluation speed.
     """
 
     output_dir: str = field(
@@ -290,6 +292,7 @@ class TrainingArguments:
             "help": "The list of integrations to report the results and logs to."
         },
     )
+
     save_on_each_node: bool = field(
         default=False,
         metadata={
@@ -312,6 +315,10 @@ class TrainingArguments:
             "help": "The list of keys in your dictionary of inputs that correspond to the labels."
         },
     )
+    skip_memory_metrics: bool = field(
+        default=True, metadata={"help": "Whether or not to skip adding of memory profiler reports to metrics."}
+    )
+
 
     def __post_init__(self):
         if self.output_dir is not None:

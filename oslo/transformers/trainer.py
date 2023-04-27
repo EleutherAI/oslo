@@ -16,6 +16,8 @@ import torch.distributed as dist
 from torch import nn
 from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
+from deepspeed.profiling.flops_profiler import FlopsProfiler
+from deepspeed.accelerator import get_accelerator
 from transformers import (
     DataCollatorWithPadding,
     PreTrainedTokenizerBase,
@@ -52,8 +54,10 @@ from transformers.trainer_utils import (
     EvalLoopOutput,
     TrainOutput,
     EvalPrediction,
+    PredictionOutput,
     PREFIX_CHECKPOINT_DIR,
     get_last_checkpoint,
+    TrainerMemoryTracker
 )
 
 import oslo
@@ -113,6 +117,9 @@ class Trainer:
 
         self.args = args
         self.resume_from_checkpoint = resume_from_checkpoint
+
+        self._memory_tracker = TrainerMemoryTracker(self.args.skip_memory_metrics)
+        self._memory_tracker.start()
 
         default_collator = (
             default_data_collator
@@ -200,10 +207,16 @@ class Trainer:
             self.args, self.state, self.control
         )
 
+        # very last
+        self._memory_tracker.stop_and_update_metrics()
+
     def train(self):
         resume_from_checkpoint = (
             None if not self.resume_from_checkpoint else self.resume_from_checkpoint
         )
+
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
 
         args = self.args
 
@@ -272,6 +285,7 @@ class Trainer:
 
         # Check if saved optimizer or scheduler states exist
         self._load_optimizer_and_scheduler(resume_from_checkpoint)
+
 
         # Train!
         log_dist("***** Running training *****")
@@ -511,6 +525,8 @@ class Trainer:
         metrics["train_loss"] = train_loss
         self.is_in_train = False
 
+        self._memory_tracker.stop_and_update_metrics(metrics)
+
         self.log(metrics)
 
         self.control = self.callback_handler.on_train_end(
@@ -541,6 +557,33 @@ class Trainer:
         """
         model.train()
         inputs = self._prepare_inputs(inputs)
+
+
+        with get_accelerator().device(0):
+            model = self.model
+            batch_size = 256
+            flops, macs, params = get_model_profile(model=model,  # model
+                                                    input_ids=inputs,
+                                                    # input shape to the model. If specified, the model takes a tensor with this shape as the only positional argument.
+                                                    args=None,  # list of positional arguments to the model.
+                                                    kwargs=None,  # dictionary of keyword arguments to the model.
+                                                    print_profile=True,
+                                                    # prints the model graph with the measured profile attached to each module
+                                                    detailed=True,  # print the detailed profile
+                                                    module_depth=-1,
+                                                    # depth into the nested modules, with -1 being the inner most modules
+                                                    top_modules=1,
+                                                    # the number of top modules to print aggregated profile
+                                                    warm_up=10,
+                                                    # the number of warm-ups before measuring the time of each module
+                                                    as_string=True,
+                                                    # print raw numbers (e.g. 1000) or as human-readable strings (e.g. 1k)
+                                                    output_file=None,
+                                                    # path to the output file. If None, the profiler prints to stdout.
+                                                    ignore_modules=None)  # the list of modules to ignore in the profiling
+
+
+
         if (
             self.args.oslo_config is not None
             and self.args.oslo_config.pipeline_parallelism
@@ -581,12 +624,12 @@ class Trainer:
         log_dist(
             f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
         )
-        best_model_path = self.state.best_model_checkpoint
+        best_model_path = os.path.join(self.state.best_model_checkpoint, WEIGHTS_NAME)
+        # best_model_path = self.state.best_model_checkpoint
         if os.path.exists(best_model_path):
             # We load the model state dict on the CPU to avoid an OOM error.
             if len(self.args.model_wrappers) > 0:
-                # from_oslo_parallelized(self.model, best_model_path)
-                self.model.from_parallelized(best_model_path)
+                self.model.from_parallelized(self.state.best_model_checkpoint)
             else:
                 state_dict = torch.load(best_model_path, map_location="cpu")
                 # If the model is on the GPU, it still works!
@@ -865,6 +908,7 @@ class Trainer:
         The calling script will be responsible for providing a method to compute metrics, as they are task-dependent
         (pass it to the init `compute_metrics` argument).
         """
+        self._memory_tracker.start()
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         start_time = time.time()
         output = self.evaluation_loop(
@@ -895,8 +939,67 @@ class Trainer:
         self.control = self.callback_handler.on_evaluate(
             self.args, self.state, self.control, output.metrics
         )
-
+        self._memory_tracker.stop_and_update_metrics(output.metrics)
         return output.metrics
+
+    def predict(
+        self, test_dataset: Dataset, ignore_keys: Optional[List[str]] = None, metric_key_prefix: str = "test"
+    ) -> PredictionOutput:
+        """
+        Run prediction and returns predictions and potential metrics.
+
+        Depending on the dataset and your use case, your test dataset may contain labels. In that case, this method
+        will also return metrics, like in `evaluate()`.
+
+        Args:
+            test_dataset (`Dataset`):
+                Dataset to run the predictions on. If it is an `datasets.Dataset`, columns not accepted by the
+                `model.forward()` method are automatically removed. Has to implement the method `__len__`
+            ignore_keys (`Lst[str]`, *optional*):
+                A list of keys in the output of your model (if it is a dictionary) that should be ignored when
+                gathering predictions.
+            metric_key_prefix (`str`, *optional*, defaults to `"test"`):
+                An optional prefix to be used as the metrics key prefix. For example the metrics "bleu" will be named
+                "test_bleu" if the prefix is "test" (default)
+
+        <Tip>
+
+        If your predictions or labels have different sequence length (for instance because you're doing dynamic padding
+        in a token classification task) the predictions will be padded (on the right) to allow for concatenation into
+        one array. The padding index is -100.
+
+        </Tip>
+
+        Returns: *NamedTuple* A namedtuple with the following keys:
+
+            - predictions (`np.ndarray`): The predictions on `test_dataset`.
+            - label_ids (`np.ndarray`, *optional*): The labels (if the dataset contained some).
+            - metrics (`Dict[str, float]`, *optional*): The potential dictionary of metrics (if the dataset contained
+              labels).
+        """
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
+
+        test_dataloader = self.get_test_dataloader(test_dataset)
+        start_time = time.time()
+
+        output = self.evaluation_loop(
+            test_dataloader, description="Prediction", ignore_keys=ignore_keys, metric_key_prefix=metric_key_prefix
+        )
+        total_batch_size = self.args.eval_batch_size * self.args.world_size
+        output.metrics.update(
+            speed_metrics(
+                metric_key_prefix,
+                start_time,
+                num_samples=output.num_samples,
+                num_steps=math.ceil(output.num_samples / total_batch_size),
+            )
+        )
+
+        self._memory_tracker.stop_and_update_metrics(output.metrics)
+
+        return PredictionOutput(predictions=output.predictions, label_ids=output.label_ids, metrics=output.metrics)
+
 
     def evaluation_loop(
         self,
@@ -1486,10 +1589,8 @@ class Trainer:
 
         if labels is not None:
             if model._get_name() in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES.values():
-                print(f" label smmother with MODEL_FOR_CAUSAL_LM_MAPPING_NAMES")
                 loss = self.label_smoother(outputs, labels, shift_labels=True)
             else:
-                print(f" label smmother to smoothing outputs")
                 loss = self.label_smoother(outputs, labels)
         else:
             if isinstance(outputs, dict) and "loss" not in outputs:
@@ -1741,3 +1842,74 @@ class Trainer:
             else contextlib.suppress()
         )
         return ctx_manager
+
+
+def get_model_profile(
+    model,
+    input_ids,
+    args=[],
+    kwargs={},
+    print_profile=True,
+    detailed=True,
+    module_depth=-1,
+    top_modules=1,
+    warm_up=1,
+    as_string=True,
+    output_file=None,
+    ignore_modules=None,
+):
+    """Returns the total floating-point operations, MACs, and parameters of a model.
+
+    Example:
+
+    .. code-block:: python
+
+        model = torchvision.models.alexnet()
+        batch_size = 256
+        flops, macs, params = get_model_profile(model=model, input_shape=(batch_size, 3, 224, 224)))
+
+    Args:
+        model ([torch.nn.Module]): the PyTorch model to be profiled.
+        input_shape (tuple): input shape to the model. If specified, the model takes a tensor with this shape as the only positional argument.
+        args (list): list of positional arguments to the model.
+        kwargs (dict): dictionary of keyword arguments to the model.
+        print_profile (bool, optional): whether to print the model profile. Defaults to True.
+        detailed (bool, optional): whether to print the detailed model profile. Defaults to True.
+        module_depth (int, optional): the depth into the nested modules. Defaults to -1 (the inner most modules).
+        top_modules (int, optional): the number of top modules to print in the aggregated profile. Defaults to 3.
+        warm_up (int, optional): the number of warm-up steps before measuring the latency of each module. Defaults to 1.
+        as_string (bool, optional): whether to print the output as string. Defaults to True.
+        output_file (str, optional): path to the output file. If None, the profiler prints to stdout.
+        ignore_modules ([type], optional): the list of modules to ignore during profiling. Defaults to None.
+
+    Returns:
+        The number of floating-point operations, multiply-accumulate operations (MACs), and parameters in the model.
+    """
+    assert isinstance(model, nn.Module), "model must be a PyTorch module"
+    prof = FlopsProfiler(model)
+    model.eval()
+
+    # assert (len(args) > 0) or (len(kwargs) > 0), "args and/or kwargs must be specified if input_shape is None"
+
+    for _ in range(warm_up):
+        _ = model(**input_ids)
+
+    prof.start_profile(ignore_list=ignore_modules)
+
+    _ = model(**input_ids)
+
+    flops = prof.get_total_flops()
+    macs = prof.get_total_macs()
+    params = prof.get_total_params()
+    if print_profile:
+        prof.print_model_profile(profile_step=warm_up,
+                                 module_depth=module_depth,
+                                 top_modules=top_modules,
+                                 detailed=detailed,
+                                 output_file=output_file)
+
+    prof.end_profile()
+    # if as_string:
+    #     return number_to_string(flops), macs_to_string(macs), params_to_string(params)
+
+    return flops, macs, params
