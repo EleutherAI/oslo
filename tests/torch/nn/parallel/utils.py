@@ -1,11 +1,10 @@
 import oslo
-from oslo import ParallelMode
+from oslo.torch.distributed.parallel_context import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel import TensorParallel, PipelineParallel
-
 
 def initialize_oslo(args, model):
     try:
-        pc = oslo.ParallelContext.from_torch(
+        pc = ParallelContext.from_torch(
             data_parallel_size=args.data_parallel_size,
             pipeline_parallel_size=args.pipeline_parallel_size,
             tensor_parallel_size=args.tensor_parallel_size,
@@ -22,10 +21,10 @@ def initialize_oslo(args, model):
             model = TensorParallel(model, pc)
         if pc.get_world_size(ParallelMode.PIPELINE) > 1:
             model = PipelineParallel(model, pc)
-
         oslo.ready(model, pc)
 
-    except:
+    except Exception as e:
+        print(e)
         pc = None
         model = model.cuda()
 

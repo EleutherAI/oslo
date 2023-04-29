@@ -9,7 +9,7 @@ from transformers import AutoModelForSequenceClassification
 class SequenceClassificationTask(AbstractTask):
     @staticmethod
     def get_model_class():
-        return partial(AutoModelForSequenceClassification.from_pretrained, num_labels=3)
+        return partial(AutoModelForSequenceClassification.from_pretrained, num_labels=3, ignore_mismatched_sizes=True)
 
     @staticmethod
     def get_inference_sample(tokenizer):
