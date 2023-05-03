@@ -1,3 +1,6 @@
+import time
+from queue import Queue
+
 import torch
 from torch.cuda.amp import custom_fwd, custom_bwd
 from torch.distributed import rpc
@@ -7,6 +10,7 @@ from oslo.torch.nn.parallel.pipeline_parallel._buffers import (
     get_original_forward_function,
     save_activation,
     pop_activation,
+    _ACTIVATIONS,
 )
 from oslo.torch.nn.parallel.pipeline_parallel._messages import (
     pack_tensor_stub,
@@ -16,19 +20,36 @@ from oslo.torch.nn.parallel.pipeline_parallel._sync import (
     register_job_requires_backward,
     notify_backward_job_done,
     _RECV_QUEUES,
+    _HANDSHAKE_QUEUES,
+    _RESPONSE_QUEUES,
+    _JOBS,
 )
 from oslo.torch.nn.parallel.pipeline_parallel._job import (
-    Job, JobInitialization, Metadata
+    Job, Backward, FinalJob, JobInitialization, HandshakeRequest, HandshakeResponse, Metadata
 )
 from oslo.torch.nn.parallel.pipeline_parallel._comm import (
-    send_data, KEY_NAME, VALUE_NAME, META_NAME,
-    infos
+    send_data, recv_data,
+    enqueue_handshake_resp,
+    enqueue_backward_job,
+    notify_last_backward_done,
+    KEY_NAME, VALUE_NAME, META_NAME,
+    infos,
 )
 
 
 funcs = dict()
 
 
+_FIRST_REQUEST_KEY = None
+
+
+_BACKWARD_KEYS = list()
+
+
+_DEBUG = False
+
+
+# TODO; write whether this is the first request
 def remote_request(
         src,
         dst,
@@ -51,8 +72,10 @@ def remote_request(
         "stub": [args_stub, kwargs_stub],
         "tensors": tensors,
     }
+
     meta = {
         "is_request": True,
+        "is_first": False,  # TODO!!
         "is_forward": is_forward,
         "is_training": is_training,
         "is_grad_enabled": is_grad_enabled,
@@ -75,7 +98,10 @@ def remote_request(
     )
 
     # register queue for recv
-    _RECV_QUEUES[unique_key] = queue
+    _RESPONSE_QUEUES[unique_key] = queue
+
+    if _DEBUG:
+        print(f"RANK {torch.distributed.get_rank()} | register queue {unique_key}")
 
 
 def send_results(
@@ -95,8 +121,7 @@ def send_results(
 
 
 def start_job(job):
-
-    if isinstance(job, Job):
+    if isinstance(job, (Job, Backward)):
         tensors = job.tensors
         unique_key = job.unique_key
         stub = job.stub
@@ -105,15 +130,18 @@ def start_job(job):
         if meta.is_request:
             if meta.is_forward:
                 result_stub, tensors = launch_forward(
+                    meta.src,   # requested_from
+                    meta.dst,   # current rank
                     meta.func_name,
                     unique_key,
                     meta.is_training,
                     meta.is_grad_enabled,
+                    meta.is_first,
                     stub,
                     *tensors,
                 )
 
-                # reverse
+                # reverse direction
                 src, dst = meta.dst, meta.src
 
                 # make data
@@ -124,6 +152,7 @@ def start_job(job):
                 }
                 new_meta = {
                     "is_request": False,
+                    "is_first": False,
                     "is_forward": meta.is_forward,
                     "is_training": meta.is_training,
                     "is_grad_enabled": meta.is_grad_enabled,
@@ -137,6 +166,7 @@ def start_job(job):
                 data[KEY_NAME] = unique_key
                 data[META_NAME] = new_meta
 
+                # TODO; need a handshake?
                 # return; send to other device
                 send_fn = funcs["send"]
                 send_fn(
@@ -146,14 +176,59 @@ def start_job(job):
                 )
 
             else:   # backward
-                pass
+                activation = pop_activation(unique_key)
+                grad_outputs = tensors
+
+                new_act = []
+                new_grad = []
+
+                # infos["LOCK"].acquire()
+
+                # wait for copy stream
+                # TODO; does rpc do sync?
+                torch.cuda.synchronize(
+                    torch.distributed.get_rank()
+                )
+
+                for act, grad in zip(activation, grad_outputs):
+                    if act is not None and grad is not None and act.requires_grad:
+                        new_act.append(act)
+                        new_grad.append(grad)
+
+                s = torch.cuda.Stream()
+
+                if len(new_act) > 0 and len(new_grad) > 0:
+                    with torch.cuda.stream(s):
+                        torch.autograd.backward(tuple(new_act), tuple(new_grad))
+
+                if _DEBUG:
+                    print(f"RANK {torch.distributed.get_rank()} | backward {unique_key}, jobs left {len(_ACTIVATIONS)}")
+
+                while not s.query():
+                    time.sleep(0.05)
+
+                _BACKWARD_KEYS.remove(unique_key)
+
+                del activation, new_act, new_grad
+                torch.cuda.empty_cache()
+
+                # if torch.distributed.get_rank() == 0:
+                #     print(f"{_BACKWARD_KEYS}")
+
+                if len(_BACKWARD_KEYS) == 0:
+                    print(f"RANK {torch.distributed.get_rank()} | DONE!!!!!!! ({len(_ACTIVATIONS)})")
+
+                    notify_last_backward_done()
+
+                # infos["LOCK"].release()
 
         # data receive
         else:
+            queue = _RESPONSE_QUEUES.pop(unique_key)
 
-            # print("AHAHAHAHAH")
+            if _DEBUG:
+                print(f"RANK {torch.distributed.get_rank()} | putting result {unique_key}")
 
-            queue = _RECV_QUEUES[unique_key]
             queue.put(
                 (stub, tensors)
             )
@@ -166,6 +241,8 @@ def start_job(job):
         unique_key = job.unique_key
         out_queue = job.out_queue
 
+        # print(f"RANK {torch.distributed.get_rank()} | job init")
+
         # function to launch self.module. needs this
         # function because torch.set_grad_enabled() is
         # thread local.
@@ -176,15 +253,69 @@ def start_job(job):
             (unique_key, result)
         )
 
+    elif isinstance(job, HandshakeRequest):
+        # notify source rank
+        src = job.src
+        dst = job.dst
+
+        # create a queue for receive
+        q = Queue()
+        _RECV_QUEUES[job.recv_key] = q
+
+        rpc.rpc_sync(
+            # to=f"RPC_WORKER_{global_dst_rank}",   # TODO; how to find global dst?
+            to=f"RPC_WORKER_{src}",
+            func=enqueue_handshake_resp,
+            args=(src, dst, job.unique_key, job.unique_key),  # reverse
+        )
+
+        recv_data(
+            src,
+            dst,
+            job.recv_key,
+        )
+
+    elif isinstance(job, HandshakeResponse):
+        # awake waiting thread
+        if _DEBUG:
+            print(f"RANK {torch.distributed.get_rank()} | {_HANDSHAKE_QUEUES.keys()=}")
+
+        q = _HANDSHAKE_QUEUES[job.unique_key]
+        q.put(
+            f"okay - {job.unique_key}"
+        )
+
 
 def launch_forward(
+        requested_from,
+        current_rank,
         func_name,
         unique_key,
         is_training,
         is_grad_enabled,
+        is_first,
         stub,
         *tensors,
 ):
+    requires_grad_any = any([t.requires_grad for t in tensors])
+    if is_training and is_grad_enabled and requires_grad_any:
+        meta = Metadata(
+            is_request=True,
+            is_first=is_first,
+            is_forward=False,
+            is_training=is_training,
+            is_grad_enabled=is_grad_enabled,
+            is_fp16=False,  # TODO;
+            func_name="",  # dummy
+            src=current_rank,
+            dst=requested_from,
+        )
+
+        if _DEBUG:
+            print(f"RANK {torch.distributed.get_rank()} | apply backward redirection {unique_key}")
+
+        tensors = apply_backward_job_enqueue(meta, unique_key, *tensors)
+
     (args, kwargs), _ = unpack_tensor_stub(stub, tensors)
 
     forward_fn = get_original_forward_function(func_name)
@@ -192,6 +323,7 @@ def launch_forward(
         result = forward_fn(*args, **kwargs)
 
     result_stub, tensors = pack_tensor_stub(result, [])
+
     need_activation_save = (
             any([t.requires_grad for t in tensors]) and is_training and is_grad_enabled
     )
@@ -201,95 +333,50 @@ def launch_forward(
     return result_stub, tensors
 
 
-def remote_module_forward(
-    caller,
-    location,
-    unique_key,
-    args_stub,
-    kwargs_stub,
-    requires_redirection,
-    is_training,
-    is_grad_enabled,
-    *tensors
-):
-    if requires_redirection and is_training and is_grad_enabled:
-        # prepare backward redirection to caller
-        tensors = apply_backward_redirection(
-            caller,
-            unique_key,
-            *tensors,
-        )
-
-    (args, kwargs), _ = unpack_tensor_stub([args_stub, kwargs_stub], tensors)
-
-    forward_fn = get_original_forward_function(location)
-    with torch.set_grad_enabled(is_grad_enabled):
-        result = forward_fn(*args, **kwargs)
-
-    result_stub, tensors = pack_tensor_stub(result, [])
-    need_activation_save = (
-        any([t.requires_grad for t in tensors]) and is_training and is_grad_enabled
-    )
-    if need_activation_save:
-        save_activation(unique_key, tensors)
-
-    return result_stub, tensors, need_activation_save
+def add_backward_required_key(key):
+    _BACKWARD_KEYS.append(key)
 
 
-def launch_remote_backward(unique_key, *grad_outputs):
-    activation = pop_activation(unique_key)
-
-    new_act = []
-    new_grad = []
-    for act, grad in zip(activation, grad_outputs):
-        if act is not None and grad is not None and act.requires_grad:
-            new_act.append(act)
-            new_grad.append(grad)
-
-    if len(new_act) > 0 and len(new_grad) > 0:
-        torch.autograd.backward(tuple(new_act), tuple(new_grad))
-        notify_backward_job_done(unique_key)
-
-
-# why
-#  forward(ctx, req, *args, **kwargs)
-#  ...
-#  return args, kwargs
-#  does not work???
-#
-#  because that is the design of Pytorch
-#  see: github.com/pytorch/pytorch/issues/16940
-#
-# based on https://github.com/facebookresearch/fairscale/blob/main/fairscale/nn/pipe/rpc.py#L53
-class _PipeBackwardRedirection(torch.autograd.Function):
+class _BackwardJobEnqueue(torch.autograd.Function):
     @staticmethod
     @custom_fwd
-    def forward(ctx, to, unique_key, *args):
-        ctx.to = to
+    def forward(ctx, meta, unique_key, *args):
+        ctx.meta = meta
         ctx.unique_key = unique_key
         ctx.num_nones = 2 + len(args)
 
+        if _DEBUG:
+            print(f"RANK {torch.distributed.get_rank()} | {meta.is_first=}, {unique_key=}")
+
         # mark
-        # TODO; can we do this before remote_forward
-        #  without rpc call?
-        rpc.rpc_sync(to=to, func=register_job_requires_backward, args=(unique_key,))
+        rpc.rpc_sync(
+            to=meta.dst,
+            func=add_backward_required_key,
+            args=(unique_key,),
+        )
 
         return args
 
     @staticmethod
     @custom_bwd
     def backward(ctx, *grad_outputs):
-        to = ctx.to
+        meta = ctx.meta
         unique_key = ctx.unique_key
 
-        rpc.rpc_async(
-            to=to,
-            func=launch_remote_backward,
-            args=(unique_key, *grad_outputs),
+        # # sync before send
+        # torch.cuda.synchronize(
+        #     torch.distributed.get_rank()
+        # )
+
+        is_final = meta.is_first
+        rpc.rpc_sync(
+            to=meta.dst,
+            func=enqueue_backward_job,
+            args=(is_final, meta, unique_key, *grad_outputs),
         )
 
         return (None,) * ctx.num_nones
 
 
-def apply_backward_redirection(to, unique_key, *args):
-    return _PipeBackwardRedirection.apply(to, unique_key, *args)
+def apply_backward_job_enqueue(meta, unique_key, *args):
+    return _BackwardJobEnqueue.apply(meta, unique_key, *args)

@@ -6,6 +6,7 @@ from functools import total_ordering
 class Metadata:
     # message direction
     is_request: bool
+    is_first: bool
 
     # job info
     is_forward: bool
@@ -22,18 +23,44 @@ class Metadata:
         return self.is_training and self.is_grad_enabled
 
 
-# TODO; make an abstract class
+_ORDERING = dict()
+
+
 @total_ordering
-class Job:
-    def __init__(self, tensors, unique_key, stub, meta):
-        self._tensors = tensors
-        self._unique_key = unique_key
-        self._stub = stub
-        self._meta = meta
+class AbstractJob:
+    def __init__(self, *args, **kwargs):
+        self._unique_key = ""
+
+    @property
+    def unique_key(self):
+        return self._unique_key
 
     # TODO; to use set, is this enough?
     def __hash__(self):
         return hash(self.unique_key)
+
+    def __lt__(self, other):
+        if self.__class__ == other.__class__:
+            if isinstance(self.unique_key, tuple):
+                if self.unique_key[1] == other.unique_key[1]:
+                    return self.unique_key < other.unique_key
+                else:
+                    return self.unique_key[1] < other.unique_key[1]
+        else:
+            return _ORDERING[self.__class__] < _ORDERING[other.__class__]
+
+    def __eq__(self, other):
+        return self.__class__ == other.__class__ and _ORDERING[self.__class__] == _ORDERING[other.__class__]
+
+
+class Job(AbstractJob):
+    def __init__(self, tensors, unique_key, stub, meta):
+        super().__init__()
+
+        self._tensors = tensors
+        self._unique_key = unique_key
+        self._stub = stub
+        self._meta = meta
 
     @property
     def tensors(self):
@@ -51,27 +78,39 @@ class Job:
     def meta(self):
         return self._meta
 
-    def __lt__(self, other):
-        other: Job
-        return self.unique_key < other.unique_key
 
-    def __eq__(self, other):
-        other: Job
-        return self.unique_key == other.unique_key
+_ORDERING[Job] = 100
 
 
-@total_ordering
-class JobInitialization:
+class Backward(Job):
+    # def __lt__(self, other):
+    #     if self.__class__ == other.__class__:
+    #         # backward in reverse order (LIFO ?)
+    #         return self.unique_key > other.unique_key
+    #     else:
+    #         return _ORDERING[self.__class__] < _ORDERING[other.__class__]
+
+    pass
+
+
+_ORDERING[Backward] = 90
+
+
+class FinalJob(Job):
+    pass
+
+
+_ORDERING[FinalJob] = 999999
+
+
+class JobInitialization(AbstractJob):
     def __init__(self, fn, is_grad_enabled, unique_key, out_queue, **kwargs):
+        super().__init__()
         self._fn = fn
         self._is_grad_enabled = is_grad_enabled
         self._unique_key = unique_key
         self._kwargs = kwargs
         self._out_queue = out_queue
-
-    # TODO; to use set, is this enough?
-    def __hash__(self):
-        return hash(self.unique_key)
 
     @property
     def fn(self):
@@ -82,10 +121,6 @@ class JobInitialization:
         return self._is_grad_enabled
 
     @property
-    def unique_key(self):
-        return self._unique_key
-
-    @property
     def kwargs(self):
         return self._kwargs
 
@@ -93,36 +128,41 @@ class JobInitialization:
     def out_queue(self):
         return self._out_queue
 
-    def __lt__(self, other):
-        other: JobInitialization
-        return self.unique_key < other.unique_key
 
-    def __eq__(self, other):
-        other: JobInitialization
-        return self.unique_key == other.unique_key
+_ORDERING[JobInitialization] = 50
 
 
-@total_ordering
-class Handshake:
-    def __init__(self, unique_key):
-        self._unique_key = unique_key
-
-    # TODO; to use set, is this enough?
-    def __hash__(self):
-        return hash(self.unique_key)
+class Handshake(AbstractJob):
+    def __init__(self, src, dst, qind, recv_key):
+        super().__init__()
+        self._src = src
+        self._dst = dst
+        # self._unique_key = f"{qind}:{src}:{dst}"
+        self._unique_key = recv_key
+        self._recv_key = recv_key
 
     @property
-    def unique_key(self):
-        return self._unique_key
+    def src(self):
+        return self._src
 
-    def __lt__(self, other):
-        if isinstance(other, (JobInitialization, Job)):
-            return True
-        else:
-            return self.unique_key < other.unique_key
+    @property
+    def dst(self):
+        return self._dst
 
-    def __eq__(self, other):
-        if isinstance(other, Handshake):
-            return self.unique_key == other.unique_key
-        else:
-            return False
+    @property
+    def recv_key(self):
+        return self._recv_key
+
+
+class HandshakeRequest(Handshake):
+    pass
+
+
+_ORDERING[HandshakeRequest] = 1
+
+
+class HandshakeResponse(Handshake):
+    pass
+
+
+_ORDERING[HandshakeResponse] = 0

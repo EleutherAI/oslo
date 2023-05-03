@@ -5,8 +5,6 @@ from threading import RLock
 from queue import Queue
 from functools import partial
 
-import pika
-
 import torch
 import torch.nn as nn
 from torch.distributed import rpc
@@ -22,9 +20,8 @@ from oslo.torch.nn.parallel.pipeline_parallel._buffers import (
     save_activation,
 )
 from oslo.torch.nn.parallel.pipeline_parallel._functional import (
-    remote_module_forward,
-    apply_backward_redirection,
     remote_request, send_results,
+    apply_backward_job_enqueue,
     funcs,
 )
 from oslo.torch.nn.parallel.pipeline_parallel._messages import (
@@ -40,17 +37,28 @@ from oslo.torch.nn.parallel.pipeline_parallel._sync import (
     reset_job_queue,
     set_result,
     get_result,
+    _JOBS,
 )
 from oslo.torch.nn.parallel.pipeline_parallel._workers import (
     workers,
 )
-from oslo.torch.nn.parallel.pipeline_parallel._comm import infos
+from oslo.torch.nn.parallel.pipeline_parallel._comm import (
+    infos, enqueue_result,
+    enqueue_batch_finished_notice,
+    enqueue_forward_finished_notice,
+    enqueue_forward_ready_notice,
+    enqueue_forward_start_notice,
+)
+from oslo.torch.nn.parallel.pipeline_parallel._job import Metadata
 from oslo.torch.nn.parallel.utils import (
     get_parallel_context,
     add_wrapper,
     OsloParallelWrapper,
 )
 from oslo.transformers.constants import BATCH_DIMENSIONS_PP
+
+
+_DEBUG = False
 
 
 def PipelineParallel(
@@ -121,6 +129,9 @@ class _PipelineParallel(OsloParallelWrapper):
 
     @torch.no_grad()
     def parallelize(self):
+        # copy activations for partitioning
+        self._recursive_replace_act(self.module)
+
         self.partitioner = ModelPartitioner(
             module=self.module,
             process_group=self.parallel_context.get_group(ParallelMode.PIPELINE),
@@ -132,7 +143,6 @@ class _PipelineParallel(OsloParallelWrapper):
         self.partitioner.partition()
         self.oslo_parallel = self.module.oslo_parallel
 
-        self._recursive_replace_act(self.module)
         self._recursive_wrap(self, "")
         self._lock = RLock()
 
@@ -146,6 +156,25 @@ class _PipelineParallel(OsloParallelWrapper):
         if self.parallel_context.is_first_rank(ParallelMode.PIPELINE):
             self.worker = workers
 
+        # communication queues
+        self.out_queue = Queue()
+        infos["OUT_QUEUE"] = self.out_queue
+
+        self.last_backward_notice = Queue()
+        infos["LAST_BACKWARD_NOTICE"] = self.last_backward_notice
+
+        self.batch_finished_notice = Queue()
+        infos["BATCH_FINISHED_NOTICE"] = self.batch_finished_notice
+
+        self.forward_finished_notice = Queue()
+        infos["FORWARD_FINISHED_NOTICE"] = self.forward_finished_notice
+
+        self.forward_ready_notice = Queue()
+        infos["FORWARD_READY_NOTICE"] = self.forward_ready_notice
+
+        self.forward_start_notice = Queue()
+        infos["FORWARD_START_NOTICE"] = self.forward_start_notice
+
     def forward(self, *args, **kwargs):
         assert len(args) == 0, (
             "Pipeline parallel model only supports ``**kwargs`` input (keyword arguments). "
@@ -158,6 +187,55 @@ class _PipelineParallel(OsloParallelWrapper):
                 "Pipeline parallel model does not support ``return_dict=False``. "
                 "Please set ``return_dict=True``."
             )
+
+        if torch.distributed.get_rank() == 0:
+            ranks_ready = set()
+
+            # torch.cuda.synchronize(
+            #     torch.distributed.get_rank()
+            # )
+
+            enqueue_forward_ready_notice(0)
+
+            while True:
+                while self.forward_ready_notice.empty():
+                    time.sleep(0.05)
+
+                r = self.forward_ready_notice.get()
+                ranks_ready.add(r)
+
+                if len(ranks_ready) == self.parallel_context.get_world_size(ParallelMode.GLOBAL):
+                    break
+
+            for dst_rank in range(1, self.parallel_context.get_world_size(ParallelMode.GLOBAL)):
+                rpc.rpc_sync(
+                    to=f"RPC_WORKER_{dst_rank}",
+                    func=enqueue_forward_start_notice,
+                )
+
+        else:
+            # torch.cuda.synchronize(
+            #     torch.distributed.get_rank()
+            # )
+
+            # notice to master
+            src_rank = torch.distributed.get_rank()
+            dst_rank = 0
+            rpc.rpc_sync(
+                to=f"RPC_WORKER_{dst_rank}",
+                func=enqueue_forward_ready_notice,
+                args=(src_rank, ),
+            )
+
+            # wait for a sign
+            while self.forward_start_notice.empty():
+                time.sleep(0.05)
+
+            _ = self.forward_start_notice.get()
+        # end sync
+
+        # TODO; seems like this is not necessary?
+        torch.cuda.empty_cache()
 
         if self.parallel_context.is_first_rank(ParallelMode.PIPELINE):
             new_kwargs = [dict() for _ in range(self.num_micro_batches)]
@@ -177,31 +255,111 @@ class _PipelineParallel(OsloParallelWrapper):
 
             # enqueue jobs
             is_grad_enabled = torch.is_grad_enabled()
-            out_queue = Queue()
-            for ind, kwargs_ in enumerate(new_kwargs):
+
+            num_concurrent = 16
+
+            for ind, kwargs_ in enumerate(new_kwargs[:num_concurrent]):
                 initialize_job(
                     fn=self.module_forward,
                     is_grad_enabled=is_grad_enabled,
                     unique_key=ind,
-                    out_queue=out_queue,
+                    out_queue=self.out_queue,
                     **kwargs_,
                 )
 
-            for _ in range(self.num_micro_batches):
-                while out_queue.empty():
+            for ri in range(self.num_micro_batches):
+                while self.out_queue.empty():
                     time.sleep(0.05)
 
                 # TODO; order?
-                ind, result = out_queue.get()
+                ind, result = self.out_queue.get()
 
-                yield result
+                yield ind, result   # TODO;
+
+                # TODO; how to find dst_rank?
+                # TODO; do this like tree
+                for dst_rank in range(1, self.parallel_context.get_world_size(ParallelMode.GLOBAL)):
+                    rpc.rpc_sync(
+                        to=f"RPC_WORKER_{dst_rank}",
+                        func=enqueue_result,
+                        args=(ind, result, ),
+                    )
+
+                if ri < self.num_micro_batches - num_concurrent:
+                    ind = ri + num_concurrent
+                    kwargs_ = new_kwargs[ind]
+
+                    initialize_job(
+                        fn=self.module_forward,
+                        is_grad_enabled=is_grad_enabled,
+                        unique_key=ind,
+                        out_queue=self.out_queue,
+                        **kwargs_,
+                    )
+
+            # barrier for last backward
+            while self.last_backward_notice.empty():
+                time.sleep(0.05)
+
+            _ = self.last_backward_notice.get()
+
+            ranks_done = set()
+            ranks_done.add(0)
+
+            while True:
+                while self.batch_finished_notice.empty():
+                    time.sleep(0.05)
+
+                r = self.batch_finished_notice.get()
+                ranks_done.add(r)
+
+                if len(ranks_done) == self.parallel_context.get_world_size(ParallelMode.GLOBAL):
+                    break
+
+            # notice other ranks
+            # TODO; how to find dst_rank?
+            # TODO; do this like tree?
+            for dst_rank in range(1, self.parallel_context.get_world_size(ParallelMode.GLOBAL)):
+                rpc.rpc_sync(
+                    to=f"RPC_WORKER_{dst_rank}",
+                    func=enqueue_forward_finished_notice,
+                )
 
         else:
-            # TODO;
-            return None
+            for _ in range(self.num_micro_batches):
+                while self.out_queue.empty():
+                    time.sleep(0.05)
 
-        # TODO; seems like this is not necessary?
-        torch.cuda.empty_cache()
+                ind, result = self.out_queue.get()
+
+                yield ind, result
+
+            # barrier for last backward
+            while self.last_backward_notice.empty():
+                time.sleep(0.05)
+
+            _ = self.last_backward_notice.get()
+
+            # notice to master
+            src_rank = torch.distributed.get_rank()
+            dst_rank = 0
+            rpc.rpc_sync(
+                to=f"RPC_WORKER_{dst_rank}",
+                func=enqueue_batch_finished_notice,
+                args=(src_rank, ),
+            )
+
+            # barrier
+            while self.forward_finished_notice.empty():
+                time.sleep(0.05)
+
+            _ = self.forward_finished_notice.get()
+
+            # torch.cuda.synchronize(
+            #     torch.distributed.get_rank()
+            # )
+
+        print(f"RANK {torch.distributed.get_rank()} | len jobs -> {len(_JOBS)}")
 
     def _recursive_replace_act(self, module):
         for name, m in module.named_children():
@@ -237,11 +395,18 @@ class _PipelineParallel(OsloParallelWrapper):
             is_same = module_device == current_device
 
             if is_same:
+                # protect from communication overlap
+                # infos["LOCK"].acquire()
+
                 forward_fn = get_original_forward_function(location)
                 result = forward_fn(*args, **kwargs)
 
+                # infos["LOCK"].release()
+
             else:
+
                 (args_stub, kwargs_stub), tensors = pack_tensor_stub([args, kwargs], [])
+
                 tensors = tuple(tensors)
 
                 # does not save activation if the module is in eval mode
@@ -249,7 +414,9 @@ class _PipelineParallel(OsloParallelWrapper):
                 is_training = self.training
                 need_activation_save = any([t.requires_grad for t in tensors])
 
-                unique_key = make_unique_key(location, self.pipe_rank)
+                # infos["LOCK"].acquire()
+
+                unique_key = make_unique_key(location, current_device.index, module_device.index)
 
                 if need_activation_save and is_training and is_grad_enabled:
                     # prepare backward
@@ -274,6 +441,8 @@ class _PipelineParallel(OsloParallelWrapper):
                     parallel_context=self.parallel_context,
                 )
 
+                # infos["LOCK"].release()
+
                 # wait for return
                 while out_queue.empty():
                     time.sleep(0.05)
@@ -281,7 +450,29 @@ class _PipelineParallel(OsloParallelWrapper):
                 result_stub, tensors = out_queue.get()
                 del out_queue
 
+                need_activation_save = any([t.requires_grad for t in tensors])
+                if need_activation_save and is_training and is_grad_enabled:
+                    meta = Metadata(
+                        is_request=True,
+                        is_first=False,
+                        is_forward=False,
+                        is_training=is_training,
+                        is_grad_enabled=is_grad_enabled,
+                        is_fp16=False,  # TODO;
+                        func_name="",   # dummy
+                        src=current_device.index,
+                        dst=module_device.index,
+                    )
+
+                    tensors = apply_backward_job_enqueue(meta, unique_key, *tensors)
+
+                    if _DEBUG:
+                        print(f"RANK {torch.distributed.get_rank()} | apply backward redirection {unique_key}")
+
                 result, _ = unpack_tensor_stub(result_stub, tensors)
+
+                if _DEBUG:
+                    print(f"RANK {torch.distributed.get_rank()} | got result {unique_key}")
 
             return result
 

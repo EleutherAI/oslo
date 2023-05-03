@@ -8,6 +8,10 @@ from oslo.torch.nn.parallel.pipeline_parallel._job import JobInitialization
 
 _RECV_QUEUES = dict()
 
+_HANDSHAKE_QUEUES = dict()
+
+_RESPONSE_QUEUES = dict()
+
 
 _JOBS = set()
 
@@ -65,9 +69,9 @@ def register_location_for_forward_counter(location):
     _NUM_FORWARD_USED_COUNTER[location] = 0
 
 
-def make_unique_key(location, rank):
+def make_unique_key(location, from_, to_):
     cnt = _NUM_FORWARD_USED_COUNTER[location]
-    unique_key = (location, cnt, rank)
+    unique_key = (location, cnt, from_, to_)
     _NUM_FORWARD_USED_COUNTER[location] += 1
     return unique_key
 
