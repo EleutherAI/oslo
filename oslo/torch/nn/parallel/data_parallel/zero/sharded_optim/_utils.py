@@ -1,3 +1,19 @@
+# Copyright 2021 HPC-AI Technology Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Modified by EleutherAI on 2023.
+
 from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
 import torch.distributed as dist
 from torch._six import inf
@@ -7,8 +23,7 @@ from typing import Optional, Iterable, List, Union
 from oslo.torch.distributed import ParallelMode
 
 
-# TODO
-def is_model_parallel_parameter(p: torch.Tensor):
+def is_model_parallel_parameter(p: torch.Tensor) -> bool:
     """
     Check if a parameter is parallel in either Pipeline or Tensor mode.
 
@@ -18,10 +33,19 @@ def is_model_parallel_parameter(p: torch.Tensor):
     Returns:
         bool: True if the parameter is parallel in either mode, False otherwise.
     """
-    parallel_mode = getattr(p, "oslo_parallel", dict())
-    return (
-        ParallelMode.PIPELINE in parallel_mode or ParallelMode.TENSOR in parallel_mode
-    )
+    oslo_parallel = getattr(p, "oslo_parallel", {})
+    parallel_modes = [
+        ParallelMode.PIPELINE,
+        ParallelMode.TENSOR_1D,
+        ParallelMode.TENSOR_2D_ROW,
+        ParallelMode.TENSOR_2D_COL,
+        ParallelMode.TENSOR_2P5D_ROW,
+        ParallelMode.TENSOR_2P5D_COL,
+        ParallelMode.TENSOR_2P5D_DEP,
+        ParallelMode.TENSOR_3D_INPUT,
+        ParallelMode.TENSOR_3D_OUTPUT,
+    ]
+    return any(mode in oslo_parallel for mode in parallel_modes)
 
 
 def flatten(input_: Iterable[torch.Tensor]) -> torch.Tensor:

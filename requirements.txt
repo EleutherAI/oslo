@@ -6,3 +6,4 @@ parameterized >= 0.8.1
 py-cpuinfo
 pybind11
 torch >= 1.11.0
+transformers

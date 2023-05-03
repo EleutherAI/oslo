@@ -2,6 +2,7 @@ import math
 import os
 from dataclasses import asdict, dataclass, field
 from typing import List, Optional, Union
+import copy
 
 import torch
 from transformers.trainer_utils import SchedulerType, IntervalStrategy
@@ -12,6 +13,8 @@ from oslo.transformers.oslo_init import (
     OsloTrainerConfig,
     init_oslo_features,
 )
+
+TRAINING_ARGS_NAME = "training_args.bin"
 
 
 @dataclass
@@ -103,6 +106,10 @@ class TrainingArguments:
 
         - `True` if `metric_for_best_model` is set to a value that isn't `"loss"` or `"eval_loss"`.
         - `False` if `metric_for_best_model` is not set, or set to `"loss"` or `"eval_loss"`.
+    ignore_data_skip (`bool`, *optional*, defaults to `False`):
+            When resuming training, whether or not to skip the epochs and batches to get the data loading at the same
+            stage as in the previous training. If set to `True`, the training will begin faster (as that skipping step
+            can take a long time) but will not yield the same results as the interrupted training would have.
     label_smoothing_factor (`float`, *optional*, defaults to 0.0):
         The label smoothing factor to use. Zero means no label smoothing, otherwise the underlying onehot-encoded
         labels are changed from 0s and 1s to `label_smoothing_factor/num_labels` and `1 - label_smoothing_factor +
@@ -111,7 +118,6 @@ class TrainingArguments:
         The optimizer to use: adamw_hf, adamw_torch, adamw_apex_fused, or adafactor.
     gradient_checkpointing (`bool`, *optional*, defaults to `False`):
         If True, use gradient checkpointing to save memory at the expense of slower backward pass.
-    # TODO
     report_to (`str` or `List[str]`, *optional*, defaults to `"all"`):
         The list of integrations to report the results and logs to. Supported platforms are `"azure_ml"`,
         `"comet_ml"`, `"mlflow"`, `"tensorboard"` and `"wandb"`. Use `"all"` to report to all integrations
@@ -119,7 +125,6 @@ class TrainingArguments:
     save_on_each_node (`bool`, *optional*, defaults to `False`):
         When doing multi-node distributed training, whether to save models and checkpoints on each node, or only on
         the main one.
-
         This should not be activated when the different nodes use the same storage as the files will be saved with
         the same names for each node.
     bf16 (`bool`, *optional*, defaults to `False`):
@@ -147,7 +152,7 @@ class TrainingArguments:
         },
     )
     evaluation_strategy: IntervalStrategy = field(
-        default="no",
+        default="steps",
         metadata={"help": "The evaluation strategy to use."},
     )
     per_device_train_batch_size: int = field(
@@ -257,6 +262,12 @@ class TrainingArguments:
             "help": "Whether the `metric_for_best_model` should be maximized or not."
         },
     )
+    ignore_data_skip: bool = field(
+        default=False,
+        metadata={
+            "help": "When resuming training, whether or not to skip the first epochs and batches to get to the same training data."
+        },
+    )
     label_smoothing_factor: float = field(
         default=0.0,
         metadata={
@@ -322,20 +333,11 @@ class TrainingArguments:
                 "eval_loss",
             ]
 
-        self.oslo_config, self.parallel_context, self.model_wrappers = None, None, None
-
-        if self.oslo_config_path_or_dict:
-
-            # will be used later by the Trainer
-            self.oslo_config = OsloTrainerConfig(self.oslo_config_path_or_dict)
-            # logging.info(f"Oslo Config: {self.oslo_config}")
-            self.parallel_context, self.model_wrappers = init_oslo_features(
-                self.oslo_config
-            )
-        else:
-            self.parallel_context, self.model_wrappers = init_oslo_features(
-                OsloTrainerConfig({})
-            )
+        (
+            self.oslo_config,
+            self.parallel_context,
+            self.model_wrappers,
+        ) = self.set_oslo_config()
 
     def __str__(self):
         self_as_dict = {
@@ -385,6 +387,31 @@ class TrainingArguments:
         The device used by this process.
         """
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    def set_oslo_config(self):
+        if self.oslo_config_path_or_dict:
+            oslo_config = OsloTrainerConfig(self.oslo_config_path_or_dict)
+        else:
+            oslo_config = OsloTrainerConfig({})
+        parallel_context, model_wrappers = init_oslo_features(oslo_config)
+        return oslo_config, parallel_context, model_wrappers
+
+    def save_args(self, path):
+        _tmp_parallel_context = self.parallel_context
+        self.parallel_context = None
+        args = copy.deepcopy(self)
+        torch.save(args, os.path.join(path, TRAINING_ARGS_NAME))
+        self.parallel_context = _tmp_parallel_context
+
+    @classmethod
+    def load_args(cls, path):
+        args = torch.load(os.path.join(path, TRAINING_ARGS_NAME))
+        (
+            args.oslo_config,
+            args.parallel_context,
+            args.model_wrappers,
+        ) = args.set_oslo_config()
+        return args
 
 
 def get_batch_size(per_device_batch_size, n_gpu) -> int:

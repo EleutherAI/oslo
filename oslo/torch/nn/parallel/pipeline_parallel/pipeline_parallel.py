@@ -274,6 +274,13 @@ class _PipelineParallel(OsloParallelWrapper):
                 # TODO; order?
                 ind, result = self.out_queue.get()
 
+                # scale loss
+                if (
+                    isinstance(result, ModelOutput)
+                    and result.get("loss", None) is not None
+                ):
+                    result.loss = result.loss / self.num_micro_batches
+
                 yield ind, result   # TODO;
 
                 # TODO; how to find dst_rank?
