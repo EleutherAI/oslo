@@ -83,24 +83,10 @@ _ORDERING[Job] = 100
 
 
 class Backward(Job):
-    # def __lt__(self, other):
-    #     if self.__class__ == other.__class__:
-    #         # backward in reverse order (LIFO ?)
-    #         return self.unique_key > other.unique_key
-    #     else:
-    #         return _ORDERING[self.__class__] < _ORDERING[other.__class__]
-
     pass
 
 
 _ORDERING[Backward] = 90
-
-
-class FinalJob(Job):
-    pass
-
-
-_ORDERING[FinalJob] = 999999
 
 
 class JobInitialization(AbstractJob):
