@@ -11,7 +11,9 @@ from torch.optim import Optimizer
 
 from transformers.utils import logging
 
-from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim._base_optim import BaseOptimizerWrapper
+from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim._base_optim import (
+    BaseOptimizerWrapper,
+)
 
 
 from oslo.torch.nn.parallel.data_parallel.zero.utils import get_current_device
@@ -21,7 +23,9 @@ from oslo.torch.nn.parallel.data_parallel._utils import (
 )
 
 from oslo.torch.nn.parallel.data_parallel.zero.chunk import Chunk, ChunkManager
-from oslo.torch.nn.parallel.data_parallel.zero.fully_sharded_data_parallel import _FullyShardedDataParallel
+from oslo.torch.nn.parallel.data_parallel.zero.fully_sharded_data_parallel import (
+    _FullyShardedDataParallel,
+)
 
 import functools
 
@@ -30,12 +34,14 @@ from typing import Callable
 
 def _disposable(func: Callable) -> Callable:
     executed = False
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         nonlocal executed
         if not executed:
             executed = True
             return func(*args, **kwargs)
+
     return wrapper
 
 
@@ -62,15 +68,17 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
         verbose (bool, optional): Whether to print verbose information, including grad overflow info. Defaults to False.
     """
 
-    def __init__(self,
-                 optim: Optimizer,
-                 module: _FullyShardedDataParallel,
-                 gpu_margin_mem_ratio: float = 0.0,
-                 clipping_norm: float = 0.0,
-                 norm_type: float = 2.0,
-                 verbose: bool = False,
-                 num_fp32_shards_per_param: int = 0,
-                 **kwargs: Any):
+    def __init__(
+        self,
+        optim: Optimizer,
+        module: _FullyShardedDataParallel,
+        gpu_margin_mem_ratio: float = 0.0,
+        clipping_norm: float = 0.0,
+        norm_type: float = 2.0,
+        verbose: bool = False,
+        num_fp32_shards_per_param: int = 0,
+        **kwargs: Any,
+    ):
         super().__init__(optim)
         assert isinstance(module, _FullyShardedDataParallel)
         self.module = module
@@ -90,8 +98,10 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
         for name, param in module.named_parameters():
             if is_ddp_ignored(param):
                 if param.requires_grad:
-                    warnings.warn(f"Parameter `{name}` is ignored by DDP but requires gradient! "
-                                  "You should handle its optimizer update by yourself!")
+                    warnings.warn(
+                        f"Parameter `{name}` is ignored by DDP but requires gradient! "
+                        "You should handle its optimizer update by yourself!"
+                    )
             else:
                 ddp_param_list.append(param)
 
@@ -103,21 +113,34 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
 
         self.__init__optimizer()
 
-        self._found_overflow: torch.Tensor = torch.zeros(1, dtype=torch.int64, device=get_current_device())
+        self._found_overflow: torch.Tensor = torch.zeros(
+            1, dtype=torch.int64, device=get_current_device()
+        )
         self._logger = logging.get_logger(__name__)
 
         self.gpu_margin_mem_ratio: float = float(gpu_margin_mem_ratio)
-        assert 0.0 <= self.gpu_margin_mem_ratio <= 1.0, f'gpu_margin_mem_ratio must >=0.0 and <=1.0'
+        assert (
+            0.0 <= self.gpu_margin_mem_ratio <= 1.0
+        ), f"gpu_margin_mem_ratio must >=0.0 and <=1.0"
 
-        self._should_move_fp32_params_h2d: bool = self.heterogeneous_manager.is_cuda_margin_mem_avail and self.gpu_margin_mem_ratio > 0.0 and num_fp32_shards_per_param >= 2
-        if self.gpu_margin_mem_ratio > 0.0 and not self.heterogeneous_manager.is_cuda_margin_mem_avail:
-            self._logger.warning(f'gpu_margin_mem_ratio is meaningless when placement_policy is not "auto"')
+        self._should_move_fp32_params_h2d: bool = (
+            self.heterogeneous_manager.is_cuda_margin_mem_avail
+            and self.gpu_margin_mem_ratio > 0.0
+            and num_fp32_shards_per_param >= 2
+        )
+        if (
+            self.gpu_margin_mem_ratio > 0.0
+            and not self.heterogeneous_manager.is_cuda_margin_mem_avail
+        ):
+            self._logger.warning(
+                f'gpu_margin_mem_ratio is meaningless when placement_policy is not "auto"'
+            )
 
         self._register_states = _disposable(self._register_states_)
 
     def _set_grad_ptr(self):
         for group in self.param_groups:
-            for fake_param in group['params']:
+            for fake_param in group["params"]:
                 chunk32 = self.param_to_chunk32[fake_param]
                 begin, end = self.param_to_range[fake_param]
                 chunk16 = chunk32.paired_chunk
@@ -128,7 +151,7 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
     def _update_fp16_params(self):
         none_tensor = torch.empty([0])
         for group in self.param_groups:
-            for fake_param in group['params']:
+            for fake_param in group["params"]:
                 assert fake_param.grad is None
                 fake_param.data = none_tensor.to(fake_param.device)
 
@@ -162,7 +185,7 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
                     group_to_norm[c16.torch_pg] = 0.0
                 group_to_norm[c16.torch_pg] += c16.l2_norm
 
-            c16.l2_norm = None    # clear l2 norm
+            c16.l2_norm = None  # clear l2 norm
 
         comm_buffer = torch.zeros(1, dtype=torch.float, device=get_current_device())
         for group, part_norm in group_to_norm.items():
@@ -178,7 +201,7 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
         clip_coef = self.max_norm / (total_norm + 1e-6)
         if clip_coef < 1:
             for group in self.param_groups:
-                for param in group['params']:
+                for param in group["params"]:
                     param.grad.data.mul_(clip_coef)
 
     def zero_grad(self, *args, **kwargs):
@@ -192,9 +215,9 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
         found_inf = self._check_overflow()
         if found_inf:
             if self.verbose:
-                self._logger.info(f'Found overflow. Skip step')
-            self._clear_global_norm()    # clear recorded norm
-            self.zero_grad()    # reset all gradients
+                self._logger.info(f"Found overflow. Skip step")
+            self._clear_global_norm()  # clear recorded norm
+            self.zero_grad()  # reset all gradients
             self._update_fp16_params()
             return
 
@@ -211,19 +234,26 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
     def _maybe_move_fp32_params(self):
         if self._should_move_fp32_params_h2d:
             self._should_move_fp32_params_h2d = False
-            available_cuda_margin_mem = self.heterogeneous_manager.cuda_margin_mem * self.gpu_margin_mem_ratio
-            fp32_params_available_cuda_margin_mem = available_cuda_margin_mem / self.optim.num_fp32_shards_per_param
+            available_cuda_margin_mem = (
+                self.heterogeneous_manager.cuda_margin_mem * self.gpu_margin_mem_ratio
+            )
+            fp32_params_available_cuda_margin_mem = (
+                available_cuda_margin_mem / self.optim.num_fp32_shards_per_param
+            )
             fp32_params_used_cuda_margin_mem = 0
 
             for group in self.param_groups:
-                for fake_param in group['params']:
+                for fake_param in group["params"]:
                     chunk32 = self.param_to_chunk32[fake_param]
                     chunk16 = chunk32.paired_chunk
 
-                    if chunk32.device_type == 'cuda':
+                    if chunk32.device_type == "cuda":
                         continue
 
-                    if fp32_params_used_cuda_margin_mem + chunk32.payload_mem < fp32_params_available_cuda_margin_mem:
+                    if (
+                        fp32_params_used_cuda_margin_mem + chunk32.payload_mem
+                        < fp32_params_available_cuda_margin_mem
+                    ):
                         self.chunk_manager.move_chunk(chunk32, get_current_device())
                         # stores grad now
                         self.chunk_manager.move_chunk(chunk16, get_current_device())
@@ -231,9 +261,9 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
                         fp32_params_used_cuda_margin_mem += chunk32.payload_mem
 
             for group in self.param_groups:
-                for fake_param in group['params']:
+                for fake_param in group["params"]:
                     chunk32 = self.param_to_chunk32[fake_param]
-                    if chunk32.device_type == 'cuda':
+                    if chunk32.device_type == "cuda":
                         state = self.optim.state[fake_param]
                         for k, v in state.items():
                             if isinstance(v, torch.Tensor):
@@ -241,14 +271,13 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
 
     def _register_states_(self):
         for group in self.optim.param_groups:
-            for p in group['params']:
+            for p in group["params"]:
                 state = self.optim.state[p]
                 for val in state.values():
                     if isinstance(val, torch.Tensor):
                         self.chunk_manager.add_extern_static_tensor(val)
 
     def __init__optimizer(self):
-
         def get_range_pair(local_chunk: Chunk, local_param: Parameter):
             param_info = local_chunk.tensors_info[local_param]
             if local_chunk.keep_gathered:
@@ -260,7 +289,7 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
         for group in self.optim.param_groups:
             fake_params_list = list()
 
-            for param in group['params']:
+            for param in group["params"]:
                 if is_ddp_ignored(param):
                     continue
                 chunk16 = self.chunk_manager.get_chunk(param)
@@ -275,4 +304,4 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
 
                 fake_params_list.append(fake_param)
 
-            group['params'] = fake_params_list
+            group["params"] = fake_params_list
