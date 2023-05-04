@@ -65,6 +65,7 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
         clipping_norm (float, optional): The norm value used to clip gradient. Defaults to 0.0.
         norm_type (float, optional): The type of norm used for gradient clipping. Currently, only L2-norm (norm_type=2.0)
             is supported in ZeroOptimizer. Defaults to 2.0.
+        num_fp32_shards_per_param (int, optional): The number of fp32 shards per param. Defaults to 0.
         verbose (bool, optional): Whether to print verbose information, including grad overflow info. Defaults to False.
     """
 
@@ -75,8 +76,8 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
         gpu_margin_mem_ratio: float = 0.0,
         clipping_norm: float = 0.0,
         norm_type: float = 2.0,
-        verbose: bool = False,
         num_fp32_shards_per_param: int = 0,
+        verbose: bool = False,
         **kwargs: Any,
     ):
         super().__init__(optim)
