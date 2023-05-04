@@ -69,6 +69,7 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
                  clipping_norm: float = 0.0,
                  norm_type: float = 2.0,
                  verbose: bool = False,
+                 num_fp32_shards_per_param: int = 0,
                  **kwargs: Any):
         super().__init__(optim)
         assert isinstance(module, _FullyShardedDataParallel)
@@ -107,11 +108,8 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
 
         self.gpu_margin_mem_ratio: float = float(gpu_margin_mem_ratio)
         assert 0.0 <= self.gpu_margin_mem_ratio <= 1.0, f'gpu_margin_mem_ratio must >=0.0 and <=1.0'
-        # Only move fp32 shards from CPU to GPU when user allows and inner optimizer is valid
-        # Inner optimizer must support optimizing hybrid (CPU and CUDA) tensors,
-        # and it must set `num_fp32_shards_per_param` correctly
-        self._should_move_fp32_params_h2d: bool = self.heterogeneous_manager.is_cuda_margin_mem_avail and self.gpu_margin_mem_ratio > 0.0 and getattr(
-            optim, 'num_fp32_shards_per_param', 0) >= 2
+
+        self._should_move_fp32_params_h2d: bool = self.heterogeneous_manager.is_cuda_margin_mem_avail and self.gpu_margin_mem_ratio > 0.0 and num_fp32_shards_per_param >= 2
         if self.gpu_margin_mem_ratio > 0.0 and not self.heterogeneous_manager.is_cuda_margin_mem_avail:
             self._logger.warning(f'gpu_margin_mem_ratio is meaningless when placement_policy is not "auto"')
 
@@ -124,8 +122,7 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
                 begin, end = self.param_to_range[fake_param]
                 chunk16 = chunk32.paired_chunk
 
-                fake_param.data = chunk16.payload[begin:end]
-                fake_param.grad = fake_param.data
+                fake_param.grad = chunk16.payload[begin:end]
                 fake_param.data = chunk32.payload[begin:end]
 
     def _update_fp16_params(self):
