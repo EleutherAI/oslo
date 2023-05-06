@@ -146,8 +146,8 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
                 begin, end = self.param_to_range[fake_param]
                 chunk16 = chunk32.paired_chunk
 
-                fake_param.grad = chunk16.payload[begin:end].to(chunk32.dtype)
                 fake_param.data = chunk32.payload[begin:end]
+                fake_param.grad = chunk16.payload[begin:end].to(chunk32.dtype)
 
     def _update_fp16_params(self):
         none_tensor = torch.empty([0])
@@ -159,7 +159,7 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
         for chunk16 in self.chunk16_set:
             chunk16.optim_update()
 
-    def check_overflow(self):
+    def _check_overflow(self):
         # clear previous overflow record
         self._found_overflow.fill_(self.module.overflow_counter)
 
@@ -222,7 +222,8 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
             self._update_fp16_params()
             return
 
-        self._clip_grads()
+        if self.clipping_flag:
+            self._clip_grads()
         ret = self.optim.step(*args, **kwargs)
         self._register_states()
         self.zero_grad()
