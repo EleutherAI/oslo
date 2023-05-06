@@ -146,7 +146,7 @@ class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
                 begin, end = self.param_to_range[fake_param]
                 chunk16 = chunk32.paired_chunk
 
-                fake_param.grad = chunk16.payload[begin:end]
+                fake_param.grad = chunk16.payload[begin:end].to(chunk32.dtype)
                 fake_param.data = chunk32.payload[begin:end]
 
     def _update_fp16_params(self):
