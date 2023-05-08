@@ -363,17 +363,31 @@ class DistributedSpecManager:
         ), f"{type(dist_spec)} should be DistributedSpec"
         trans_func_key = (old_dist_spec.placement, dist_spec.placement)
         trans_funcs = {
-            (DistributedPlacementPattern.REPLICATE, DistributedPlacementPattern.REPLICATE): DistributedSpecManager._r2r,
-            (DistributedPlacementPattern.REPLICATE, DistributedPlacementPattern.SHARD): DistributedSpecManager._r2s,
-            (DistributedPlacementPattern.SHARD, DistributedPlacementPattern.REPLICATE): DistributedSpecManager._s2r,
-            (DistributedPlacementPattern.SHARD, DistributedPlacementPattern.SHARD): DistributedSpecManager._s2s
+            (
+                DistributedPlacementPattern.REPLICATE,
+                DistributedPlacementPattern.REPLICATE,
+            ): DistributedSpecManager._r2r,
+            (
+                DistributedPlacementPattern.REPLICATE,
+                DistributedPlacementPattern.SHARD,
+            ): DistributedSpecManager._r2s,
+            (
+                DistributedPlacementPattern.SHARD,
+                DistributedPlacementPattern.REPLICATE,
+            ): DistributedSpecManager._s2r,
+            (
+                DistributedPlacementPattern.SHARD,
+                DistributedPlacementPattern.SHARD,
+            ): DistributedSpecManager._s2s,
         }
         forward_trans_handle = trans_funcs[trans_func_key]
         if not DistributedSpecManager._use_autograd_function:
             return forward_trans_handle(
                 tensor, old_dist_spec, dist_spec, parallel_context
             )
-        backward_trans_handle = trans_funcs[(dist_spec.placement, old_dist_spec.placement)]
+        backward_trans_handle = trans_funcs[
+            (dist_spec.placement, old_dist_spec.placement)
+        ]
         return TransformDistributedSpec.apply(
             tensor,
             old_dist_spec,
