@@ -41,9 +41,9 @@ class ParameterStore(BaseStore):
 
         super().__init__(torch_pg)
         # param partitioning data structures
-        self._fp16_param_to_rank = dict()
-        self._rank_group_id_to_fp16_param_list = dict()
-        self._rank_group_id_to_flat_fp16_param = dict()
+        self._param_to_rank = dict()
+        self._rank_group_id_to_param_list = dict()
+        self._rank_group_id_to_flat_param = dict()
 
         # param reduction data structures
         self._is_param_reduced = dict()
@@ -54,24 +54,24 @@ class ParameterStore(BaseStore):
         Set the mapping between parameter to rank, each parameter should be owned by a rank.
 
         Args:
-            tensor (Tensor): The FP16 parameters.
+            tensor (Tensor): The parameter.
             ranks (int): The rank of which the process is responsible for updating the parameter
         """
 
-        self._fp16_param_to_rank[tensor] = rank
+        self._param_to_rank[tensor] = rank
 
     def get_param_rank(self, tensor: Tensor) -> int:
         """
         Gives the rank which the parameter belongs to
 
         Args:
-            tensor (Tensor): The FP16 parameters.
+            tensor (Tensor): The parameter.
 
         Returns:
-            int: The rank of FP16 params.
+            int: The rank of params.
 
         """
-        return self._fp16_param_to_rank[tensor]
+        return self._param_to_rank[tensor]
 
     def belongs_to_current_rank(self, tensor: Tensor) -> bool:
         """
@@ -84,69 +84,69 @@ class ParameterStore(BaseStore):
             bool: True if the parameter should be updated by the current rank. Otherwise false.
         """
 
-        tensor_rank = self._fp16_param_to_rank[tensor]
+        tensor_rank = self._param_to_rank[tensor]
         return tensor_rank == self._local_rank
 
-    def add_fp16_param_list_by_rank_group(
+    def add_param_list_by_rank_group(
         self, rank: int, group_id: int, tensor_list: List[Tensor]
     ) -> None:
         """
-        Add a list of FP16 parameters to the previously added parameters, associated with the given rank and group ID.
+        Add a list of parameters to the previously added parameters, associated with the given rank and group ID.
 
         Args:
             rank (int): The rank of the process.
             group_id (int): The group ID associated with the parameters.
-            tensor_list (List[Tensor]): The list of FP16 parameters.
+            tensor_list (List[Tensor]): The list of parameters.
         """
-        if rank not in self._rank_group_id_to_fp16_param_list:
-            self._rank_group_id_to_fp16_param_list[rank] = dict()
+        if rank not in self._rank_group_id_to_param_list:
+            self._rank_group_id_to_param_list[rank] = dict()
 
-        if group_id not in self._rank_group_id_to_fp16_param_list[rank]:
-            self._rank_group_id_to_fp16_param_list[rank][group_id] = []
+        if group_id not in self._rank_group_id_to_param_list[rank]:
+            self._rank_group_id_to_param_list[rank][group_id] = []
 
-        self._rank_group_id_to_fp16_param_list[rank][group_id].extend(tensor_list)
+        self._rank_group_id_to_param_list[rank][group_id].extend(tensor_list)
 
-    def get_fp16_params_by_rank_group(self, rank: int, group_id: int) -> List[Tensor]:
+    def get_params_by_rank_group(self, rank: int, group_id: int) -> List[Tensor]:
         """
-        Retrieve the list of FP16 parameters associated with the given rank and group ID.
+        Retrieve the list of parameters associated with the given rank and group ID.
 
         Args:
             rank (int): The rank of the process.
             group_id (int): The group ID associated with the parameters.
 
         Returns:
-            List[Tensor]: The list of FP16 parameters.
+            List[Tensor]: The list of parameters.
         """
-        return self._rank_group_id_to_fp16_param_list[rank][group_id]
+        return self._rank_group_id_to_param_list[rank][group_id]
 
-    def add_flat_fp16_param_by_rank_group(
+    def add_flat_param_by_rank_group(
         self, rank: int, group_id: int, tensor: Tensor
     ):
         """
-        Add a flat FP16 parameter by rank and group.
+        Add a flat parameter by rank and group.
 
         Args:
             rank (int): The rank.
             group_id (int): The group ID.
-            tensor (Tensor): The flat FP16 parameter.
+            tensor (Tensor): The flat parameter.
         """
-        if rank not in self._rank_group_id_to_flat_fp16_param:
-            self._rank_group_id_to_flat_fp16_param[rank] = dict()
+        if rank not in self._rank_group_id_to_flat_param:
+            self._rank_group_id_to_flat_param[rank] = dict()
 
-        self._rank_group_id_to_flat_fp16_param[rank][group_id] = tensor
+        self._rank_group_id_to_flat_param[rank][group_id] = tensor
 
-    def get_flat_fp16_param_by_rank_group(self, rank: int, group_id: int) -> bool:
+    def get_flat_param_by_rank_group(self, rank: int, group_id: int) -> bool:
         """
-        Get a flat FP16 parameter by rank and group.
+        Get a flat parameter by rank and group.
 
         Args:
             rank (int): The rank.
             group_id (int): The group ID.
 
         Returns:
-            Tensor: The flat FP16 parameter.
+            Tensor: The flat parameter.
         """
-        return self._rank_group_id_to_flat_fp16_param[rank][group_id]
+        return self._rank_group_id_to_flat_param[rank][group_id]
 
     def is_param_reduced(self, tensor: Tensor) -> bool:
         """
