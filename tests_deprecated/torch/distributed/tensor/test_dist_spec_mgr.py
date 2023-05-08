@@ -5,8 +5,8 @@ import pytest
 import torch.multiprocessing as mp
 from oslo.torch.utils import get_free_port
 from oslo.torch.distributed.parallel_context import ParallelContext
-from oslo.torch.nn.parallel.data_parallel.zero.tensor import DistributedSpecManager
-from oslo.torch.nn.parallel.data_parallel.zero.tensor.distributed_spec import (
+from oslo.torch.distributed.tensor import DistributedSpecManager
+from oslo.torch.distributed.tensor.distributed_spec import (
     ShardSpec,
     ReplicaSpec,
 )

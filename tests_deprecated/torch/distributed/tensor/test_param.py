@@ -1,4 +1,4 @@
-from oslo.torch.nn.parallel.data_parallel.zero.tensor import (
+from oslo.torch.distributed.tensor import (
     DistributedTensor,
     DistributedParameter,
 )

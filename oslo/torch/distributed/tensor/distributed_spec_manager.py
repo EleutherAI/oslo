@@ -4,7 +4,7 @@ import torch
 import torch.distributed as dist
 from numpy import prod
 
-from .distributed_spec import DistributedSpec
+from .distributed_spec import DistributedSpec, DistributedPlacementPattern
 
 from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.distributed.parallel_context import ParallelContext
@@ -361,18 +361,33 @@ class DistributedSpecManager:
         assert isinstance(
             dist_spec, DistributedSpec
         ), f"{type(dist_spec)} should be DistributedSpec"
-        forward_trans_handle = getattr(
-            DistributedSpecManager,
-            f"_{old_dist_spec.placement.value}2{dist_spec.placement.value}",
-        )
+        trans_func_key = (old_dist_spec.placement, dist_spec.placement)
+        trans_funcs = {
+            (
+                DistributedPlacementPattern.REPLICATE,
+                DistributedPlacementPattern.REPLICATE,
+            ): DistributedSpecManager._r2r,
+            (
+                DistributedPlacementPattern.REPLICATE,
+                DistributedPlacementPattern.SHARD,
+            ): DistributedSpecManager._r2s,
+            (
+                DistributedPlacementPattern.SHARD,
+                DistributedPlacementPattern.REPLICATE,
+            ): DistributedSpecManager._s2r,
+            (
+                DistributedPlacementPattern.SHARD,
+                DistributedPlacementPattern.SHARD,
+            ): DistributedSpecManager._s2s,
+        }
+        forward_trans_handle = trans_funcs[trans_func_key]
         if not DistributedSpecManager._use_autograd_function:
             return forward_trans_handle(
                 tensor, old_dist_spec, dist_spec, parallel_context
             )
-        backward_trans_handle = getattr(
-            DistributedSpecManager,
-            f"_{dist_spec.placement.value}2{old_dist_spec.placement.value}",
-        )
+        backward_trans_handle = trans_funcs[
+            (dist_spec.placement, old_dist_spec.placement)
+        ]
         return TransformDistributedSpec.apply(
             tensor,
             old_dist_spec,
