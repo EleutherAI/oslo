@@ -15,7 +15,7 @@ import numpy as np
 import torch.distributed as dist
 import torch.nn as nn
 
-from oslo.torch.nn.parallel.data_parallel.zero.tensor.distributed_parameter import (
+from oslo.torch.distributed.tensor.distributed_parameter import (
     DistributedParameter,
 )
 from oslo.torch.nn.parallel.data_parallel._utils import (
