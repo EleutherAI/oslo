@@ -3,14 +3,14 @@ import pytest
 from numpy import allclose
 
 from oslo.torch.utils import get_free_port
-from oslo.torch.nn.parallel.data_parallel.zero.tensor.distributed_spec import (
+from oslo.torch.distributed.tensor.distributed_spec import (
     ShardSpec,
     ReplicaSpec,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.tensor.distributed_tensor_spec import (
+from oslo.torch.distributed.tensor.distributed_tensor_spec import (
     DistributedTensorSpec,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.tensor.distributed_tensor import (
+from oslo.torch.distributed.tensor.distributed_tensor import (
     DistributedTensor,
 )
 from oslo.torch.distributed.parallel_mode import ParallelMode
