@@ -119,9 +119,7 @@ class ParameterStore(BaseStore):
         """
         return self._rank_group_id_to_param_list[rank][group_id]
 
-    def add_flat_param_by_rank_group(
-        self, rank: int, group_id: int, tensor: Tensor
-    ):
+    def add_flat_param_by_rank_group(self, rank: int, group_id: int, tensor: Tensor):
         """
         Add a flat parameter by rank and group.
 
