@@ -29,7 +29,6 @@ from transformers.modeling_outputs import (
 from oslo.torch.distributed import ParallelContext
 from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn.parallel import PipelineParallel
-from oslo.torch.nn.parallel.pipeline_parallel._sync import _JOBS, _NUM_FORWARD_USED_COUNTER
 from oslo.torch.nn.parallel.pipeline_parallel._buffers import _MODULE_DEVICE_LOCATIONS
 from oslo.torch.nn.parallel.tensor_parallel.tensor_parallel import TensorParallel
 from oslo.torch.nn.parallel.utils import parallelize
@@ -279,7 +278,8 @@ def run():
 
                 if out_pp is not None:
                     loss_pp = out_pp.loss
-                    loss_pp = loss_pp / num_micro_batches
+                    # loss is scaled in PP wrapper
+                    # loss_pp = loss_pp / num_micro_batches
                     loss_pp.backward()
 
                     _l = loss_pp.detach().item()

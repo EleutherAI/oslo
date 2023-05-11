@@ -6,7 +6,6 @@ from functools import total_ordering
 class Metadata:
     # message direction
     is_request: bool
-    is_first: bool
 
     # job info
     is_forward: bool
@@ -18,9 +17,6 @@ class Metadata:
     # communication info
     src: int
     dst: int
-
-    def requires_redirection(self):
-        return self.is_training and self.is_grad_enabled
 
 
 _ORDERING = dict()
@@ -89,7 +85,7 @@ class Backward(Job):
 _ORDERING[Backward] = 90
 
 
-class JobInitialization(AbstractJob):
+class Input(AbstractJob):
     def __init__(self, fn, is_grad_enabled, unique_key, out_queue, **kwargs):
         super().__init__()
         self._fn = fn
@@ -115,15 +111,14 @@ class JobInitialization(AbstractJob):
         return self._out_queue
 
 
-_ORDERING[JobInitialization] = 50
+_ORDERING[Input] = 50
 
 
 class Handshake(AbstractJob):
-    def __init__(self, src, dst, qind, recv_key):
+    def __init__(self, src, dst, recv_key):
         super().__init__()
         self._src = src
         self._dst = dst
-        # self._unique_key = f"{qind}:{src}:{dst}"
         self._unique_key = recv_key
         self._recv_key = recv_key
 

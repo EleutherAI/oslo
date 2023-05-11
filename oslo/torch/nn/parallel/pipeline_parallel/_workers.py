@@ -1,12 +1,13 @@
-from threading import Lock, Thread
+from threading import Thread
 from queue import Queue
 import time
 
 from ._functional import start_job
-from ._sync import select_job
+from ._sync import select_job, sleep
 
 
-_JOB_PASS = Queue()
+# a queue for communication between a job selector and workers
+_JOBS_SELECTED = Queue()
 
 
 class JobSelection(Thread):
@@ -14,28 +15,29 @@ class JobSelection(Thread):
         while True:
             job = select_job()
 
-            while _JOB_PASS.qsize() > 10:
-                time.sleep(0.05)
+            while _JOBS_SELECTED.qsize() > 10:
+                sleep()
 
-            _JOB_PASS.put(job)
+            _JOBS_SELECTED.put(job)
 
 
-class WorkerWatcher(Thread):
+class WorkerPoolWatcher(Thread):
     def run(self):
         while True:
             num_working = 0
-            for worker in workers:
-                num_working += worker._running
 
-            # print(f"{len(workers)=}, {num_working=}")
+            for w in worker_pool:
+                num_working += w.running
 
-            if num_working == len(workers):
-                worker = Worker()
-                worker.setDaemon(True)
-                worker.start()
-                workers.append(worker)
+            # TODO; develop logic for controlling the number of workers
+            if num_working == len(worker_pool) < 32:
+                new_worker = Worker()
+                new_worker.setDaemon(True)
+                new_worker.start()
+                worker_pool.append(new_worker)
 
-            time.sleep(10.)
+            # sleep for enough time
+            time.sleep(30.)
 
 
 class Worker(Thread):
@@ -45,7 +47,7 @@ class Worker(Thread):
 
     def run(self):
         while True:
-            job = _JOB_PASS.get()
+            job = _JOBS_SELECTED.get()
 
             self._running = True
 
@@ -54,19 +56,27 @@ class Worker(Thread):
 
             self._running = False
 
+    @property
+    def running(self):
+        return self._running
 
+
+# worker for job selection
 job_selection = JobSelection()
 job_selection.setDaemon(True)
 job_selection.start()
 
-workers = []
+
+# workers run for forward and backward
+worker_pool = []
 for _ in range(16):     # TODO; 16 as an arg
     worker = Worker()
     worker.setDaemon(True)
     worker.start()
-    workers.append(worker)
+    worker_pool.append(worker)
 
 
-worker_watcher = WorkerWatcher()
-worker_watcher.setDaemon(True)
-worker_watcher.start()
+# worker that controls the number of workers
+pool_watcher = WorkerPoolWatcher()
+pool_watcher.setDaemon(True)
+pool_watcher.start()

@@ -1,13 +1,12 @@
 from oslo.torch.nn.parallel.pipeline_parallel._sync import (
     register_location_for_forward_counter,
-    _NUM_FORWARD_USED_COUNTER,
 )
 
 
 # original forward dictionary
 _ORIGINAL_FORWARDS = dict()
 
-# module device locations
+# module device(local) locations
 _MODULE_DEVICE_LOCATIONS = dict()
 
 
