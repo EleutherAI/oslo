@@ -38,8 +38,8 @@ class TestDataPermutationLM(TestDataBinarization):
         self,
         max_length,
         dataset,
-        plm_probability=0.15,
-        mean_noise_span_length=3,
+        plm_probability=1/6,
+        max_span_length=5,
         batch_size=1024,
         batch_check_num_sample=2,
         batch_check_tokens=False,
@@ -50,7 +50,7 @@ class TestDataPermutationLM(TestDataBinarization):
 
         if self.sp_data_collator:
             self.sp_data_collator.plm_probability = plm_probability
-            self.sp_data_collator.mean_noise_span_length = mean_noise_span_length #check mean noise to change max_span_length
+            self.sp_data_collator.max_span_length = max_span_length
         additional_special_ids = self.tokenizer.additional_special_tokens_ids
         min_additional_special_id = min(additional_special_ids)
 
@@ -60,7 +60,7 @@ class TestDataPermutationLM(TestDataBinarization):
             f"Max Length: {max_length}",
             f"Batch size: {batch_size}",
             f"PLM probability: {plm_probability}",
-            f"Mean noise span length: {mean_noise_span_length}\n",
+            f"Max span length: {max_span_length}\n",
             sep="\n",
         )
         processed_dataset = dataset.map(
