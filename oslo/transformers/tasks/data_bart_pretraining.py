@@ -235,7 +235,7 @@ class DataCollatorForBartPretraining(object):
                 : num_to_permute_map[i]
             ]
             ordering = np.arange(0, num_sentences_map[i])
-            # In orderring, mix the sentences by replacing the index corresponding to substitions with a random mixture of num_to_permute_map.
+            # In orderring, mix the sentences by replacing the index corresponding to substitutions with a random mixture of num_to_permute_map.
             ordering[substitutions] = substitutions[
                 np.random.permutation(num_to_permute_map[i])
             ]
