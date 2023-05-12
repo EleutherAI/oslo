@@ -106,22 +106,17 @@ def send_data(
     dst_rank: int,
 ):
     parallel_context = COMM_INFO.PARALLEL_CONTEXT
-
-    # need to get global rank of dst device for rpc.
-    # assumes that all ranks except `parallel_mode`
-    # are same between src device and dst device
-    ranks = parallel_context.get_local_ranks()
-    ranks[ParallelMode.PIPELINE] = dst_rank
-
-    global_dst_rank = parallel_context.ranks2device(ranks)
+    global_dst_rank = parallel_context.pp_rank_to_global_rank_for_rpc(
+        pp_rank=dst_rank,
+    )
 
     recv_key = data[KEY_NAME]
     q = Queue()
     QUEUES.HANDSHAKE_QUEUES[recv_key] = q
 
     rpc.rpc_sync(
-        # to=f"RPC_WORKER_{global_dst_rank}",   # TODO; how to find global dst?
-        to=f"RPC_WORKER_{dst_rank}",
+        # TODO; make a rpc worker name getter
+        to=f"RPC_WORKER_{global_dst_rank}",
         func=enqueue_handshake_req,
         args=(src_rank, dst_rank, recv_key),
     )

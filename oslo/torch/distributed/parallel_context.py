@@ -459,6 +459,7 @@ class ParallelContext(object):
         self.seed = seed
         self.make_ranks_to_devices()
 
+        # RPC requires global rank
         self.rpc_worker_map = {
             rank: f"RPC_WORKER_{rank}"
             for rank in self.get_ranks_in_group(ParallelMode.GLOBAL)
@@ -890,6 +891,27 @@ class ParallelContext(object):
                 world_size=world_size,
                 rpc_backend_options=options,
             )
+
+    # TODO; SP and MoE?
+    def local_ranks_to_global_rank(self, *, dp_rank, pp_rank, tp_rank):
+        return (
+            self.tensor_parallel_size * self.pipeline_parallel_size * dp_rank
+            + self.tensor_parallel_size * pp_rank
+            + tp_rank
+        )
+
+    def pp_rank_to_global_rank_for_rpc(self, pp_rank):
+        # need to get global rank of dst device for rpc.
+        # assumes that all ranks except `parallel_mode`
+        # are same between src device and dst device
+        ranks = self.get_local_ranks()
+        dp_rank = ranks[ParallelMode.DATA]
+        tp_rank = ranks[ParallelMode.TENSOR]
+        return self.local_ranks_to_global_rank(
+            dp_rank=dp_rank,
+            pp_rank=pp_rank,
+            tp_rank=tp_rank,
+        )
 
     def make_ranks_to_devices(self):
         rank_tensor = torch.zeros(len(self._local_ranks), dtype=torch.long).cuda()

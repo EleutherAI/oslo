@@ -23,6 +23,7 @@ from oslo.torch.nn.parallel.pipeline_parallel._comm import (
     enqueue_backward_job,
     notify_last_backward_done,
     KEY_NAME, VALUE_NAME, META_NAME,
+    COMM_INFO,
 )
 
 
@@ -217,10 +218,13 @@ def start_job(job):
         q = Queue()
         QUEUES.RECV_QUEUES[job.recv_key] = q
 
+        parallel_context = COMM_INFO.PARALLEL_CONTEXT
+        global_dst_rank = parallel_context.pp_rank_to_global_rank_for_rpc(
+            pp_rank=src,
+        )
+
         rpc.rpc_sync(
-            # TODO; how to find global dst?
-            # to=f"RPC_WORKER_{global_dst_rank}",
-            to=f"RPC_WORKER_{src}",
+            to=f"RPC_WORKER_{global_dst_rank}",
             func=enqueue_handshake_resp,
             args=(src, dst, job.unique_key),  # reverse
         )
