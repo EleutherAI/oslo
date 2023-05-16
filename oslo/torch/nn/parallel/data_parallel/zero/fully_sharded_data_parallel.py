@@ -614,7 +614,6 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
     def _init_chunks(
         self, param_order, strict_ddp_mode: bool, cpu_offload: bool, pin_memory: bool
     ):
-        ddp_pg = self.parallel_context.get_group(ParallelMode.DATA)
         for p in param_order.generate():
             self._preprocess_param(p)
             assert isinstance(p, DistributedParameter)
@@ -623,7 +622,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             if strict_ddp_mode:
                 if not p.is_replicate():
                     p.set_dist_spec(ReplicaSpec())
-                p.set_parallel_context(pg=ddp_pg)
+                p.set_parallel_context(parallel_context=self.parallel_context)
 
             # ignore the parameters with no gradient
             if not p.requires_grad:

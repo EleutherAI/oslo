@@ -45,11 +45,11 @@ def _disposable(func: Callable) -> Callable:
     return wrapper
 
 
-class HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
-    """A wrapper for optimizer. ``_FullyShardedDataParallel`` and ``HeterogeneousZeroOptimizer`` implement Zero Redundancy Optimizer (ZeRO state-3).
+class _HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
+    """A wrapper for optimizer. ``_FullyShardedDataParallel`` and ``_HeterogeneousZeroOptimizer`` implement Zero Redundancy Optimizer (ZeRO state-3).
 
     Note:
-        You must use ``_FullyShardedDataParallel`` with ``HeterogeneousZeroOptimizer``.
+        You must use ``_FullyShardedDataParallel`` with ``_HeterogeneousZeroOptimizer``.
 
     Note:
         Make sure you set ``placement_policy`` of ``heterogeneousManager`` to `"auto"`,

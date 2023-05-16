@@ -3,8 +3,8 @@ from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim.sharded_optim impor
 )
 
 from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim.heterogeneous_optim import (
-    HeterogeneousZeroOptimizer,
+    _HeterogeneousZeroOptimizer,
 )
 
 
-__ALL__ = ["ZeroRedundancyOptimizer", "HeterogeneousZeroOptimizer"]
+__ALL__ = ["ZeroRedundancyOptimizer", "_HeterogeneousZeroOptimizer"]
