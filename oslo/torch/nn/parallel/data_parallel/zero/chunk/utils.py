@@ -27,6 +27,9 @@ from oslo.torch.nn.parallel.data_parallel.zero.memory_tracer import (
 )
 from oslo.torch.distributed.parallel_mode import ParallelMode
 
+from oslo.torch.distributed.parallel_context import ParallelContext
+from oslo.torch.distributed.parallel_mode import ParallelMode
+
 
 def _filter_exlarge_params(model: nn.Module, size_dict: Dict[int, List[int]]):
     """
@@ -114,7 +117,7 @@ def classify_params_by_dp_degree(
             continue
 
         if strict_ddp_flag or type(param) is not DistributedParameter:
-            param_key = dist.get_world_size()
+            param_key = ParallelContext.get_context().get_world_size(ParallelMode.DATA)
         else:
             param_key = param.parallel_context.get_world_size(ParallelMode.DATA)
 
