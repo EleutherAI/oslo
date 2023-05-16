@@ -96,8 +96,8 @@ class _DistributedDataParallel(OsloParallelWrapper):
                 {
                     k: v
                     for k, v in zip(
-                        outputs.keys(),
-                        DistributedBackwardFunction.apply(self, *outputs.values()),
+                        inputs.keys(),
+                        DistributedBackwardFunction.apply(self, *inputs.values()),
                     )
                 }
             )
