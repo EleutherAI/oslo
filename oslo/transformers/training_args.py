@@ -427,13 +427,6 @@ class TrainingArguments:
         """
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # @property
-    # def _no_sync_in_gradient_accumulation(self):
-    #     """
-    #     Whether or not to use no_sync for the gradients when doing gradient accumulation.
-    #     """
-    #     return len(self.model_wrappers) > 0
-
     def set_oslo_config(self):
         if self.oslo_config_path_or_dict:
             oslo_config = OsloTrainerConfig(self.oslo_config_path_or_dict)
