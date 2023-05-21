@@ -128,18 +128,30 @@ class TrainingArguments:
         This should not be activated when the different nodes use the same storage as the files will be saved with
         the same names for each node.
     bf16 (`bool`, *optional*, defaults to `False`):
-            Whether to use bf16 16-bit (mixed) precision training instead of 32-bit training. Requires Ampere or higher
-            NVIDIA architecture. This is an experimental API and it may change.
+        Whether to use bf16 16-bit (mixed) precision training instead of 32-bit training. Requires Ampere or higher
+        NVIDIA architecture. This is an experimental API and it may change.
     fp16 (`bool`, *optional*, defaults to `False`):
         Whether to use fp16 16-bit (mixed) precision training instead of 32-bit training.
     label_names (`List[str]`, *optional*):
-            The list of keys in your dictionary of inputs that correspond to the labels.
+        The list of keys in your dictionary of inputs that correspond to the labels.
 
-            Will eventually default to `["labels"]` except if the model used is one of the `XxxForQuestionAnswering` in
-            which case it will default to `["start_positions", "end_positions"]`.
+        Will eventually default to `["labels"]` except if the model used is one of the `XxxForQuestionAnswering` in
+        which case it will default to `["start_positions", "end_positions"]`.
     skip_memory_metrics (`bool`, *optional*, defaults to `True`):
-            Whether to skip adding of memory profiler reports to metrics. This is skipped by default because it slows
-            down the training and evaluation speed.
+        Whether to skip adding of memory profiler reports to metrics. This is skipped by default because it slows
+        down the training and evaluation speed.
+    use_flops_profiler (`bool`, *optional*, defaults to `True`):
+        Whether to use flops profiler (This feature is a form that was copied from DeepSpeed's FLOPS profiler
+        and modified to fit Oslo.)
+    flops_profiler_profile_step (`int`, *optional*, defaults to 1):
+        Setting that determines after which step the FLOPS profile will be output.
+    flops_profiler_module_depth (`int`, *optional*, defaults to -1):
+        The depth of the model at which to print the aggregated module information. When set to -1,
+        it prints information from the top module to the innermost modules (the maximum depth).
+    flops_profiler_top_modules (`int`, *optional*, defaults to 3):
+        Limits the aggregated profile output to the number of top modules specified.
+    flops_profiler_output_path (`str`, *optional*, defaults to None):
+        Path to the output file. If None, the profiler prints to stdout.
     """
 
     output_dir: str = field(
@@ -226,7 +238,7 @@ class TrainingArguments:
         metadata={"help": "The checkpoint save strategy to use."},
     )
     save_steps: int = field(
-        default=500, metadata={"help": "Save checkpoint every X updates steps."}
+        default=1000, metadata={"help": "Save checkpoint every X updates steps."}
     )
 
     seed: int = field(
@@ -316,9 +328,29 @@ class TrainingArguments:
         },
     )
     skip_memory_metrics: bool = field(
-        default=True, metadata={"help": "Whether or not to skip adding of memory profiler reports to metrics."}
+        default=True,
+        metadata={
+            "help": "Whether or not to skip adding of memory profiler reports to metrics."
+        },
     )
-
+    use_flops_profiler: bool = field(
+        default=True,
+        metadata={
+            "help": "The output directory where the model predictions and checkpoints will be written."
+        },
+    )
+    flops_profiler_profile_step: int = field(
+        default=1000, metadata={"help": "Batch size per GPU/TPU core/CPU for training."}
+    )
+    flops_profiler_module_depth: int = field(
+        default=-1, metadata={"help": "Batch size per GPU/TPU core/CPU for training."}
+    )
+    flops_profiler_top_modules: int = field(
+        default=3, metadata={"help": "Batch size per GPU/TPU core/CPU for training."}
+    )
+    flops_profiler_output_path: str = field(
+        default=None, metadata={"help": "Batch size per GPU/TPU core/CPU for training."}
+    )
 
     def __post_init__(self):
         if self.output_dir is not None:
@@ -426,7 +458,6 @@ class TrainingArguments:
             args.model_wrappers,
         ) = args.set_oslo_config()
         return args
-
 
 
 def get_batch_size(per_device_batch_size, n_gpu) -> int:

@@ -16,8 +16,9 @@ import torch.distributed as dist
 from torch import nn
 from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
-from deepspeed.profiling.flops_profiler import FlopsProfiler
-from deepspeed.accelerator import get_accelerator
+
+# from deepspeed.profiling.flops_profiler import FlopsProfiler
+# from deepspeed.accelerator import get_accelerator
 from transformers import (
     DataCollatorWithPadding,
     PreTrainedTokenizerBase,
@@ -44,7 +45,7 @@ from transformers.trainer_pt_utils import (
     nested_concat,
     nested_detach,
     reissue_pt_warnings,
-    LabelSmoother
+    LabelSmoother,
 )
 from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
 from transformers.trainer_utils import (
@@ -57,7 +58,7 @@ from transformers.trainer_utils import (
     PredictionOutput,
     PREFIX_CHECKPOINT_DIR,
     get_last_checkpoint,
-    TrainerMemoryTracker
+    TrainerMemoryTracker,
 )
 
 import oslo
@@ -74,6 +75,7 @@ from oslo.transformers.data.data_collator import (
 )
 from oslo.transformers.trainer_utils import OptimizerNames, log_dist
 from oslo.transformers.training_args import TrainingArguments
+from oslo.transformers.profiler import FlopsProfiler
 
 TRAINER_STATE_NAME = "trainer_state.json"
 OPTIMIZER_NAME = "optimizer.pt"
@@ -140,7 +142,9 @@ class Trainer:
 
         # Label smoothing
         if self.args.label_smoothing_factor != 0:
-            self.label_smoother = LabelSmoother(epsilon=self.args.label_smoothing_factor)
+            self.label_smoother = LabelSmoother(
+                epsilon=self.args.label_smoothing_factor
+            )
         else:
             self.label_smoother = None
 
@@ -270,6 +274,12 @@ class Trainer:
             )
         self.model = self._wrap_model(self.model_wrappers)
 
+        log_dist(
+            f"DeepSpeed Flops Profiler Enabled: {self.args.use_flops_profiler is True}"
+        )
+        if self.args.use_flops_profiler is True:
+            self.flops_profiler = FlopsProfiler(self.model)
+
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
             resume_from_checkpoint = get_last_checkpoint(args.output_dir)
@@ -285,7 +295,6 @@ class Trainer:
 
         # Check if saved optimizer or scheduler states exist
         self._load_optimizer_and_scheduler(resume_from_checkpoint)
-
 
         # Train!
         log_dist("***** Running training *****")
@@ -408,6 +417,12 @@ class Trainer:
             step = -1
             for step, inputs in enumerate(epoch_iterator):
 
+                flops_profiler_active = (
+                    self.args.use_flops_profiler is True
+                    and self.state.global_step == self.args.flops_profiler_profile_step
+                    and self.parallel_context.get_local_rank(ParallelMode.GLOBAL) == 0
+                )
+
                 # Skip past any already trained steps if resuming training
                 if steps_trained_in_current_epoch > 0:
                     steps_trained_in_current_epoch -= 1
@@ -423,13 +438,17 @@ class Trainer:
                     self.control = self.callback_handler.on_step_begin(
                         args, self.state, self.control
                     )
+                if flops_profiler_active:
+                    self.flops_profiler.start_profile(ignore_list=None)
 
                 if (
-                    ((step + 1) % args.gradient_accumulation_steps != 0)
-                    and self.parallel_context.get_local_rank(ParallelMode.GLOBAL) != -1
-                ):
+                    (step + 1) % args.gradient_accumulation_steps != 0
+                ) and self.parallel_context.get_local_rank(ParallelMode.GLOBAL) != -1:
                     # TODO check whether DP support no_sync feature
-                    print("no_sync", self.parallel_context.get_local_rank(ParallelMode.GLOBAL))
+                    print(
+                        "no_sync",
+                        self.parallel_context.get_local_rank(ParallelMode.GLOBAL),
+                    )
                     # Avoid unnecessary synchronization DDP since there will be no backward pass on this example.
                     with self.model.no_sync():
                         tr_loss_step = self.training_step(self.model, inputs)
@@ -443,6 +462,9 @@ class Trainer:
                     )
                 else:
                     tr_loss += tr_loss_step
+
+                if flops_profiler_active:
+                    self.flops_profiler.stop_profile()
 
                 if (step + 1) % args.gradient_accumulation_steps == 0 or (
                     # last step in epoch but step is always smaller than gradient_accumulation_steps
@@ -459,7 +481,8 @@ class Trainer:
                             self.optimizer.clip_grad_norm(args.max_grad_norm)
                         else:
                             nn.utils.clip_grad_norm_(
-                                self.model.parameters(), args.max_grad_norm,
+                                self.model.parameters(),
+                                args.max_grad_norm,
                             )
 
                     # Optimizer step
@@ -486,6 +509,15 @@ class Trainer:
                     self.control = self.callback_handler.on_substep_end(
                         args, self.state, self.control
                     )
+                if flops_profiler_active:
+                    self.flops_profiler.print_model_profile(
+                        profile_step=step,
+                        module_depth=self.args.flops_profiler_module_depth,
+                        top_modules=self.args.flops_profiler_top_modules,
+                        detailed=True,
+                        output_file=self.args.flops_profiler_output_path,
+                    )
+                    self.flops_profiler.end_profile()
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
             if step < 0:
@@ -557,32 +589,6 @@ class Trainer:
         """
         model.train()
         inputs = self._prepare_inputs(inputs)
-
-
-        with get_accelerator().device(0):
-            model = self.model
-            batch_size = 256
-            flops, macs, params = get_model_profile(model=model,  # model
-                                                    input_ids=inputs,
-                                                    # input shape to the model. If specified, the model takes a tensor with this shape as the only positional argument.
-                                                    args=None,  # list of positional arguments to the model.
-                                                    kwargs=None,  # dictionary of keyword arguments to the model.
-                                                    print_profile=True,
-                                                    # prints the model graph with the measured profile attached to each module
-                                                    detailed=True,  # print the detailed profile
-                                                    module_depth=-1,
-                                                    # depth into the nested modules, with -1 being the inner most modules
-                                                    top_modules=1,
-                                                    # the number of top modules to print aggregated profile
-                                                    warm_up=10,
-                                                    # the number of warm-ups before measuring the time of each module
-                                                    as_string=True,
-                                                    # print raw numbers (e.g. 1000) or as human-readable strings (e.g. 1k)
-                                                    output_file=None,
-                                                    # path to the output file. If None, the profiler prints to stdout.
-                                                    ignore_modules=None)  # the list of modules to ignore in the profiling
-
-
 
         if (
             self.args.oslo_config is not None
@@ -853,7 +859,7 @@ class Trainer:
         log_dist(f"Saving model checkpoint to {output_dir}")
 
         if len(self.args.model_wrappers) > 0:
-            self.model.save_pretrained(output_dir, state_dict=state_dict)
+            self.model.save_pretrained(save_directory=output_dir, state_dict=state_dict)
         else:
             if not isinstance(self.model, PreTrainedModel):
                 if isinstance(unwrap_model(self.model), PreTrainedModel):
@@ -943,7 +949,10 @@ class Trainer:
         return output.metrics
 
     def predict(
-        self, test_dataset: Dataset, ignore_keys: Optional[List[str]] = None, metric_key_prefix: str = "test"
+        self,
+        test_dataset: Dataset,
+        ignore_keys: Optional[List[str]] = None,
+        metric_key_prefix: str = "test",
     ) -> PredictionOutput:
         """
         Run prediction and returns predictions and potential metrics.
@@ -984,7 +993,10 @@ class Trainer:
         start_time = time.time()
 
         output = self.evaluation_loop(
-            test_dataloader, description="Prediction", ignore_keys=ignore_keys, metric_key_prefix=metric_key_prefix
+            test_dataloader,
+            description="Prediction",
+            ignore_keys=ignore_keys,
+            metric_key_prefix=metric_key_prefix,
         )
         total_batch_size = self.args.eval_batch_size * self.args.world_size
         output.metrics.update(
@@ -998,8 +1010,11 @@ class Trainer:
 
         self._memory_tracker.stop_and_update_metrics(output.metrics)
 
-        return PredictionOutput(predictions=output.predictions, label_ids=output.label_ids, metrics=output.metrics)
-
+        return PredictionOutput(
+            predictions=output.predictions,
+            label_ids=output.label_ids,
+            metrics=output.metrics,
+        )
 
     def evaluation_loop(
         self,
@@ -1844,72 +1859,72 @@ class Trainer:
         return ctx_manager
 
 
-def get_model_profile(
-    model,
-    input_ids,
-    args=[],
-    kwargs={},
-    print_profile=True,
-    detailed=True,
-    module_depth=-1,
-    top_modules=1,
-    warm_up=1,
-    as_string=True,
-    output_file=None,
-    ignore_modules=None,
-):
-    """Returns the total floating-point operations, MACs, and parameters of a model.
-
-    Example:
-
-    .. code-block:: python
-
-        model = torchvision.models.alexnet()
-        batch_size = 256
-        flops, macs, params = get_model_profile(model=model, input_shape=(batch_size, 3, 224, 224)))
-
-    Args:
-        model ([torch.nn.Module]): the PyTorch model to be profiled.
-        input_shape (tuple): input shape to the model. If specified, the model takes a tensor with this shape as the only positional argument.
-        args (list): list of positional arguments to the model.
-        kwargs (dict): dictionary of keyword arguments to the model.
-        print_profile (bool, optional): whether to print the model profile. Defaults to True.
-        detailed (bool, optional): whether to print the detailed model profile. Defaults to True.
-        module_depth (int, optional): the depth into the nested modules. Defaults to -1 (the inner most modules).
-        top_modules (int, optional): the number of top modules to print in the aggregated profile. Defaults to 3.
-        warm_up (int, optional): the number of warm-up steps before measuring the latency of each module. Defaults to 1.
-        as_string (bool, optional): whether to print the output as string. Defaults to True.
-        output_file (str, optional): path to the output file. If None, the profiler prints to stdout.
-        ignore_modules ([type], optional): the list of modules to ignore during profiling. Defaults to None.
-
-    Returns:
-        The number of floating-point operations, multiply-accumulate operations (MACs), and parameters in the model.
-    """
-    assert isinstance(model, nn.Module), "model must be a PyTorch module"
-    prof = FlopsProfiler(model)
-    model.eval()
-
-    # assert (len(args) > 0) or (len(kwargs) > 0), "args and/or kwargs must be specified if input_shape is None"
-
-    for _ in range(warm_up):
-        _ = model(**input_ids)
-
-    prof.start_profile(ignore_list=ignore_modules)
-
-    _ = model(**input_ids)
-
-    flops = prof.get_total_flops()
-    macs = prof.get_total_macs()
-    params = prof.get_total_params()
-    if print_profile:
-        prof.print_model_profile(profile_step=warm_up,
-                                 module_depth=module_depth,
-                                 top_modules=top_modules,
-                                 detailed=detailed,
-                                 output_file=output_file)
-
-    prof.end_profile()
-    # if as_string:
-    #     return number_to_string(flops), macs_to_string(macs), params_to_string(params)
-
-    return flops, macs, params
+# def get_model_profile(
+#     model,
+#     input_ids,
+#     args=[],
+#     kwargs={},
+#     print_profile=True,
+#     detailed=True,
+#     module_depth=-1,
+#     top_modules=1,
+#     warm_up=1,
+#     as_string=True,
+#     output_file=None,
+#     ignore_modules=None,
+# ):
+#     """Returns the total floating-point operations, MACs, and parameters of a model.
+#
+#     Example:
+#
+#     .. code-block:: python
+#
+#         model = torchvision.models.alexnet()
+#         batch_size = 256
+#         flops, macs, params = get_model_profile(model=model, input_shape=(batch_size, 3, 224, 224)))
+#
+#     Args:
+#         model ([torch.nn.Module]): the PyTorch model to be profiled.
+#         input_shape (tuple): input shape to the model. If specified, the model takes a tensor with this shape as the only positional argument.
+#         args (list): list of positional arguments to the model.
+#         kwargs (dict): dictionary of keyword arguments to the model.
+#         print_profile (bool, optional): whether to print the model profile. Defaults to True.
+#         detailed (bool, optional): whether to print the detailed model profile. Defaults to True.
+#         module_depth (int, optional): the depth into the nested modules. Defaults to -1 (the inner most modules).
+#         top_modules (int, optional): the number of top modules to print in the aggregated profile. Defaults to 3.
+#         warm_up (int, optional): the number of warm-up steps before measuring the latency of each module. Defaults to 1.
+#         as_string (bool, optional): whether to print the output as string. Defaults to True.
+#         output_file (str, optional): path to the output file. If None, the profiler prints to stdout.
+#         ignore_modules ([type], optional): the list of modules to ignore during profiling. Defaults to None.
+#
+#     Returns:
+#         The number of floating-point operations, multiply-accumulate operations (MACs), and parameters in the model.
+#     """
+#     assert isinstance(model, nn.Module), "model must be a PyTorch module"
+#     prof = FlopsProfiler(model)  # => in func init
+#     model.eval()
+#
+#     # assert (len(args) > 0) or (len(kwargs) > 0), "args and/or kwargs must be specified if input_shape is None"
+#
+#     for _ in range(warm_up):
+#         _ = model(**input_ids)
+#
+#     prof.start_profile(ignore_list=ignore_modules)
+#
+#     _ = model(**input_ids)
+#
+#     flops = prof.get_total_flops()
+#     macs = prof.get_total_macs()
+#     params = prof.get_total_params()
+#     if print_profile:
+#         prof.print_model_profile(profile_step=warm_up,
+#                                  module_depth=module_depth,
+#                                  top_modules=top_modules,
+#                                  detailed=detailed,
+#                                  output_file=output_file)
+#
+#     prof.end_profile()
+#     # if as_string:
+#     #     return number_to_string(flops), macs_to_string(macs), params_to_string(params)
+#
+#     return flops, macs, params
