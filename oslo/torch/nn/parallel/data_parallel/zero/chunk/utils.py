@@ -15,9 +15,6 @@ import numpy as np
 import torch.distributed as dist
 import torch.nn as nn
 
-from oslo.torch.distributed.tensor.distributed_parameter import (
-    DistributedParameter,
-)
 from oslo.torch.nn.parallel.data_parallel._utils import (
     is_ddp_ignored,
 )
@@ -77,49 +74,26 @@ def _get_unused_byte(size_list: List[int], chunk_size: int) -> int:
     return left + acc
 
 
-def _tensor_numel(local_param: DistributedParameter, strict_ddp_flag: bool) -> int:
-    """_tensor_numel
-
-    Get the number of elements of a tensor
-
-    Args:
-        local_param (DistributedParameter): the tensor
-        strict_ddp_flag (bool): whether to use strict ddp
-
-    Returns:
-        int: the number of elements
-    """
-    if strict_ddp_flag and type(local_param) is DistributedParameter:
-        return local_param.numel_global()
-    else:
-        return local_param.numel()
-
-
 def classify_params_by_dp_degree(
-    param_order: OrderedParamGenerator, strict_ddp_flag: bool = False
-) -> Dict[int, List[DistributedParameter]]:
+    param_order: OrderedParamGenerator,
+) -> Dict[int, List[torch.Tensor]]:
     """classify_params_by_dp_degree
 
     Classify the parameters by their dp degree
 
     Args:
         param_order (OrderedParamGenerator): the order of param be visied
-        strict_ddp_flag (bool, optional): whether to enable the strict ddp mode.
-            all parameters keep replicated in this mode.
 
     Returns:
-        Dict[int, List[DistributedParameter]]: a dict contains the classification results.
+        Dict[int, List[torch.Tensor]]: a dict contains the classification results.
         The keys are dp_degrees and the values are parameters.
     """
-    params_dict: Dict[int, List[DistributedParameter]] = dict()
+    params_dict: Dict[int, List[torch.Tensor]] = dict()
     for param in param_order.generate():
         if is_ddp_ignored(param):
             continue
 
-        if strict_ddp_flag or type(param) is not DistributedParameter:
-            param_key = ParallelContext.get_context().get_world_size(ParallelMode.DATA)
-        else:
-            param_key = param.parallel_context.get_world_size(ParallelMode.DATA)
+        param_key = ParallelContext.get_context().get_world_size(ParallelMode.DATA)
 
         if param_key not in params_dict:
             params_dict[param_key] = []
@@ -134,7 +108,6 @@ def search_chunk_configuration(
     search_interval_byte: int,  # hidden size is the best value for the interval
     min_chunk_size_mb: float = 32,
     filter_exlarge_params: bool = True,
-    strict_ddp_flag: bool = False,
     memstas: Optional[MemStats] = None,
 ) -> Tuple[Dict, int, int]:
     """search_chunk_configuration
@@ -143,10 +116,8 @@ def search_chunk_configuration(
         model (nn.Module): torch module
         search_range_mb (float): searching range in mega byte.
         search_interval_byte (int): searching interval in byte.
-        min_chunk_size_mb (float, optional): the minimum size of a distributed chunk.
+        min_chunk_size_mb (float, optional): the minimum size of a chunk.
         filter_exlarge_params (bool, optional): filter extreme large parameters. Defaults to True.
-        strict_ddp_flag (bool, optional): whether to enable the strict ddp mode.
-            all parameters keep replicated in this mode.
 
     Returns:
         Tuple[Dict, int]: chunk config (a dict of dp_degree -> chunk init args) and its memory chunk waste in byte.
@@ -164,7 +135,7 @@ def search_chunk_configuration(
     min_chunk_size_byte = round(min_chunk_size_mb * 1024**2)
     assert search_range_byte >= 0
 
-    params_dict = classify_params_by_dp_degree(param_order, strict_ddp_flag)
+    params_dict = classify_params_by_dp_degree(param_order)
     size_lcm = np.lcm.reduce(list(params_dict.keys()))
     config_dict: Dict[int, Dict] = dict()
     total_param_size = 0
@@ -172,7 +143,7 @@ def search_chunk_configuration(
     size_dict: Dict[int, List[int]] = dict()
     for dp_degree in params_dict:
         params_list = params_dict[dp_degree]
-        size_list = [_tensor_numel(p, strict_ddp_flag) for p in params_list]
+        size_list = [p.numel() for p in params_list]
         group_acc_size = sum(size_list)
         total_param_size += group_acc_size
 

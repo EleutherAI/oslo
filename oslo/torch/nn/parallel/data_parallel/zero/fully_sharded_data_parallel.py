@@ -74,8 +74,6 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
         pin_memory (bool): Chunks on CPU Memory use pin-memory.
         force_outputs_fp32 (bool): If set to True, outputs will be fp32. Otherwise, outputs will be fp16.
             Defaults to False.
-        strict_ddp_mode (bool): If set to True, there is no tensor sharding, each tensor is replicated.
-            Defaults to False. Users can set it to True, when they clearly know that they only need DDP.
         search_range_mb (int): Search range for the chunk size. Defaults to 32.
         hidden_dim (int): Hidden dimension for the chunk size search. Defaults to None.
         min_chunk_size_mb (int): Minimum chunk size in MB. Defaults to 32.
@@ -90,7 +88,6 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
         placement_policy: str = "cuda",
         pin_memory: bool = False,
         force_outputs_fp32: bool = False,
-        strict_ddp_mode: bool = False,
         search_range_mb: int = 32,
         hidden_dim: Optional[int] = None,
         min_chunk_size_mb: float = 32,
@@ -103,7 +100,6 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             hidden_dim=hidden_dim,
             search_range_mb=search_range_mb,
             min_chunk_size_mb=min_chunk_size_mb,
-            strict_ddp_flag=strict_ddp_mode,
         )
         self.heterogeneous_manager = HeterogeneousMemoryManager(
             placement_policy, self.chunk_manager, memstats
@@ -132,7 +128,6 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
 
         self._init_chunks(
             param_order=param_order,
-            strict_ddp_mode=strict_ddp_mode,
             cpu_offload=self.heterogeneous_manager.policy_name != "cuda",
             pin_memory=pin_memory,
         )
@@ -608,16 +603,8 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
                     if input_name not in local_state:
                         unexpected_keys.append(key)
 
-    def _init_chunks(
-        self, param_order, strict_ddp_mode: bool, cpu_offload: bool, pin_memory: bool
-    ):
+    def _init_chunks(self, param_order, cpu_offload: bool, pin_memory: bool):
         for p in param_order.generate():
-            # gather sharded parameters in the strict ddp mode
-            if strict_ddp_mode:
-                if not p.is_replicate():
-                    p.set_dist_spec(ReplicaSpec())
-                p.set_parallel_context(parallel_context=self.parallel_context)
-
             # ignore the parameters with no gradient
             if not p.requires_grad:
                 self.set_params_to_ignore([p])
@@ -634,7 +621,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             p.data = p.data.half()
 
             # register the fp16 parameter and fp32 parameter in the chunk manager
-            dp_world_size = p.parallel_context.get_world_size(ParallelMode.DATA)
+            dp_world_size = self.parallel_context.get_world_size(ParallelMode.DATA)
             self.chunk_manager.register_tensor(
                 tensor=p,
                 group_type="fp16_param",
