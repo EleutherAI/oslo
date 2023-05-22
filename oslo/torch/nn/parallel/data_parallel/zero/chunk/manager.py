@@ -6,6 +6,8 @@ import torch
 from .chunk import Chunk, ChunkFullError, TensorState
 from oslo.torch.nn.parallel.data_parallel.zero.utils import get_current_device
 
+from oslo.torch.distributed.parallel_context import ParallelContext
+
 
 class ChunkManager:
     """
@@ -39,6 +41,7 @@ class ChunkManager:
         tensor: torch.Tensor,
         group_type: str,
         config_key: int,
+        parallel_context: ParallelContext,
         cpu_offload: bool = False,
         pin_memory: bool = False,
     ) -> None:
@@ -51,6 +54,7 @@ class ChunkManager:
             group_type: the data type of the group.
             config_key: the key of the group's name, the size of the dp world
             cpu_offload: if True, the chunk will be closed on CPU
+            parallel_context: the parallel context
             pin_memory: whether the chunk is pinned in the cpu memory
         """
         assert tensor not in self.tensor_chunk_map
@@ -83,7 +87,7 @@ class ChunkManager:
 
             chunk = Chunk(
                 chunk_size=chunk_size,
-                parallel_context=tensor.parallel_context,
+                parallel_context=parallel_context,
                 dtype=tensor.dtype,
                 cpu_shard_init=cpu_offload,
                 pin_memory=pin_memory,

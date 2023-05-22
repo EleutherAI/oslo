@@ -626,6 +626,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
                 tensor=p,
                 group_type="fp16_param",
                 config_key=dp_world_size,
+                parallel_context=self.parallel_context,
                 cpu_offload=cpu_offload,
                 pin_memory=pin_memory,
             )
@@ -633,6 +634,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
                 tensor=fp32_p,
                 group_type="fp32_param",
                 config_key=dp_world_size,
+                parallel_context=self.parallel_context,
                 cpu_offload=cpu_offload,
                 pin_memory=pin_memory,
             )
