@@ -1,7 +1,7 @@
 import itertools
 from collections import OrderedDict
 from functools import partial
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 import torch
 import torch.distributed as dist
@@ -28,14 +28,6 @@ from oslo.torch.nn.parallel.data_parallel.zero.memory_tracer.param_runtime_order
 )
 from oslo.torch.distributed.tensor.distributed_tensor import (
     ReplicaSpec,
-)
-from oslo.torch.distributed.tensor.distributed_parameter import (
-    DistributedParameter,
-    DistributedTensor,
-    DistributedTensorSpec,
-)
-from oslo.torch.distributed.tensor.param_op_hook import (
-    DistributedParamOpHookManager,
 )
 from oslo.torch.nn.parallel.data_parallel.zero.utils import (
     get_current_device,
@@ -69,7 +61,7 @@ def _cast_float(args, dtype: torch.dtype):
 
 
 class _FullyShardedDataParallel(_DistributedDataParallel):
-    """Fully sharded data parallel for DistributedTensor.
+    """Fully sharded data parallel.
     Warning: Nested FullyShardedDataParallel is not supported now.
     It is designed to be used with ChunkManager and HeterogeneousMemoryManager.
     For more details, see the API reference of ``ChunkManager`` and ``HeterogeneousMemoryManager``.
@@ -118,8 +110,8 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
         )
         self.force_outputs_fp32 = force_outputs_fp32
         self.param_op_hook = HeterogeneousZeROHook(self.heterogeneous_manager)
-        self.fp32_params: List[DistributedTensor] = list()
-        self.fp16_params: List[DistributedParameter] = list()
+        self.fp32_params: List[torch.Tensor] = list()
+        self.fp16_params: List[torch.Tensor] = list()
         self.overflow_counter = 0
         self.grads_device: Dict[torch.Tensor, torch.device] = dict()
         self.param2name: Dict[nn.Parameter, str] = dict()
@@ -152,6 +144,9 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
                 param_name = m_name + "." + p_name if m_name else p_name
                 self.name2param[param_name] = p_var
 
+    def _pre_forward(self):
+        self.param_op_hook.pre_forward(list(self.param_order.generate()))
+
     def _post_forward(self):
         """This function is only triggered for inference."""
         access_list = list(self.chunk_manager.accessed_chunks)
@@ -178,9 +173,12 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             ), "You should run a completed iteration as your warmup iter"
 
         args, kwargs = _cast_float(args, torch.half), _cast_float(kwargs, torch.half)
+
+        params = list(self.module.parameters())
         self.heterogeneous_manager.pre_iter(*args)
-        with DistributedParamOpHookManager.use_hooks(self.param_op_hook):
-            outputs = super().forward(*args, **kwargs)
+        self.param_op_hook.pre_forward(params)
+        outputs = super().forward(*args, **kwargs)
+        self.param_op_hook.post_forward(params)
         # scatter chunks in the inference mode
         if not grad_flag:
             self._post_forward()
@@ -196,21 +194,23 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             p.grad = None
 
     def _pre_backward(self):
+        params = list(self.module.parameters())
+        self.param_op_hook.pre_backward(params)
+
         # set the context as backward
         self.param_op_hook.toggle_training_phase()
-        self.__old_param_op_hooks = DistributedParamOpHookManager.hooks
-        DistributedParamOpHookManager.hooks = [self.param_op_hook]
 
         # set a visit label for all parameters
         # the label is used to check whether the parameter is correctly reduced
-        for param in self.param2name:
+        for param in params:
             if not is_ddp_ignored(param):
                 setattr(param, "_heterogeneous_reduced", False)
 
     def _post_backward(self):
+        self.param_op_hook.post_backward(list(self.module.parameters()))
+
         # reset the context for forward
         self.param_op_hook.toggle_training_phase()
-        DistributedParamOpHookManager.hooks = self.__old_param_op_hooks
 
         if self.chunk_manager.accessed_mem != 0:
             error_params = ["Reduction failed at followed parameters:"]
@@ -234,29 +234,26 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
     def grad_handle(self, p, grad):
         empty_grad = torch.empty_like(grad)
         free_storage(empty_grad)
-        with torch._C.DisableTorchFunction():
-            chunk = self.chunk_manager.get_chunk(p)
-            if chunk.tensors_info[p].state != TensorState.HOLD_AFTER_BWD:
-                raise RuntimeError(
-                    f"Parameter `{self.param2name[p]}` failed at the gradient reduction. "
-                    "Some unsupported torch function is operated upon this parameter."
-                )
-            self.chunk_manager.trans_tensor_state(p, TensorState.READY_FOR_REDUCE)
-            chunk.copy_tensor_to_chunk_slice(p, grad)
-            reduced = self.chunk_manager.reduce_chunk(chunk)
-            if reduced:
-                if chunk.is_gathered:
-                    chunk.cuda_global_chunk.div_(chunk.pg_size)
-                else:
-                    chunk.cuda_shard.div_(chunk.pg_size)
-                # check overflow elements
-                self.overflow_counter += chunk.has_inf_or_nan
-                # record l2 norm for gradient clipping
-                if chunk.l2_norm_flag:
-                    chunk.set_l2_norm()
-                self.chunk_manager.move_chunk(
-                    chunk, self.grads_device[p], force_copy=True
-                )
+        chunk = self.chunk_manager.get_chunk(p)
+        if chunk.tensors_info[p].state != TensorState.HOLD_AFTER_BWD:
+            raise RuntimeError(
+                f"Parameter `{self.param2name[p]}` failed at the gradient reduction. "
+                "Some unsupported torch function is operated upon this parameter."
+            )
+        self.chunk_manager.trans_tensor_state(p, TensorState.READY_FOR_REDUCE)
+        chunk.copy_tensor_to_chunk_slice(p, grad)
+        reduced = self.chunk_manager.reduce_chunk(chunk)
+        if reduced:
+            if chunk.is_gathered:
+                chunk.cuda_global_chunk.div_(chunk.pg_size)
+            else:
+                chunk.cuda_shard.div_(chunk.pg_size)
+            # check overflow elements
+            self.overflow_counter += chunk.has_inf_or_nan
+            # record l2 norm for gradient clipping
+            if chunk.l2_norm_flag:
+                chunk.set_l2_norm()
+            self.chunk_manager.move_chunk(chunk, self.grads_device[p], force_copy=True)
         return empty_grad
 
     def zero_grad(self, set_to_none: bool = False) -> None:
@@ -615,9 +612,6 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
         self, param_order, strict_ddp_mode: bool, cpu_offload: bool, pin_memory: bool
     ):
         for p in param_order.generate():
-            self._preprocess_param(p)
-            assert isinstance(p, DistributedParameter)
-
             # gather sharded parameters in the strict ddp mode
             if strict_ddp_mode:
                 if not p.is_replicate():
@@ -635,9 +629,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
 
             # create a fp32 parameter
             fp32_data = p.data.float()
-            fp32_p = DistributedTensor(
-                fp32_data, spec=DistributedTensorSpec(p.parallel_context)
-            )
+            fp32_p = torch.Tensor(fp32_data)
             # create a fp16 parameter
             p.data = p.data.half()
 
@@ -678,16 +670,3 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             buffer.data = buffer.cuda()
             if torch.is_floating_point(buffer):
                 buffer.data = buffer.half()
-
-    def _preprocess_param(self, p: Union[nn.Parameter, DistributedParameter]):
-        """Convert parameter to DistributedParameter in-place.
-
-        Args:
-            p (Union[nn.Parameter, DistributedParameter]): parameter to be converted
-        """
-        if type(p) is DistributedParameter:
-            return
-        requires_grad = p.requires_grad
-
-        p.__class__ = DistributedParameter
-        p.__init__(p, requires_grad=requires_grad)

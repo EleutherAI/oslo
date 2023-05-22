@@ -4,9 +4,6 @@ from typing import Deque, Dict, Iterable, List, Optional, Set, Tuple
 import torch
 
 from .chunk import Chunk, ChunkFullError, TensorState
-from oslo.torch.distributed.tensor import (
-    DistributedTensor,
-)
 from oslo.torch.nn.parallel.data_parallel.zero.utils import get_current_device
 
 
@@ -39,7 +36,7 @@ class ChunkManager:
 
     def register_tensor(
         self,
-        tensor: DistributedTensor,
+        tensor: torch.Tensor,
         group_type: str,
         config_key: int,
         cpu_offload: bool = False,
@@ -58,8 +55,8 @@ class ChunkManager:
         """
         assert tensor not in self.tensor_chunk_map
         assert isinstance(
-            tensor, DistributedTensor
-        ), "Please feed DistributedTensor to this ChunkManager"
+            tensor, torch.Tensor
+        ), "Please feed Tensor to this ChunkManager"
         assert config_key in self.dp_degree_chunk_size_dict
 
         chunk_size = self.dp_degree_chunk_size_dict[config_key]
