@@ -197,7 +197,6 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
         self.param_op_hook.pre_backward(self.fp16_params)
 
     def _post_backward(self):
-        self.param_op_hook.post_backward(self.fp16_params)
         # reset the context for forward
         self.param_op_hook.toggle_training_phase()
 
@@ -221,6 +220,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
         self.heterogeneous_manager.post_iter()
 
     def grad_handle(self, p, grad):
+        self.param_op_hook.post_backward([p])
         empty_grad = torch.empty_like(grad)
         free_storage(empty_grad)
         chunk = self.chunk_manager.get_chunk(p)
