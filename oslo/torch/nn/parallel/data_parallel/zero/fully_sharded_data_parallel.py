@@ -139,9 +139,6 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
                 param_name = m_name + "." + p_name if m_name else p_name
                 self.name2param[param_name] = p_var
 
-    def _pre_forward(self):
-        self.param_op_hook.pre_forward(list(self.param_order.generate()))
-
     def _post_forward(self):
         """This function is only triggered for inference."""
         access_list = list(self.chunk_manager.accessed_chunks)
@@ -169,11 +166,10 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
 
         args, kwargs = _cast_float(args, torch.half), _cast_float(kwargs, torch.half)
 
-        params = list(self.module.parameters())
         self.heterogeneous_manager.pre_iter(*args)
-        self.param_op_hook.pre_forward(params)
+        self.param_op_hook.pre_forward(self.fp16_params)
         outputs = super().forward(*args, **kwargs)
-        self.param_op_hook.post_forward(params)
+        self.param_op_hook.post_forward(self.fp16_params)
         # scatter chunks in the inference mode
         if not grad_flag:
             self._post_forward()
@@ -189,21 +185,19 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             p.grad = None
 
     def _pre_backward(self):
-        params = list(self.module.parameters())
-        self.param_op_hook.pre_backward(params)
-
         # set the context as backward
         self.param_op_hook.toggle_training_phase()
 
         # set a visit label for all parameters
         # the label is used to check whether the parameter is correctly reduced
-        for param in params:
+        for param in self.param2name:
             if not is_ddp_ignored(param):
                 setattr(param, "_heterogeneous_reduced", False)
 
-    def _post_backward(self):
-        self.param_op_hook.post_backward(list(self.module.parameters()))
+        self.param_op_hook.pre_backward(self.fp16_params)
 
+    def _post_backward(self):
+        self.param_op_hook.post_backward(self.fp16_params)
         # reset the context for forward
         self.param_op_hook.toggle_training_phase()
 
