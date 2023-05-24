@@ -10,7 +10,7 @@ from oslo.torch.utils.logging import DistributedLogger
 def worker_fn(rank, log_file_path):
     logger = DistributedLogger.get_instance(f"TestLogger{rank}")
     logger.set_level("INFO")
-    logger.log_to_file(log_file_path / f"rank_{rank}.log")
+    logger.attach_file_handler(log_file_path / f"rank_{rank}.log")
     logger.info(f"Test log message from rank {rank}")
     assert (log_file_path / f"rank_{rank}.log").exists()
 
@@ -29,10 +29,10 @@ class TestDistributedLogger(unittest.TestCase):
         logger.set_level("ERROR")
         self.assertEqual(logger._logger.level, logging.ERROR)
 
-    def test_log_to_file(self):
+    def test_attach_file_handler(self):
         logger = DistributedLogger.get_instance("TestLogger")
         logger.set_level("INFO")
-        logger.log_to_file(self.log_file_path / "test.log")
+        logger.attach_file_handler(self.log_file_path / "test.log")
         logger.info("Test log message")
         self.assertTrue((self.log_file_path / "test.log").exists())
 

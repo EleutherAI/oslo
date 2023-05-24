@@ -18,7 +18,11 @@ class DistributedLogger:
 
     @staticmethod
     def get_instance(name: str):
-        """Get the unique logger instance based on name."""
+        """Get the unique logger instance based on name.
+
+        Args:
+            name (str): The name of the logger.
+        """
         if name not in DistributedLogger.__instances:
             DistributedLogger.__instances[name] = DistributedLogger(name=name)
         return DistributedLogger.__instances[name]
@@ -35,7 +39,7 @@ class DistributedLogger:
         self._logger.propagate = False
 
     @staticmethod
-    def __get_call_info():
+    def _get_call_info():
         # Retrieve the record of the third stack frame
         caller_record = inspect.stack()[2]
         # Extract necessary details
@@ -50,14 +54,21 @@ class DistributedLogger:
         assert level in self.LOG_LEVELS, f"Invalid logging level: {level}"
         self._logger.setLevel(getattr(logging, level))
 
-    def log_to_file(
+    def attach_file_handler(
         self,
         path: Union[str, Path],
         mode: str = "a",
         level: str = "INFO",
         suffix: str = None,
     ) -> None:
-        """Save the logs to file."""
+        """Attach a file handler to the logger.
+
+        Args:
+            path (str or Path): The path to the log file.
+            mode (str): The mode to open the file. Default: 'a'.
+            level (str): The logging level. Default: 'INFO'.
+            suffix (str): The suffix of the log file name. Default: None.
+        """
         assert level in self.LOG_LEVELS, f"Invalid logging level: {level}"
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
@@ -77,7 +88,7 @@ class DistributedLogger:
 
     def _log(self, level: str, message: str, ranks: List[int] = None) -> None:
         if ranks is None or self._get_rank() in ranks:
-            message_prefix = f"{self.__get_call_info()}:"
+            message_prefix = f"{self._get_call_info()}:"
             log_function = getattr(self._logger, level)
             log_function(message_prefix)
             log_function(message)
