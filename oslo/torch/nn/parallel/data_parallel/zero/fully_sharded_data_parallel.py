@@ -1,7 +1,7 @@
 import itertools
 from collections import OrderedDict
 from functools import partial
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 import torch
 import torch.distributed as dist
@@ -28,14 +28,6 @@ from oslo.torch.nn.parallel.data_parallel.zero.memory_tracer.param_runtime_order
 )
 from oslo.torch.distributed.tensor.distributed_tensor import (
     ReplicaSpec,
-)
-from oslo.torch.distributed.tensor.distributed_parameter import (
-    DistributedParameter,
-    DistributedTensor,
-    DistributedTensorSpec,
-)
-from oslo.torch.distributed.tensor.param_op_hook import (
-    DistributedParamOpHookManager,
 )
 from oslo.torch.nn.parallel.data_parallel.zero.utils import (
     get_current_device,
@@ -69,7 +61,7 @@ def _cast_float(args, dtype: torch.dtype):
 
 
 class _FullyShardedDataParallel(_DistributedDataParallel):
-    """Fully sharded data parallel for DistributedTensor.
+    """Fully sharded data parallel.
     Warning: Nested FullyShardedDataParallel is not supported now.
     It is designed to be used with ChunkManager and HeterogeneousMemoryManager.
     For more details, see the API reference of ``ChunkManager`` and ``HeterogeneousMemoryManager``.
@@ -82,8 +74,6 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
         pin_memory (bool): Chunks on CPU Memory use pin-memory.
         force_outputs_fp32 (bool): If set to True, outputs will be fp32. Otherwise, outputs will be fp16.
             Defaults to False.
-        strict_ddp_mode (bool): If set to True, there is no tensor sharding, each tensor is replicated.
-            Defaults to False. Users can set it to True, when they clearly know that they only need DDP.
         search_range_mb (int): Search range for the chunk size. Defaults to 32.
         hidden_dim (int): Hidden dimension for the chunk size search. Defaults to None.
         min_chunk_size_mb (int): Minimum chunk size in MB. Defaults to 32.
@@ -98,7 +88,6 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
         placement_policy: str = "cuda",
         pin_memory: bool = False,
         force_outputs_fp32: bool = False,
-        strict_ddp_mode: bool = False,
         search_range_mb: int = 32,
         hidden_dim: Optional[int] = None,
         min_chunk_size_mb: float = 32,
@@ -111,15 +100,14 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             hidden_dim=hidden_dim,
             search_range_mb=search_range_mb,
             min_chunk_size_mb=min_chunk_size_mb,
-            strict_ddp_flag=strict_ddp_mode,
         )
         self.heterogeneous_manager = HeterogeneousMemoryManager(
             placement_policy, self.chunk_manager, memstats
         )
         self.force_outputs_fp32 = force_outputs_fp32
         self.param_op_hook = HeterogeneousZeROHook(self.heterogeneous_manager)
-        self.fp32_params: List[DistributedTensor] = list()
-        self.fp16_params: List[DistributedParameter] = list()
+        self.fp32_params: List[torch.Tensor] = list()
+        self.fp16_params: List[torch.Tensor] = list()
         self.overflow_counter = 0
         self.grads_device: Dict[torch.Tensor, torch.device] = dict()
         self.param2name: Dict[nn.Parameter, str] = dict()
@@ -140,7 +128,6 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
 
         self._init_chunks(
             param_order=param_order,
-            strict_ddp_mode=strict_ddp_mode,
             cpu_offload=self.heterogeneous_manager.policy_name != "cuda",
             pin_memory=pin_memory,
         )
@@ -178,9 +165,11 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             ), "You should run a completed iteration as your warmup iter"
 
         args, kwargs = _cast_float(args, torch.half), _cast_float(kwargs, torch.half)
+
         self.heterogeneous_manager.pre_iter(*args)
-        with DistributedParamOpHookManager.use_hooks(self.param_op_hook):
-            outputs = super().forward(*args, **kwargs)
+        self.param_op_hook.pre_forward(self.fp16_params)
+        outputs = super().forward(*args, **kwargs)
+        self.param_op_hook.post_forward(self.fp16_params)
         # scatter chunks in the inference mode
         if not grad_flag:
             self._post_forward()
@@ -198,8 +187,6 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
     def _pre_backward(self):
         # set the context as backward
         self.param_op_hook.toggle_training_phase()
-        self.__old_param_op_hooks = DistributedParamOpHookManager.hooks
-        DistributedParamOpHookManager.hooks = [self.param_op_hook]
 
         # set a visit label for all parameters
         # the label is used to check whether the parameter is correctly reduced
@@ -207,10 +194,11 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             if not is_ddp_ignored(param):
                 setattr(param, "_heterogeneous_reduced", False)
 
+        self.param_op_hook.pre_backward(self.fp16_params)
+
     def _post_backward(self):
         # reset the context for forward
         self.param_op_hook.toggle_training_phase()
-        DistributedParamOpHookManager.hooks = self.__old_param_op_hooks
 
         if self.chunk_manager.accessed_mem != 0:
             error_params = ["Reduction failed at followed parameters:"]
@@ -232,31 +220,29 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
         self.heterogeneous_manager.post_iter()
 
     def grad_handle(self, p, grad):
+        self.param_op_hook.post_backward([p])
         empty_grad = torch.empty_like(grad)
         free_storage(empty_grad)
-        with torch._C.DisableTorchFunction():
-            chunk = self.chunk_manager.get_chunk(p)
-            if chunk.tensors_info[p].state != TensorState.HOLD_AFTER_BWD:
-                raise RuntimeError(
-                    f"Parameter `{self.param2name[p]}` failed at the gradient reduction. "
-                    "Some unsupported torch function is operated upon this parameter."
-                )
-            self.chunk_manager.trans_tensor_state(p, TensorState.READY_FOR_REDUCE)
-            chunk.copy_tensor_to_chunk_slice(p, grad)
-            reduced = self.chunk_manager.reduce_chunk(chunk)
-            if reduced:
-                if chunk.is_gathered:
-                    chunk.cuda_global_chunk.div_(chunk.pg_size)
-                else:
-                    chunk.cuda_shard.div_(chunk.pg_size)
-                # check overflow elements
-                self.overflow_counter += chunk.has_inf_or_nan
-                # record l2 norm for gradient clipping
-                if chunk.l2_norm_flag:
-                    chunk.set_l2_norm()
-                self.chunk_manager.move_chunk(
-                    chunk, self.grads_device[p], force_copy=True
-                )
+        chunk = self.chunk_manager.get_chunk(p)
+        if chunk.tensors_info[p].state != TensorState.HOLD_AFTER_BWD:
+            raise RuntimeError(
+                f"Parameter `{self.param2name[p]}` failed at the gradient reduction. "
+                "Some unsupported torch function is operated upon this parameter."
+            )
+        self.chunk_manager.trans_tensor_state(p, TensorState.READY_FOR_REDUCE)
+        chunk.copy_tensor_to_chunk_slice(p, grad)
+        reduced = self.chunk_manager.reduce_chunk(chunk)
+        if reduced:
+            if chunk.is_gathered:
+                chunk.cuda_global_chunk.div_(chunk.pg_size)
+            else:
+                chunk.cuda_shard.div_(chunk.pg_size)
+            # check overflow elements
+            self.overflow_counter += chunk.has_inf_or_nan
+            # record l2 norm for gradient clipping
+            if chunk.l2_norm_flag:
+                chunk.set_l2_norm()
+            self.chunk_manager.move_chunk(chunk, self.grads_device[p], force_copy=True)
         return empty_grad
 
     def zero_grad(self, set_to_none: bool = False) -> None:
@@ -611,19 +597,8 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
                     if input_name not in local_state:
                         unexpected_keys.append(key)
 
-    def _init_chunks(
-        self, param_order, strict_ddp_mode: bool, cpu_offload: bool, pin_memory: bool
-    ):
+    def _init_chunks(self, param_order, cpu_offload: bool, pin_memory: bool):
         for p in param_order.generate():
-            self._preprocess_param(p)
-            assert isinstance(p, DistributedParameter)
-
-            # gather sharded parameters in the strict ddp mode
-            if strict_ddp_mode:
-                if not p.is_replicate():
-                    p.set_dist_spec(ReplicaSpec())
-                p.set_parallel_context(parallel_context=self.parallel_context)
-
             # ignore the parameters with no gradient
             if not p.requires_grad:
                 self.set_params_to_ignore([p])
@@ -635,18 +610,17 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
 
             # create a fp32 parameter
             fp32_data = p.data.float()
-            fp32_p = DistributedTensor(
-                fp32_data, spec=DistributedTensorSpec(p.parallel_context)
-            )
+            fp32_p = torch.Tensor(fp32_data)
             # create a fp16 parameter
             p.data = p.data.half()
 
             # register the fp16 parameter and fp32 parameter in the chunk manager
-            dp_world_size = p.parallel_context.get_world_size(ParallelMode.DATA)
+            dp_world_size = self.parallel_context.get_world_size(ParallelMode.DATA)
             self.chunk_manager.register_tensor(
                 tensor=p,
                 group_type="fp16_param",
                 config_key=dp_world_size,
+                parallel_context=self.parallel_context,
                 cpu_offload=cpu_offload,
                 pin_memory=pin_memory,
             )
@@ -654,6 +628,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
                 tensor=fp32_p,
                 group_type="fp32_param",
                 config_key=dp_world_size,
+                parallel_context=self.parallel_context,
                 cpu_offload=cpu_offload,
                 pin_memory=pin_memory,
             )
@@ -678,16 +653,3 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             buffer.data = buffer.cuda()
             if torch.is_floating_point(buffer):
                 buffer.data = buffer.half()
-
-    def _preprocess_param(self, p: Union[nn.Parameter, DistributedParameter]):
-        """Convert parameter to DistributedParameter in-place.
-
-        Args:
-            p (Union[nn.Parameter, DistributedParameter]): parameter to be converted
-        """
-        if type(p) is DistributedParameter:
-            return
-        requires_grad = p.requires_grad
-
-        p.__class__ = DistributedParameter
-        p.__init__(p, requires_grad=requires_grad)

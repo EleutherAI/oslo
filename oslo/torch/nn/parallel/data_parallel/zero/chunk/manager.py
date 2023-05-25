@@ -4,10 +4,9 @@ from typing import Deque, Dict, Iterable, List, Optional, Set, Tuple
 import torch
 
 from .chunk import Chunk, ChunkFullError, TensorState
-from oslo.torch.distributed.tensor import (
-    DistributedTensor,
-)
 from oslo.torch.nn.parallel.data_parallel.zero.utils import get_current_device
+
+from oslo.torch.distributed.parallel_context import ParallelContext
 
 
 class ChunkManager:
@@ -39,9 +38,10 @@ class ChunkManager:
 
     def register_tensor(
         self,
-        tensor: DistributedTensor,
+        tensor: torch.Tensor,
         group_type: str,
         config_key: int,
+        parallel_context: ParallelContext,
         cpu_offload: bool = False,
         pin_memory: bool = False,
     ) -> None:
@@ -54,12 +54,13 @@ class ChunkManager:
             group_type: the data type of the group.
             config_key: the key of the group's name, the size of the dp world
             cpu_offload: if True, the chunk will be closed on CPU
+            parallel_context: the parallel context
             pin_memory: whether the chunk is pinned in the cpu memory
         """
         assert tensor not in self.tensor_chunk_map
         assert isinstance(
-            tensor, DistributedTensor
-        ), "Please feed DistributedTensor to this ChunkManager"
+            tensor, torch.Tensor
+        ), "Please feed Tensor to this ChunkManager"
         assert config_key in self.dp_degree_chunk_size_dict
 
         chunk_size = self.dp_degree_chunk_size_dict[config_key]
@@ -86,7 +87,7 @@ class ChunkManager:
 
             chunk = Chunk(
                 chunk_size=chunk_size,
-                parallel_context=tensor.parallel_context,
+                parallel_context=parallel_context,
                 dtype=tensor.dtype,
                 cpu_shard_init=cpu_offload,
                 pin_memory=pin_memory,
