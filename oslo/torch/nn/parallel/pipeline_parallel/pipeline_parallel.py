@@ -111,6 +111,8 @@ class _PipelineParallel(OsloParallelWrapper):
 
     @torch.no_grad()
     def parallelize(self):
+        # print(f"ranK : {torch.distributed.get_rank()}",self.parallel_context.get_group(ParallelMode.PIPELINE))
+        # print(adfasfd)
         self.partitioner = ModelPartitioner(
             module=self.module,
             process_group=self.parallel_context.get_group(ParallelMode.PIPELINE),

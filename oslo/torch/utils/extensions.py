@@ -46,6 +46,8 @@ def save_pretrained(
     PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0_ep_0.bin"
 
     if merge_checkpoints and not is_merge_meaningless(self.parallel_context):
+        # print(self.__class__(self.config))
+        # print(asdfasf)
         model_to_save = self.__class__(self.config).eval()
 
         if state_dict is None:
@@ -53,6 +55,10 @@ def save_pretrained(
 
         if hasattr(self, "oslo_wrappers"):
             for parallel_mode, wrapper in self.oslo_wrappers.items():
+                # print(model_to_save)
+                # print(self.parallel_context.get_world_size(ParallelMode.TENSOR))
+                # print(wrapper)
+                # print(asdfasfs)
                 if isinstance(wrapper, _TensorParallel):
                     model_to_save = TensorParallel(
                         model_to_save,
@@ -82,8 +88,8 @@ def save_pretrained(
                         use_residual=wrapper.use_residual,
                     )
 
-        model_to_save.load_state_dict(state_dict)
         oslo.ready(model_to_save, parallel_context=self.parallel_context)
+        model_to_save.load_state_dict(state_dict)
 
         if hasattr(model_to_save, "oslo_wrappers"):
             for parallel_mode, wrapper in model_to_save.oslo_wrappers.items():
@@ -198,7 +204,6 @@ def from_parallelized(self, path):
     """
     PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0_ep_0.bin"
     parallelized_model_path = path
-
     file_names = {
         os.path.join(
             parallelized_model_path,
