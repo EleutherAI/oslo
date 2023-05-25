@@ -11,17 +11,21 @@ from transformers import (
 )
 
 import oslo
+from tests.util.oslo import initialize_oslo
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 parser = ArgumentParser()
 parser.add_argument("--local_rank", default=0, type=int)
-parser.add_argument("--config", required=True, type=str)
 parser.add_argument("--task", required=True, type=str)
 parser.add_argument("--model", required=True, type=str)
 parser.add_argument("--tokenizer", default=None, type=str)
 parser.add_argument("--input", default=None, type=str)
 parser.add_argument("--tensor_parallel_size", default=1, type=int)
+parser.add_argument("--data_parallel_size", default=1, type=int)
+parser.add_argument("--pipeline_parallel_size", default=1, type=int)
+parser.add_argument("--tensor_parallel_depth", default=1, type=int)
+parser.add_argument("--tensor_parallel_mode", default="1D", type=str)
 args = parser.parse_args()
 generation_task = args.task not in ["causal-lm", "seq2seq-lm"]
 args.tokenizer = args.tokenizer if args.tokenizer else args.model
@@ -79,8 +83,8 @@ forward_fn = model.forward if generation_task else partial(model.generate, num_b
 output_before = forward_fn(**tokenizer(input, return_tensors="pt"))
 
 # 5. Parallelize the model
-model = oslo.initialize(model, config=args.config)
-forward_fn = model.forward if generation_task else partial(model.generate, num_beams=3)
+model_oslo, parallel_context = initialize_oslo(args, model)
+forward_fn = model_oslo.forward if generation_task else partial(model_oslo.generate, num_beams=3)
 
 # 6. Get result after parallelization
 output_after = forward_fn(**tokenizer(input, return_tensors="pt").to("cuda"))
