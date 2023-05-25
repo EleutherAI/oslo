@@ -258,7 +258,7 @@ def compute_norm(
     return total_norm
 
 
-def split_half_float_double(
+def split_by_dtype(
     tensor_list: List[torch.Tensor],
 ) -> List[List[torch.Tensor]]:
     """
