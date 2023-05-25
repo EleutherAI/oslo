@@ -57,6 +57,7 @@ args = TrainingArguments(
     eval_steps=500,
     optim="adam",
     lr_scheduler_type="linear",
+    gradient_accumulation_steps=4,
     num_train_epochs=3,
     seed=0,
     load_best_model_at_end=True,
