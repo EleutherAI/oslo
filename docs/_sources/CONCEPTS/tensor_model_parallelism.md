@@ -1,5 +1,5 @@
 # Concept of Tensor Model Parallelism
-- Authors: Kichang Yang, Kevin Ko, Minho Ryu
+- Authors: Kichang Yang, Kevin Ko
 
 **Tensor Model Parallelism** makes it possible to train larger models by partitioning the parameter tensors into multiple dimensions.
 We support 1D, 2D, 2.5D, and 3D tensor partitioning algorithms which make tensor parallel training more efficient.

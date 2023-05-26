@@ -18,8 +18,8 @@ logging.captureWarnings(True)
 
 
 class ProcessorForSummarization(BaseProcessor):
-    def __init__(self, tokenizer: PreTrainedTokenizerBase, max_seq_length: int) -> None:
-        super().__init__(tokenizer=tokenizer, max_seq_length=max_seq_length)
+    def __init__(self, tokenizer: PreTrainedTokenizerBase, max_length: int) -> None:
+        super().__init__(tokenizer=tokenizer, max_length=max_length)
 
     def __call__(self, examples: Batch) -> Dict[str, List[int]]:
         column_names = [k for k, v in examples.items()]
@@ -36,14 +36,14 @@ class ProcessorForSummarization(BaseProcessor):
         dict_of_training_examples["input_ids"] = self._tokenizer(
             examples["text"],
             truncation=True,
-            max_length=self._max_seq_length,
+            max_length=self._max_length,
             verbose=False,
         )["input_ids"]
 
         dict_of_training_examples["labels"] = self._tokenizer(
             examples["labels"],
             truncation=True,
-            max_length=self._max_seq_length,
+            max_length=self._max_length,
             verbose=False,
         )["input_ids"]
 

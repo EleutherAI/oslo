@@ -82,8 +82,8 @@ def save_pretrained(
                         use_residual=wrapper.use_residual,
                     )
 
-        oslo.ready(model_to_save, parallel_context=self.parallel_context)
         model_to_save.load_state_dict(state_dict)
+        oslo.ready(model_to_save, parallel_context=self.parallel_context)
 
         if hasattr(model_to_save, "oslo_wrappers"):
             for parallel_mode, wrapper in model_to_save.oslo_wrappers.items():
@@ -193,9 +193,7 @@ def from_parallelized(self, path):
     """
     Example:
     >>> model = AnyModel()
-    >>> parallel_context = ParallelContext.from_torch(...)
-    >>> model = TensorParallel(model, parallel_context
-    >>> oslo.ready(model_oslo, parallel_context)
+    >>> model = TensorParallel(model, ...)
     >>> model.from_parallelized(path)
     """
     PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0_ep_0.bin"

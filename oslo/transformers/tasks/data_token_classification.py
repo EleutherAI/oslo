@@ -26,10 +26,10 @@ class ProcessorForTokenClassification(BaseProcessor):
     def __init__(
         self,
         tokenizer: PreTrainedTokenizerBase,
-        max_seq_length: int,
+        max_length: int,
         dataset: Union[Dataset, DatasetDict] = None,
     ) -> None:
-        super().__init__(tokenizer, max_seq_length)
+        super().__init__(tokenizer, max_length)
         if dataset is None:
             raise ValueError(
                 "dataset argument must be set. (dataset: Union[Dataset, DatasetDict])"
@@ -52,7 +52,7 @@ class ProcessorForTokenClassification(BaseProcessor):
         dict_of_training_examples: Dict[str, List[int]] = self._tokenizer(
             examples["tokens"],
             truncation=True,
-            max_length=self._max_seq_length,
+            max_length=self._max_length,
             is_split_into_words=True,
             verbose=False,
         )
