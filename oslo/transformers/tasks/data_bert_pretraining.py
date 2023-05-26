@@ -18,16 +18,16 @@ logging.captureWarnings(True)
 
 class ProcessorForBertPretraining(BaseProcessor):
     def __init__(
-        self, tokenizer: PreTrainedTokenizerBase, max_length: int = 512
+        self, tokenizer: PreTrainedTokenizerBase, max_seq_length: int = 512
     ) -> None:
-        super().__init__(tokenizer=tokenizer, max_length=max_length)
+        super().__init__(tokenizer=tokenizer, max_seq_length=max_seq_length)
 
         if not isinstance(self._tokenizer, (BertTokenizer, BertTokenizerFast)):
             warnings.warn(
                 "PorcessorForBertPretraining is suitable for BertTokenizer-like tokenizers."
             )
 
-        self._chunk_size = max_length - 3
+        self._chunk_size = max_seq_length - 3
 
     def __call__(self, examples: Batch) -> Dict[str, List[int]]:
         column_names = [k for k, v in examples.items()]

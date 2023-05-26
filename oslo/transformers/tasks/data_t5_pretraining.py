@@ -23,11 +23,11 @@ class ProcessorForT5Pretraining(BaseProcessor):
     def __init__(
         self,
         tokenizer: PreTrainedTokenizerBase,
-        max_length: int = 512,
+        max_seq_length: int = 512,
         mlm_probability: float = 0.15,
         mean_noise_span_length: float = 3.0,
     ) -> None:
-        super().__init__(tokenizer, max_length)
+        super().__init__(tokenizer, max_seq_length)
         if mlm_probability >= 1.0:
             warnings.warn("MLM Probability is greater than 1.0")
 
@@ -40,9 +40,9 @@ class ProcessorForT5Pretraining(BaseProcessor):
             self._chunk_size,
             self.target_chunk_size,
         ) = self.compute_input_and_target_lengths(
-            max_length, mlm_probability, mean_noise_span_length
+            max_seq_length, mlm_probability, mean_noise_span_length
         )
-        self._max_length = max_length
+        self._max_seq_length = max_seq_length
         self.mlm_probability = mlm_probability
         self.mean_noise_span_length = mean_noise_span_length
 
@@ -140,7 +140,7 @@ class DataCollatorForT5Pretraining(object):
         self.tokenizer = processor._tokenizer
         self.noise_density = processor.mlm_probability
         self.mean_noise_span_length = processor.mean_noise_span_length
-        self.input_length = processor._max_length
+        self.input_length = processor._max_seq_length
         self.target_length = processor.target_chunk_size
         self.pad_token_id = self.tokenizer.pad_token_id
         self.label_pad_token_id = label_pad_token_id

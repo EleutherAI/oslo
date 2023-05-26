@@ -8,13 +8,15 @@ import sys
 import random
 import warnings
 from packaging import version
-from typing import Any, Dict, List, Optional, Union, Type, Mapping, Tuple
+from typing import Any, Dict, List, Optional, Union, Type, Mapping, Tuple, Callable
+from tqdm.auto import tqdm
 
 import torch
 import torch.distributed as dist
 from torch import nn
 from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
+
 from transformers import (
     DataCollatorWithPadding,
     PreTrainedTokenizerBase,
@@ -41,7 +43,9 @@ from transformers.trainer_pt_utils import (
     nested_concat,
     nested_detach,
     reissue_pt_warnings,
+    LabelSmoother,
 )
+from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
 from transformers.trainer_utils import (
     speed_metrics,
     denumpify_detensorize,
@@ -49,12 +53,15 @@ from transformers.trainer_utils import (
     EvalLoopOutput,
     TrainOutput,
     EvalPrediction,
+    PredictionOutput,
     PREFIX_CHECKPOINT_DIR,
+    get_last_checkpoint,
+    TrainerMemoryTracker,
 )
 
 import oslo
 from oslo.torch import ParallelMode
-from oslo.torch.utils.extensions import save_pretrained as save_pretrained_oslo
+
 from oslo.torch.nn.parallel import (
     PipelineParallel,
     TensorParallel,
@@ -66,14 +73,14 @@ from oslo.transformers.data.data_collator import (
 )
 from oslo.transformers.trainer_utils import OptimizerNames, log_dist
 from oslo.transformers.training_args import TrainingArguments
+from oslo.transformers.profiler import FlopsProfiler
 
-TRAINING_ARGS_NAME = "training_args.bin"
 TRAINER_STATE_NAME = "trainer_state.json"
 OPTIMIZER_NAME = "optimizer.pt"
 SCHEDULER_NAME = "scheduler.pt"
 SCALER_NAME = "scaler.pt"
 WEIGHTS_NAME = "pytorch_model.bin"
-CONFIG_NAME = "config.yaml"
+OSLO_CONFIG_NAME = "config.yaml"
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
 DEFAULT_PROGRESS_CALLBACK = ProgressCallback
@@ -84,11 +91,13 @@ class Trainer:
         self,
         model: nn.Module = None,
         args: TrainingArguments = None,
+        load_args_from_saved: Optional[Union[str, bool]] = None,
         train_dataset: Optional[Dataset] = None,
         eval_dataset: Optional[Dataset] = None,
         data_collator: Optional[DataCollator] = None,
         tokenizer: Optional[PreTrainedTokenizerBase] = None,
-        # compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
+        compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
+        resume_from_checkpoint: Optional[Union[str, bool]] = None,
     ):
 
         if args is None:
@@ -97,7 +106,20 @@ class Trainer:
             log_dist(f"No `TrainingArguments` passed, using `output_dir={output_dir}`.")
             args = TrainingArguments(output_dir=output_dir)
 
+        if load_args_from_saved:
+            if resume_from_checkpoint and load_args_from_saved is not None:
+                load_args_path = (
+                    load_args_from_saved
+                    if isinstance(load_args_from_saved, str)
+                    else resume_from_checkpoint
+                )
+                args.load_args(load_args_path)
+
         self.args = args
+        self.resume_from_checkpoint = resume_from_checkpoint
+
+        self._memory_tracker = TrainerMemoryTracker(self.args.skip_memory_metrics)
+        self._memory_tracker.start()
 
         default_collator = (
             default_data_collator
@@ -116,34 +138,36 @@ class Trainer:
         self.parallel_context = None
         self.model_wrappers = []
 
-        self.label_smoother = None  # TODO
+        # Label smoothing
+        if self.args.label_smoothing_factor != 0:
+            self.label_smoother = LabelSmoother(
+                epsilon=self.args.label_smoothing_factor
+            )
+        else:
+            self.label_smoother = None
 
         self.parallel_context, self.model_wrappers = (
             args.parallel_context,
             args.model_wrappers,
         )
 
-        if (
-            len(self.model_wrappers)
-            > 0
-            # or ((args.fp16_full_eval or args.bf16_full_eval) and not args.do_train)
-        ):
+        if len(self.model_wrappers) > 0:
             self.place_model_on_device = False
         else:
             self.place_model_on_device = True
 
         if self.place_model_on_device:
-            # log_dist(f"model device, args.device: {self.args.device}", rank=-1)
             kwargs = dict(device=self.args.device)
             model = model.to(**kwargs)
+
+        self.model = model
 
         if args.save_on_each_node:
             self.should_save = self.is_local_process_zero()
         else:
             self.should_save = self.is_world_process_zero()
 
-        self.model = model
-
+        self.compute_metrics = compute_metrics
         # Define and add callback
         default_callbacks = DEFAULT_CALLBACKS
         callbacks = default_callbacks
@@ -164,8 +188,9 @@ class Trainer:
         self.do_grad_scaling = False
         if args.fp16 or args.bf16:
             self.do_grad_scaling = True
+            # TODO: Set ShardedGradScaler when oslo feature of it is ready
             # self.scaler = ShardedGradScaler()
-        # TODO Label Smoother
+        # TODO: Label Smoother
 
         self.state = TrainerState(
             is_local_process_zero=self.is_local_process_zero(),
@@ -184,23 +209,18 @@ class Trainer:
             self.args, self.state, self.control
         )
 
-    def train(
-        self,
-        resume_from_checkpoint: Optional[Union[str, bool]] = None,
-    ):
+        # very last
+        self._memory_tracker.stop_and_update_metrics()
+
+    def train(self):
         resume_from_checkpoint = (
-            None if not resume_from_checkpoint else resume_from_checkpoint
+            None if not self.resume_from_checkpoint else self.resume_from_checkpoint
         )
 
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
+
         args = self.args
-        # TODO Load potential model checkpoint
-        # if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
-        #     resume_from_checkpoint = get_last_checkpoint(args.output_dir)
-        #     if resume_from_checkpoint is None:
-        #         raise ValueError(f"No valid checkpoint found in output directory ({args.output_dir})")
-        #
-        # if resume_from_checkpoint is not None:
-        #     self._load_from_checkpoint(resume_from_checkpoint)
 
         # Data loader and number of training steps
         train_dataloader = self.get_train_dataloader()
@@ -250,13 +270,29 @@ class Trainer:
                 self.parallel_context,
                 **self.args.oslo_config["activation_checkpointing"],
             )
-
         self.model = self._wrap_model(self.model_wrappers)
+
+        log_dist(
+            f"DeepSpeed Flops Profiler Enabled: {self.args.use_flops_profiler is True}"
+        )
+        if self.args.use_flops_profiler is True:
+            self.flops_profiler = FlopsProfiler(self.model)
+
+        # Load potential model checkpoint
+        if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
+            resume_from_checkpoint = get_last_checkpoint(args.output_dir)
+            if resume_from_checkpoint is None:
+                raise ValueError(
+                    f"No valid checkpoint found in output directory ({args.output_dir})"
+                )
+
+        if resume_from_checkpoint is not None:
+            self._load_from_checkpoint(resume_from_checkpoint)
 
         self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
-        # # TODO Check if saved optimizer or scheduler states exist
-        # self._load_optimizer_and_scheduler(resume_from_checkpoint)
+        # Check if saved optimizer or scheduler states exist
+        self._load_optimizer_and_scheduler(resume_from_checkpoint)
 
         # Train!
         log_dist("***** Running training *****")
@@ -274,33 +310,42 @@ class Trainer:
         self.state.epoch = 0
         start_time = time.time()
         epochs_trained = 0
-        # steps_trained_in_current_epoch = 0
-        # steps_trained_progress_bar = None
+        steps_trained_in_current_epoch = 0
+        steps_trained_progress_bar = None
 
-        # # TODO Check if continuing training from a checkpoint
-        # if resume_from_checkpoint is not None and os.path.isfile(
-        #         os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
-        # ):
-        #     self.state = TrainerState.load_from_json(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
-        #     epochs_trained = self.state.global_step // num_update_steps_per_epoch
-        #     if not args.ignore_data_skip:
-        #         steps_trained_in_current_epoch = self.state.global_step % (num_update_steps_per_epoch)
-        #         steps_trained_in_current_epoch *= args.gradient_accumulation_steps
-        #     else:
-        #         steps_trained_in_current_epoch = 0
-        #
-        #     logger.info("  Continuing training from checkpoint, will skip to saved global_step")
-        #     logger.info(f"  Continuing training from epoch {epochs_trained}")
-        #     logger.info(f"  Continuing training from global step {self.state.global_step}")
-        #     if not args.ignore_data_skip:
-        #         logger.info(
-        #             f"  Will skip the first {epochs_trained} epochs then the first {steps_trained_in_current_epoch} "
-        #             "batches in the first epoch. If this takes a lot of time, you can add the `--ignore_data_skip` "
-        #             "flag to your launch command, but you will resume the training on data already seen by your model."
-        #         )
-        #         if self.is_local_process_zero() and not args.disable_tqdm:
-        #             steps_trained_progress_bar = tqdm(total=steps_trained_in_current_epoch)
-        #             steps_trained_progress_bar.set_description("Skipping the first batches")
+        if resume_from_checkpoint is not None and os.path.isfile(
+            os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
+        ):
+            self.state = TrainerState.load_from_json(
+                os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
+            )
+            epochs_trained = self.state.global_step // num_update_steps_per_epoch
+            if not args.ignore_data_skip:
+                steps_trained_in_current_epoch = self.state.global_step % (
+                    num_update_steps_per_epoch
+                )
+                steps_trained_in_current_epoch *= args.gradient_accumulation_steps
+            else:
+                steps_trained_in_current_epoch = 0
+
+            log_dist(
+                "  Continuing training from checkpoint, will skip to saved global_step"
+            )
+            log_dist(f"  Continuing training from epoch {epochs_trained}")
+            log_dist(f"  Continuing training from global step {self.state.global_step}")
+            if not args.ignore_data_skip:
+                log_dist(
+                    f"  Will skip the first {epochs_trained} epochs then the first {steps_trained_in_current_epoch} "
+                    "batches in the first epoch. If this takes a lot of time, you can add the `--ignore_data_skip` "
+                    "flag to your launch command, but you will resume the training on data already seen by your model."
+                )
+                if self.is_local_process_zero():
+                    steps_trained_progress_bar = tqdm(
+                        total=steps_trained_in_current_epoch
+                    )
+                    steps_trained_progress_bar.set_description(
+                        "Skipping the first batches"
+                    )
 
         # Update the references
         self.callback_handler.model = self.model
@@ -322,10 +367,29 @@ class Trainer:
         self._total_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
         self.optimizer.zero_grad()
+        self.model.zero_grad()
 
         self.control = self.callback_handler.on_train_begin(
             args, self.state, self.control
         )
+        # Skip the first epochs_trained epochs to get the random state of the dataloader at the right point.
+        if not args.ignore_data_skip:
+            for epoch in range(epochs_trained):
+                is_random_sampler = hasattr(train_dataloader, "sampler") and isinstance(
+                    train_dataloader.sampler, RandomSampler
+                )
+                if (
+                    version.parse(torch.__version__) < version.parse("1.11")
+                    or not is_random_sampler
+                ):
+                    # We just need to begin an iteration to create the randomization of the sampler.
+                    # That was before PyTorch 1.11 however...
+                    for _ in train_dataloader:
+                        break
+                else:
+                    # Otherwise we need to call the whooooole sampler cause there is some random operation added
+                    # AT THE VERY END!
+                    _ = list(train_dataloader.sampler)
 
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, DataLoader) and isinstance(
@@ -338,9 +402,7 @@ class Trainer:
                 train_dataloader.dataset.set_epoch(epoch)
 
             epoch_iterator = train_dataloader
-            # # TODO Reset the past mems state at the beginning of each epoch if necessary.
-            # if args.past_index >= 0:
-            #     self._past = None
+
             steps_in_epoch = (
                 len(epoch_iterator)
                 if len_dataloader is not None
@@ -352,33 +414,44 @@ class Trainer:
 
             step = -1
             for step, inputs in enumerate(epoch_iterator):
-                # # TODO Skip past any already trained steps if resuming training
-                # if steps_trained_in_current_epoch > 0:
-                #     steps_trained_in_current_epoch -= 1
-                #     if steps_trained_progress_bar is not None:
-                #         steps_trained_progress_bar.update(1)
-                #     if steps_trained_in_current_epoch == 0:
-                #         self._load_rng_state(resume_from_checkpoint)
-                #     continue
-                # elif steps_trained_progress_bar is not None:
-                #     steps_trained_progress_bar.close()
-                #     steps_trained_progress_bar = None
+
+                flops_profiler_active = (
+                    self.args.use_flops_profiler is True
+                    and self.state.global_step == self.args.flops_profiler_profile_step
+                    and self.parallel_context.get_local_rank(ParallelMode.GLOBAL) == 0
+                )
+
+                # Skip past any already trained steps if resuming training
+                if steps_trained_in_current_epoch > 0:
+                    steps_trained_in_current_epoch -= 1
+                    if steps_trained_progress_bar is not None:
+                        steps_trained_progress_bar.update(1)
+                    if steps_trained_in_current_epoch == 0:
+                        self._load_rng_state(resume_from_checkpoint)
+                    continue
+                elif steps_trained_progress_bar is not None:
+                    steps_trained_progress_bar.close()
+                    steps_trained_progress_bar = None
                 if step % args.gradient_accumulation_steps == 0:
                     self.control = self.callback_handler.on_step_begin(
                         args, self.state, self.control
                     )
+                if flops_profiler_active:
+                    self.flops_profiler.start_profile(ignore_list=None)
 
-                # TODO _no_sync_in_gradient_accumulation
-                # if (
-                #     ((step + 1) % args.gradient_accumulation_steps != 0)
-                #     and args.local_rank != -1
-                #     and args._no_sync_in_gradient_accumulation
-                # ):
-                #     # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
-                #     with model.no_sync():
-                #         tr_loss_step = self.training_step(model, inputs)
-                # else:
-                tr_loss_step = self.training_step(self.model, inputs)
+                if (
+                    (step + 1) % args.gradient_accumulation_steps != 0
+                ) and self.parallel_context.get_local_rank(ParallelMode.GLOBAL) != -1:
+                    # TODO check whether DP support no_sync feature
+                    print(
+                        "no_sync",
+                        self.parallel_context.get_local_rank(ParallelMode.GLOBAL),
+                    )
+                    # Avoid unnecessary synchronization DDP since there will be no backward pass on this example.
+                    with self.model.no_sync():
+                        tr_loss_step = self.training_step(self.model, inputs)
+                else:
+                    tr_loss_step = self.training_step(self.model, inputs)
 
                 if torch.isnan(tr_loss_step) or torch.isinf(tr_loss_step):
                     # if loss is nan or inf simply add the average of previous logged losses
@@ -388,12 +461,28 @@ class Trainer:
                 else:
                     tr_loss += tr_loss_step
 
+                if flops_profiler_active:
+                    self.flops_profiler.stop_profile()
+
                 if (step + 1) % args.gradient_accumulation_steps == 0 or (
                     # last step in epoch but step is always smaller than gradient_accumulation_steps
                     steps_in_epoch <= args.gradient_accumulation_steps
                     and (step + 1) == steps_in_epoch
                 ):
                     # TODO Gradient Clipping
+                    if args.max_grad_norm is not None and args.max_grad_norm > 0:
+                        # TODO Reduce gradients first
+                        # self.scaler.unscale_(self.optimizer)
+                        # TODO check what kind of optimizer have clip_grad_norm?
+                        if hasattr(self.optimizer, "clip_grad_norm"):
+                            # Some optimizers (like the sharded optimizer) have a specific way to do gradient clipping
+                            self.optimizer.clip_grad_norm(args.max_grad_norm)
+                        else:
+                            nn.utils.clip_grad_norm_(
+                                self.model.parameters(),
+                                args.max_grad_norm,
+                            )
+
                     # Optimizer step
                     optimizer_was_run = True
                     if self.do_grad_scaling:
@@ -418,6 +507,15 @@ class Trainer:
                     self.control = self.callback_handler.on_substep_end(
                         args, self.state, self.control
                     )
+                if flops_profiler_active:
+                    self.flops_profiler.print_model_profile(
+                        profile_step=step,
+                        module_depth=self.args.flops_profiler_module_depth,
+                        top_modules=self.args.flops_profiler_top_modules,
+                        detailed=True,
+                        output_file=self.args.flops_profiler_output_path,
+                    )
+                    self.flops_profiler.end_profile()
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
             if step < 0:
@@ -457,6 +555,8 @@ class Trainer:
         metrics["train_loss"] = train_loss
         self.is_in_train = False
 
+        self._memory_tracker.stop_and_update_metrics(metrics)
+
         self.log(metrics)
 
         self.control = self.callback_handler.on_train_end(
@@ -486,9 +586,8 @@ class Trainer:
             `torch.Tensor`: The tensor with training loss on this batch.
         """
         model.train()
-        # log_dist(f"Before self._prepare_inputs: \n{inputs}", rank=-1)
         inputs = self._prepare_inputs(inputs)
-        # log_dist(f"After self._prepare_inputs: \n{inputs}", rank=-1)
+
         if (
             self.args.oslo_config is not None
             and self.args.oslo_config.pipeline_parallelism
@@ -509,17 +608,36 @@ class Trainer:
 
         return loss.detach()
 
+    def _load_from_checkpoint(self, resume_from_checkpoint):
+        log_dist(f"Loading model from {resume_from_checkpoint}.")
+
+        if len(self.args.model_wrappers) > 0:
+            self.model.from_parallelized(resume_from_checkpoint)
+        else:
+            if not os.path.isfile(os.path.join(resume_from_checkpoint, WEIGHTS_NAME)):
+                raise ValueError(
+                    f"Can't find a valid checkpoint at {resume_from_checkpoint}"
+                )
+            state_dict = torch.load(
+                os.path.join(resume_from_checkpoint, WEIGHTS_NAME), map_location="cpu"
+            )
+            self._load_state_dict_in_model(state_dict)
+            del state_dict
+
     def _load_best_model(self):
         log_dist(
             f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
         )
-
         best_model_path = os.path.join(self.state.best_model_checkpoint, WEIGHTS_NAME)
+        # best_model_path = self.state.best_model_checkpoint
         if os.path.exists(best_model_path):
             # We load the model state dict on the CPU to avoid an OOM error.
-            state_dict = torch.load(best_model_path, map_location="cpu")
-            # If the model is on the GPU, it still works!
-            self._load_state_dict_in_model(state_dict)
+            if len(self.args.model_wrappers) > 0:
+                self.model.from_parallelized(self.state.best_model_checkpoint)
+            else:
+                state_dict = torch.load(best_model_path, map_location="cpu")
+                # If the model is on the GPU, it still works!
+                self._load_state_dict_in_model(state_dict)
         else:
             log_dist(
                 f"Could not locate the best model at {best_model_path}, if you are running a distributed training "
@@ -527,8 +645,8 @@ class Trainer:
             )
 
     def _load_state_dict_in_model(self, state_dict):
-        load_result = self.model.load_state_dict(state_dict, strict=False)
 
+        load_result = self.model.load_state_dict(state_dict, strict=False)
         if len(load_result.missing_keys) != 0:
             if self.model._keys_to_ignore_on_save is not None and set(
                 load_result.missing_keys
@@ -575,12 +693,48 @@ class Trainer:
             metrics = self.evaluate()
 
         if self.control.should_save:
-            self._save_checkpoint(model, metrics=metrics)
+            self._save_checkpoint(metrics=metrics)
             self.control = self.callback_handler.on_save(
                 self.args, self.state, self.control
             )
 
-    def _save_checkpoint(self, model, metrics=None):
+    def _load_rng_state(self, checkpoint):
+        if checkpoint is None:
+            return
+        local_rank = self.parallel_context.get_local_rank(ParallelMode.GLOBAL)
+        if local_rank != -1:
+            rng_file = os.path.join(checkpoint, f"rng_state_{local_rank}.pth")
+            if not os.path.isfile(os.path.join(checkpoint, rng_file)):
+                log_dist(
+                    f"Didn't find an RNG file for process {local_rank}, if you are resuming a training that "
+                    "wasn't launched in a distributed fashion, reproducibility is not guaranteed."
+                )
+                return
+        else:
+            rng_file = os.path.join(checkpoint, "rng_state.pth")
+            if not os.path.isfile(rng_file):
+                log_dist(
+                    "Didn't find an RNG file, if you are resuming a training that was launched in a distributed "
+                    "fashion, reproducibility is not guaranteed."
+                )
+                return
+        checkpoint_rng_state = torch.load(rng_file)
+        random.setstate(checkpoint_rng_state["python"])
+        np.random.set_state(checkpoint_rng_state["numpy"])
+        torch.random.set_rng_state(checkpoint_rng_state["cpu"])
+        if torch.cuda.is_available():
+            if local_rank != -1:
+                torch.cuda.random.set_rng_state(checkpoint_rng_state["cuda"])
+            else:
+                try:
+                    torch.cuda.random.set_rng_state_all(checkpoint_rng_state["cuda"])
+                except Exception as e:
+                    log_dist(
+                        f"Didn't manage to set back the RNG states of the GPU because of the following error:\n {e}"
+                        "\nThis won't yield the same results as if the training had not been interrupted."
+                    )
+
+    def _save_checkpoint(self, metrics=None):
         # Save model checkpoint
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
 
@@ -660,6 +814,31 @@ class Trainer:
         # if self.should_save:
         #     self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
 
+    def _load_optimizer_and_scheduler(self, checkpoint):
+        """If optimizer and scheduler states exist, load them."""
+        if checkpoint is None:
+            return
+        if os.path.isfile(os.path.join(checkpoint, OPTIMIZER_NAME)) and os.path.isfile(
+            os.path.join(checkpoint, SCHEDULER_NAME)
+        ):
+            self.optimizer.load_state_dict(
+                torch.load(
+                    os.path.join(checkpoint, OPTIMIZER_NAME),
+                    map_location=self.args.device,
+                )
+            )
+            with warnings.catch_warnings(record=True) as caught_warnings:
+                self.lr_scheduler.load_state_dict(
+                    torch.load(os.path.join(checkpoint, SCHEDULER_NAME))
+                )
+            reissue_pt_warnings(caught_warnings)
+            if self.do_grad_scaling and os.path.isfile(
+                os.path.join(checkpoint, SCALER_NAME)
+            ):
+                self.scaler.load_state_dict(
+                    torch.load(os.path.join(checkpoint, SCALER_NAME))
+                )
+
     def save_model(
         self,
         output_dir: Optional[str] = None,
@@ -676,11 +855,9 @@ class Trainer:
             output_dir = self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
         log_dist(f"Saving model checkpoint to {output_dir}")
-        log_dist(type(self.model))
-        log_dist(self.args.model_wrappers)
 
         if len(self.args.model_wrappers) > 0:
-            save_pretrained_oslo(self.model, output_dir, state_dict=state_dict)
+            self.model.save_pretrained(save_directory=output_dir, state_dict=state_dict)
         else:
             if not isinstance(self.model, PreTrainedModel):
                 if isinstance(unwrap_model(self.model), PreTrainedModel):
@@ -702,9 +879,7 @@ class Trainer:
         if self.tokenizer is not None:
             self.tokenizer.save_pretrained(output_dir)
 
-        # TODO error => TypeError: cannot pickle 'torch._C._distributed_c10d.ProcessGroupNCCL' object
-        # # Good practice: save your training arguments together with the trained model
-        # torch.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
+        self.args.save_args(output_dir)
 
     def log(self, logs: Dict[str, float]) -> None:
         """
@@ -731,7 +906,13 @@ class Trainer:
         # ignore_keys: Optional[List[str]] = None,
         # metric_key_prefix: str = 'eval',
     ) -> Dict[str, float]:
+        """
+        Run evaluation and returns metrics.
 
+        The calling script will be responsible for providing a method to compute metrics, as they are task-dependent
+        (pass it to the init `compute_metrics` argument).
+        """
+        self._memory_tracker.start()
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         start_time = time.time()
         output = self.evaluation_loop(
@@ -739,10 +920,11 @@ class Trainer:
             description="Evaluation",
             # No point gathering the predictions if there are no metrics, otherwise we defer to
             # self.args.prediction_loss_only
-            # prediction_loss_only=True if self.compute_metrics is None else None,
+            prediction_loss_only=True if self.compute_metrics is None else None,
             # ignore_keys=ignore_keys,
             # metric_key_prefix=metric_key_prefix,
         )
+        # log_dist(output.metrics)
 
         total_batch_size = (
             self.args.eval_batch_size
@@ -761,31 +943,99 @@ class Trainer:
         self.control = self.callback_handler.on_evaluate(
             self.args, self.state, self.control, output.metrics
         )
-
+        self._memory_tracker.stop_and_update_metrics(output.metrics)
         return output.metrics
+
+    def predict(
+        self,
+        test_dataset: Dataset,
+        ignore_keys: Optional[List[str]] = None,
+        metric_key_prefix: str = "test",
+    ) -> PredictionOutput:
+        """
+        Run prediction and returns predictions and potential metrics.
+
+        Depending on the dataset and your use case, your test dataset may contain labels. In that case, this method
+        will also return metrics, like in `evaluate()`.
+
+        Args:
+            test_dataset (`Dataset`):
+                Dataset to run the predictions on. If it is an `datasets.Dataset`, columns not accepted by the
+                `model.forward()` method are automatically removed. Has to implement the method `__len__`
+            ignore_keys (`Lst[str]`, *optional*):
+                A list of keys in the output of your model (if it is a dictionary) that should be ignored when
+                gathering predictions.
+            metric_key_prefix (`str`, *optional*, defaults to `"test"`):
+                An optional prefix to be used as the metrics key prefix. For example the metrics "bleu" will be named
+                "test_bleu" if the prefix is "test" (default)
+
+        <Tip>
+
+        If your predictions or labels have different sequence length (for instance because you're doing dynamic padding
+        in a token classification task) the predictions will be padded (on the right) to allow for concatenation into
+        one array. The padding index is -100.
+
+        </Tip>
+
+        Returns: *NamedTuple* A namedtuple with the following keys:
+
+            - predictions (`np.ndarray`): The predictions on `test_dataset`.
+            - label_ids (`np.ndarray`, *optional*): The labels (if the dataset contained some).
+            - metrics (`Dict[str, float]`, *optional*): The potential dictionary of metrics (if the dataset contained
+              labels).
+        """
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
+
+        test_dataloader = self.get_test_dataloader(test_dataset)
+        start_time = time.time()
+
+        output = self.evaluation_loop(
+            test_dataloader,
+            description="Prediction",
+            ignore_keys=ignore_keys,
+            metric_key_prefix=metric_key_prefix,
+        )
+        total_batch_size = self.args.eval_batch_size * self.args.world_size
+        output.metrics.update(
+            speed_metrics(
+                metric_key_prefix,
+                start_time,
+                num_samples=output.num_samples,
+                num_steps=math.ceil(output.num_samples / total_batch_size),
+            )
+        )
+
+        self._memory_tracker.stop_and_update_metrics(output.metrics)
+
+        return PredictionOutput(
+            predictions=output.predictions,
+            label_ids=output.label_ids,
+            metrics=output.metrics,
+        )
 
     def evaluation_loop(
         self,
         dataloader: DataLoader,
         description: str,
-        # prediction_loss_only: Optional[bool] = None,
+        prediction_loss_only: Optional[bool] = None,
         ignore_keys: Optional[List[str]] = None,
         metric_key_prefix: str = "eval",
     ) -> EvalLoopOutput:
         args = self.args
-
-        # prediction_loss_only = prediction_loss_only if prediction_loss_only is not None else False
+        prediction_loss_only = (
+            prediction_loss_only if prediction_loss_only is not None else False
+        )
 
         model = self._wrap_model(self.model_wrappers, training=False)
 
         batch_size = self.args.eval_batch_size
-        log_dist(f"***** Running {description} *****", rank=-1)
+        log_dist(f"***** Running {description} *****")
         if has_length(dataloader):
-            log_dist(f"  Num examples = {self.num_examples(dataloader)}", rank=-1)
+            log_dist(f"  Num examples = {self.num_examples(dataloader)}")
         else:
-            log_dist("  Num examples: Unknown", rank=-1)
-
-        log_dist(f"  Batch size = {batch_size}", rank=-1)
+            log_dist("  Num examples: Unknown")
+        log_dist(f"  Batch size = {batch_size}")
 
         model.eval()
 
@@ -824,7 +1074,7 @@ class Trainer:
             loss, logits, labels = self.prediction_step(
                 model,
                 inputs,
-                # prediction_loss_only,
+                prediction_loss_only,
                 ignore_keys=ignore_keys,
             )
             # inputs_decode = inputs["input_ids"] if args.include_inputs_for_metrics else None
@@ -966,20 +1216,19 @@ class Trainer:
         if all_inputs is not None:
             all_inputs = nested_truncate(all_inputs, num_samples)
 
-        # # Metrics! TODO
-        # if self.compute_metrics is not None and all_preds is not None and all_labels is not None:
-        #     if args.include_inputs_for_metrics:
-        #         metrics = self.compute_metrics(
-        #             EvalPrediction(predictions=all_preds,
-        #                            label_ids=all_labels,
-        #                            inputs=all_inputs))
-        #     else:
-        #         metrics = self.compute_metrics(
-        #             EvalPrediction(predictions=all_preds, label_ids=all_labels))
-        # else:
-        #     metrics = {}
-
-        metrics = {}
+        # Metrics!
+        if (
+            self.compute_metrics is not None
+            and all_preds is not None
+            and all_labels is not None
+        ):
+            metrics = self.compute_metrics(
+                EvalPrediction(
+                    predictions=all_preds, label_ids=all_labels, inputs=all_inputs
+                )
+            )
+        else:
+            metrics = {}
 
         # To be JSON-serializable, we need to remove numpy types or zero-d tensors
         metrics = denumpify_detensorize(metrics)
@@ -1054,7 +1303,7 @@ class Trainer:
         self,
         model: nn.Module,
         inputs: Dict[str, Union[torch.Tensor, Any]],
-        # prediction_loss_only: bool,
+        prediction_loss_only: bool,
         ignore_keys: Optional[List[str]] = None,
     ) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor], Optional[torch.Tensor]]:
         has_labels = all(inputs.get(k) is not None for k in self.label_names)
@@ -1103,8 +1352,8 @@ class Trainer:
                 # if self.args.past_index >= 0:
                 #     self._past = outputs[self.args.past_index - 1]
 
-        # if prediction_loss_only:
-        #     return (loss, None, None)
+        if prediction_loss_only:
+            return (loss, None, None)
 
         logits = nested_detach(logits)
         if len(logits) == 1:
@@ -1121,7 +1370,7 @@ class Trainer:
 
         model = self.model
         # Distributed training (should be after apex fp16 initialization)
-        if self.parallel_context is not None:
+        if len(self.model_wrappers) > 0:
             for wrapper in model_wrappers:
                 log_dist(f"Model wrapping with wrapper: {wrapper}")
 
@@ -1329,7 +1578,7 @@ class Trainer:
         Args:
             num_training_steps (int): The number of training steps to do.
         """
-        if self.parallel_context or self.lr_scheduler is None:
+        if self.lr_scheduler is None:
             from transformers import get_scheduler
 
             self.lr_scheduler = get_scheduler(
@@ -1350,14 +1599,18 @@ class Trainer:
         else:
             labels = None
         outputs = model(**inputs)
-        # # TODO: Save past state if it exists
-        # # HF-TODO: this needs to be fixed and made cleaner later.
-        # if self.args.past_index >= 0:
-        #     self._past = outputs[self.args.past_index]
 
         if labels is not None:
-            loss = self.label_smoother(outputs, labels)
+            if model._get_name() in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES.values():
+                loss = self.label_smoother(outputs, labels, shift_labels=True)
+            else:
+                loss = self.label_smoother(outputs, labels)
         else:
+            if isinstance(outputs, dict) and "loss" not in outputs:
+                raise ValueError(
+                    "The model did not return a loss from the inputs, only the following keys: "
+                    f"{','.join(outputs.keys())}. For reference, the inputs it received are {','.join(inputs.keys())}."
+                )
             # We don't use .loss here since the model may return tuples instead of ModelOutput.
             loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
 
@@ -1417,9 +1670,6 @@ class Trainer:
                 "The batch received was empty, your model won't be able to train on it. Double-check that your "
                 "training dataset contains keys expected by the model."
             )
-        # TODO mems
-        # if self.args.past_index >= 0 and self._past is not None:
-        #     inputs["mems"] = self._past
 
         return inputs
 

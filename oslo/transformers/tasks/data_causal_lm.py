@@ -13,10 +13,10 @@ logging.captureWarnings(True)
 
 class ProcessorForCausalLM(BaseProcessor):
     def __init__(
-        self, tokenizer: PreTrainedTokenizerBase, max_length: int = 512
+        self, tokenizer: PreTrainedTokenizerBase, max_seq_length: int = 512
     ) -> None:
-        super().__init__(tokenizer=tokenizer, max_length=max_length)
-        self._chunk_size = max_length
+        super().__init__(tokenizer=tokenizer, max_seq_length=max_seq_length)
+        self._chunk_size = max_seq_length
 
     def __call__(self, examples: Batch) -> Dict[str, List[int]]:
         column_names = [k for k, v in examples.items()]

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
-from datasets.arrow_dataset import Batch
+# from datasets.arrow_dataset import Batch
 
 try:
     from transformers import PreTrainedTokenizerBase
@@ -10,17 +10,18 @@ except ImportError:
 
 
 class BaseProcessor(ABC):
-    def __init__(self, tokenizer: PreTrainedTokenizerBase, max_length: int) -> None:
+    def __init__(self, tokenizer: PreTrainedTokenizerBase, max_seq_length: int) -> None:
         self._tokenizer = tokenizer
-        self._max_length = max_length
-        self._chunk_size = max_length
+        self._max_seq_length = max_seq_length
+        self._chunk_size = max_seq_length - 1
         self._buffer = []
 
     def save_tokenizer(self, path: str) -> None:
         self._tokenizer.save_pretrained(path)
 
     @abstractmethod
-    def __call__(self, examples: Batch) -> Dict[str, List[int]]:
+    # def __call__(self, examples: Batch) -> Dict[str, List[int]]:
+    def __call__(self, examples) -> Dict[str, List[int]]:
         pass
 
 

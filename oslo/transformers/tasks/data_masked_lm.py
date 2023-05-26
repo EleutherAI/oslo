@@ -16,15 +16,15 @@ logging.captureWarnings(True)
 
 class ProcessorForMaskedLM(BaseProcessor):
     def __init__(
-        self, tokenizer: PreTrainedTokenizerBase, max_length: int = 512
+        self, tokenizer: PreTrainedTokenizerBase, max_seq_length: int = 512
     ) -> None:
-        super().__init__(tokenizer=tokenizer, max_length=max_length)
+        super().__init__(tokenizer=tokenizer, max_seq_length=max_seq_length)
         assert (
             self._tokenizer.eos_token_id is not None
             or self._tokenizer.sep_token_id is not None
         ), "The 'eos token' or 'sep token' must be defined."
 
-        self._chunk_size = max_length - 2
+        self._chunk_size = max_seq_length - 2
         self.eos_text_id = (
             self._tokenizer.eos_token_id
             if self._tokenizer.eos_token_id is not None
