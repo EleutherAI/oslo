@@ -16,14 +16,12 @@
 
 from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
 import torch.distributed as dist
-from torch._six import inf
-import math
+from math import sqrt, inf
 import torch
 from typing import Optional, Iterable, List, Union
 from oslo.torch.distributed import ParallelMode
 
 
-# TODO
 def is_model_parallel_parameter(p: torch.Tensor) -> bool:
     """
     Check if a parameter is parallel in either Pipeline or Tensor mode.
@@ -34,10 +32,19 @@ def is_model_parallel_parameter(p: torch.Tensor) -> bool:
     Returns:
         bool: True if the parameter is parallel in either mode, False otherwise.
     """
-    parallel_mode = getattr(p, "oslo_parallel", {})
-    return ParallelMode.PIPELINE in parallel_mode or any(
-        key.startswith("tensor") for key in parallel_mode
-    )
+    oslo_parallel = getattr(p, "oslo_parallel", {})
+    parallel_modes = [
+        ParallelMode.PIPELINE,
+        ParallelMode.TENSOR_1D,
+        ParallelMode.TENSOR_2D_ROW,
+        ParallelMode.TENSOR_2D_COL,
+        ParallelMode.TENSOR_2P5D_ROW,
+        ParallelMode.TENSOR_2P5D_COL,
+        ParallelMode.TENSOR_2P5D_DEP,
+        ParallelMode.TENSOR_3D_INPUT,
+        ParallelMode.TENSOR_3D_OUTPUT,
+    ]
+    return any(mode in oslo_parallel for mode in parallel_modes)
 
 
 def flatten(input_: Iterable[torch.Tensor]) -> torch.Tensor:
@@ -78,7 +85,7 @@ def calculate_global_norm_from_list(norm_list: List[float]) -> float:
     total_norm = 0.0
     for norm in norm_list:
         total_norm += norm**2.0
-    return math.sqrt(total_norm)
+    return sqrt(total_norm)
 
 
 def reduce_tensor_dp_group(
@@ -251,7 +258,7 @@ def compute_norm(
     return total_norm
 
 
-def split_half_float_double(
+def split_by_dtype(
     tensor_list: List[torch.Tensor],
 ) -> List[List[torch.Tensor]]:
     """

@@ -1,46 +1,29 @@
-import os
+import logging
 import torch
+import os
 from datasets import load_dataset
-from torch.utils.data import DataLoader
 from transformers import BertTokenizer, BertForSequenceClassification
 
-from oslo.transformers.training_args import TrainingArguments
-from oslo.transformers.trainer import Trainer
 from oslo.transformers.tasks.data_sequence_classification import (
     ProcessorForSequenceClassification,
     DataCollatorForSequenceClassification,
 )
-import logging
+from oslo.transformers.trainer import Trainer
+from oslo.transformers.training_args import TrainingArguments
 
 logging.basicConfig(level=logging.INFO)
 
-os.environ["WANDB_DISABLED"] = "true"
-
-oslo_init_dict_form = {
-    "data_parallelism": {
-        "enable": True,
-        "parallel_size": 1,
-        "zero_stage": 1,
-    },
-    "tensor_parallelism": {
-        "enable": False,
-        "parallel_size": 1,
-        "parallel_mode": "2.5d",
-    },
-    "pipeline_parallelism": {"enable": False, "parallel_size": 4},
-}
 model = BertForSequenceClassification.from_pretrained("bert-base-uncased")
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-
-processor = ProcessorForSequenceClassification(tokenizer, 512)
-if processor._tokenizer.pad_token is None:
-    processor._tokenizer.pad_token = processor._tokenizer.eos_token
 
 # 데이터셋 생성
 dataset = load_dataset("glue", "cola")
 dataset = dataset.rename_column("sentence", "text")
 dataset = dataset.rename_column("label", "labels")
 
+processor = ProcessorForSequenceClassification(tokenizer, 512)
+if processor._tokenizer.pad_token is None:
+    processor._tokenizer.pad_token = processor._tokenizer.eos_token
 
 processed_dataset = dataset.map(
     processor, batched=True, remove_columns=dataset["train"].column_names
@@ -51,20 +34,11 @@ valid_dataset = processed_dataset["validation"]
 
 data_collator = DataCollatorForSequenceClassification(processor)
 
+# Define trainer arguments
+reload_path = "output/checkpoint-500"
+args = TrainingArguments.load_args(reload_path)
 
-args = TrainingArguments(
-    output_dir="output",
-    eval_steps=500,
-    optim="adam",
-    lr_scheduler_type="linear",
-    gradient_accumulation_steps=4,
-    num_train_epochs=3,
-    seed=0,
-    load_best_model_at_end=True,
-    oslo_config_path_or_dict=oslo_init_dict_form,
-    dataloader_drop_last=True,
-)
-
+# Define trainer
 trainer = Trainer(
     args=args,
     model=model,
@@ -72,6 +46,14 @@ trainer = Trainer(
     train_dataset=train_dataset,
     eval_dataset=valid_dataset,
     data_collator=data_collator,
+    resume_from_checkpoint=reload_path,
 )
 
+# Train
 trainer.train()
+
+# # Save
+# trainer.save_model()
+
+# Eval
+metrics = trainer.evaluate(eval_dataset=valid_dataset)
