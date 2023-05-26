@@ -164,7 +164,7 @@ def serialize_corpora(
     tokenizer_dir: str,
     corpora_dir: str,
     corpus_type: CorpusType,
-    max_seq_length: int,
+    max_length: int,
     mlm_probability: Optional[float] = 0.15,
     mean_noise_span_length: Optional[float] = 3.0,
     save_dir: Optional[str] = None,
@@ -206,19 +206,17 @@ def serialize_corpora(
 
     if task_type == "token_classification":
         data_processor = task_type_to_processor[task_type](
-            tokenizer_dir, max_seq_length, corpora
+            tokenizer_dir, max_length, corpora
         )
     elif task_type == "t5_pretraining":
         data_processor = task_type_to_processor[task_type](
             tokenizer_dir,
-            max_seq_length,
+            max_length,
             mlm_probability,
             mean_noise_span_length,
         )
     else:
-        data_processor = task_type_to_processor[task_type](
-            tokenizer_dir, max_seq_length
-        )
+        data_processor = task_type_to_processor[task_type](tokenizer_dir, max_length)
 
     dataset = corpora.map(
         data_processor,

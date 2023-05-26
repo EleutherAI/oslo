@@ -1,27 +1,18 @@
 import logging
+import random
 import warnings
 from typing import Any, Dict, List, Optional
-import math
+
 import numpy as np
 import torch
-from oslo.torch.distributed import ParallelContext
-from oslo.transformers.tasks.data_base import BaseProcessor
-import os
-import torch.distributed as dist
+from datasets.arrow_dataset import Batch
 
+from oslo.transformers.tasks.data_base import BaseProcessor
 
 try:
-    from transformers import (
-        BartTokenizer,
-        BartTokenizerFast,
-        PreTrainedTokenizerBase,
-        BatchEncoding,
-    )
-    from transformers.models.bart.modeling_flax_bart import shift_tokens_right
+    from transformers import BartTokenizer, BartTokenizerFast, PreTrainedTokenizerBase
 except ImportError:
     print("You have to install `transformers` to use `oslo.transformers` modules")
-import re
-from itertools import chain
 
 logging.captureWarnings(True)
 
@@ -30,119 +21,72 @@ class ProcessorForBartPretraining(BaseProcessor):
     def __init__(
         self,
         tokenizer: PreTrainedTokenizerBase,
-        max_seq_length: int = 1024,
+        max_length: int = 1024,
     ) -> None:
-        super().__init__(tokenizer, max_seq_length)
+        super().__init__(tokenizer, max_length)
 
         if not isinstance(self._tokenizer, (BartTokenizer, BartTokenizerFast)):
             warnings.warn(
                 "PorcessorForBartPretraining is only suitable for BartTokenizer-like tokenizers."
             )
 
-    def __call__(self, dataset) -> Dict[str, List[int]]:
-        column_names = list(dataset["train"][0].keys())
+        self._chunk_size = max_length - 1
+
+    def __call__(self, examples: Batch) -> Dict[str, List[int]]:
+        column_names = [k for k, v in examples.items()]
         assert (
             "text" in column_names
         ), "The name of dataset column that you want to tokenize must be 'text'"
 
-        def split_sentence_add_token(example):
-            # l reprise the role in the last two films..  Watch I-Reporter give her review of Potter's latest » . There is life beyond
-            pattern = r"(?<=[.!?])\s"
-            splited_sents = [
-                self._tokenizer.bos_token
-                + f"{self._tokenizer.pad_token}".join(
-                    [
-                        sp_text.strip()
-                        for sp_text in re.split(pattern, text)
-                        if len(sp_text)
-                        > 1  # Conditional statement for the last sentence
-                    ]
-                )
-                + self._tokenizer.eos_token
-                for text in example["text"]
-            ]
+        dict_of_training_examples: Dict[str, List[int]] = {"input_ids": []}
 
-            tokenized_sents = self._tokenizer(
-                splited_sents,
-                padding=False,
-                truncation=False,
-                add_special_tokens=False,
-                return_attention_mask=False,
-                return_special_tokens_mask=False,
-                verbose=False,
-            )["input_ids"]
+        list_of_input_ids: List[List[int]] = self._tokenizer(
+            examples["text"],
+            padding=False,
+            truncation=False,
+            add_special_tokens=False,
+            return_attention_mask=False,
+            return_special_tokens_mask=False,
+            verbose=False,
+        )["input_ids"]
 
-            return {"input_ids": tokenized_sents}
+        for input_ids in list_of_input_ids:
+            input_ids += [self._tokenizer.sep_token_id]
+            self._buffer.extend(input_ids)
 
-        # using maximum cpu power
-        if dist.is_initialized():
-            world_size = dist.get_world_size()
-        else:
-            world_size = 1
-        os_count = os.cpu_count()
-        split_tokenized_dataset = dataset.map(
-            split_sentence_add_token,
-            batched=True,
-            num_proc=os_count // world_size,  #  number of multiprocessor
-            remove_columns=column_names,
-        )
+            while len(self._buffer) >= self._chunk_size:
+                chunk_ids = self._buffer[: self._chunk_size]
+                dict_of_training_examples["input_ids"].append(chunk_ids)
+                self._buffer = self._buffer[self._chunk_size :]
 
-        def group_text(examples):
-            self._buffer.extend(
-                list(chain.from_iterable(examples["input_ids"]))
-            )  # combine input_ids dataset
-            total_length = len(self._buffer)
-            quotient, remain = divmod(total_length, self._max_seq_length)
-            output = [
-                self._buffer[i : i + self._max_seq_length]
-                for i in range(0, quotient * self._max_seq_length, self._max_seq_length)
-            ]
-            self._buffer = self._buffer[quotient * self._max_seq_length :]
-            return {"input_ids": output}
-
-        group_dataset = split_tokenized_dataset.map(
-            group_text, batched=True, num_proc=os_count // world_size
-        )
-
-        return group_dataset
+        return dict_of_training_examples
 
 
 class DataCollatorForBartPretraining(object):
     """
     Processing training examples to mini-batch for Bart (text_infilling, sentence_permutation).
-    processor:
-        pass
-    mask_ratio (:obj:`float`):
-        The probability with which to (randomly) mask tokens in the input
-    poisson_lambda (:obj:`float`):
-        Mean parameter of Poisson distribution used to generate span-lengths to be masked
-    permute_sentence_ratio (:obj:`float`):
-        Ratio of sentences to be permuted in each document
-    decoder_start_token_id: (:obj:`int):
-        The decoder start token id of the model
-    label_pad_token_id:
-        pass
-
     """
 
     def __init__(
         self,
         processor: ProcessorForBartPretraining,
-        mask_ratio: float = 0.3,
-        poisson_lambda: float = 3.0,
-        permute_sentence_ratio: bool = 0.8,
-        decoder_start_token_id: Optional[int] = None,
+        mlm_probability: float = 0.15,
+        possion_lambda: float = 3.0,
+        permute_sentence: bool = True,
         label_pad_token_id: int = -100,
+        decoder_start_token_id: Optional[int] = None,
     ):
+        if mlm_probability >= 1.0:
+            warnings.warn("MLM Probability is greater than 1.0")
 
         assert isinstance(
             processor, ProcessorForBartPretraining
         ), "DataCollatorForBartPretraining is only suitable for ProcessorForBartPretraining."
 
         self.tokenizer = processor._tokenizer
-        self.mask_ratio = mask_ratio
-        self.poisson_lambda = poisson_lambda
-        self.permute_sentence_ratio = permute_sentence_ratio
+        self.mlm_probability = mlm_probability
+        self.possion_lambda = possion_lambda
+        self.permute_sentence = permute_sentence
         self.pad_token_id = self.tokenizer.pad_token_id
         self.mask_token_id = processor._tokenizer.mask_token_id
         self.label_pad_token_id = label_pad_token_id
@@ -158,200 +102,122 @@ class DataCollatorForBartPretraining(object):
         }
 
     def __call__(self, examples: List[Dict[str, Any]]) -> Dict[str, Any]:
-        batch = BatchEncoding(
-            {
-                k: np.array([examples[i][k] for i in range(len(examples))])
-                for k, v in examples[0].items()
-            }
+        examples = self._prepare_noise_text_from_examples(examples)
+        batch = self.tokenizer.pad(
+            examples,
+            return_attention_mask=True,
+            return_tensors="pt",
         )
-        batch["labels"] = batch["input_ids"].copy()
-        batch["decoder_input_ids"] = shift_tokens_right(
-            batch["labels"], self.tokenizer.pad_token_id, self.decoder_start_token_id
-        )
+        return self._prepare_decoder_inputs_from_labels(batch)
 
-        do_permute = False
-        if self.permute_sentence_ratio:
-            batch["input_ids"] = self.permute_sentences(batch["input_ids"])
-            do_permute = True
+    def _prepare_noise_text_from_examples(
+        self, examples: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        output_examples = []
+        for example in examples:
+            chunk_ids = example["input_ids"]
+            labels = chunk_ids[:]
 
-        if self.mask_ratio:
-            batch["input_ids"], batch["labels"] = self.text_infilling(
-                batch["input_ids"], batch["labels"], do_permute
+            chunk_ids = self._text_infilling(chunk_ids)
+            if self.permute_sentence:
+                chunk_ids = self._sentence_permutation(chunk_ids)
+
+            chunk_ids = self.tokenizer.build_inputs_with_special_tokens(chunk_ids)
+            labels = self.tokenizer.build_inputs_with_special_tokens(labels)[1:]
+
+            output_examples.append(
+                {
+                    "input_ids": chunk_ids,
+                    "labels": labels,
+                }
             )
 
-        # ignore pad tokens
-        batch["attention_mask"] = (
-            batch["input_ids"] != self.tokenizer.pad_token_id
-        ).astype(int)
-        batch["decoder_attention_mask"] = (
-            batch["decoder_input_ids"] != self.tokenizer.pad_token_id
-        ).astype(int)
-        return batch
+        return output_examples
 
-    def permute_sentences(self, input_ids):
-        """
-        Shuffle sentences in each document.
-        """
-        results = input_ids.copy()
+    def _text_infilling(self, input_ids: List[int]) -> List[int]:
+        length = len(input_ids)
+        num_noise_tokens = int(np.round(length * self.mlm_probability))
 
-        # find end locations of sentences
-        # When creating an example, when a sentence comes in, sentence separation is performed, and the PAD token is inserted between the sentences.
-        end_sentence_mask = input_ids == self.tokenizer.pad_token_id
-        sentence_ends = np.argwhere(end_sentence_mask)
-        sentence_ends[:, 1] += 1
-        example_has_multiple_sentences, num_sentences = np.unique(
-            sentence_ends[:, 0], return_counts=True
-        )
+        # pick the lengths of the noise spans
+        def _possion_segmentation(num_noise_tokens):
+            segment_lengths = []
+            while sum(segment_lengths) < num_noise_tokens:
+                span_length = np.random.poisson(lam=self.possion_lambda)
+                segment_lengths.append(span_length)
 
-        # E.X. num_sentences_map[3] = 10 indicates that there are 10 separate sentences in batch_index 3.
-        num_sentences_map = {
-            sent_idx: count
-            for sent_idx, count in zip(example_has_multiple_sentences, num_sentences)
-        }
-        # Num_to_permute mixes only the sentence by the permit_ratio of the total when there are actually 10 sentences to be separated.
-        num_to_permute = np.ceil(num_sentences * self.permute_sentence_ratio).astype(
-            int
-        )
-        num_to_permute_map = {
-            sent_idx: count
-            for sent_idx, count in zip(example_has_multiple_sentences, num_to_permute)
-        }
+            difference = sum(segment_lengths) - num_noise_tokens
+            segment_lengths[-1] = segment_lengths[-1] - difference
+            segment_lengths.sort(reverse=True)
+            return segment_lengths
 
-        sentence_ends = np.split(
-            sentence_ends[:, 1],
-            np.unique(sentence_ends[:, 0], return_index=True)[1][1:],
-        )
-        sentence_ends_map = {
-            sent_idx: count
-            for sent_idx, count in zip(example_has_multiple_sentences, sentence_ends)
-        }
+        temp_ids = input_ids
+        while len(temp_ids) >= length:
+            temp_ids = input_ids[:]
+            noise_span_lengths = _possion_segmentation(num_noise_tokens)
 
-        for i in range(input_ids.shape[0]):
-            if i not in example_has_multiple_sentences:
-                continue
-            # Create a random number of sentences to be separated (num_sentences_map) and extract by the permit_ratio (num_to_permute_map).
-            # Substitutions is a random selection of sentences to be selected, and ordering[substitutions] is a random mixing of selected sentences.
-            substitutions = np.random.permutation(num_sentences_map[i])[
-                : num_to_permute_map[i]
-            ]
-            ordering = np.arange(0, num_sentences_map[i])
-            # In orderring, mix the sentences by replacing the index corresponding to substitutions with a random mixture of num_to_permute_map.
-            ordering[substitutions] = substitutions[
-                np.random.permutation(num_to_permute_map[i])
-            ]
+            for noise_span_length in noise_span_lengths:
+                max_idx = len(temp_ids) - noise_span_length + 1
+                # get start index of mask span
+                start_indices = self.get_start_indices[max_idx]
+                for start_idx in start_indices:
+                    if (
+                        self.mask_token_id
+                        in temp_ids[start_idx : start_idx + noise_span_length]
+                    ):
+                        continue
+                    else:
+                        temp_ids = (
+                            temp_ids[:start_idx]
+                            + [self.mask_token_id]
+                            + temp_ids[start_idx + noise_span_length :]
+                        )
+                        # rotate start indices
+                        self.get_start_indices[max_idx] = np.roll(start_indices, 1)
+                        break
 
-            # write shuffled sentences into results
-            # Need to solve the problem of having to repeat the whole sentence, later.
-            index = 0
-            for j in ordering:
-                sentence = input_ids[
-                    i,
-                    (sentence_ends_map[i][j - 1] if j > 0 else 0) : sentence_ends_map[
-                        i
-                    ][j],
-                ]
-                results[i, index : index + sentence.shape[0]] = sentence
-                index += sentence.shape[0]
-        return results
+        input_ids = temp_ids
 
-    def text_infilling(self, input_ids, labels, do_permute):
-        """
-        Sampling text spans with span lengths drawn from a Poisson distribution and masking them.
-        """
+        return input_ids
 
-        # get spectial_token in special_tokens of tokenizer
-        f_get_special_tokens_mask = lambda x: self.tokenizer.get_special_tokens_mask(
-            x, already_has_special_tokens=True
-        )
-        special_tokens_mask_labels = np.apply_along_axis(
-            f_get_special_tokens_mask, 0, labels
-        ).astype(bool)
-        special_tokens_mask_inputs = np.apply_along_axis(
-            f_get_special_tokens_mask, 0, input_ids
-        ).astype(bool)
+    def _sentence_permutation(self, input_ids: List[int]) -> List[int]:
+        ref_tokens = self.tokenizer.convert_ids_to_tokens(input_ids)
 
-        # determine how many tokens we need to mask in total
-        # masking something that is not a PAD token and not a Special token.
-        is_token_mask = (
-            ~(input_ids == self.tokenizer.pad_token_id) & ~special_tokens_mask_inputs
-        )
-        num_tokens_to_mask = int(
-            math.ceil(is_token_mask.astype(float).sum() * self.mask_ratio)
-        )
-        if num_tokens_to_mask == 0:
-            return input_ids, labels
-
-        # generate a sufficient number of span lengths
-        span_lengths = np.random.poisson(
-            lam=self.poisson_lambda, size=(num_tokens_to_mask,)
-        )
-        while np.cumsum(span_lengths, 0)[-1] < num_tokens_to_mask:
-            span_lengths = np.concatenate(
-                [
-                    span_lengths,
-                    np.random.poisson(
-                        lam=self.poisson_lambda, size=(num_tokens_to_mask,)
-                    ),
-                ]
-            )
-
-        # remove all spans of length 0
-        # note that BART inserts additional mask tokens where length == 0,
-        # which we do not implement for now as it adds additional complexity
-        span_lengths = span_lengths[span_lengths > 0]
-
-        # trim to about num_tokens_to_mask tokens
-        # Found index of span_length to select token as much as num_tokens_to_mask
-        cutoff_idx = (
-            np.argmin(np.abs(np.cumsum(span_lengths, 0) - num_tokens_to_mask)) + 1
-        )
-        span_lengths = span_lengths[:cutoff_idx]
-
-        # randomly choose starting positions for masking
-        token_indices = np.argwhere(is_token_mask)
-        span_starts = np.random.permutation(token_indices.shape[0])[
-            : span_lengths.shape[0]
+        split_sentences = []
+        split_points = [
+            idx for idx, token in enumerate(ref_tokens) if token in (".", "Ġ.")
         ]
-        # prepare mask
-        masked_indices = token_indices[span_starts]
-        mask = np.full_like(input_ids, fill_value=False)
 
-        # masking process
-        # Put a True value in the index corresponding to the masked_indices,
-        # do -1 in span_length since one mask token is in it, and calculate remaining whether there is anything left to mask.
-        # The index of masked_indices is +1 to point to the next token.
-        # Repeat the above process to insert the mask token until the span_length is all 0 or less and the masked_indices are less than max_index.
+        if split_points:
+            prev_point = 0
+            for split_point in split_points:
+                split_point += 1
+                split_sentences.append(input_ids[prev_point:split_point])
+                prev_point = split_point
+            split_sentences.append(input_ids[prev_point:])
 
-        # mask starting positions
-        for mi in masked_indices:
-            mask[tuple(mi)] = True
-        span_lengths -= 1
-        # fill up spans
-        max_index = input_ids.shape[1] - 1
-        remaining = (span_lengths > 0) & (masked_indices[:, 1] < max_index)
-        while np.any(remaining):
-            # Need to modify only the mainnig part repeatedly without repeating all masked_indices, B.S
-            masked_indices[remaining, 1] += 1
-            for mi in masked_indices:
-                mask[tuple(mi)] = True
-            span_lengths -= 1
-            remaining = (span_lengths > 0) & (masked_indices[:, 1] < max_index)
+            random.shuffle(split_sentences)
 
-        # place the mask tokens
-        # If the mask corresponds to special_tokens_mask_inputs, enter False because you should not mask
-        mask[np.where(special_tokens_mask_inputs)] = False
-        input_ids[np.where(mask)] = self.tokenizer.mask_token_id
-        if not do_permute:  # why this code needs?
-            labels[np.where(mask == 0)] = -100
-        else:
-            labels[np.where(special_tokens_mask_labels)] = -100
+            input_ids = []
+            for split_sentence in split_sentences:
+                input_ids.extend(split_sentence)
 
-        # remove mask tokens that are not starts of spans
-        to_remove = (mask == 1) & np.roll((mask == 1), 1, 1)
-        new_input_ids = np.full_like(input_ids, fill_value=self.tokenizer.pad_token_id)
-        for i, example in enumerate(input_ids):
-            # remove all span_masked_tokens except for the first token
-            new_example = example[~to_remove[i]]
-            new_input_ids[i, : new_example.shape[0]] = new_example
+        return input_ids
 
-        return new_input_ids, labels
+    def _prepare_decoder_inputs_from_labels(self, batch):
+        # Shift input ids one token to the right
+        shifted_input_ids = batch["labels"].new_zeros(batch["labels"].shape)
+        shifted_input_ids[:, 1:] = batch["labels"][:, :-1].clone()
+        shifted_input_ids[:, 0] = self.decoder_start_token_id
+
+        shifted_input_ids.masked_fill_(
+            shifted_input_ids == self.label_pad_token_id,
+            self.pad_token_id,
+        )
+
+        batch["decoder_input_ids"] = shifted_input_ids
+        batch["decoder_attention_mask"] = torch.where(
+            shifted_input_ids == self.pad_token_id,
+            0,
+            torch.ones_like(shifted_input_ids),
+        )
+        return batch

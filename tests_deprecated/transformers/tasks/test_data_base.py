@@ -17,13 +17,19 @@ class TestDataBinarization:
         # Check batch after preprocessing and collection
         print("--------- batch check ---------\n")
         print(f"batch keys: {', '.join([key for key in batch.keys()])}\n")
+        for key, value in batch.items():
+            print(f"{key} size: {value.size()}")
+
         for idx in range(num_samples):
             for key, value in batch.items():
-                print(f"key = {key}\nsize: {value.shape}\nvalue:{value[idx]}\n")
+                print(f"{key}: \n{value[idx]}\n")
+
+            for key, value in batch.items():
                 if key == "input_ids":
-                    print(f"input_ids decode: {self.tokenizer.decode(value[idx])}\n")
-                elif key == "labels" and (-100 not in value[idx]):
-                    print(f"labels decode: {self.tokenizer.decode(value[idx])}\n")
+                    print(f"input_ids decode: \n{self.tokenizer.decode(value[idx])}\n")
+                elif key == "labels" and value.dim() != 1 and (-100 not in value[idx]):
+                    print(f"labels decode: \n{self.tokenizer.decode(value[idx])}\n")
+
             if check_token:
                 print(
                     f"tokens: \n{self.tokenizer.convert_ids_to_tokens(batch['input_ids'][idx])}\n"
@@ -38,7 +44,7 @@ class TestDataBinarization:
         must_be_equal_to_max_length: bool = False,
     ):
         for batch in tqdm(dataloader):
-            seq_length = batch[key].shape[1]
+            seq_length = batch[key].size(1)
             if must_be_equal_to_max_length:
                 if pad_to_multiple_of is None:
                     assert (

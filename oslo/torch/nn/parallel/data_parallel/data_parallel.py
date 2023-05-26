@@ -14,6 +14,7 @@ from oslo.torch.nn.parallel.utils import (
 )
 from oslo.torch.nn.parallel.data_parallel._reducer import Reducer
 from oslo.torch.nn.parallel.data_parallel._utils import (
+    free_storage,
     is_ddp_ignored,
     DistributedBackwardFunction,
 )
@@ -42,7 +43,7 @@ def DistributedDataParallel(
 
 
 class _DistributedDataParallel(OsloParallelWrapper):
-    """Distributed data parallel wrapper for OSLO.
+    """Distributed data parallel wrapper for Oslo.
     Example:
         >>> from oslo.torch.nn.parallel import DistributedDataParallel as DDP
         >>> model = torch.nn.Linear(20, 1)
@@ -120,11 +121,13 @@ class _DistributedDataParallel(OsloParallelWrapper):
         for p in self.module.parameters():
             if is_ddp_ignored(p):
                 continue
-            p.grad = p._saved_grad
+            if p.grad.device.type != "cpu":
+                p.grad = p._saved_grad
 
     def grad_handle(self, p, grad):
         if grad.device.type != "cpu":
             empty_grad = torch.empty_like(grad)
+            free_storage(empty_grad)
             if self.dp_world_size > 1:
                 grad = grad / self.dp_world_size
                 self.comm_stream.wait_stream(torch.cuda.current_stream())
@@ -141,7 +144,7 @@ class _DistributedDataParallel(OsloParallelWrapper):
             return empty_grad
 
         else:
-            # You must assign the model to CPU after invoking ``oslo.ready()``.
+            # You must model.to('cpu') after oslo.ready() to use cpu.
             dist.all_reduce(
                 grad, group=self.parallel_context.get_cpu_group(ParallelMode.DATA)
             )

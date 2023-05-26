@@ -20,10 +20,10 @@ class ProcessorForSequenceClassification(BaseProcessor):
     def __init__(
         self,
         tokenizer: PreTrainedTokenizerBase,
-        max_seq_length: int,
+        max_length: int,
         is_text_pair: bool = False,
     ) -> None:
-        super().__init__(tokenizer=tokenizer, max_seq_length=max_seq_length)
+        super().__init__(tokenizer=tokenizer, max_length=max_length)
         self.is_text_pair = is_text_pair
 
     def __call__(self, examples: Batch) -> Dict[str, List[int]]:
@@ -41,7 +41,7 @@ class ProcessorForSequenceClassification(BaseProcessor):
                 examples["text1"],
                 examples["text2"],
                 truncation=True,
-                max_length=self._max_seq_length,
+                max_length=self._max_length,
                 verbose=False,
             )
         else:
@@ -52,7 +52,7 @@ class ProcessorForSequenceClassification(BaseProcessor):
             dict_of_training_examples: Dict[str, List[int]] = self._tokenizer(
                 examples["text"],
                 truncation=True,
-                max_length=self._max_seq_length,
+                max_length=self._max_length,
                 verbose=False,
             )
 
