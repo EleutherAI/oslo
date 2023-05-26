@@ -129,6 +129,8 @@
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">TUTORIALS</span></p>
 <ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../TUTORIALS/data_parallelism.html">Data Parallelism Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../TUTORIALS/zero_redundancy_optimizer.html">Zero redundancy optimizer Tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../TUTORIALS/tensor_model_parallelism.html">Tensor Model Parallelism Tutorial</a></li>
 </ul>
 
@@ -302,7 +304,7 @@ document.write(`
 It is recommended to set <code class="docutils literal notranslate"><span class="pre">tp_depth</span></code> to more than 1, as the algorithm becomes identical to the 2D algorithm if <code class="docutils literal notranslate"><span class="pre">tp_depth</span></code> is 1.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># model = defined in section 2.2</span>
 
-<span class="kn">from</span> <span class="nn">oslo</span> <span class="kn">import</span> <span class="n">ParallelContext</span>
+<span class="kn">from</span> <span class="nn">oslo</span> <span class="kn">import</span> <span class="n">ParallelContext</span><span class="p">,</span> <span class="n">ParallelMode</span>
 <span class="kn">from</span> <span class="nn">oslo.torch.nn.parallel</span> <span class="kn">import</span> <span class="n">TensorParallel</span>
 
 <span class="n">tp_size</span> <span class="o">=</span> <span class="mi">8</span>

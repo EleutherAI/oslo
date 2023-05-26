@@ -41,6 +41,8 @@ Documents
    :maxdepth: 1
    :caption: TUTORIALS
 
+   TUTORIALS/data_parallelism
+   TUTORIALS/zero_redundancy_optimizer
    TUTORIALS/tensor_model_parallelism
 
 
