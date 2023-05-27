@@ -26,9 +26,6 @@ from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager import (
 from oslo.torch.nn.parallel.data_parallel.zero.memory_tracer.param_runtime_order import (
     OrderedParamGenerator,
 )
-from oslo.torch.distributed.tensor.distributed_tensor import (
-    ReplicaSpec,
-)
 from oslo.torch.nn.parallel.data_parallel.zero.utils import (
     get_current_device,
     get_temp_total_chunk_on_cuda,

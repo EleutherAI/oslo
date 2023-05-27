@@ -1,6 +1,4 @@
-from contextlib import contextmanager
 from enum import Enum
-from functools import partial
 from typing import List
 
 import torch
@@ -11,9 +9,6 @@ from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
 from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager import (
     HeterogeneousMemoryManager,
 )
-from oslo.torch.distributed.tensor.param_op_hook import (
-    DistributedParamOpHook,
-)
 from oslo.torch.nn.parallel.data_parallel._utils import is_ddp_ignored
 
 
@@ -22,7 +17,7 @@ class TrainingPhase(Enum):
     BACKWARD = 1
 
 
-class HeterogeneousZeROHook(DistributedParamOpHook):
+class HeterogeneousZeROHook:
     def __init__(self, heterogeneous_manager: HeterogeneousMemoryManager) -> None:
         super().__init__()
         self._heterogeneous_manager = heterogeneous_manager
@@ -69,19 +64,3 @@ class HeterogeneousZeROHook(DistributedParamOpHook):
             self._training_phase = TrainingPhase.BACKWARD
         else:
             self._training_phase = TrainingPhase.FORWARD
-
-    @contextmanager
-    def switch_training_phase(
-        self, training_phase: TrainingPhase = TrainingPhase.BACKWARD
-    ):
-        old_training_phase = self._training_phase
-        try:
-            self._training_phase = training_phase
-            yield
-        finally:
-            self._training_phase = old_training_phase
-
-    switch_to_backward = switch_training_phase
-    switch_to_forward = partial(
-        switch_to_backward, training_phase=TrainingPhase.FORWARD
-    )
