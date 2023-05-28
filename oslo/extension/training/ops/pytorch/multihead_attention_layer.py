@@ -107,11 +107,17 @@ class LSMultiheadAttentionLayer(nn.Module):
 
         self.config = copy.deepcopy(config)
         if isinstance(self.config, PretrainedConfig):
-            self.config.max_batch_tokens = 4096 # 일단 default batch size로 128로 설정
+            self.config.max_seq_len = self.config.max_position_embeddings
+            self.config.nhead = self.config.num_attention_heads
+            self.config.max_batch_tokens = 128 * self.config.max_position_embeddings # 일단 default batch size로 128로 설정
             self.config.activation_dropout_ratio = self.config.hidden_dropout_prob  # 이 둘이 같다고 가정
             self.config.attention_probs_dropout_prob = self.config.hidden_dropout_prob
+            self.config.attn_prob_dropout_ratio = self.config.hidden_dropout_prob
+            self.config.hidden_dropout_ratio = self.config.hidden_dropout_prob
+            self.config.activation_fn = self.config.hidden_act
             self.config.fp16 = False
             self.config.local_rank = 0
+            self.config.initializer_range = 0.01
             self.config.pre_or_postLayerNorm = False
             self.config.mask_future_tokens = False
             self.config.is_post_ln = False
@@ -197,14 +203,20 @@ class LSMultiheadAttentionLayer(nn.Module):
         class Config:
             max_batch_tokens: int  # max batch token numbers
             max_position_embeddings: int  # max sequence length
+            max_seq_len: int
             hidden_size: int  # size of transformer hidden layers
             num_attention_heads: int  # number of heads in attention
+            nhead: int
             intermediate_size: int # size of intermediate layer
             attention_probs_dropout_prob: float  # attention score dropout ratio
+            attn_prob_dropout_ratio: float
             activation_dropout_ratio: float # activation dropout ratio
             hidden_dropout_prob: float  # dropout ration before residual
+            hidden_dropout_ratio: float
             pre_or_postLayerNorm: bool  # pre layer norm or post
             hidden_act: str  # relu or gelu
+            activation_fn: str
+            initializer_range: float  # std for initializing weight
             mask_future_tokens: bool  # mask future tokens
             is_post_ln: bool  # post layer norm
             fp16: bool  # fp16 presion
@@ -329,7 +341,7 @@ class LSMultiheadAttentionLayer(nn.Module):
         global layer_cuda_module
         cuda_module = layer_cuda_module
         cuda_module.set_training_mode(True)
-        
+
         self.config.is_grad_enabled = torch.is_grad_enabled()
         self.config.quant_mode = self.quant_mode
 
@@ -371,4 +383,4 @@ class LSMultiheadAttentionLayer(nn.Module):
             self.config,
         )
 
-        return output.to(self.para)
+        return (output.to(self.para),)

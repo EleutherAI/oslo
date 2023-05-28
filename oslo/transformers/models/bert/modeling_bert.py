@@ -164,7 +164,7 @@ class BertEmbeddings(nn.Module):
 
 
 class BertSelfAttention(nn.Module):
-    def __init__(self, config, position_embedding_type=None, use_lightseq2=True):
+    def __init__(self, config, position_embedding_type=None):
         super().__init__()
         
         if config.hidden_size % config.num_attention_heads != 0 and not hasattr(
@@ -293,37 +293,37 @@ class BertSelfAttention(nn.Module):
                     + relative_position_scores_key
                 )
 
-            scale = 1 / math.sqrt(self.attention_head_size)
+        scale = 1 / math.sqrt(self.attention_head_size)
 
-            attention_scores = attention_scores * scale
-            if attention_mask is not None:
-                # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
-                attention_scores = attention_scores + attention_mask
+        attention_scores = attention_scores * scale
+        if attention_mask is not None:
+            # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
+            attention_scores = attention_scores + attention_mask
 
-            # Normalize the attention scores to probabilities.
-            attention_probs = nn.functional.softmax(attention_scores, dim=-1)
+        # Normalize the attention scores to probabilities.
+        attention_probs = nn.functional.softmax(attention_scores, dim=-1)
 
-            # This is actually dropping out entire tokens to attend to, which might
-            # seem a bit unusual, but is taken from the original Transformer paper.
-            attention_probs = self.dropout(attention_probs)
+        # This is actually dropping out entire tokens to attend to, which might
+        # seem a bit unusual, but is taken from the original Transformer paper.
+        attention_probs = self.dropout(attention_probs)
 
-            # Mask heads if we want to
-            if head_mask is not None:
-                attention_probs = attention_probs * head_mask
+        # Mask heads if we want to
+        if head_mask is not None:
+            attention_probs = attention_probs * head_mask
 
-            context_layer = torch.matmul(attention_probs, value_layer)
+        context_layer = torch.matmul(attention_probs, value_layer)
 
-            context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
-            new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
-            context_layer = context_layer.view(new_context_layer_shape)
+        context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
+        context_layer = context_layer.view(new_context_layer_shape)
 
-            outputs = (
-                (context_layer, attention_probs) if output_attentions else (context_layer,)
-            )
+        outputs = (
+            (context_layer, attention_probs) if output_attentions else (context_layer,)
+        )
 
-            if self.is_decoder:
-                outputs = outputs + (past_key_value,)
-            return outputs
+        if self.is_decoder:
+            outputs = outputs + (past_key_value,)
+        return outputs
 
 
 class BertSelfOutput(nn.Module):

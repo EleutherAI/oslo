@@ -9,7 +9,7 @@
 namespace cg = cooperative_groups;
 namespace lightseq {
 namespace cuda {
-const float LN_EPSILON = 1e-8f;
+const float LN_EPSILON = 1e-12f;
 #define TILE_DIM 32
 
 template <typename T>

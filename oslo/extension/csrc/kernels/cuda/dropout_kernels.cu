@@ -132,7 +132,7 @@ __global__ void curand_init_kernel(curandStatePhilox4_32_10_t *state,
   /* Each thread gets same seed, a different sequence
      number, no offset */
   int id = threadIdx.x + blockIdx.x * blockDim.x;
-  curand_init(seed, id, 0, &state[id]);
+  curand_init(seed, id, id % 4, &state[id]);
 }
 
 void launch_curand_init(int total_count, int dim, cudaStream_t stream) {
@@ -170,7 +170,7 @@ __global__ void ls_dropout_kernel(const int total_count, const float ratio,
   if (i * 4 >= total_count) return;
 
   curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
+  curand_init(seed, i, i % 4, &state);
   uint8_t m[4];
 
   float4 *out4 = reinterpret_cast<float4 *>(out);
@@ -206,7 +206,7 @@ __global__ void ls_dropout_kernel(const int total_count, const float ratio,
   if (i * 8 >= total_count) return;
 
   curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
+  curand_init(seed, i, i % 4, &state);
 
   const float4 *vals_float4 = reinterpret_cast<const float4 *>(in);
   float4 *outs_float4 = reinterpret_cast<float4 *>(out);
@@ -381,7 +381,7 @@ __global__ void ls_dropout_res_bias_kernel(
   if (i * 4 >= total_count) return;
 
   curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
+  curand_init(seed, i, i % 4, &state);
   uint8_t m[4];
 
   float4 *out4 = reinterpret_cast<float4 *>(out);
@@ -424,7 +424,7 @@ __global__ void ls_dropout_res_bias_kernel(
   if (i * 8 >= total_count) return;
 
   curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
+  curand_init(seed, i, i % 4, &state);
 
   const float4 *vals_float4 = reinterpret_cast<const float4 *>(in);
   float4 *outs_float4 = reinterpret_cast<float4 *>(out);
@@ -684,7 +684,7 @@ __global__ void ls_dropout_act_bias_kernel(
   if (i * 4 >= total_count) return;
 
   curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
+  curand_init(seed, i, i % 4, &state);
   uint8_t m[4];
 
   float4 *out4 = reinterpret_cast<float4 *>(out);
@@ -729,7 +729,7 @@ __global__ void ls_dropout_act_bias_kernel(
   if (i * 8 >= total_count) return;
 
   curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
+  curand_init(seed, i, i % 4, &state);
 
   const float4 *vals_float4 = reinterpret_cast<const float4 *>(in);
   float4 *outs_float4 = reinterpret_cast<float4 *>(out);
@@ -865,7 +865,7 @@ __global__ void ls_quant_dropout_act_bias_kernel(
   if (i * 4 >= total_count) return;
 
   curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
+  curand_init(seed, i, i % 4, &state);
   uint8_t m[4];
 
   float output_clip_max = cmax_out[0];
@@ -926,7 +926,7 @@ __global__ void ls_quant_dropout_act_bias_kernel(
   if (i * 8 >= total_count) return;
 
   curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
+  curand_init(seed, i, i % 4, &state);
 
   const int64_t *qin8 = reinterpret_cast<const int64_t *>(qin);
   int64_t *qout8 = reinterpret_cast<int64_t *>(qout);
@@ -1087,7 +1087,7 @@ __global__ void ls_fakequant_dropout_act_bias_kernel(
   if (i * 4 >= total_count) return;
 
   curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
+  curand_init(seed, i, i % 4, &state);
   uint8_t m[4];
 
   float output_clip_max = cmax_out[0];
@@ -1160,7 +1160,7 @@ __global__ void ls_fakequant_dropout_act_bias_kernel(
   if (i * 8 >= total_count) return;
 
   curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
+  curand_init(seed, i, i % 4, &state);
 
   const int64_t *qin8 = reinterpret_cast<const int64_t *>(qin);
   float4 *qout8 = reinterpret_cast<float4 *>(qout);
@@ -1816,7 +1816,7 @@ __global__ void ls_quant_dropout_res_bias_kernel(
   if (i * 4 >= total_count) return;
 
   curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
+  curand_init(seed, i, i % 4, &state);
   uint8_t m[4];
 
   float4 *out4 = reinterpret_cast<float4 *>(out);
@@ -1872,7 +1872,7 @@ __global__ void ls_quant_dropout_res_bias_kernel(
   if (i * 8 >= total_count) return;
 
   curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
+  curand_init(seed, i, i % 4, &state);
 
   const int64_t *qvals8_ptr = reinterpret_cast<const int64_t *>(qin);
   float4 *outs_float4 = reinterpret_cast<float4 *>(out);
