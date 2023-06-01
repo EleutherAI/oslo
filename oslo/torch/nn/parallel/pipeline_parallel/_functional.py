@@ -1,9 +1,11 @@
+import time
 from queue import Queue
 
 import torch
 from torch.cuda.amp import custom_fwd, custom_bwd
 from torch.distributed import rpc
 
+from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn.parallel.pipeline_parallel._buffers import (
     get_original_forward_function,
     save_activation,
@@ -22,6 +24,10 @@ from oslo.torch.nn.parallel.pipeline_parallel._comm import (
     enqueue_handshake_resp,
     enqueue_backward_job,
     notify_last_backward_done,
+    enqueue_local_backward_finished_notice,
+    enqueue_backward_done_notice,
+    enqueue_backward_start_notice,
+    enqueue_local_backward_start_notice,
     KEY_NAME, VALUE_NAME, META_NAME,
     COMM_INFO,
 )
@@ -150,14 +156,60 @@ def start_job(job):
                 new_act = []
                 new_grad = []
 
-                # infos["LOCK"].acquire()
+                # ensure communication sync
+                COMM_INFO.LOCK.acquire()
 
-                # wait for copy stream
-                # TODO; does rpc do sync?
-                torch.cuda.synchronize(
-                    torch.distributed.get_rank()
-                )
+                # TODO; do we need to wait for colleagues ?
+                parallel_context = COMM_INFO.PARALLEL_CONTEXT
+                if parallel_context.need_tensor_group_sync():
+                    cur_rank = torch.distributed.get_rank()
+                    # TODO; is min rank a master?
+                    master_rank = min(parallel_context.get_ranks_in_group(ParallelMode.TENSOR))
+                    sync_key = (unique_key[0], unique_key[1], master_rank)
 
+                    if parallel_context.is_first_rank(ParallelMode.TENSOR):
+                        ranks_done = set()
+                        ranks_done.add(cur_rank)
+                        tensor_group_size = parallel_context.tensor_parallel_size
+
+                        # wait for colleagues
+                        while True:
+                            if QUEUES.TENSOR_GROUP_SYNC_QUEUES[sync_key].empty():
+                                sleep()
+
+                            r = QUEUES.TENSOR_GROUP_SYNC_QUEUES[sync_key].get()
+
+                            ranks_done.add(r)
+
+                            if len(ranks_done) == tensor_group_size:
+                                break
+
+                        # send okay to go signal
+                        for dst_rank in parallel_context.get_ranks_in_group(ParallelMode.TENSOR):
+                            if dst_rank == cur_rank:
+                                continue
+
+                            rpc.rpc_sync(
+                                to=f"RPC_WORKER_{dst_rank}",
+                                func=enqueue_backward_start_notice,
+                                args=(sync_key,),
+                            )
+
+                    else:
+                        # notice to master
+                        rpc.rpc_sync(
+                            to=f"RPC_WORKER_{master_rank}",
+                            func=enqueue_local_backward_start_notice,
+                            args=(sync_key, cur_rank, ),
+                        )
+
+                        # wait for okay to go signal
+                        while QUEUES.TENSOR_GROUP_NOTIFICATION_QUEUES[sync_key].empty():
+                            sleep()
+
+                        _ = QUEUES.TENSOR_GROUP_NOTIFICATION_QUEUES[sync_key].get()
+
+                # actual backward
                 for act, grad in zip(activation, grad_outputs):
                     if act is not None and grad is not None and act.requires_grad:
                         new_act.append(act)
@@ -172,16 +224,70 @@ def start_job(job):
                 while not s.query():
                     sleep()
 
+                parallel_context = COMM_INFO.PARALLEL_CONTEXT
+                if parallel_context.need_tensor_group_sync():
+                    cur_rank = torch.distributed.get_rank()
+                    # TODO; is min rank a master?
+                    master_rank = min(parallel_context.get_ranks_in_group(ParallelMode.TENSOR))
+                    sync_key = (unique_key[0], unique_key[1], master_rank)
+
+                    if parallel_context.is_first_rank(ParallelMode.TENSOR):
+                        ranks_done = set()
+                        ranks_done.add(cur_rank)
+                        tensor_group_size = parallel_context.tensor_parallel_size
+
+                        # wait for colleagues
+                        while True:
+                            if QUEUES.TENSOR_GROUP_SYNC_QUEUES[sync_key].empty():
+                                sleep()
+
+                            r = QUEUES.TENSOR_GROUP_SYNC_QUEUES[sync_key].get()
+
+                            ranks_done.add(r)
+
+                            if len(ranks_done) == tensor_group_size:
+                                break
+
+                        # send okay to go signal
+                        for dst_rank in parallel_context.get_ranks_in_group(ParallelMode.TENSOR):
+                            if dst_rank == cur_rank:
+                                continue
+
+                            rpc.rpc_sync(
+                                to=f"RPC_WORKER_{dst_rank}",
+                                func=enqueue_backward_done_notice,
+                                args=(sync_key, ),
+                            )
+
+                        del QUEUES.TENSOR_GROUP_SYNC_QUEUES[sync_key]
+                        del QUEUES.TENSOR_GROUP_NOTIFICATION_QUEUES[sync_key]
+
+                    else:
+                        # notice to master
+                        rpc.rpc_sync(
+                            to=f"RPC_WORKER_{master_rank}",
+                            func=enqueue_local_backward_finished_notice,
+                            args=(sync_key, cur_rank, ),
+                        )
+
+                        # wait for okay to go signal
+                        while QUEUES.TENSOR_GROUP_NOTIFICATION_QUEUES[sync_key].empty():
+                            sleep()
+
+                        _ = QUEUES.TENSOR_GROUP_NOTIFICATION_QUEUES[sync_key].get()
+                        del QUEUES.TENSOR_GROUP_NOTIFICATION_QUEUES[sync_key]
+
                 _BACKWARD_KEYS.remove(unique_key)
 
                 del activation, new_act, new_grad
-                # TODO; empty cache properly
+                # TODO; empty cache properly.
+                #  not for every backward pass
                 torch.cuda.empty_cache()
 
                 if len(_BACKWARD_KEYS) == 0:
                     notify_last_backward_done()
 
-                # infos["LOCK"].release()
+                COMM_INFO.LOCK.release()
 
         # data receive
         else:
@@ -218,13 +324,8 @@ def start_job(job):
         q = Queue()
         QUEUES.RECV_QUEUES[job.recv_key] = q
 
-        parallel_context = COMM_INFO.PARALLEL_CONTEXT
-        global_dst_rank = parallel_context.pp_rank_to_global_rank_for_rpc(
-            pp_rank=src,
-        )
-
         rpc.rpc_sync(
-            to=f"RPC_WORKER_{global_dst_rank}",
+            to=f"RPC_WORKER_{src}",
             func=enqueue_handshake_resp,
             args=(src, dst, job.unique_key),  # reverse
         )

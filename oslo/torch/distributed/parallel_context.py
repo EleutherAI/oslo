@@ -892,6 +892,9 @@ class ParallelContext(object):
                 rpc_backend_options=options,
             )
 
+    def need_tensor_group_sync(self):
+        return self.tensor_parallel_size > 1
+
     # TODO; SP and MoE?
     def local_ranks_to_global_rank(self, *, dp_rank, pp_rank, tp_rank):
         return (
@@ -904,14 +907,14 @@ class ParallelContext(object):
         # need to get global rank of dst device for rpc.
         # assumes that all ranks except `parallel_mode`
         # are same between src device and dst device
-        ranks = self.get_local_ranks()
-        dp_rank = ranks[ParallelMode.DATA]
-        tp_rank = ranks[ParallelMode.TENSOR]
-        return self.local_ranks_to_global_rank(
+        dp_rank = self.get_local_rank(ParallelMode.DATA)
+        tp_rank = self.get_local_rank(ParallelMode.TENSOR)
+        result = self.local_ranks_to_global_rank(
             dp_rank=dp_rank,
             pp_rank=pp_rank,
             tp_rank=tp_rank,
         )
+        return result
 
     def make_ranks_to_devices(self):
         rank_tensor = torch.zeros(len(self._local_ranks), dtype=torch.long).cuda()

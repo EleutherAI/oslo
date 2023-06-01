@@ -1,4 +1,5 @@
 import copy
+import time
 from queue import Queue
 
 import torch
@@ -126,6 +127,7 @@ class _PipelineParallel(OsloParallelWrapper):
 
         self._recursive_wrap(self, "")
 
+        self.global_rank = self.parallel_context.get_local_rank(ParallelMode.GLOBAL)
         self.pipe_rank = self.parallel_context.get_local_rank(ParallelMode.PIPELINE)
         self.tensor_rank = self.parallel_context.get_local_rank(ParallelMode.TENSOR)
 
@@ -208,6 +210,7 @@ class _PipelineParallel(OsloParallelWrapper):
         # TODO; seems like this is not necessary?
         torch.cuda.empty_cache()
 
+        # micro-batch forward
         if self.parallel_context.is_first_rank(ParallelMode.PIPELINE):
             new_kwargs = [dict() for _ in range(self.num_micro_batches)]
             for k, v in kwargs.items():
@@ -227,7 +230,7 @@ class _PipelineParallel(OsloParallelWrapper):
             # enqueue jobs
             is_grad_enabled = torch.is_grad_enabled()
 
-            num_concurrent = 16
+            num_concurrent = 16     # TODO; make as an argument
 
             for ind, kwargs_ in enumerate(new_kwargs[:num_concurrent]):
                 initialize_job(
@@ -252,11 +255,16 @@ class _PipelineParallel(OsloParallelWrapper):
                 ):
                     result.loss = result.loss / self.num_micro_batches
 
+                torch.cuda.synchronize()
+
                 yield ind, result   # TODO;
 
-                # TODO; how to find dst_rank?
-                # TODO; do this like tree
-                for dst_rank in range(1, self.parallel_context.get_world_size(ParallelMode.GLOBAL)):
+                # pass result to PIPELINE groups
+                colleague = self.parallel_context.get_ranks_in_group(ParallelMode.PIPELINE)
+                for dst_rank in colleague:
+                    if dst_rank == self.global_rank:
+                        continue
+
                     rpc.rpc_sync(
                         to=f"RPC_WORKER_{dst_rank}",
                         func=enqueue_result,
@@ -275,6 +283,19 @@ class _PipelineParallel(OsloParallelWrapper):
                         **kwargs_,
                     )
 
+        # not a master of PIPELINE group
+        else:
+            for _ in range(self.num_micro_batches):
+                while self.out_queue.empty():
+                    sleep()
+
+                ind, result = self.out_queue.get()
+
+                yield ind, result
+        # end forward
+
+        # forward finish sync
+        if self.parallel_context.is_first_rank(ParallelMode.GLOBAL):
             # barrier for last backward
             while self.last_backward_notice.empty():
                 sleep()
@@ -282,7 +303,7 @@ class _PipelineParallel(OsloParallelWrapper):
             _ = self.last_backward_notice.get()
 
             ranks_done = set()
-            ranks_done.add(0)
+            ranks_done.add(0)   # TODO; is 0 always a master of GLOBAL group?
 
             while True:
                 while self.batch_finished_notice.empty():
@@ -303,15 +324,8 @@ class _PipelineParallel(OsloParallelWrapper):
                     func=enqueue_forward_finished_notice,
                 )
 
+        # not a master of GLOBAL group
         else:
-            for _ in range(self.num_micro_batches):
-                while self.out_queue.empty():
-                    sleep()
-
-                ind, result = self.out_queue.get()
-
-                yield ind, result
-
             # barrier for last backward
             while self.last_backward_notice.empty():
                 sleep()
@@ -319,8 +333,8 @@ class _PipelineParallel(OsloParallelWrapper):
             _ = self.last_backward_notice.get()
 
             # notice to master
-            src_rank = torch.distributed.get_rank()
-            dst_rank = 0
+            src_rank = self.global_rank
+            dst_rank = 0    # TODO; is 0 always a master of GLOBAL group?
             rpc.rpc_sync(
                 to=f"RPC_WORKER_{dst_rank}",
                 func=enqueue_batch_finished_notice,
@@ -332,6 +346,7 @@ class _PipelineParallel(OsloParallelWrapper):
                 sleep()
 
             _ = self.forward_finished_notice.get()
+        # end sync
 
     def _recursive_replace_act(self, module):
         for name, m in module.named_children():
@@ -367,13 +382,13 @@ class _PipelineParallel(OsloParallelWrapper):
             is_same = module_device == current_device
 
             if is_same:
-                # protect from communication overlap
-                # infos["LOCK"].acquire()
+                # ensure communication sync
+                COMM_INFO.LOCK.acquire()
 
                 forward_fn = get_original_forward_function(location)
                 result = forward_fn(*args, **kwargs)
 
-                # infos["LOCK"].release()
+                COMM_INFO.LOCK.release()
 
             else:
 
@@ -386,7 +401,7 @@ class _PipelineParallel(OsloParallelWrapper):
                 is_training = self.training
                 need_activation_save = any([t.requires_grad for t in tensors])
 
-                # infos["LOCK"].acquire()
+                COMM_INFO.LOCK.acquire()
 
                 unique_key = make_unique_key(location, current_device.index, module_device.index)
 
@@ -398,7 +413,7 @@ class _PipelineParallel(OsloParallelWrapper):
 
                 remote_request(
                     src=current_device.index,
-                    dst=module_device.index,
+                    dst=module_device.index,    # global rank
                     unique_key=unique_key,
                     queue=queue_recv,
                     args_stub=args_stub,
@@ -411,7 +426,7 @@ class _PipelineParallel(OsloParallelWrapper):
                     tensors=tensors,
                 )
 
-                # infos["LOCK"].release()
+                COMM_INFO.LOCK.release()
 
                 # wait for return
                 while queue_recv.empty():

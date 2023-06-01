@@ -4,8 +4,7 @@ from queue import Queue
 import torch
 from torch.distributed import rpc
 
-from oslo.torch.distributed import ParallelMode
-
+from oslo.torch.distributed.parallel_mode import ParallelMode
 from ._types import CommunicationInformation
 from ._sync import sleep, register_job, NOTIFICATIONS, QUEUES
 from ._job import Job, Backward, HandshakeRequest, HandshakeResponse, Metadata
@@ -38,6 +37,22 @@ def enqueue_forward_finished_notice():
     NOTIFICATIONS.FORWARD_FINISHED_NOTICE.put("FINISHED")
 
 
+def enqueue_local_backward_start_notice(key, rank):
+    QUEUES.TENSOR_GROUP_SYNC_QUEUES[key].put(rank)
+
+
+def enqueue_local_backward_finished_notice(key, rank):
+    QUEUES.TENSOR_GROUP_SYNC_QUEUES[key].put(rank)
+
+
+def enqueue_backward_start_notice(key):
+    QUEUES.TENSOR_GROUP_NOTIFICATION_QUEUES[key].put("START")
+
+
+def enqueue_backward_done_notice(key):
+    QUEUES.TENSOR_GROUP_NOTIFICATION_QUEUES[key].put("FINISHED")
+
+
 def enqueue_result(ind, data):
     NOTIFICATIONS.OUTPUT.put(
         (ind, data)
@@ -51,6 +66,21 @@ def enqueue_backward_job(meta, unique_key, *grad_outputs):
         stub=None,
         meta=meta,
     )
+
+    parallel_context = COMM_INFO.PARALLEL_CONTEXT
+
+    if parallel_context.need_tensor_group_sync():
+        master_rank = min(parallel_context.get_ranks_in_group(ParallelMode.TENSOR))
+        # remove src and dst from key, because
+        #   those are rank local
+        sync_key = (unique_key[0], unique_key[1], master_rank)
+
+        # a queue for sync done notification
+        QUEUES.TENSOR_GROUP_NOTIFICATION_QUEUES[sync_key] = Queue()
+
+        # add a queue for synchronization
+        if parallel_context.is_first_rank(ParallelMode.TENSOR):
+            QUEUES.TENSOR_GROUP_SYNC_QUEUES[sync_key] = Queue()
 
     register_job(job)
 
@@ -105,18 +135,13 @@ def send_data(
     src_rank: int,
     dst_rank: int,
 ):
-    parallel_context = COMM_INFO.PARALLEL_CONTEXT
-    global_dst_rank = parallel_context.pp_rank_to_global_rank_for_rpc(
-        pp_rank=dst_rank,
-    )
-
     recv_key = data[KEY_NAME]
     q = Queue()
     QUEUES.HANDSHAKE_QUEUES[recv_key] = q
 
     rpc.rpc_sync(
         # TODO; make a rpc worker name getter
-        to=f"RPC_WORKER_{global_dst_rank}",
+        to=f"RPC_WORKER_{dst_rank}",
         func=enqueue_handshake_req,
         args=(src_rank, dst_rank, recv_key),
     )
@@ -126,6 +151,7 @@ def send_data(
 
     r = q.get()
 
+    # TODO; okay?
     torch.cuda.set_device(
         torch.distributed.get_rank()
     )

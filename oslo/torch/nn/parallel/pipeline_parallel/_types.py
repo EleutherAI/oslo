@@ -1,3 +1,4 @@
+from threading import RLock
 from dataclasses import dataclass
 from typing import Any
 
@@ -47,6 +48,10 @@ class SyncQueues:
     HANDSHAKE_QUEUES = dict()
     RESPONSE_QUEUES = dict()
 
+    # queues for synchronize tensor group
+    TENSOR_GROUP_SYNC_QUEUES = dict()
+    TENSOR_GROUP_NOTIFICATION_QUEUES = dict()
+
     # TODO; proper location?
     JOBS = set()
 
@@ -55,6 +60,7 @@ class SyncQueues:
 @dataclass
 class CommunicationInformation:
     PARALLEL_CONTEXT: Any = None
+    LOCK: Any = None
 
     # initialization flag
     _initialized = False
@@ -67,5 +73,6 @@ class CommunicationInformation:
             return
 
         self.PARALLEL_CONTEXT = parallel_context
+        self.LOCK = RLock()
 
         self._initialized = True

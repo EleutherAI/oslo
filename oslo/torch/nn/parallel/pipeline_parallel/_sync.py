@@ -6,6 +6,8 @@ from oslo.torch.nn.parallel.pipeline_parallel._types import (
     SyncQueues,
 )
 
+import torch
+
 
 QUEUES = SyncQueues()
 
