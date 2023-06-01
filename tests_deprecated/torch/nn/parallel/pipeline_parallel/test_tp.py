@@ -214,6 +214,7 @@ if torch.distributed.get_rank() == 1:
         print(f"{k}: {v}")
 
 
+target_step = 50
 # save_dir = None
 save_dir = "tmp_tp"
 if save_dir is not None:
@@ -243,7 +244,7 @@ if save_dir is not None:
 
 
 def run():
-    batch_size = 1 * num_micro_batches
+    batch_size = 8 * num_micro_batches
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.pad_token = tokenizer.eos_token
 
@@ -274,12 +275,10 @@ def run():
             out_tp = wrapper(**inputs, labels=inputs["input_ids"])
             loss_tp = out_tp.loss
             loss_tp.backward()
-            tp_losses.append(loss_tp.item())
 
             out_no_tp = model_no_tp(**inputs, labels=inputs["input_ids"])
             loss_no_tp = out_no_tp.loss
             loss_no_tp.backward()
-            no_tp_losses.append(loss_no_tp.item())
 
             if dist.get_rank() == 0:
                 print(f"{dist.get_rank()}, {loss_tp}, {loss_no_tp}")
@@ -288,7 +287,7 @@ def run():
 
             # TODO; split optimizer_pp? barrier?
 
-            if save_dir is not None and step_count == 0:
+            if save_dir is not None and step_count == target_step:
                 for name, param in wrapper.named_parameters():
                     if param.grad is not None:
                         torch.save(param.grad, f"{save_dir}/grad_{name}_tp_{torch.distributed.get_rank()}.pkl")

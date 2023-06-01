@@ -231,6 +231,7 @@ if torch.distributed.get_rank() == 1:
         print(f"{k}: {v}")
 
 
+target_step = 50
 # save_dir = None
 save_dir = "tmp3"
 if save_dir is not None:
@@ -260,7 +261,7 @@ if save_dir is not None:
 
 
 def run():
-    batch_size = 1 * num_micro_batches
+    batch_size = 8 * num_micro_batches
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.pad_token = tokenizer.eos_token
 
@@ -362,7 +363,7 @@ def run():
 
             # TODO; split optimizer_pp? barrier?
 
-            if save_dir is not None and step_count == 0:
+            if save_dir is not None and step_count == target_step:
                 for name, param in wrapper_pp.named_parameters():
                     if param.grad is not None:
                         torch.save(param.grad, f"{save_dir}/grad_{name}_pp_tp_{torch.distributed.get_rank()}.pkl")
