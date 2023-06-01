@@ -38,6 +38,10 @@ def enqueue_forward_finished_notice():
 
 
 def enqueue_local_backward_start_notice(key, rank):
+    # wait for master to reach this backward job
+    while key not in QUEUES.TENSOR_GROUP_SYNC_QUEUES:
+        sleep()
+
     QUEUES.TENSOR_GROUP_SYNC_QUEUES[key].put(rank)
 
 
