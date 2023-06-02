@@ -199,7 +199,9 @@ def from_parallelized(self, path):
     """
     Example:
     >>> model = AnyModel()
-    >>> model = TensorParallel(model, ...)
+    >>> parallel_context = ParallelContext.from_torch(...)
+    >>> model = TensorParallel(model, parallel_context
+    >>> oslo.ready(model_oslo, parallel_context)
     >>> model.from_parallelized(path)
     """
     PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0_ep_0.bin"
