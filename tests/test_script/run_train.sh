@@ -1,4 +1,5 @@
-# EXAMPLE:`sh ./tests/test_script/run_train.sh aloxatel/bert-base-mnli sequence-classification 2 128 128 100 2 1 1 2 1 4 1D`
+# EXAMPLE BERT:`sh ./tests/test_script/run_train.sh aloxatel/bert-base-mnli sequence-classification 2 128 128 100 2 1 1 2 1 4 1D`
+# EXAMPLE GPT:`sh ./tests/test_script/run_train.sh gpt2 causal-lm 2 64 64 200 2 1 1 2 1 4 1D`
 # Check tensorboard: `tensorboard --logdir tests/ckpt/tensorboard`
 
 # task specific model

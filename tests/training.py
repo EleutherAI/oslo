@@ -17,12 +17,9 @@ from transformers import AutoTokenizer
 from tqdm import tqdm
 from tests.tasks.model_task import ModelTask
 from oslo import ParallelContext, ParallelMode
-from oslo.torch.nn.parallel import (
-    TensorParallel,
-    PipelineParallel,
-    DistributedDataParallel,
-)
-from oslo.torch.nn.parallel import DistributedDataParallel
+from oslo.torch.nn.parallel import TensorParallel, PipelineParallel
+from oslo.torch.nn.parallel.data_parallel import DistributedDataParallel as DDP
+
 
 from tests.util.arg_parser import get_args
 
@@ -44,32 +41,23 @@ tensor_parallel_mode_map = {
 }
 
 
-def set_cpu_maximum_parallelism():
-    """Maximize parallelism"""
-    conf_str = torch.__config__.parallel_info()
-    inter_str = conf_str.split("hardware_concurrency() : ")[1]
-    max_concurrency = inter_str.split("\n")[0]
-    os.environ["OMP_NUM_THREADS"] = max_concurrency
-    print(f"environmental variable OMP_NUM_THREADS is set to {max_concurrency}.")
-
-
 def torch_ddp_dataloader(dataset, batch_size, parallel_context, args):
     """DDP func"""
     num_workers = 1
-    batch_sampler = DistributedSampler(
-        dataset,
-        num_replicas=parallel_context.get_world_size(
-            tensor_parallel_mode_map[args.tensor_parallel_mode]
-        ),
-        rank=parallel_context.get_local_rank(
-            tensor_parallel_mode_map[args.tensor_parallel_mode]
-        ),
-        shuffle=False,
-        drop_last=True,
-    )
+    if args.tensor_parallel_size > 1:
+        rank_group = tensor_parallel_mode_map[args.tensor_parallel_mode]
+    else:
+        rank_group = ParallelMode.DATA
+
+    num_replicas = parallel_context.get_world_size(rank_group)
+
+    rank = parallel_context.get_local_rank(rank_group)
+
+    batch_sampler = DistributedSampler(dataset, num_replicas=num_replicas, rank=rank)
+
     d_loader = torch.utils.data.DataLoader(
         dataset=dataset,
-        batch_size=batch_size,
+        batch_size=batch_size // num_replicas,
         pin_memory=True,
         shuffle=False,
         num_workers=num_workers,
@@ -78,24 +66,9 @@ def torch_ddp_dataloader(dataset, batch_size, parallel_context, args):
     return d_loader
 
 
-def train_step(is_oslo, model, optimizer, inputs, step, summary_writer):
-    """Forward-Backward-Step"""
-    loss = model(**inputs).loss
-    loss.backward()
-    optimizer.step()
-
-    if not dist.is_initialized() or dist.get_rank() == 0:
-        model_name = "oslo" if is_oslo else "no_oslo"
-        summary_events = [(f"test/{model_name}", loss.item(), step)]
-        write_summary_events(summary_writer, summary_events)
-        summary_writer.flush()
-        wandb.log({model_name: loss}, step=step)
-
-
 def main():
 
     args = get_args()
-    set_cpu_maximum_parallelism()
     name = (
         f"{args.model}-{args.task}-"
         f"bsz={args.batch_size}-"
@@ -103,8 +76,8 @@ def main():
     )
 
     # 1. set tokenizer
-    args.tokenizer = args.tokenizer if args.tokenizer else args.model
-    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
+
+    tokenizer = AutoTokenizer.from_pretrained(args.model)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -119,24 +92,25 @@ def main():
     # 3. Create parallelized model and optimizer
     model_tasks = ModelTask()
     model_tasks_config = model_tasks.get_model_task(args.task)
-    model_oslo = model_tasks_config["class"](args.model)
 
-    model_no_oslo = model_tasks_config["class"](args.model).to(args.local_rank)
-    model_no_oslo.train()
+    model_oslo = model_tasks_config["class"](args.model)
+    optimizer_oslo = AdamW(model_oslo.parameters(), lr=3e-5)
+
+    model_no_oslo = model_tasks_config["class"](args.model)
+    optimizer_no_oslo = AdamW(model_no_oslo.parameters(), lr=3e-5)
 
     parallel_context = ParallelContext.from_torch(
         data_parallel_size=args.data_parallel_size,
         pipeline_parallel_size=args.pipeline_parallel_size,
         tensor_parallel_size=args.tensor_parallel_size,
         tensor_parallel_mode=tensor_parallel_mode_map[args.tensor_parallel_mode],
-        tensor_parallel_depth=args.tensor_parallel_depth,
     )
 
     if args.tensor_parallel_size > 1:
         model_oslo = TensorParallel(model_oslo, parallel_context)
 
     if args.data_parallel_size > 1:
-        model_oslo = DistributedDataParallel(model_oslo, parallel_context)
+        model_oslo = DDP(model_oslo, parallel_context)
 
     assert (
         args.tensor_parallel_size > 1 or args.data_parallel_size > 1
@@ -144,8 +118,12 @@ def main():
 
     oslo.ready(model_oslo, parallel_context)
 
-    optimizer_oslo = AdamW(params=model_oslo.parameters(), lr=3e-5)
-    optimizer_no_oslo = AdamW(params=model_no_oslo.parameters(), lr=3e-5)
+    if args.tensor_parallel_size == 1 and args.data_parallel_size > 1:
+        torch.cuda.set_device(dist.get_rank())
+        model_no_oslo = model_no_oslo.cuda(dist.get_rank())
+        model_no_oslo = torch.nn.parallel.DistributedDataParallel(
+            model_no_oslo, device_ids=[dist.get_rank()], find_unused_parameters=False
+        )
 
     # 4. Initialize wandb and create folders
     if not dist.is_initialized() or dist.get_rank() == 0:
@@ -156,9 +134,9 @@ def main():
     dist.barrier()
 
     # 5. Load dataset and do preprocessing
-    dataset = model_tasks_config["load_dataset"].select(range(args.train_step))
+    dataset = model_tasks_config["load_dataset"]
     torch_dataset = model_tasks_config["preprocessing_map_func"](
-        dataset, tokenizer, args.sequence_length
+        dataset, tokenizer, args
     )
 
     if args.data_parallel_size > 1:
@@ -172,6 +150,10 @@ def main():
 
     # 6. Train model
     step = 0
+    model_no_oslo.cuda()
+    model_no_oslo.train()
+    model_oslo.train()
+
     for ep in range(args.epoch):
         save_model_dir = f"tests/ckpt/checkpoint_{str(ep)}"
 
@@ -181,24 +163,33 @@ def main():
         for _, sample in enumerate(tqdm(oslo_model_dataloader)):
             optimizer_oslo.zero_grad()
             optimizer_no_oslo.zero_grad()
-            inputs = {k: v.cuda() for k, v in sample.items()}
+            inputs = {k: v.cuda() for k, v in sample.items() if k != "guid"}
 
             # 7. Run no oslo model
             oslo_loss = model_oslo(**inputs).loss
-            oslo_loss.backward()
-            optimizer_oslo.step()
 
             # 8. Run no oslo model
             no_oslo_loss = model_no_oslo(**inputs).loss
-            no_oslo_loss.backward()
-            optimizer_no_oslo.step()
 
             if dist.get_rank() == 0:
-                print(f"[tp/no_tp loss]: {oslo_loss:.4f}, {no_oslo_loss:.4f}")
-                wandb.log(
-                    {"oslo_loss": oslo_loss, "no_oslo_loss": no_oslo_loss, "time": step}
+                print(
+                    f"[tp/no_tp loss]: {oslo_loss.item():.4f} / {no_oslo_loss.item():.4f}"
                 )
+                wandb.log(
+                    {
+                        "oslo_loss": f"{oslo_loss.item():.4f}",
+                        "no_oslo_loss": f"{no_oslo_loss.item():.4f}",
+                        "time": step,
+                    }
+                )
+
             step += 1
+
+            oslo_loss.backward()
+            optimizer_oslo.step()
+
+            no_oslo_loss.backward()
+            optimizer_no_oslo.step()
 
         dist.barrier()
         # 9. Save oslo model

@@ -84,7 +84,9 @@ output_before = forward_fn(**tokenizer(input, return_tensors="pt"))
 
 # 5. Parallelize the model
 model_oslo, parallel_context = initialize_oslo(args, model)
-forward_fn = model_oslo.forward if generation_task else partial(model_oslo.generate, num_beams=3)
+forward_fn = (
+    model_oslo.forward if generation_task else partial(model_oslo.generate, num_beams=3)
+)
 
 # 6. Get result after parallelization
 output_after = forward_fn(**tokenizer(input, return_tensors="pt").to("cuda"))

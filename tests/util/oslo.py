@@ -2,6 +2,7 @@ import oslo
 from oslo.torch.distributed.parallel_context import ParallelContext, ParallelMode
 from oslo.torch.nn.parallel import TensorParallel, PipelineParallel
 
+
 def initialize_oslo(args, model):
     try:
         pc = ParallelContext.from_torch(

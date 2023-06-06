@@ -409,4 +409,4 @@ tests/cache
 tests/ckpt
 tests/dataset_download.ipynb
 tests/test_script/run_train_test.sh
-wandb
+tests/test_script/run_train_test_gpt.sh
