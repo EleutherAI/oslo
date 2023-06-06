@@ -10,10 +10,7 @@ from transformers.utils import logging
 
 from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.distributed.parallel_mode import ParallelMode
-from oslo.torch.nn.parallel.data_parallel._utils import (
-    free_storage,
-    is_ddp_ignored,
-)
+from oslo.torch.nn.parallel.data_parallel._utils import is_ddp_ignored
 from oslo.torch.nn.parallel.data_parallel.data_parallel import _DistributedDataParallel
 from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
     Chunk,
@@ -219,7 +216,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
     def grad_handle(self, p, grad):
         self.param_op_hook.post_backward([p])
         empty_grad = torch.empty_like(grad)
-        free_storage(empty_grad)
+
         chunk = self.chunk_manager.get_chunk(p)
         if chunk.tensors_info[p].state != TensorState.HOLD_AFTER_BWD:
             raise RuntimeError(

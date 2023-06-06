@@ -4,15 +4,6 @@ import torch
 from torch.autograd import Variable
 
 
-def free_storage(data: torch.Tensor) -> None:
-    """Free underlying storage of a Tensor."""
-    if data.storage().size() > 0:
-        # Since we're modifying the Tensor's Storage directly, make sure the Tensor
-        # is the sole occupant of the Storage.
-        assert data.storage_offset() == 0
-        data.storage().resize_(0)
-
-
 def is_ddp_ignored(p):
     return getattr(p, "_ddp_to_ignore", False)
 
