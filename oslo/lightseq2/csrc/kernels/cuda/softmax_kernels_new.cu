@@ -341,7 +341,9 @@ void launch_attn_softmax_bw_new(T *inp_grad, const T *out_grad,
                                 cudaStream_t stream) {
   const int warps_per_block = 4;
   // rows = batch_size * nhead * from_len
-  dim3 grid_dim(rows / warps_per_block);
+  int ngrid = rows / warps_per_block;
+  if (ngrid == 0) ngrid = 1;
+  dim3 grid_dim(ngrid);
   dim3 block_dim(WARP_SIZE, warps_per_block);
 
   if (softmax_len <= 32)

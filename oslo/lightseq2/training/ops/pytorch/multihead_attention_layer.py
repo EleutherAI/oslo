@@ -143,6 +143,8 @@ class LSMultiheadAttentionLayer(nn.Module):
             else cuda_module.create_multihead_attention_layer_new_fp32
         )
 
+        cuda_module.set_training_mode(True)
+
         # int layer_id, int max_batch_tokens, int max_position_embeddings, int hidden_size,
         # int num_heads, int intermediate_size, float attention_probs_dropout_prob,
         # float activation_dropout_ratio, float hidden_dropout_prob,
@@ -370,11 +372,9 @@ class LSMultiheadAttentionLayer(nn.Module):
         if len(encoder_padding_mask.size()) == 1:
             assert bs == 1 and sl == encoder_padding_mask.size(0)
         else:
-            encoder_padding_mask = encoder_padding_mask.squeeze()
-
             assert bs == encoder_padding_mask.size(
                 0
-            ) and sl == encoder_padding_mask.size(1)
+            ) and sl == encoder_padding_mask.size()[-1]
         encoder_padding_mask = torch.nan_to_num(encoder_padding_mask)
         output = LSMultiheadAttentionFunc.apply(
             hidden_states,
