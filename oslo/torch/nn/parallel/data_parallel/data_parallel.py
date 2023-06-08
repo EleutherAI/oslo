@@ -3,7 +3,6 @@ from functools import partial
 
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 import torch.distributed as dist
 
 from oslo.torch.distributed.parallel_context import ParallelContext
@@ -14,22 +13,10 @@ from oslo.torch.nn.parallel.utils import (
     OsloParallelWrapper,
 )
 from oslo.torch.nn.parallel.data_parallel._reducer import Reducer
-from oslo.torch.nn.parallel.data_parallel._utils import is_ddp_ignored
-
-
-class _DistributedBackwardFunction(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, module, *inputs):
-        ctx.module = module
-        return inputs
-
-    @staticmethod
-    def backward(ctx, *grad_outputs):
-        ctx.module._pre_backward()
-        # Enqueue a callback to flush the reducer.
-        # This callback is triggered after all gradients' calculation is completed.
-        Variable._execution_engine.queue_callback(ctx.module._post_backward)
-        return (None,) + grad_outputs
+from oslo.torch.nn.parallel.data_parallel._utils import (
+    is_ddp_ignored,
+    DistributedBackwardFunction,
+)
 
 
 def DistributedDataParallel(
@@ -109,7 +96,7 @@ class _DistributedDataParallel(OsloParallelWrapper):
                     k: v
                     for k, v in zip(
                         inputs.keys(),
-                        _DistributedBackwardFunction.apply(self, *inputs.values()),
+                        DistributedBackwardFunction.apply(self, *inputs.values()),
                     )
                 }
             )
@@ -118,7 +105,7 @@ class _DistributedDataParallel(OsloParallelWrapper):
         if single_output:
             inputs = (inputs,)
 
-        outputs = _DistributedBackwardFunction.apply(self, *inputs)
+        outputs = DistributedBackwardFunction.apply(self, *inputs)
         return outputs[0] if single_output else outputs
 
     def _pre_backward(self):
