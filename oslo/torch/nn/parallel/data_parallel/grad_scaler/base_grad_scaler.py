@@ -6,7 +6,7 @@ from torch import Tensor
 
 from oslo.torch.utils.logging import get_dist_logger
 
-__all__ = ['BaseGradScaler']
+__all__ = ["BaseGradScaler"]
 
 
 class BaseGradScaler(ABC):
@@ -27,28 +27,25 @@ class BaseGradScaler(ABC):
 
     # @property
     def scale(self, loss) -> Tensor:
-        """Returns the loss scale.
-        """
+        """Returns the loss scale."""
 
         return self._scale * loss
-    
+
     def step(self, optimizer):
         self.found_inf = optimizer._check_overflow()
         return optimizer.step()
 
     @property
     def inv_scale(self) -> Tensor:
-        """Returns the inverse of the loss scale.
-        """
+        """Returns the inverse of the loss scale."""
 
         return self._scale.double().reciprocal().float()
 
     def state_dict(self) -> Dict:
-        """Returns the states of the gradient scaler as a dict object.
-        """
+        """Returns the states of the gradient scaler as a dict object."""
 
         state_dict = dict()
-        state_dict['scale'] = self.scale
+        state_dict["scale"] = self.scale
         return state_dict
 
     def load_state_dict(self, state_dict: Dict) -> None:
@@ -58,7 +55,7 @@ class BaseGradScaler(ABC):
             state_dict (dict): the states of the gradient scaler
         """
 
-        self._scale = state_dict['scale']
+        self._scale = state_dict["scale"]
 
     @abstractmethod
     def update(self) -> None:
