@@ -16,7 +16,7 @@ from oslo.torch.nn import (
     VocabParallelCrossEntropyLoss2p5D,
 )
 from oslo.transformers.modeling_utils import OsloModel
-from oslo.extension.training.ops.pytorch.multihead_attention_layer import LSMultiheadAttentionLayer
+from oslo.lightseq2.training.ops.pytorch.multihead_attention_layer import LSMultiheadAttentionLayer
 
 try:
     from transformers.modeling_outputs import (

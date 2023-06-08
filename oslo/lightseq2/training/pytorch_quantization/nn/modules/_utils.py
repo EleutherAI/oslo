@@ -23,8 +23,8 @@ import logging
 
 from torch import nn
 
-from oslo.extension.training.pytorch_quantization.nn import TensorQuantizer
-from oslo.extension.training.pytorch_quantization.tensor_quant import (
+from oslo.lightseq2.training.pytorch_quantization.nn import TensorQuantizer
+from oslo.lightseq2.training.pytorch_quantization.tensor_quant import (
     QuantDescriptor,
     QUANT_DESC_8BIT_PER_TENSOR,
 )
@@ -42,7 +42,7 @@ class QuantMixin:
     def set_default_quant_desc_input(cls, value):
         """
         Args:
-            value: An instance of :class:`QuantDescriptor <oslo.extension.training.pytorch_quantization.tensor_quant.QuantDescriptor>`
+            value: An instance of :class:`QuantDescriptor <oslo.lightseq2.training.pytorch_quantization.tensor_quant.QuantDescriptor>`
         """
         if not isinstance(value, QuantDescriptor):
             raise ValueError("{} is not an instance of QuantDescriptor!")
@@ -52,7 +52,7 @@ class QuantMixin:
     def set_default_quant_desc_weight(cls, value):
         """
         Args:
-            value: An instance of :class:`QuantDescriptor <oslo.extension.training.pytorch_quantization.tensor_quant.QuantDescriptor>`
+            value: An instance of :class:`QuantDescriptor <oslo.lightseq2.training.pytorch_quantization.tensor_quant.QuantDescriptor>`
         """
         if not isinstance(value, QuantDescriptor):
             raise ValueError("{} is not an instance of QuantDescriptor!")
@@ -64,8 +64,8 @@ class QuantMixin:
         Create input and weight quantizer based on quant_desc passed by kwargs, or default of the class.
 
         Args:
-            quant_desc_input: An instance of :class:`QuantDescriptor <oslo.extension.training.pytorch_quantization.tensor_quant.QuantDescriptor>`
-            quant_desc_weight: An instance of :class:`QuantDescriptor <oslo.extension.training.pytorch_quantization.tensor_quant.QuantDescriptor>`
+            quant_desc_input: An instance of :class:`QuantDescriptor <oslo.lightseq2.training.pytorch_quantization.tensor_quant.QuantDescriptor>`
+            quant_desc_weight: An instance of :class:`QuantDescriptor <oslo.lightseq2.training.pytorch_quantization.tensor_quant.QuantDescriptor>`
             num_layers: An integer. Default None. If not None, create a list of quantizers.
         """
         if not inspect.stack()[1].function == "__init__":
@@ -125,7 +125,7 @@ class QuantInputMixin:
     def set_default_quant_desc_input(cls, value):
         """
         Args:
-            value: An instance of :class:`QuantDescriptor <oslo.extension.training.pytorch_quantization.tensor_quant.QuantDescriptor>`
+            value: An instance of :class:`QuantDescriptor <oslo.lightseq2.training.pytorch_quantization.tensor_quant.QuantDescriptor>`
         """
         if not isinstance(value, QuantDescriptor):
             raise ValueError("{} is not an instance of QuantDescriptor!")
@@ -137,7 +137,7 @@ class QuantInputMixin:
         Create input quantizer based on quant_desc passed by kwargs, or default of the class.
 
         Args:
-            quant_desc_input: An instance of :class:`QuantDescriptor <oslo.extension.training.pytorch_quantization.tensor_quant.QuantDescriptor>`
+            quant_desc_input: An instance of :class:`QuantDescriptor <oslo.lightseq2.training.pytorch_quantization.tensor_quant.QuantDescriptor>`
         """
         if not inspect.stack()[1].function == "__init__":
             raise TypeError(
@@ -177,9 +177,9 @@ def pop_quant_desc_in_kwargs(quant_cls, input_only=False, **kwargs):
        input_only: A boolean. If True, pop quant_desc_input only, not quant_desc_weight. Default false.
 
     Keyword Arguments:
-       quant_desc_input: An instance of :class:`QuantDescriptor <oslo.extension.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
+       quant_desc_input: An instance of :class:`QuantDescriptor <oslo.lightseq2.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
            Quantization descriptor of input.
-       quant_desc_weight: An instance of :class:`QuantDescriptor <oslo.extension.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
+       quant_desc_weight: An instance of :class:`QuantDescriptor <oslo.lightseq2.training.pytorch_quantization.tensor_quant.QuantDescriptor>`.
            Quantization descriptor of weight.
     """
     quant_desc_input = kwargs.pop(

@@ -30,8 +30,8 @@ from torch import nn
 from torch.nn import Parameter
 from torch.nn.utils.rnn import PackedSequence
 
-from oslo.extension.training.pytorch_quantization import tensor_quant
-from oslo.extension.training.pytorch_quantization.nn._functions import quant_rnn
+from oslo.lightseq2.training.pytorch_quantization import tensor_quant
+from oslo.lightseq2.training.pytorch_quantization.nn._functions import quant_rnn
 
 from . import _utils
 

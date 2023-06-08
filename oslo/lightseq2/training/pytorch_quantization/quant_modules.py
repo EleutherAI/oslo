@@ -18,7 +18,7 @@
 
 from collections import namedtuple
 import torch
-from oslo.extension.training.pytorch_quantization import nn as quant_nn
+from oslo.lightseq2.training.pytorch_quantization import nn as quant_nn
 
 # Definition of the named tuple that is used to store mapping of the quantized modules
 _quant_entry = namedtuple("quant_entry", "orig_mod mod_name replace_mod")
@@ -147,9 +147,9 @@ def initialize(float_module_list=None, custom_quant_modules=None):
         float_module_list = ["Linear"]
         custom_quant_modules = [(torch.nn, "Linear", quant_nn.QuantLinear)]
         ## Monkey patch the modules
-        oslo.extension.training.pytorch_quantization.quant_modules.initialize(float_module_list, custom_modules)
+        oslo.lightseq2.training.pytorch_quantization.quant_modules.initialize(float_module_list, custom_modules)
         ## Use the quantized modules
-        oslo.extension.training.pytorch_quantization.quant_modules.deactivate()
+        oslo.lightseq2.training.pytorch_quantization.quant_modules.deactivate()
     """
     _quant_module_helper_object.prepare_state(float_module_list, custom_quant_modules)
     _quant_module_helper_object.apply_quant_modules()

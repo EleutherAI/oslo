@@ -8,14 +8,14 @@ from torch import nn
 from torch.autograd import Function
 
 
-from oslo.extension.training.ops.pytorch.util import (
+from oslo.lightseq2.training.ops.pytorch.util import (
     copy_para,
     state_dict,
     MODEL_ARCH,
     check_config,
     calc_offset,
 )
-from oslo.extension.training.ops.pytorch.layer_base import TransformerDecoderLayerBase
+from oslo.lightseq2.training.ops.pytorch.layer_base import TransformerDecoderLayerBase
 
 _all_layer_grads = dict()
 

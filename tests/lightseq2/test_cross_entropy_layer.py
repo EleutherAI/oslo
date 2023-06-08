@@ -1,6 +1,6 @@
 import torch
 
-from oslo.extension.training.ops.pytorch.cross_entropy_layer import LSCrossEntropyLayer
+from oslo.lightseq2.training.ops.pytorch.cross_entropy_layer import LSCrossEntropyLayer
 
 import time
 import pytest

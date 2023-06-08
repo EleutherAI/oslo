@@ -1,9 +1,9 @@
 from fairseq.incremental_decoding_utils import with_incremental_state
-from oslo.extension.training.ops.pytorch.transformer_decoder_layer import (
+from oslo.lightseq2.training.ops.pytorch.transformer_decoder_layer import (
     LSTransformerDecoderLayer,
 )
 
-# import oslo.extension.training.ops.pytorch.transformer_decoder_layer_new as decoder_new
+# import oslo.lightseq2.training.ops.pytorch.transformer_decoder_layer_new as decoder_new
 
 
 @with_incremental_state

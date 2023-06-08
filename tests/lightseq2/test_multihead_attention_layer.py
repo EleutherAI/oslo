@@ -1,6 +1,6 @@
 import torch
 
-from oslo.extension.training.ops.pytorch.multihead_attention_layer import LSMultiheadAttentionLayer
+from oslo.lightseq2.training.ops.pytorch.multihead_attention_layer import LSMultiheadAttentionLayer
 
 import time
 import pytest

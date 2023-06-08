@@ -1,10 +1,10 @@
 import torch.nn.functional as F
 from torch.nn import Linear
-from oslo.extension.training.pytorch_quantization.tensor_quant import (
+from oslo.lightseq2.training.pytorch_quantization.tensor_quant import (
     QuantDescriptor,
     QUANT_DESC_8BIT_PER_TENSOR,
 )
-from oslo.extension.training.pytorch_quantization.nn.modules.tensor_quantizer import (
+from oslo.lightseq2.training.pytorch_quantization.nn.modules.tensor_quantizer import (
     TensorQuantizer,
     enable_quant,
     disable_quant,

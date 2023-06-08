@@ -4,9 +4,9 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
-from oslo.extension.training.ops.pytorch import TransformerBuilder
-from oslo.extension.training.ops.pytorch.layer_base import TransformerEmbeddingLayerBase
-from oslo.extension.training.ops.pytorch.util import (
+from oslo.lightseq2.training.ops.pytorch import TransformerBuilder
+from oslo.lightseq2.training.ops.pytorch.layer_base import TransformerEmbeddingLayerBase
+from oslo.lightseq2.training.ops.pytorch.util import (
     copy_para,
     state_dict,
     calc_offset,

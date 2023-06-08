@@ -11,8 +11,8 @@ from fairseq.models import (
 from fairseq.models.fairseq_encoder import EncoderOut
 from fairseq.modules import LayerNorm
 
-from oslo.extension.training.ops.pytorch.layer_base import TransformerEmbeddingLayerBase
-from oslo.extension.training.ops.pytorch.quantization import (
+from oslo.lightseq2.training.ops.pytorch.layer_base import TransformerEmbeddingLayerBase
+from oslo.lightseq2.training.ops.pytorch.quantization import (
     QuantLinear,
     disable_quant,
     enable_quant,
@@ -218,7 +218,7 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
             need_offset=("bart" in args.arch),
         )
         if use_torch_layer:
-            from oslo.extension.training.ops.pytorch.torch_transformer_layers import (
+            from oslo.lightseq2.training.ops.pytorch.torch_transformer_layers import (
                 TransformerEmbeddingLayer,
             )
 
@@ -226,7 +226,7 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                 emb_lookup = emb_lookup.emb_lookup
             emb = TransformerEmbeddingLayer(config, emb_lookup=emb_lookup)
         else:
-            from oslo.extension.training.ops.pytorch.transformer_embedding_layer import (
+            from oslo.lightseq2.training.ops.pytorch.transformer_embedding_layer import (
                 LSTransformerEmbeddingLayer as TransformerEmbeddingLayer,
             )
 
@@ -273,9 +273,9 @@ class LSTransformerEncoder(FairseqEncoder):
 
     def build_encoder_layer(self, args):
         if args.use_torch_layer:
-            from oslo.extension.training.ops.pytorch import TransformerEncoderLayer
+            from oslo.lightseq2.training.ops.pytorch import TransformerEncoderLayer
         else:
-            from oslo.extension.training.ops.pytorch.transformer_encoder_layer import (
+            from oslo.lightseq2.training.ops.pytorch.transformer_encoder_layer import (
                 LSTransformerEncoderLayer as TransformerEncoderLayer,
             )
 
@@ -399,7 +399,7 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
             self.output_projection.weight_quant = self.embed_tokens.emb_quant
             self.output_projection.weight = self.embed_tokens.embeddings
         else:
-            from oslo.extension.training.ops.pytorch.quant_linear_layer import (
+            from oslo.lightseq2.training.ops.pytorch.quant_linear_layer import (
                 LSQuantLinearLayer,
             )
 
@@ -419,7 +419,7 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
 
     def build_decoder_layer(self, args):
         if args.use_torch_layer:
-            from oslo.extension.training.ops.pytorch.torch_transformer_layers import (
+            from oslo.lightseq2.training.ops.pytorch.torch_transformer_layers import (
                 TransformerDecoderLayer,
             )
         else:

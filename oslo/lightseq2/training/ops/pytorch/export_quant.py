@@ -1,8 +1,8 @@
 from collections import OrderedDict
 import numpy as np
-from oslo.extension.training.ops.pytorch.util import get_pos_embedding
-from oslo.extension.training import LSTransformerEncoderLayer, LSTransformerDecoderLayer
-from oslo.extension.training.ops.pytorch.export import apply_rule
+from oslo.lightseq2.training.ops.pytorch.util import get_pos_embedding
+from oslo.lightseq2.training import LSTransformerEncoderLayer, LSTransformerDecoderLayer
+from oslo.lightseq2.training.ops.pytorch.export import apply_rule
 
 
 global_quant_range = 127

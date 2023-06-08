@@ -1,10 +1,10 @@
 import torch
 
-from oslo.extension.training.ops.pytorch import TransformerBuilder
-from oslo.extension.training.ops.pytorch.transformer_encoder_layer import (
+from oslo.lightseq2.training.ops.pytorch import TransformerBuilder
+from oslo.lightseq2.training.ops.pytorch.transformer_encoder_layer import (
     LSTransformerEncoderLayer,
 )
-from oslo.extension.training.ops.pytorch.quantization import (
+from oslo.lightseq2.training.ops.pytorch.quantization import (
     weight_quant_config,
     act_quant_config,
 )

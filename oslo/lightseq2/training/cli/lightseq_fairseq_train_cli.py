@@ -1,7 +1,7 @@
 import pathlib
 import sys
 
-from oslo.extension.training.gcq.ls_fs_gcq_train import cli_main
+from oslo.lightseq2.training.gcq.ls_fs_gcq_train import cli_main
 
 
 def ls_cli_main(*args, **kwargs):
