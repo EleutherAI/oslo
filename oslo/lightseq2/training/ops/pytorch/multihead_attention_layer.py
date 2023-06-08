@@ -109,7 +109,9 @@ class LSMultiheadAttentionLayer(nn.Module):
         if isinstance(self.config, PretrainedConfig):
             self.config.max_seq_len = self.config.max_position_embeddings
             self.config.nhead = self.config.num_attention_heads
-            self.config.max_batch_tokens = 128 * self.config.max_position_embeddings # 일단 default batch size로 128로 설정
+            if hasattr(self.config, "max_batch_size_for_lightseq"):
+                self.config.max_batch_size_for_lightseq = 16
+            self.config.max_batch_tokens = self.config.max_batch_size_for_lightseq * self.config.max_position_embeddings # 일단 default batch size로 128로 설정
             self.config.activation_dropout_ratio = self.config.hidden_dropout_prob  # 이 둘이 같다고 가정
             self.config.attention_probs_dropout_prob = self.config.hidden_dropout_prob
             self.config.attn_prob_dropout_ratio = self.config.hidden_dropout_prob
