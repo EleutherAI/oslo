@@ -1,4 +1,4 @@
-# Data Parallelism Tutorial
+`# Data Parallelism Tutorial
 - Authors: Jinwon Kim
 
 

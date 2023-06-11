@@ -66,7 +66,7 @@ from oslo.torch.nn.parallel import (
     PipelineParallel,
     TensorParallel,
     DistributedDataParallel,
-    ZeroRedundancyOptimizer
+    ZeroRedundancyOptimizer,
 )
 from oslo.torch.utils.checkpoint.activation_checkpointing import ActivationCheckpointing
 from oslo.transformers.data.data_collator import (
@@ -1495,13 +1495,17 @@ class Trainer:
                 optimizer_grouped_parameters, **optimizer_kwargs
             )
         # if zero 1 or 2:
-        if self.args.oslo_config.data_parallelism is not None \
-                and self.args.oslo_config.data_parallelism["zero_stage"] < 3:
+        if (
+            self.args.oslo_config.data_parallelism is not None
+            and self.args.oslo_config.data_parallelism["zero_stage"] < 3
+        ):
             self.optimizer = ZeroRedundancyOptimizer(
                 self.optimizer,
                 parallel_context=self.parallel_context,
                 overlap_communication=True,
-                partition_grad=True if self.args.oslo_config.data_parallelism["zero_stage"] == 2 else False,
+                partition_grad=True
+                if self.args.oslo_config.data_parallelism["zero_stage"] == 2
+                else False,
             )
         log_dist(f"Optimizer: {self.optimizer}")
         return self.optimizer

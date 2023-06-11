@@ -27,10 +27,7 @@ oslo_init_dict_form = {
         "parallel_size": 2,
         "parallel_mode": "1d",
     },
-    "pipeline_parallelism": {
-        "enable": False,
-        "parallel_size": 4
-    },
+    "pipeline_parallelism": {"enable": False, "parallel_size": 4},
 }
 model = BertForSequenceClassification.from_pretrained("bert-base-uncased")
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
@@ -40,11 +37,11 @@ if processor._tokenizer.pad_token is None:
     processor._tokenizer.pad_token = processor._tokenizer.eos_token
 
 # 데이터셋 생성
-if not os.path.exists('glue-cola'):
+if not os.path.exists("glue-cola"):
     dataset = load_dataset("glue", "cola")
-    dataset.save_to_disk('glue-cola')
+    dataset.save_to_disk("glue-cola")
 else:
-    dataset = load_from_disk('glue-cola')
+    dataset = load_from_disk("glue-cola")
 
 dataset = dataset.rename_column("sentence", "text")
 dataset = dataset.rename_column("label", "labels")
