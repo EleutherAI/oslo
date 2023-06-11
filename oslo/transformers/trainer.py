@@ -65,6 +65,8 @@ from oslo.torch import ParallelMode
 from oslo.torch.nn.parallel import (
     PipelineParallel,
     TensorParallel,
+    DistributedDataParallel,
+    ZeroRedundancyOptimizer
 )
 from oslo.torch.utils.checkpoint.activation_checkpointing import ActivationCheckpointing
 from oslo.transformers.data.data_collator import (
@@ -1373,7 +1375,6 @@ class Trainer:
         if len(self.model_wrappers) > 0:
             for wrapper in model_wrappers:
                 log_dist(f"Model wrapping with wrapper: {wrapper}")
-
                 if wrapper == TensorParallel:
                     log_dist(self.args.oslo_config)
                     model = wrapper(
@@ -1393,13 +1394,13 @@ class Trainer:
                 #         parallel_context=self.parallel_context,
                 #         **self.args.oslo_config.sequence_parallelism["params"],
                 #     )
-                # elif wrapper == DistributedDataParallel:
-                #     # model = model.to()
-                #     model = wrapper(
-                #         model,
-                #         parallel_context=self.parallel_context,
-                #         **self.args.oslo_config.data_parallelism["params"],
-                #     )
+                elif wrapper == DistributedDataParallel:
+                    # model = model.to()
+                    model = wrapper(
+                        model,
+                        parallel_context=self.parallel_context,
+                        **self.args.oslo_config.data_parallelism["params"],
+                    )
                 # elif wrapper == DataParallel:
                 #     self.create_optimizer()
                 #     model, self.optimizer = wrapper(
@@ -1492,6 +1493,15 @@ class Trainer:
         if self.optimizer is None:
             self.optimizer = optimizer_cls(
                 optimizer_grouped_parameters, **optimizer_kwargs
+            )
+        # if zero 1 or 2:
+        if self.args.oslo_config.data_parallelism is not None \
+                and self.args.oslo_config.data_parallelism["zero_stage"] < 3:
+            self.optimizer = ZeroRedundancyOptimizer(
+                self.optimizer,
+                parallel_context=self.parallel_context,
+                overlap_communication=True,
+                partition_grad=True if self.args.oslo_config.data_parallelism["zero_stage"] == 2 else False,
             )
         log_dist(f"Optimizer: {self.optimizer}")
         return self.optimizer

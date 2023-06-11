@@ -261,9 +261,9 @@ class OsloTrainerConfig:
                     self.data_parallelism["params"] = {}
                 log_dist(
                     f"data_parallelism: enabled"
-                    f"\tparallel_size: {self.data_parallelism['parallel_size']}"
-                    f"\tzero_stage: {self.data_parallelism['zero_stage']}"
-                    f"\tcpu_offload: {self.cpu_offload}"
+                    f"\n\tparallel_size: {self.data_parallelism['parallel_size']}"
+                    f"\n\tzero_stage: {self.data_parallelism['zero_stage']}"
+                    f"\n\tcpu_offload: {self.cpu_offload}"
                 )
 
         if (
