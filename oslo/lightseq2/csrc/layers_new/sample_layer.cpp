@@ -19,8 +19,8 @@ SampleLayer<T>::SampleLayer(int nshared_layer, int max_batch_size, int max_step,
 }
 
 template <typename T>
-std::tuple<Variable *, Variable *> SampleLayer<T>::
-operator()(Variable *logits, Variable *alive_seq) {
+std::tuple<Variable *, Variable *>
+SampleLayer<T>::operator()(Variable *logits, Variable *alive_seq) {
   set_inputs({logits, alive_seq});
 
   std::tuple<Variable *, Variable *> beam_search_outs =

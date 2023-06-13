@@ -48,9 +48,9 @@ DecEncAttentionLayer<T1, T2>::DecEncAttentionLayer(
 }
 
 template <typename T1, typename T2>
-Variable *DecEncAttentionLayer<T1, T2>::
-operator()(Variable *inp, Variable *enc_mask, Variable *enc_k,
-           Variable *enc_v) {
+Variable *
+DecEncAttentionLayer<T1, T2>::operator()(Variable *inp, Variable *enc_mask,
+                                         Variable *enc_k, Variable *enc_v) {
   set_inputs({inp, enc_mask, enc_k, enc_v});
 
   Variable *q_linear_out = nullptr;

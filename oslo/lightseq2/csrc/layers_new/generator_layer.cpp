@@ -43,8 +43,8 @@ GeneratorLayer<T>::GeneratorLayer(GenerateMethod gm, int nshared_dec_layer,
 }
 
 template <typename T>
-std::tuple<Variable *, Variable *> GeneratorLayer<T>::
-operator()(Variable *logits, Variable *alive_seq) {
+std::tuple<Variable *, Variable *>
+GeneratorLayer<T>::operator()(Variable *logits, Variable *alive_seq) {
   set_inputs({logits, alive_seq});
 
   Variable *alive_seq_out = nullptr;

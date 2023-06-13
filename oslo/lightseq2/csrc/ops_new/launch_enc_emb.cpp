@@ -3,9 +3,10 @@
 namespace lightseq {
 
 template <typename T>
-std::tuple<Variable *, Variable *> LaunchEncEmbOp<T>::
-operator()(Variable *inp_tokens, Variable *token_emb, Variable *pos_emb,
-           Variable *lang_emb, Variable *lang_id) {
+std::tuple<Variable *, Variable *>
+LaunchEncEmbOp<T>::operator()(Variable *inp_tokens, Variable *token_emb,
+                              Variable *pos_emb, Variable *lang_emb,
+                              Variable *lang_id) {
   size_t max_size = _max_batch_tokens * _hidden_dim;
 
   _result = new Variable("LaunchEncEmbOp_out", _max_batch_tokens * _hidden_dim,

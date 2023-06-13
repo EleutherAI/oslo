@@ -55,8 +55,9 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
 }
 
 template <typename T1, typename T2>
-std::tuple<Variable *, Variable *, Variable *> DecSelfAttentionLayer<T1, T2>::
-operator()(Variable *inp, Variable *cache_k, Variable *cache_v) {
+std::tuple<Variable *, Variable *, Variable *>
+DecSelfAttentionLayer<T1, T2>::operator()(Variable *inp, Variable *cache_k,
+                                          Variable *cache_v) {
   set_inputs({inp, cache_k, cache_v});
 
   Variable *qkv_out = nullptr;

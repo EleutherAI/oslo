@@ -47,9 +47,9 @@ GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
 }
 
 template <typename T1, typename T2>
-Variable *GptAttentionLayer<T1, T2>::
-operator()(Variable *inp, Variable *cache_k, Variable *cache_v,
-           Variable *pad_mask) {
+Variable *
+GptAttentionLayer<T1, T2>::operator()(Variable *inp, Variable *cache_k,
+                                      Variable *cache_v, Variable *pad_mask) {
   set_inputs({inp});
 
   Variable *qkv_out = nullptr;

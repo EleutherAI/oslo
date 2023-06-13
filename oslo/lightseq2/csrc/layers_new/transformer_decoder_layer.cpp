@@ -36,9 +36,12 @@ template <typename T1, typename T2>
 TransformerDecoderLayer<T1, T2>::~TransformerDecoderLayer() {}
 
 template <typename T1, typename T2>
-std::tuple<Variable *, Variable *, Variable *> TransformerDecoderLayer<T1, T2>::
-operator()(Variable *inp, Variable *total_enc_kv, Variable *enc_mask,
-           Variable *cache_self_k, Variable *cache_self_v) {
+std::tuple<Variable *, Variable *, Variable *>
+TransformerDecoderLayer<T1, T2>::operator()(Variable *inp,
+                                            Variable *total_enc_kv,
+                                            Variable *enc_mask,
+                                            Variable *cache_self_k,
+                                            Variable *cache_self_v) {
   set_inputs({inp, total_enc_kv, enc_mask, cache_self_k, cache_self_v});
 
   enc_k = new Variable("enc_k", total_enc_kv);

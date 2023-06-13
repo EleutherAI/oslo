@@ -3,8 +3,9 @@
 namespace lightseq {
 
 template <typename T>
-std::tuple<Variable *, Variable *, Variable *> LaunchGptEmbOp<T>::
-operator()(Variable *inp_tokens, Variable *token_emb, Variable *pos_emb) {
+std::tuple<Variable *, Variable *, Variable *>
+LaunchGptEmbOp<T>::operator()(Variable *inp_tokens, Variable *token_emb,
+                              Variable *pos_emb) {
   set_parents({inp_tokens, token_emb, pos_emb});
 
   size_t max_size = _max_batch_tokens * _hidden_dim;
