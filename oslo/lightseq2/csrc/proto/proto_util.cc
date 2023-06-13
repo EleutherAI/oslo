@@ -149,9 +149,9 @@ std::vector<int> read_hdf5_dataset_data_int(
 
 int read_hdf5_dataset_scalar(hid_t hdf5_file, std::string dataset_name,
                              hid_t output_type, void *output_buf) {
-  return read_hdf5_dataset_data(hdf5_file, dataset_name, output_type,
-                                output_buf, [](int size) { return size != 1; },
-                                "Expect scalar with shape of 1.");
+  return read_hdf5_dataset_data(
+      hdf5_file, dataset_name, output_type, output_buf,
+      [](int size) { return size != 1; }, "Expect scalar with shape of 1.");
 }
 
 void transform_param_shape(float *origin, float *buffer, int row_size,

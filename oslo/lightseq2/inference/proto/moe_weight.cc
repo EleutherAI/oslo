@@ -807,17 +807,17 @@ void MoeWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
   idx += _max_step * _hidden_size;
 
   offset.push_back(idx);
-  read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/norm_scale",
-                         H5T_NATIVE_FLOAT, value.data() + idx,
-                         [=](int size) { return size != _hidden_size; },
-                         "Wrong norm_scale_size !");
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/norm_scale", H5T_NATIVE_FLOAT,
+      value.data() + idx, [=](int size) { return size != _hidden_size; },
+      "Wrong norm_scale_size !");
   idx += _hidden_size;
 
   offset.push_back(idx);
-  read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/norm_bias",
-                         H5T_NATIVE_FLOAT, value.data() + idx,
-                         [=](int size) { return size != _hidden_size; },
-                         "Wrong norm_bias_size !");
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/norm_bias", H5T_NATIVE_FLOAT,
+      value.data() + idx, [=](int size) { return size != _hidden_size; },
+      "Wrong norm_bias_size !");
   idx += _hidden_size;
 
   if (source == "src") {
@@ -851,10 +851,10 @@ void MoeWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
     idx += _hidden_size * 2 * _n_dec_layer;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/shared_bias",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != vocab_size; },
-                           "Wrong shared_bias_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/shared_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != vocab_size; },
+        "Wrong shared_bias_size !");
     idx += vocab_size;
 
     std::vector<_DataType> raw_value;
@@ -924,17 +924,17 @@ void MoeWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     std::string dataset_prefix = "encoder_stack/" + std::to_string(layer_id);
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/multihead_norm_scale",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong multihead_norm_scale_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong multihead_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/multihead_norm_bias",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong multihead_norm_bias_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_norm_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong multihead_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -946,11 +946,11 @@ void MoeWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file,
-                           dataset_prefix + "/multihead_project_bias_qkv",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size * 3; },
-                           "Wrong multihead_project_bias_qkv_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_project_bias_qkv",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size * 3; },
+        "Wrong multihead_project_bias_qkv_size !");
     idx += _hidden_size * 3;
 
     offset.push_back(idx);
@@ -962,36 +962,36 @@ void MoeWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file,
-                           dataset_prefix + "/multihead_project_bias_output",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong multihead_project_bias_output_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_project_bias_output",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size; },
+        "Wrong multihead_project_bias_output_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_norm_scale",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong ffn_norm_scale_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_norm_bias",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong ffn_norm_bias_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_norm_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_first_kernel",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) {
-                             return size != _hidden_size * _inner_size &&
-                                    size != _hidden_size * _inner_size *
-                                                _expert_num_encoder;
-                           },
-                           "Wrong ffn_first_kernel_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_first_kernel", H5T_NATIVE_FLOAT,
+        value.data() + idx,
+        [=](int size) {
+          return size != _hidden_size * _inner_size &&
+                 size != _hidden_size * _inner_size * _expert_num_encoder;
+        },
+        "Wrong ffn_first_kernel_size !");
     if (_is_moe_layer_encoder[layer_id]) {
       idx += _hidden_size * _inner_size * _expert_num_encoder;
     } else {
@@ -999,13 +999,14 @@ void MoeWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     }
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_first_bias",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) {
-                             return size != _inner_size &&
-                                    size != _inner_size * _expert_num_encoder;
-                           },
-                           "Wrong ffn_first_bias_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_first_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx,
+        [=](int size) {
+          return size != _inner_size &&
+                 size != _inner_size * _expert_num_encoder;
+        },
+        "Wrong ffn_first_bias_size !");
     if (_is_moe_layer_encoder[layer_id]) {
       idx += _inner_size * _expert_num_encoder;
     } else {
@@ -1013,14 +1014,14 @@ void MoeWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     }
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_second_kernel",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) {
-                             return size != _hidden_size * _inner_size &&
-                                    size != _hidden_size * _inner_size *
-                                                _expert_num_encoder;
-                           },
-                           "Wrong ffn_second_kernel_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_second_kernel", H5T_NATIVE_FLOAT,
+        value.data() + idx,
+        [=](int size) {
+          return size != _hidden_size * _inner_size &&
+                 size != _hidden_size * _inner_size * _expert_num_encoder;
+        },
+        "Wrong ffn_second_kernel_size !");
     if (_is_moe_layer_encoder[layer_id]) {
       idx += _hidden_size * _inner_size * _expert_num_encoder;
     } else {
@@ -1028,13 +1029,14 @@ void MoeWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     }
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_second_bias",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) {
-                             return size != _hidden_size &&
-                                    size != _hidden_size * _expert_num_encoder;
-                           },
-                           "Wrong ffn_second_bias_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_second_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx,
+        [=](int size) {
+          return size != _hidden_size &&
+                 size != _hidden_size * _expert_num_encoder;
+        },
+        "Wrong ffn_second_bias_size !");
     if (_is_moe_layer_encoder[layer_id]) {
       idx += _hidden_size * _expert_num_encoder;
     } else {
@@ -1045,13 +1047,13 @@ void MoeWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     if (_gate_type == 0) {
       if (_is_moe_layer_encoder[layer_id]) {
         offset_gate.push_back(idx_gate);
-        read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/gate_kernel",
-                               H5T_NATIVE_FLOAT, value_gate.data() + idx_gate,
-                               [=](int size) {
-                                 return size !=
-                                        _hidden_size * _expert_num_encoder;
-                               },
-                               "Wrong gate_kernel_size !");
+        read_hdf5_dataset_data(
+            hdf5_file, dataset_prefix + "/gate_kernel", H5T_NATIVE_FLOAT,
+            value_gate.data() + idx_gate,
+            [=](int size) {
+              return size != _hidden_size * _expert_num_encoder;
+            },
+            "Wrong gate_kernel_size !");
         idx_gate += _hidden_size * _expert_num_encoder;
       }
     }
@@ -1112,17 +1114,17 @@ void MoeWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     std::string dataset_prefix = "decoder_stack/" + std::to_string(layer_id);
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/self_norm_scale",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong self_norm_scale_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/self_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong self_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/self_norm_bias",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong self_norm_bias_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/self_norm_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong self_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -1134,10 +1136,10 @@ void MoeWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/self_project_bias_qkv",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size * 3; },
-                           "Wrong self_project_bias_qkv_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/self_project_bias_qkv", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size * 3; },
+        "Wrong self_project_bias_qkv_size !");
     idx += _hidden_size * 3;
 
     offset.push_back(idx);
@@ -1149,25 +1151,25 @@ void MoeWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file,
-                           dataset_prefix + "/self_project_bias_output",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong self_project_bias_output_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/self_project_bias_output",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size; },
+        "Wrong self_project_bias_output_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/encdec_norm_scale",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong encdec_norm_scale_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/encdec_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong encdec_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/encdec_norm_bias",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong encdec_norm_bias_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/encdec_norm_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong encdec_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -1179,10 +1181,10 @@ void MoeWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/encdec_project_bias_q",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong encdec_project_bias_q_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/encdec_project_bias_q", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong encdec_project_bias_q_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -1194,36 +1196,36 @@ void MoeWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file,
-                           dataset_prefix + "/encdec_project_bias_output",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong encdec_project_bias_output_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/encdec_project_bias_output",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size; },
+        "Wrong encdec_project_bias_output_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_norm_scale",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong ffn_norm_scale_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_norm_bias",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong ffn_norm_bias_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_norm_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_first_kernel",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) {
-                             return size != _hidden_size * _inner_size &&
-                                    size != _hidden_size * _inner_size *
-                                                _expert_num_decoder;
-                           },
-                           "Wrong ffn_first_kernel_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_first_kernel", H5T_NATIVE_FLOAT,
+        value.data() + idx,
+        [=](int size) {
+          return size != _hidden_size * _inner_size &&
+                 size != _hidden_size * _inner_size * _expert_num_decoder;
+        },
+        "Wrong ffn_first_kernel_size !");
     if (_is_moe_layer_decoder[layer_id]) {
       idx += _hidden_size * _inner_size * _expert_num_decoder;
     } else {
@@ -1231,13 +1233,14 @@ void MoeWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     }
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_first_bias",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) {
-                             return size != _inner_size &&
-                                    size != _inner_size * _expert_num_decoder;
-                           },
-                           "Wrong ffn_first_bias_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_first_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx,
+        [=](int size) {
+          return size != _inner_size &&
+                 size != _inner_size * _expert_num_decoder;
+        },
+        "Wrong ffn_first_bias_size !");
     if (_is_moe_layer_decoder[layer_id]) {
       idx += _inner_size * _expert_num_decoder;
     } else {
@@ -1245,14 +1248,14 @@ void MoeWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     }
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_second_kernel",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) {
-                             return size != _hidden_size * _inner_size &&
-                                    size != _hidden_size * _inner_size *
-                                                _expert_num_decoder;
-                           },
-                           "Wrong ffn_second_kernel_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_second_kernel", H5T_NATIVE_FLOAT,
+        value.data() + idx,
+        [=](int size) {
+          return size != _hidden_size * _inner_size &&
+                 size != _hidden_size * _inner_size * _expert_num_decoder;
+        },
+        "Wrong ffn_second_kernel_size !");
     if (_is_moe_layer_decoder[layer_id]) {
       idx += _hidden_size * _inner_size * _expert_num_decoder;
     } else {
@@ -1260,13 +1263,14 @@ void MoeWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     }
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_second_bias",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) {
-                             return size != _hidden_size &&
-                                    size != _hidden_size * _expert_num_decoder;
-                           },
-                           "Wrong ffn_second_bias_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_second_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx,
+        [=](int size) {
+          return size != _hidden_size &&
+                 size != _hidden_size * _expert_num_decoder;
+        },
+        "Wrong ffn_second_bias_size !");
     if (_is_moe_layer_decoder[layer_id]) {
       idx += _hidden_size * _expert_num_decoder;
     } else {
@@ -1277,13 +1281,13 @@ void MoeWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     if (_gate_type == 0) {
       if (_is_moe_layer_decoder[layer_id]) {
         offset_gate.push_back(idx_gate);
-        read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/gate_kernel",
-                               H5T_NATIVE_FLOAT, value_gate.data() + idx_gate,
-                               [=](int size) {
-                                 return size !=
-                                        _hidden_size * _expert_num_decoder;
-                               },
-                               "Wrong gate_kernel_size !");
+        read_hdf5_dataset_data(
+            hdf5_file, dataset_prefix + "/gate_kernel", H5T_NATIVE_FLOAT,
+            value_gate.data() + idx_gate,
+            [=](int size) {
+              return size != _hidden_size * _expert_num_decoder;
+            },
+            "Wrong gate_kernel_size !");
         idx_gate += _hidden_size * _expert_num_decoder;
       }
     }

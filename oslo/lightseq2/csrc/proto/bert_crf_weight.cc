@@ -305,17 +305,17 @@ void BertCrfWeight<T>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   idx += _max_step * _hidden_size;
 
   offset.push_back(idx);
-  read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/norm_scale",
-                         H5T_NATIVE_FLOAT, value.data() + idx,
-                         [=](int size) { return size != _hidden_size; },
-                         "Wrong norm_scale_size !");
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/norm_scale", H5T_NATIVE_FLOAT,
+      value.data() + idx, [=](int size) { return size != _hidden_size; },
+      "Wrong norm_scale_size !");
   idx += _hidden_size;
 
   offset.push_back(idx);
-  read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/norm_bias",
-                         H5T_NATIVE_FLOAT, value.data() + idx,
-                         [=](int size) { return size != _hidden_size; },
-                         "Wrong norm_bias_size !");
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/norm_bias", H5T_NATIVE_FLOAT,
+      value.data() + idx, [=](int size) { return size != _hidden_size; },
+      "Wrong norm_bias_size !");
   idx += _hidden_size;
 
   offset.push_back(idx);
@@ -327,24 +327,24 @@ void BertCrfWeight<T>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   idx += _hidden_size * _num_tags;
 
   offset.push_back(idx);
-  read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/classifier_bias",
-                         H5T_NATIVE_FLOAT, value.data() + idx,
-                         [=](int size) { return size != _num_tags; },
-                         "Wrong classifier_bias_size !");
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/classifier_bias", H5T_NATIVE_FLOAT,
+      value.data() + idx, [=](int size) { return size != _num_tags; },
+      "Wrong classifier_bias_size !");
   idx += _num_tags;
 
   offset.push_back(idx);
-  read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/crf_start_transitions",
-                         H5T_NATIVE_FLOAT, value.data() + idx,
-                         [=](int size) { return size != _num_tags; },
-                         "Wrong crf_start_transitions_size !");
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/crf_start_transitions", H5T_NATIVE_FLOAT,
+      value.data() + idx, [=](int size) { return size != _num_tags; },
+      "Wrong crf_start_transitions_size !");
   idx += _num_tags;
 
   offset.push_back(idx);
-  read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/crf_end_transitions",
-                         H5T_NATIVE_FLOAT, value.data() + idx,
-                         [=](int size) { return size != _num_tags; },
-                         "Wrong crf_end_transitions_size !");
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/crf_end_transitions", H5T_NATIVE_FLOAT,
+      value.data() + idx, [=](int size) { return size != _num_tags; },
+      "Wrong crf_end_transitions_size !");
   idx += _num_tags;
 
   offset.push_back(idx);
@@ -396,17 +396,17 @@ void BertCrfWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     std::string dataset_prefix = "encoder_stack/" + std::to_string(layer_id);
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/multihead_norm_scale",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong multihead_norm_scale_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong multihead_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/multihead_norm_bias",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong multihead_norm_bias_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_norm_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong multihead_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -418,11 +418,11 @@ void BertCrfWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file,
-                           dataset_prefix + "/multihead_project_bias_qkv",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size * 3; },
-                           "Wrong multihead_project_bias_qkv_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_project_bias_qkv",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size * 3; },
+        "Wrong multihead_project_bias_qkv_size !");
     idx += _hidden_size * 3;
 
     offset.push_back(idx);
@@ -434,25 +434,25 @@ void BertCrfWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file,
-                           dataset_prefix + "/multihead_project_bias_output",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong multihead_project_bias_output_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_project_bias_output",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size; },
+        "Wrong multihead_project_bias_output_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_norm_scale",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong ffn_norm_scale_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_norm_bias",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong ffn_norm_bias_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_norm_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -464,10 +464,10 @@ void BertCrfWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_first_bias",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _inner_size; },
-                           "Wrong ffn_first_bias_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_first_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _inner_size; },
+        "Wrong ffn_first_bias_size !");
     idx += _inner_size;
 
     offset.push_back(idx);
@@ -479,10 +479,10 @@ void BertCrfWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_second_bias",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong ffn_second_bias_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_second_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_second_bias_size !");
     idx += _hidden_size;
   }
 

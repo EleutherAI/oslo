@@ -593,20 +593,20 @@ void T5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
 
   offset.push_back(idx);
 
-  read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/position_embedding",
-                         H5T_NATIVE_FLOAT, value.data() + idx,
-                         [=](int size) {
-                           return size !=
-                                  _relative_attention_num_buckets * _head_num;
-                         },
-                         "Wrong position_embedding_size !");
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/position_embedding", H5T_NATIVE_FLOAT,
+      value.data() + idx,
+      [=](int size) {
+        return size != _relative_attention_num_buckets * _head_num;
+      },
+      "Wrong position_embedding_size !");
   idx += _relative_attention_num_buckets * _head_num;
 
   offset.push_back(idx);
-  read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/norm_scale",
-                         H5T_NATIVE_FLOAT, value.data() + idx,
-                         [=](int size) { return size != _hidden_size; },
-                         "Wrong norm_scale_size !");
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/norm_scale", H5T_NATIVE_FLOAT,
+      value.data() + idx, [=](int size) { return size != _hidden_size; },
+      "Wrong norm_scale_size !");
   idx += _hidden_size;
 
   offset.push_back(idx);
@@ -708,10 +708,10 @@ void T5Weight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     std::string dataset_prefix = "encoder_stack/" + std::to_string(layer_id);
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/multihead_norm_scale",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong multihead_norm_scale_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong multihead_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -750,10 +750,10 @@ void T5Weight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_norm_scale",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong ffn_norm_scale_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -826,10 +826,10 @@ void T5Weight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     std::string dataset_prefix = "decoder_stack/" + std::to_string(layer_id);
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/self_norm_scale",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong self_norm_scale_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/self_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong self_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -868,10 +868,10 @@ void T5Weight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
 
     offset.push_back(idx);
 
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/encdec_norm_scale",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong encdec_norm_scale_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/encdec_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong encdec_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -909,10 +909,10 @@ void T5Weight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_norm_scale",
-                           H5T_NATIVE_FLOAT, value.data() + idx,
-                           [=](int size) { return size != _hidden_size; },
-                           "Wrong ffn_norm_scale_size !");
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
