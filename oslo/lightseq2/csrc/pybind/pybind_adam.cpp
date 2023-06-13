@@ -4,21 +4,22 @@
 
 // x is torch::Tensor
 #define CHECK_CUDA(x) AT_ASSERTM(x.is_cuda(), #x " must be a CUDA tensor")
-#define CHECK_CONTIGUOUS(x) \
+#define CHECK_CONTIGUOUS(x)                                                    \
   AT_ASSERTM(x.is_contiguous(), #x " must be contiguous")
-#define CHECK_INPUT(x) \
-  CHECK_CUDA(x);       \
+#define CHECK_INPUT(x)                                                         \
+  CHECK_CUDA(x);                                                               \
   CHECK_CONTIGUOUS(x)
 
 // C++ interface
 namespace lightseq {
 namespace cuda {
-void adam(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m, at::Tensor& v,
-          at::Tensor& g, float lr, float beta1, float beta2, float eps,
+void adam(at::Tensor &p, at::Tensor &p_copy, at::Tensor &m, at::Tensor &v,
+          at::Tensor &g, float lr, float beta1, float beta2, float eps,
           float grad_scale, int step, int mode, int bias_correction,
           float decay) {
   CHECK_INPUT(p);
-  if (p_copy.numel() > 0) CHECK_INPUT(p_copy);
+  if (p_copy.numel() > 0)
+    CHECK_INPUT(p_copy);
   CHECK_INPUT(m);
   CHECK_INPUT(v);
   CHECK_INPUT(g);
@@ -37,12 +38,13 @@ void adam(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m, at::Tensor& v,
                   mode, bias_correction, decay);
 }
 
-void apex_adam(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m, at::Tensor& v,
-               at::Tensor& g, float lr, float beta1, float beta2, float eps,
+void apex_adam(at::Tensor &p, at::Tensor &p_copy, at::Tensor &m, at::Tensor &v,
+               at::Tensor &g, float lr, float beta1, float beta2, float eps,
                float grad_scale, int step, int mode, int bias_correction,
                float decay) {
   CHECK_INPUT(p);
-  if (p_copy.numel() > 0) CHECK_INPUT(p_copy);
+  if (p_copy.numel() > 0)
+    CHECK_INPUT(p_copy);
   CHECK_INPUT(m);
   CHECK_INPUT(v);
   CHECK_INPUT(g);
@@ -60,8 +62,8 @@ void apex_adam(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m, at::Tensor& v,
   apex_fused_adam_cuda(p, p_copy, m, v, g, lr, beta1, beta2, eps, grad_scale,
                        step, mode, bias_correction, decay);
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("adam", &lightseq::cuda::adam,
         "LightSeq Adam optimized CUDA implementation.");

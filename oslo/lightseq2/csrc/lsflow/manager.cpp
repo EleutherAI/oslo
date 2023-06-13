@@ -62,8 +62,8 @@ void MemoryManager::calculate_buffer_() {
       if (max_first_op <= min_last_op) {
         size_t gap = allocated_offset - prev_offset;
         if (allocated_offset > prev_offset && gap >= cal_tensor_usage.size &&
-            gap < smallest_gap) {  // Note the subtraction handling for unsigned
-                                   // types
+            gap < smallest_gap) { // Note the subtraction handling for unsigned
+                                  // types
           smallest_gap = gap;
           best_offset = prev_offset;
           best_offset_flag = true;
@@ -169,7 +169,8 @@ void MemoryManager::calculate_buffer_() {
             [](const std::pair<TensorUsage, size_t> &x,
                const std::pair<TensorUsage, size_t> &y) -> bool {
               // return x.first.first_idx < y.first.first_idx;
-              if (x.second != y.second) return x.second < y.second;
+              if (x.second != y.second)
+                return x.second < y.second;
               if (x.second + x.first.size != y.second + y.first.size)
                 return x.second + x.first.size > y.second + y.first.size;
               return x.first.first_idx < y.first.first_idx;
@@ -206,20 +207,18 @@ void MemoryManager::calculate_buffer_() {
 
       printf("================================\n");
       printf("ERROR occurred!\n");
-      printf(
-          "idx: %d, life cycle : [%d, %d], name: \"%s\", size: %zu, offset: "
-          "%zu\n",
-          unique_id, iter.first.first_idx, iter.first.last_idx,
-          iter.first._name.c_str(), size, iter.second);
+      printf("idx: %d, life cycle : [%d, %d], name: \"%s\", size: %zu, offset: "
+             "%zu\n",
+             unique_id, iter.first.first_idx, iter.first.last_idx,
+             iter.first._name.c_str(), size, iter.second);
 
       int check_unique_id = check_iter.first.unique_id;
       size_t check_size = check_iter.first.size;
-      printf(
-          "idx: %d, life cycle : [%d, %d], name: \"%s\", size: %zu, offset: "
-          "%zu\n",
-          check_unique_id, check_iter.first.first_idx,
-          check_iter.first.last_idx, check_iter.first._name.c_str(), check_size,
-          check_iter.second);
+      printf("idx: %d, life cycle : [%d, %d], name: \"%s\", size: %zu, offset: "
+             "%zu\n",
+             check_unique_id, check_iter.first.first_idx,
+             check_iter.first.last_idx, check_iter.first._name.c_str(),
+             check_size, check_iter.second);
 
       printf("================================\n");
       exit(-1);
@@ -230,4 +229,4 @@ void MemoryManager::calculate_buffer_() {
   printf("\n========== Finish MemoryManager calculate_buffer_ ==========\n\n");
 }
 
-}  // namespace lightseq
+} // namespace lightseq

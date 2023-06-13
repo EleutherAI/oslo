@@ -11,9 +11,8 @@
 using namespace std;
 namespace lightseq {
 namespace cuda {
-template <typename T>
-class Normalize_Layer {
- public:
+template <typename T> class Normalize_Layer {
+public:
   struct Config {
     uint32_t hidden_dim;
     bool use_mean;
@@ -75,10 +74,10 @@ class Normalize_Layer {
 
   inline bool use_mean() const { return config_.use_mean; }
 
- private:
+private:
   Config config_;
   T *vars_;
   T *means_;
 };
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

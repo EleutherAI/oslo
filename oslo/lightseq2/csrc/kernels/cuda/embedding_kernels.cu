@@ -1,7 +1,7 @@
 #include <chrono>
-#include <ctime>
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
+#include <ctime>
 
 #include "kernels.h"
 
@@ -122,7 +122,8 @@ __global__ void lookup_scale_pos_dropout<float>(
     float dropout_ratio, float emb_scale, int step, int seed) {
   int batch_id = blockIdx.x;
   int seq_id = blockIdx.y * blockDim.x + threadIdx.x;
-  if (seq_id >= seq_len) return;
+  if (seq_id >= seq_len)
+    return;
 
   int target_pos = batch_id * seq_len + seq_id;
   int start = target_pos * embedding_dim + threadIdx.y;
@@ -207,7 +208,8 @@ __global__ void lookup_scale_pos_dropout<__half>(
     int step, int seed) {
   int batch_id = blockIdx.x;
   int seq_id = blockIdx.y * blockDim.x + threadIdx.x;
-  if (seq_id >= seq_len) return;
+  if (seq_id >= seq_len)
+    return;
 
   int target_pos = batch_id * seq_len + seq_id;
   int start = target_pos * embedding_dim + threadIdx.y;
@@ -382,7 +384,8 @@ padding_idx: padding index of the sentences (default: 2)
 template <typename T>
 __global__ void zero_grads(T *grad_embeddings, int total_nums) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx >= total_nums) return;
+  if (idx >= total_nums)
+    return;
   float4 *grad_embeddings4 = reinterpret_cast<float4 *>(grad_embeddings);
   float4 zero4;
   zero4.x = zero4.y = zero4.z = zero4.w = 0.f;
@@ -402,7 +405,8 @@ __global__ void d_lookup_scale_pos_dropout<float>(
     int embedding_dim, int padding_idx, float dropout_ratio, float emb_scale) {
   int batch_id = blockIdx.x;
   int seq_id = blockIdx.y * blockDim.x + threadIdx.x;
-  if (seq_id >= seq_len) return;
+  if (seq_id >= seq_len)
+    return;
 
   int target_pos = batch_id * seq_len + seq_id;
   int start = target_pos * embedding_dim + threadIdx.y;
@@ -470,7 +474,8 @@ __global__ void d_lookup_scale_pos_dropout<__half>(
     int embedding_dim, int padding_idx, float dropout_ratio, float emb_scale) {
   int batch_id = blockIdx.x;
   int seq_id = blockIdx.y * blockDim.x + threadIdx.x;
-  if (seq_id >= seq_len) return;
+  if (seq_id >= seq_len)
+    return;
 
   int target_pos = batch_id * seq_len + seq_id;
   int start = target_pos * embedding_dim + threadIdx.y;
@@ -585,7 +590,8 @@ __global__ void d_lookup_scale_trainable_pos_dropout<float>(
     float dropout_ratio, float emb_scale) {
   int batch_id = blockIdx.x;
   int seq_id = blockIdx.y * blockDim.x + threadIdx.x;
-  if (seq_id >= seq_len) return;
+  if (seq_id >= seq_len)
+    return;
 
   int target_pos = batch_id * seq_len + seq_id;
   int start = target_pos * embedding_dim + threadIdx.y;
@@ -640,7 +646,8 @@ __global__ void d_lookup_scale_trainable_pos_dropout<__half>(
     float dropout_ratio, float emb_scale) {
   int batch_id = blockIdx.x;
   int seq_id = blockIdx.y * blockDim.x + threadIdx.x;
-  if (seq_id >= seq_len) return;
+  if (seq_id >= seq_len)
+    return;
 
   int target_pos = batch_id * seq_len + seq_id;
   int start = target_pos * embedding_dim + threadIdx.y;
@@ -789,5 +796,5 @@ void launch_d_lookup_scale_pos_dropout<__half>(
         seq_len, embedding_dim, padding_idx, dropout_ratio, emb_scale);
   }
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

@@ -2,8 +2,8 @@
 #include "../kernels/gptKernels_int8.h"
 #include "../kernels/transformerKernels.h"
 #include "../kernels/transformerKernels_int8.h"
-#include "quant_gpt_encoder.h"
 #include "cublas_helper.h"
+#include "quant_gpt_encoder.h"
 
 /**
 @file
@@ -21,33 +21,22 @@ QuantGptEncoder<OpType_>::QuantGptEncoder(
     int max_batch_size, const int *p_d_token_id, float *p_d_ppl,
     int *p_d_sample_id, const QuantGptWeight<OpType_> &tw, cudaStream_t stream,
     cudaStream_t cache_stream, cublasHandle_t hd)
-    : _max_batch_size(max_batch_size),
-      _p_d_token_id(p_d_token_id),
-      _p_d_ppl(p_d_ppl),
-      _p_d_sample_id(p_d_sample_id),
-      _tw(tw),
-      _stream(stream),
-      _cache_stream(cache_stream),
-      _hd(hd),
-      _p_d_src_emb_wei(tw.get_src_emb_wei()),
-      _p_d_enc_wei(tw.get_enc_wei()),
-      _fone((_DataType)1.f),
-      _fzero((_DataType)0.f),
+    : _max_batch_size(max_batch_size), _p_d_token_id(p_d_token_id),
+      _p_d_ppl(p_d_ppl), _p_d_sample_id(p_d_sample_id), _tw(tw),
+      _stream(stream), _cache_stream(cache_stream), _hd(hd),
+      _p_d_src_emb_wei(tw.get_src_emb_wei()), _p_d_enc_wei(tw.get_enc_wei()),
+      _fone((_DataType)1.f), _fzero((_DataType)0.f),
       _src_emb_clip_max(tw.get_src_emb_clip_max()),
       _output_ln_clip_max(tw.get_output_ln_clip_max()),
       _logits_clip_max(tw.get_logits_clip_max()),
-      _enc_clip_max(tw.get_enc_clip_max()),
-      _ione((int32_t)1),
+      _enc_clip_max(tw.get_enc_clip_max()), _ione((int32_t)1),
       _izero((int32_t)0),
       _atten_scaler((_DataType)sqrt(1.f / tw._dim_per_head)),
       _max_batch_dim(max_batch_size * tw._max_step * tw._hidden_size),
-      _max_thread_per_block(1024),
-      _h_real_seq_len(max_batch_size, 0),
+      _max_thread_per_block(1024), _h_real_seq_len(max_batch_size, 0),
       _h_ppl(max_batch_size, 0.f),
-      _h_sample_id(max_batch_size * tw._max_step, 0),
-      _h_unfinished(1),
-      _is_benchmark(false),
-      _algo_map(),
+      _h_sample_id(max_batch_size * tw._max_step, 0), _h_unfinished(1),
+      _is_benchmark(false), _algo_map(),
       _sm_gt_eq_80(getSMVersion() >= 80 ? true : false) {
   CHECK_GPU_ERROR(cublasLtCreate(&_cublas_lt_handle));
 }
@@ -58,8 +47,7 @@ Init the GPU memory pointer which point to
 These buffer are used during custom cuda kernel function,
   find the corresponding function to see how these buffer are used
 */
-template <OperationType OpType_>
-void QuantGptEncoder<OpType_>::init_buffer() {
+template <OperationType OpType_> void QuantGptEncoder<OpType_>::init_buffer() {
   CHECK_GPU_ERROR(
       cudaMalloc(&_p_d_real_seq_len, _max_batch_size * sizeof(int)));
   CHECK_GPU_ERROR(cudaMalloc(&_p_d_query, _max_batch_dim * sizeof(_DataType)));
@@ -86,9 +74,9 @@ void QuantGptEncoder<OpType_>::init_buffer() {
       round_up(std::max(_tw._inner_size, _tw._hidden_size * 3), 32);
   CHECK_GPU_ERROR(
       cudaMalloc(&_int8_ffn_in_buf, max_batch_dim * sizeof(int8_t)));
-  CHECK_GPU_ERROR(cudaMalloc(
-      &_int32_ffn_out_buf,
-      std::max(max_batch_dim, max_attn_score_dim) * sizeof(int32_t)));
+  CHECK_GPU_ERROR(cudaMalloc(&_int32_ffn_out_buf,
+                             std::max(max_batch_dim, max_attn_score_dim) *
+                                 sizeof(int32_t)));
   CHECK_GPU_ERROR(
       cudaMalloc(&_int8_ffn_out_buf,
                  std::max(max_batch_dim, round_up(_tw._src_vocab_size, 32) *
@@ -219,8 +207,7 @@ void QuantGptEncoder<OpType_>::init_buffer() {
 /**
 Some requirements needed by custom cuda kernel function
 */
-template <OperationType OpType_>
-std::string QuantGptEncoder<OpType_>::check() {
+template <OperationType OpType_> std::string QuantGptEncoder<OpType_>::check() {
   // if (_max_thread_per_block < _tw._hidden_size) {
   //   return "violate hidden_size <= max_thread_per_block";
   // }
@@ -385,7 +372,8 @@ int QuantGptEncoder<OpType_>::run_one_sample(int batch_size,
     _p_d_self_v_cache1 = ftmp;
 
     bool unfinish = sample_one_token_with_cache();
-    if (!unfinish && !_is_benchmark) break;
+    if (!unfinish && !_is_benchmark)
+      break;
   }
 
   CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_sample_id_buf, _p_d_sample_id,
@@ -657,8 +645,7 @@ void QuantGptEncoder<OpType_>::self_attention_with_cache() {
   return;
 }
 
-template <OperationType OpType_>
-void QuantGptEncoder<OpType_>::ffn_add_norm() {
+template <OperationType OpType_> void QuantGptEncoder<OpType_>::ffn_add_norm() {
   /* ---step 1. first ffn layer--- */
   if (_sm_gt_eq_80) {
     cublaslt_gemm(_int8_p_d_enc_wei[_layer_id * 4 + 2], _int8_ffn_in_buf,
@@ -796,8 +783,7 @@ void QuantGptEncoder<OpType_>::ffn_add_norm_with_cache() {
 /**
 Compute ppl from encoder output
 */
-template <OperationType OpType_>
-void QuantGptEncoder<OpType_>::compute_ppl() {
+template <OperationType OpType_> void QuantGptEncoder<OpType_>::compute_ppl() {
   /* ---step 1. project hidden states to vocab logits--- */
   cublasLtMM_withAlgo_i8IO(_int8_ffn_out_buf, 1, _batch_token_num,
                            _tw._src_vocab_size, _tw._hidden_size, 0, 0, 0,
@@ -821,5 +807,5 @@ void QuantGptEncoder<OpType_>::compute_ppl() {
 template class QuantGptEncoder<OperationType::FP16>;
 template class QuantGptEncoder<OperationType::FP32>;
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

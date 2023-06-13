@@ -6,7 +6,7 @@
 Example of how to run transformer inference using our implementation.
 */
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   std::string model_weights_path = argv[1];
 
   std::vector<int> example_input = {63, 47,   65,  1507, 88,  74,
@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
   auto model = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
       "Transformer", model_weights_path, max_batch_size);
 
-  void* d_input;
+  void *d_input;
   CHECK_GPU_ERROR(
       cudaMalloc(&d_input, sizeof(int) * batch_size * batch_seq_len));
   CHECK_GPU_ERROR(cudaMemcpy(d_input, host_input.data(),
@@ -41,7 +41,7 @@ int main(int argc, char* argv[]) {
   model->set_input_shape(0, {batch_size, batch_seq_len});
 
   for (int i = 0; i < model->get_output_size(); i++) {
-    void* d_output;
+    void *d_output;
     std::vector<int> shape = model->get_output_max_shape(i);
     int total_size = 1;
     for (int j = 0; j < shape.size(); j++) {
@@ -70,8 +70,8 @@ int main(int argc, char* argv[]) {
             << " ms" << std::endl;
 
   for (int i = 0; i < model->get_output_size(); i++) {
-    const void* d_output;
-    d_output = static_cast<const float*>(model->get_output_ptr(i));
+    const void *d_output;
+    d_output = static_cast<const float *>(model->get_output_ptr(i));
     std::vector<int> shape = model->get_output_shape(i);
     std::cout << "output shape: ";
     int size = 1;
@@ -82,9 +82,9 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl;
 
     if (!i)
-      lightseq::print_vec((int*)d_output, "output", size);
+      lightseq::print_vec((int *)d_output, "output", size);
     else
-      lightseq::print_vec((float*)d_output, "output", size);
+      lightseq::print_vec((float *)d_output, "output", size);
   }
 
   return 0;

@@ -119,35 +119,35 @@ std::string _cudaGetErrorString(cudaError_t error) {
 
 std::string _cudaGetErrorString(cublasStatus_t error) {
   switch (error) {
-    case CUBLAS_STATUS_SUCCESS:
-      return "CUBLAS_STATUS_SUCCESS";
+  case CUBLAS_STATUS_SUCCESS:
+    return "CUBLAS_STATUS_SUCCESS";
 
-    case CUBLAS_STATUS_NOT_INITIALIZED:
-      return "CUBLAS_STATUS_NOT_INITIALIZED";
+  case CUBLAS_STATUS_NOT_INITIALIZED:
+    return "CUBLAS_STATUS_NOT_INITIALIZED";
 
-    case CUBLAS_STATUS_ALLOC_FAILED:
-      return "CUBLAS_STATUS_ALLOC_FAILED";
+  case CUBLAS_STATUS_ALLOC_FAILED:
+    return "CUBLAS_STATUS_ALLOC_FAILED";
 
-    case CUBLAS_STATUS_INVALID_VALUE:
-      return "CUBLAS_STATUS_INVALID_VALUE";
+  case CUBLAS_STATUS_INVALID_VALUE:
+    return "CUBLAS_STATUS_INVALID_VALUE";
 
-    case CUBLAS_STATUS_ARCH_MISMATCH:
-      return "CUBLAS_STATUS_ARCH_MISMATCH";
+  case CUBLAS_STATUS_ARCH_MISMATCH:
+    return "CUBLAS_STATUS_ARCH_MISMATCH";
 
-    case CUBLAS_STATUS_MAPPING_ERROR:
-      return "CUBLAS_STATUS_MAPPING_ERROR";
+  case CUBLAS_STATUS_MAPPING_ERROR:
+    return "CUBLAS_STATUS_MAPPING_ERROR";
 
-    case CUBLAS_STATUS_EXECUTION_FAILED:
-      return "CUBLAS_STATUS_EXECUTION_FAILED";
+  case CUBLAS_STATUS_EXECUTION_FAILED:
+    return "CUBLAS_STATUS_EXECUTION_FAILED";
 
-    case CUBLAS_STATUS_INTERNAL_ERROR:
-      return "CUBLAS_STATUS_INTERNAL_ERROR";
+  case CUBLAS_STATUS_INTERNAL_ERROR:
+    return "CUBLAS_STATUS_INTERNAL_ERROR";
 
-    case CUBLAS_STATUS_NOT_SUPPORTED:
-      return "CUBLAS_STATUS_NOT_SUPPORTED";
+  case CUBLAS_STATUS_NOT_SUPPORTED:
+    return "CUBLAS_STATUS_NOT_SUPPORTED";
 
-    case CUBLAS_STATUS_LICENSE_ERROR:
-      return "CUBLAS_STATUS_LICENSE_ERROR";
+  case CUBLAS_STATUS_LICENSE_ERROR:
+    return "CUBLAS_STATUS_LICENSE_ERROR";
   }
   return "CUBLAS_UNKNOW";
 }
@@ -171,8 +171,7 @@ template void check_gpu_error<cublasStatus_t>(cublasStatus_t result,
                                               const char *const file,
                                               int const line);
 
-template <typename T>
-T *cuda_malloc(size_t ele_num) {
+template <typename T> T *cuda_malloc(size_t ele_num) {
   size_t byte_size = ele_num * sizeof(T);
   T *pdata = nullptr;
   CHECK_GPU_ERROR(cudaMalloc((void **)&pdata, byte_size));
@@ -197,8 +196,7 @@ void cuda_free(void *pdata) {
   }
 }
 
-template <typename T>
-void cuda_set(T *pdata, int value, size_t ele_num) {
+template <typename T> void cuda_set(T *pdata, int value, size_t ele_num) {
   size_t byte_size = ele_num * sizeof(T);
 
   if (pdata != nullptr) {
@@ -214,23 +212,19 @@ template void cuda_set<uint8_t>(uint8_t *pdata, int value, size_t ele_num);
 
 template void cuda_set<int8_t>(int8_t *pdata, int value, size_t ele_num);
 
-template <typename T>
-struct _isnan {
+template <typename T> struct _isnan {
   __device__ bool operator()(T a) const { return isnan(a); }
 };
 
-template <>
-struct _isnan<__half> {
+template <> struct _isnan<__half> {
   __device__ bool operator()(const __half a) const { return __hisnan(a); }
 };
 
-template <typename T>
-struct _isinf {
+template <typename T> struct _isinf {
   __device__ bool operator()(T a) const { return isinf(a); }
 };
 
-template <>
-struct _isinf<__half> {
+template <> struct _isinf<__half> {
   __device__ bool operator()(const __half a) const { return __hisinf(a); }
 };
 
@@ -269,12 +263,10 @@ template void check_nan_inf<__half>(const __half *data_ptr, int dsize,
                                     int line, cudaStream_t stream);
 
 // square<T> computes the square of a number f(x) -> x*x
-template <typename T>
-struct _square {
+template <typename T> struct _square {
   __host__ __device__ float operator()(const T &x) const { return x * x; }
 };
-template <>
-struct _square<__half> {
+template <> struct _square<__half> {
   __host__ __device__ float operator()(const __half &x) const {
     return __half2float(x) * __half2float(x);
   }
@@ -320,5 +312,5 @@ std::string getGPUName() {
   }
   return "";
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

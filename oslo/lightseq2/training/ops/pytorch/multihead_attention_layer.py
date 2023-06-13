@@ -24,7 +24,6 @@ from oslo.lightseq2.training.ops.pytorch.util import (
 from transformers import PretrainedConfig
 
 
-
 layer_cuda_module = None
 
 
@@ -50,10 +49,7 @@ class LSMultiheadAttentionFunc(Function):
             input = input.to(torch.half)
             input_mask = input_mask.to(torch.half)
 
-        (output,) = forward_func(
-            config.layer_id,
-            input,
-            input_mask)
+        (output,) = forward_func(config.layer_id, input, input_mask)
 
         if config.is_grad_enabled and config.training:
             ctx.save_for_backward(output, input, input_mask)
@@ -97,12 +93,7 @@ class LSMultiheadAttentionLayer(nn.Module):
 
     layer_id = 0
 
-    def __init__(
-        self,
-        config,
-        initial_weights=None, 
-        initial_biases=None
-    ):
+    def __init__(self, config, initial_weights=None, initial_biases=None):
         super(LSMultiheadAttentionLayer, self).__init__()
 
         self.config = copy.deepcopy(config)
@@ -111,8 +102,13 @@ class LSMultiheadAttentionLayer(nn.Module):
             self.config.nhead = self.config.num_attention_heads
             if hasattr(self.config, "max_batch_size_for_lightseq"):
                 self.config.max_batch_size_for_lightseq = 16
-            self.config.max_batch_tokens = self.config.max_batch_size_for_lightseq * self.config.max_position_embeddings # 일단 default batch size로 128로 설정
-            self.config.activation_dropout_ratio = self.config.hidden_dropout_prob  # 이 둘이 같다고 가정
+            self.config.max_batch_tokens = (
+                self.config.max_batch_size_for_lightseq
+                * self.config.max_position_embeddings
+            )  # 일단 default batch size로 128로 설정
+            self.config.activation_dropout_ratio = (
+                self.config.hidden_dropout_prob
+            )  # 이 둘이 같다고 가정
             self.config.attention_probs_dropout_prob = self.config.hidden_dropout_prob
             self.config.attn_prob_dropout_ratio = self.config.hidden_dropout_prob
             self.config.hidden_dropout_ratio = self.config.hidden_dropout_prob
@@ -211,10 +207,10 @@ class LSMultiheadAttentionLayer(nn.Module):
             hidden_size: int  # size of transformer hidden layers
             num_attention_heads: int  # number of heads in attention
             nhead: int
-            intermediate_size: int # size of intermediate layer
+            intermediate_size: int  # size of intermediate layer
             attention_probs_dropout_prob: float  # attention score dropout ratio
             attn_prob_dropout_ratio: float
-            activation_dropout_ratio: float # activation dropout ratio
+            activation_dropout_ratio: float  # activation dropout ratio
             hidden_dropout_prob: float  # dropout ration before residual
             hidden_dropout_ratio: float
             pre_or_postLayerNorm: bool  # pre layer norm or post
@@ -224,7 +220,7 @@ class LSMultiheadAttentionLayer(nn.Module):
             mask_future_tokens: bool  # mask future tokens
             is_post_ln: bool  # post layer norm
             fp16: bool  # fp16 presion
-            local_rank: int = 0 # rank in local node
+            local_rank: int = 0  # rank in local node
             quant_mode: bool = False
             training: bool = True
             is_grad_enabled: bool = True
@@ -237,12 +233,12 @@ class LSMultiheadAttentionLayer(nn.Module):
     def gen_offset(hidden_size, intermediate_size):
         hs, ims = hidden_size, intermediate_size
         sizes = [
-            hs * hs * 3, # attn_qkvw
-            hs * 3,     # attn_qkvb
-            hs * hs,    # attn_ow
-            hs,     # attn_ob
-            hs,     # attn_nw
-            hs,     # attn_nb
+            hs * hs * 3,  # attn_qkvw
+            hs * 3,  # attn_qkvb
+            hs * hs,  # attn_ow
+            hs,  # attn_ob
+            hs,  # attn_nw
+            hs,  # attn_nb
         ]
         offsets = calc_offset(sizes)
         return offsets
@@ -260,13 +256,17 @@ class LSMultiheadAttentionLayer(nn.Module):
     def init_transformer_weights(self):
         hs = self.config.hidden_size
         attn_qkvw = self._get_weights(0).view(3, hs, hs)
-        nn.init.normal_(attn_qkvw[0,:,:], mean=0.0, std=self.config.initializer_range)
-        nn.init.normal_(attn_qkvw[1,:,:], mean=0.0, std=self.config.initializer_range)
-        nn.init.normal_(attn_qkvw[2,:,:], mean=0.0, std=self.config.initializer_range)
+        nn.init.normal_(attn_qkvw[0, :, :], mean=0.0, std=self.config.initializer_range)
+        nn.init.normal_(attn_qkvw[1, :, :], mean=0.0, std=self.config.initializer_range)
+        nn.init.normal_(attn_qkvw[2, :, :], mean=0.0, std=self.config.initializer_range)
 
         nn.init.zeros_(self._get_weights(1))
 
-        nn.init.normal_(self._get_weights(2).view(-1, hs), mean=0.0, std=self.config.initializer_range)
+        nn.init.normal_(
+            self._get_weights(2).view(-1, hs),
+            mean=0.0,
+            std=self.config.initializer_range,
+        )
         nn.init.zeros_(self._get_weights(3))
 
         nn.init.ones_(self._get_weights(4))
@@ -374,9 +374,10 @@ class LSMultiheadAttentionLayer(nn.Module):
         if len(encoder_padding_mask.size()) == 1:
             assert bs == 1 and sl == encoder_padding_mask.size(0)
         else:
-            assert bs == encoder_padding_mask.size(
-                0
-            ) and sl == encoder_padding_mask.size()[-1]
+            assert (
+                bs == encoder_padding_mask.size(0)
+                and sl == encoder_padding_mask.size()[-1]
+            )
         encoder_padding_mask = torch.nan_to_num(encoder_padding_mask)
         output = LSMultiheadAttentionFunc.apply(
             hidden_states,

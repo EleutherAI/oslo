@@ -3,9 +3,9 @@
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <curand_kernel.h>
+#include <stdexcept>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdexcept>
 #include <vector>
 
 #define MAX_THREADS 1024
@@ -280,9 +280,8 @@ __forceinline__ __host__ __device__ int flat_3dim(int id1, int id2, int id3,
 }
 
 /* Convert 4-dim tensor index into vector index */
-__forceinline__ __host__ __device__ int flat_4dim(int id1, int id2, int id3,
-                                                  int id4, int dim2, int dim3,
-                                                  int dim4) {
+__forceinline__ __host__ __device__ int
+flat_4dim(int id1, int id2, int id3, int id4, int dim2, int dim3, int dim4) {
   // return id1*(dim2*dim3*dim4) + id2*(dim3*dim4) + id3*dim4 + id4;
   int res = id4;
 
@@ -350,9 +349,9 @@ __forceinline__ __host__ __device__ int flat_6dim(int id1, int id2, int id3,
 }
 
 /* Convert vector index to 6-dim tensor index */
-__forceinline__ __host__ __device__ void decompose_6dim(
-    int src, int dim1, int dim2, int dim3, int dim4, int dim5, int *id0,
-    int *id1, int *id2, int *id3, int *id4, int *id5) {
+__forceinline__ __host__ __device__ void
+decompose_6dim(int src, int dim1, int dim2, int dim3, int dim4, int dim5,
+               int *id0, int *id1, int *id2, int *id3, int *id4, int *id5) {
   *id5 = src % dim5;
   src /= dim5;
 
@@ -370,11 +369,9 @@ __forceinline__ __host__ __device__ void decompose_6dim(
 }
 
 /* Convert vector index to 5-dim tensor index */
-__forceinline__ __host__ __device__ void decompose_5dim(int src, int dim1,
-                                                        int dim2, int dim3,
-                                                        int dim4, int *id0,
-                                                        int *id1, int *id2,
-                                                        int *id3, int *id4) {
+__forceinline__ __host__ __device__ void
+decompose_5dim(int src, int dim1, int dim2, int dim3, int dim4, int *id0,
+               int *id1, int *id2, int *id3, int *id4) {
   *id4 = src % dim4;
   src /= dim4;
 
@@ -404,9 +401,8 @@ __forceinline__ __host__ __device__ void decompose_4dim(int src, int dim1,
 }
 
 /* Convert vector index to 3-dim tensor index */
-__forceinline__ __host__ __device__ void decompose_3dim(int src, int dim1,
-                                                        int dim2, int *id0,
-                                                        int *id1, int *id2) {
+__forceinline__ __host__ __device__ void
+decompose_3dim(int src, int dim1, int dim2, int *id0, int *id1, int *id2) {
   *id2 = src % dim2;
   src /= dim2;
 
@@ -475,9 +471,11 @@ __forceinline__ __device__ float fake_quantize(float x, float clip_max,
                                                bool symmetry = true) {
   clip_mask = uint8_t(get_clip_mask(x, clip_max, start_bit, symmetry));
   float dequant_scale = clip_max / kQuantRangeI8;
-  if (!symmetry) dequant_scale /= 2;
+  if (!symmetry)
+    dequant_scale /= 2;
   float i8_f = x / dequant_scale;
-  if (!symmetry) i8_f -= kQuantRangeI8;
+  if (!symmetry)
+    i8_f -= kQuantRangeI8;
   float i8 = floorf(i8_f + 0.5f);
   i8 = fminf(fmaxf(i8, -kQuantRangeI8), kQuantRangeI8);
   if (symmetry)
@@ -501,36 +499,24 @@ __forceinline__ __device__ float dequantize(int8_t x, float clip_max) {
 }
 
 /* row major index to col32 index */
-__forceinline__ __host__ __device__ int row_major2flat_col32(int row_id,
-                                                             int col_id,
-                                                             int row_size,
-                                                             int col_size) {
+__forceinline__ __host__ __device__ int
+row_major2flat_col32(int row_id, int col_id, int row_size, int col_size) {
   return ((col_id & 0xffffe0) * row_size) + (row_id << 5) + (col_id & 31);
 }
 
-template <typename T>
-__inline__ float get_float(T val);
+template <typename T> __inline__ float get_float(T val);
 
-template <>
-__inline__ float get_float<float>(float val) {
-  return val;
-}
+template <> __inline__ float get_float<float>(float val) { return val; }
 
-template <>
-__inline__ float get_float<__half>(__half val) {
+template <> __inline__ float get_float<__half>(__half val) {
   return __half2float(val);
 }
 
-template <typename T>
-static __global__ void zero_grad(T *grad);
+template <typename T> static __global__ void zero_grad(T *grad);
 
-template <>
-__global__ void zero_grad<float>(float *grad) {
-  grad[0] = 0;
-}
+template <> __global__ void zero_grad<float>(float *grad) { grad[0] = 0; }
 
-template <>
-__global__ void zero_grad<__half>(__half *grad) {
+template <> __global__ void zero_grad<__half>(__half *grad) {
   grad[0] = __half(0.0);
 }
 
@@ -546,5 +532,5 @@ __inline__ std::vector<LSLayout> getLSLayout(std::string layout) {
   else
     return {kRowMajor, kRowMajor, kRowMajor};
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

@@ -1,5 +1,5 @@
-#include "test_model_weight.h"
 #include "linear_layer.h"
+#include "test_model_weight.h"
 
 namespace lightseq {
 
@@ -19,7 +19,7 @@ void test_func() {
   for (int i = 0; i < weight_size; i++) {
     wei_emb.push_back(rand() % 100);
   }
-  std::vector<const float*> _p_wei_emb;
+  std::vector<const float *> _p_wei_emb;
   _p_wei_emb.push_back(wei_emb.data());
 
   // create linear layer & load params
@@ -28,18 +28,18 @@ void test_func() {
   linear_layer->load_params(_p_wei_emb, 0);
 
   // construct network
-  Variable* inp(new Variable("input", g_dtype<float>()));
-  Variable* out = (*linear_layer)(inp);
+  Variable *inp(new Variable("input", g_dtype<float>()));
+  Variable *out = (*linear_layer)(inp);
 
   // set input_ptr & output_ptr
-  float* input_ptr = (float*)malloc(batch_tokens * input_size * sizeof(float));
+  float *input_ptr = (float *)malloc(batch_tokens * input_size * sizeof(float));
   for (int i = 0; i < batch_tokens * input_size; i++) {
     *(input_ptr + i) = rand() % 100;
   }
-  inp->set_value((char*)input_ptr);
-  float* output_ptr =
-      (float*)malloc(batch_tokens * output_size * sizeof(float));
-  out->set_value((char*)output_ptr);
+  inp->set_value((char *)input_ptr);
+  float *output_ptr =
+      (float *)malloc(batch_tokens * output_size * sizeof(float));
+  out->set_value((char *)output_ptr);
 
   // calculate
   linear_layer->before_forward(batch_size, seq_len);
@@ -73,6 +73,6 @@ void test_func() {
 
   printf("==========\n");
 }
-}  // namespace lightseq
+} // namespace lightseq
 
 int main() { lightseq::test_func(); }

@@ -12,8 +12,8 @@
 #include <string>
 #include <vector>
 
-#include "quant_gpt.pb.h"
 #include "../tools/util.h"
+#include "quant_gpt.pb.h"
 
 namespace lightseq {
 namespace cuda {
@@ -21,9 +21,8 @@ namespace cuda {
 /*
 Load the model weights which stored in custom proto file into GPU memory.
 */
-template <OperationType OpType_>
-class QuantGptWeight {
- private:
+template <OperationType OpType_> class QuantGptWeight {
+private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
 
@@ -39,8 +38,8 @@ class QuantGptWeight {
   void hdf5_parse_enc_wei(hid_t hdf5_file);
 
   // store the weights pointer
-  std::vector<const _DataType *> _p_d_src_emb_wei;  // size: 4
-  std::vector<const _DataType *> _p_d_enc_wei;      // size: 12 * enc_layer_num
+  std::vector<const _DataType *> _p_d_src_emb_wei; // size: 4
+  std::vector<const _DataType *> _p_d_enc_wei;     // size: 12 * enc_layer_num
 
   // store the weights on gpu memory
   std::vector<_DataType> _d_src_emb_wei;
@@ -50,9 +49,9 @@ class QuantGptWeight {
   float _src_emb_clip_max;
   float _output_ln_clip_max;
   float _logits_clip_max;
-  std::vector<float> _enc_clip_max;  // size: 11 * enc_layer_num
+  std::vector<float> _enc_clip_max; // size: 11 * enc_layer_num
 
- public:
+public:
   std::string initializing(std::string weight_path);
 
   const std::vector<const _DataType *> &get_src_emb_wei() const {
@@ -84,17 +83,17 @@ class QuantGptWeight {
   int _max_step;
   int _extra_decode_length;
   int _src_vocab_size;
-  int _n_enc_layer;  // number of encoder layer
+  int _n_enc_layer; // number of encoder layer
   int _dim_per_head;
-  int _weight_per_enc_layer;  // 12
+  int _weight_per_enc_layer; // 12
 
   int _head_num;
-  int _padding_id;  // for src
+  int _padding_id; // for src
   std::string _sampling_method = "topk";
   int _topk = 4;
   float _topp = 0.75;
   int _eos_id;
 };
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

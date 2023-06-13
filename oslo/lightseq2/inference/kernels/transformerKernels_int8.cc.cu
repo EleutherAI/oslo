@@ -30,7 +30,8 @@ __global__ void quantize_tensor_kernel(const float *input, int8_t *output,
                                        int batch_tokens, int hidden_size,
                                        float quant_scale, bool out_col32) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= batch_tokens * hidden_size) return;
+  if (i >= batch_tokens * hidden_size)
+    return;
   int output_index;
   if (out_col32) {
     int row_id = i / hidden_size;
@@ -47,7 +48,8 @@ __global__ void quantize_tensor_kernel(const __half *input, int8_t *output,
                                        int batch_tokens, int hidden_size,
                                        float quant_scale, bool out_col32) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= batch_tokens * hidden_size) return;
+  if (i >= batch_tokens * hidden_size)
+    return;
 
   int output_index;
   if (out_col32) {
@@ -87,13 +89,13 @@ __global__ void dequantize_tensor_kernel(const int32_t *input, T *output,
                                          float dequant_scale, bool in_col32);
 
 template <>
-__global__ void dequantize_tensor_kernel<float>(const int32_t *input,
-                                                float *output, int batch_tokens,
-                                                int hidden_size,
-                                                float dequant_scale,
-                                                bool in_col32) {
+__global__ void
+dequantize_tensor_kernel<float>(const int32_t *input, float *output,
+                                int batch_tokens, int hidden_size,
+                                float dequant_scale, bool in_col32) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= batch_tokens * hidden_size) return;
+  if (i >= batch_tokens * hidden_size)
+    return;
   int input_index;
   if (in_col32) {
     int row_id = i / hidden_size;
@@ -107,11 +109,13 @@ __global__ void dequantize_tensor_kernel<float>(const int32_t *input,
 }
 
 template <>
-__global__ void dequantize_tensor_kernel<__half>(
-    const int32_t *input, __half *output, int batch_tokens, int hidden_size,
-    float dequant_scale, bool in_col32) {
+__global__ void
+dequantize_tensor_kernel<__half>(const int32_t *input, __half *output,
+                                 int batch_tokens, int hidden_size,
+                                 float dequant_scale, bool in_col32) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= batch_tokens * hidden_size) return;
+  if (i >= batch_tokens * hidden_size)
+    return;
 
   int in_index;
   if (in_col32) {
@@ -147,12 +151,11 @@ void launch_dequantize_tensor<__half>(const int32_t *input, __half *output,
 }
 
 template <typename T>
-__global__ void ker_norm_layer_resual_i8O(T *input, int8_t *output,
-                                          const T *scale, const T *bias,
-                                          const T *residual_bias,
-                                          const int hidden_size,
-                                          float quant_scale, bool is_post_ln,
-                                          bool out_col32) {
+__global__ void
+ker_norm_layer_resual_i8O(T *input, int8_t *output, const T *scale,
+                          const T *bias, const T *residual_bias,
+                          const int hidden_size, float quant_scale,
+                          bool is_post_ln, bool out_col32) {
   int block_start = blockIdx.x * hidden_size;
   int start = block_start + threadIdx.x;
   int end = block_start + hidden_size;
@@ -164,7 +167,8 @@ __global__ void ker_norm_layer_resual_i8O(T *input, int8_t *output,
   // step 0. compute mean
   __shared__ float s_mean;
   float reduce_res = blockReduceSum<float>(val);
-  if (threadIdx.x == 0) s_mean = reduce_res / float(hidden_size);
+  if (threadIdx.x == 0)
+    s_mean = reduce_res / float(hidden_size);
   __syncthreads();
 
   // step 1. compute variance
@@ -227,7 +231,8 @@ __global__ void ker_norm_layer_resual_i8O<__half>(
   }
   __shared__ float s_mean;
   float reduce_res = blockReduceSum<float>(val);
-  if (threadIdx.x == 0) s_mean = reduce_res / mean_dim;
+  if (threadIdx.x == 0)
+    s_mean = reduce_res / mean_dim;
   __syncthreads();
 
   // step 1. compute variance
@@ -240,7 +245,8 @@ __global__ void ker_norm_layer_resual_i8O<__half>(
   }
   __shared__ float s_var;
   reduce_res = blockReduceSum(val);
-  if (threadIdx.x == 0) s_var = rsqrtf(reduce_res / mean_dim + epsilon);
+  if (threadIdx.x == 0)
+    s_var = rsqrtf(reduce_res / mean_dim + epsilon);
   __syncthreads();
 
   char2 output_c2;
@@ -339,7 +345,8 @@ __global__ void ker_residual_bias_ln_i32I_i8O(
     }
     float residual_out =
         __int2float_rn(input[input_index]) * dequant_scale + residual[i];
-    if (colsum != nullptr) residual_out += __ldg(&colsum[i - block_start]);
+    if (colsum != nullptr)
+      residual_out += __ldg(&colsum[i - block_start]);
     s_row_out[i - block_start] = residual_out;
     val += residual_out;
   }
@@ -347,7 +354,8 @@ __global__ void ker_residual_bias_ln_i32I_i8O(
   // step 0. compute mean
   __shared__ float s_mean;
   float reduce_res = blockReduceSum<float>(val);
-  if (threadIdx.x == 0) s_mean = reduce_res / __int2float_rn(hidden_size);
+  if (threadIdx.x == 0)
+    s_mean = reduce_res / __int2float_rn(hidden_size);
   __syncthreads();
 
   // step 1. compute variance
@@ -424,7 +432,8 @@ __global__ void ker_residual_bias_ln_i32I_i8O<half>(
   // step 0. compute mean
   __shared__ float s_mean;
   float reduce_res = blockReduceSum<float>(val);
-  if (threadIdx.x == 0) s_mean = reduce_res / __int2float_rn(hidden_size);
+  if (threadIdx.x == 0)
+    s_mean = reduce_res / __int2float_rn(hidden_size);
   __syncthreads();
 
   // step 1. compute variance
@@ -511,11 +520,12 @@ template void ker_residual_bias_ln_i32I_i8O_launcher<half>(
     bool in_col32, bool out_col32, const half *colsum);
 
 template <typename T>
-__global__ void ker_residual_bias_ln_i8I_i8O(
-    const int8_t *input, const T *scale, const T *bias, const T *residual_bias,
-    int8_t *output, T *residual, int hidden_size, float dequant_scale,
-    float quant_scale, bool is_post_ln, bool in_col32, bool out_col32,
-    const T *colsum) {
+__global__ void
+ker_residual_bias_ln_i8I_i8O(const int8_t *input, const T *scale, const T *bias,
+                             const T *residual_bias, int8_t *output,
+                             T *residual, int hidden_size, float dequant_scale,
+                             float quant_scale, bool is_post_ln, bool in_col32,
+                             bool out_col32, const T *colsum) {
   extern __shared__ float s_row_out[];
 
   int block_start = blockIdx.x * hidden_size;
@@ -534,7 +544,8 @@ __global__ void ker_residual_bias_ln_i8I_i8O(
     }
     float residual_out =
         __int2float_rn(input[input_index]) * dequant_scale + residual[i];
-    if (colsum) residual_out += colsum[i - block_start];
+    if (colsum)
+      residual_out += colsum[i - block_start];
     s_row_out[i - block_start] = residual_out;
     val += residual_out;
   }
@@ -542,7 +553,8 @@ __global__ void ker_residual_bias_ln_i8I_i8O(
   // step 0. compute mean
   __shared__ float s_mean;
   float reduce_res = blockReduceSum<float>(val);
-  if (threadIdx.x == 0) s_mean = reduce_res / __int2float_rn(hidden_size);
+  if (threadIdx.x == 0)
+    s_mean = reduce_res / __int2float_rn(hidden_size);
   __syncthreads();
 
   // step 1. compute variance
@@ -610,7 +622,8 @@ __global__ void ker_residual_bias_ln_i8I_i8O<half>(
     }
     float residual_out = __int2float_rn(input[input_index]) * dequant_scale +
                          safe_half_to_float(residual[i]);
-    if (colsum) residual_out += safe_half_to_float(colsum[i - block_start]);
+    if (colsum)
+      residual_out += safe_half_to_float(colsum[i - block_start]);
     s_row_out[i - block_start] = residual_out;
     val += residual_out;
   }
@@ -618,7 +631,8 @@ __global__ void ker_residual_bias_ln_i8I_i8O<half>(
   // step 0. compute mean
   __shared__ float s_mean;
   float reduce_res = blockReduceSum<float>(val);
-  if (threadIdx.x == 0) s_mean = reduce_res / __int2float_rn(hidden_size);
+  if (threadIdx.x == 0)
+    s_mean = reduce_res / __int2float_rn(hidden_size);
   __syncthreads();
 
   // step 1. compute variance
@@ -705,11 +719,10 @@ template void ker_residual_bias_ln_i8I_i8O_launcher<half>(
     bool in_col32, bool out_col32, const half *colsum);
 
 template <typename T>
-__global__ void ker_residual_bias_ln_i32I(const int32_t *input, const T *scale,
-                                          const T *bias, const T *residual,
-                                          T *output, int hidden_size,
-                                          float dequant_scale, bool in_col32,
-                                          const T *colsum) {
+__global__ void
+ker_residual_bias_ln_i32I(const int32_t *input, const T *scale, const T *bias,
+                          const T *residual, T *output, int hidden_size,
+                          float dequant_scale, bool in_col32, const T *colsum) {
   extern __shared__ float s_row_out[];
 
   int block_start = blockIdx.x * hidden_size;
@@ -728,7 +741,8 @@ __global__ void ker_residual_bias_ln_i32I(const int32_t *input, const T *scale,
     }
     float residual_out =
         __int2float_rn(input[input_index]) * dequant_scale + residual[i];
-    if (colsum) residual_out += colsum[i - block_start];
+    if (colsum)
+      residual_out += colsum[i - block_start];
 
     s_row_out[i - block_start] = residual_out;
     val += residual_out;
@@ -737,7 +751,8 @@ __global__ void ker_residual_bias_ln_i32I(const int32_t *input, const T *scale,
   // step 0. compute mean
   __shared__ float s_mean;
   float reduce_res = blockReduceSum<float>(val);
-  if (threadIdx.x == 0) s_mean = reduce_res / __int2float_rn(hidden_size);
+  if (threadIdx.x == 0)
+    s_mean = reduce_res / __int2float_rn(hidden_size);
   __syncthreads();
 
   // step 1. compute variance
@@ -787,7 +802,8 @@ __global__ void ker_residual_bias_ln_i32I<half>(
     }
     float residual_out = __int2float_rn(input[input_index]) * dequant_scale +
                          safe_half_to_float(residual[i]);
-    if (colsum) residual_out += safe_half_to_float(colsum[i - block_start]);
+    if (colsum)
+      residual_out += safe_half_to_float(colsum[i - block_start]);
 
     s_row_out[i - block_start] = residual_out;
     val += residual_out;
@@ -796,7 +812,8 @@ __global__ void ker_residual_bias_ln_i32I<half>(
   // step 0. compute mean
   __shared__ float s_mean;
   float reduce_res = blockReduceSum<float>(val);
-  if (threadIdx.x == 0) s_mean = reduce_res / __int2float_rn(hidden_size);
+  if (threadIdx.x == 0)
+    s_mean = reduce_res / __int2float_rn(hidden_size);
   __syncthreads();
 
   // step 1. compute variance
@@ -1006,10 +1023,11 @@ __global__ void ker_bias_relu_i8I_i8O(int8_t *input, int8_t *output,
 
 /* fp16 version */
 template <>
-__global__ void ker_bias_relu_i8I_i8O<__half>(
-    int8_t *input, int8_t *output, const __half *bias, int feature_dim,
-    float dequant_scale, float quant_scale, float clip_max, bool in_col32,
-    bool out_col32, bool narrow_clip) {
+__global__ void
+ker_bias_relu_i8I_i8O<__half>(int8_t *input, int8_t *output, const __half *bias,
+                              int feature_dim, float dequant_scale,
+                              float quant_scale, float clip_max, bool in_col32,
+                              bool out_col32, bool narrow_clip) {
   int block_start = blockIdx.x * feature_dim;
   int start = block_start + threadIdx.x;
   int end = block_start + feature_dim;
@@ -1078,12 +1096,11 @@ template void ker_bias_relu_i8I_i8O_launcher<__half>(
     float clip_max, bool in_col32, bool out_col32, bool narrow_clip);
 
 template <typename T>
-__global__ void ker_arrange_encself_qkv_i8I(const int8_t *ori_qkv,
-                                            const T *qkv_bias, T *new_qkv,
-                                            int max_batch_dim,
-                                            int batch_seq_len, int dim_per_head,
-                                            int head_num, float dequant_scale,
-                                            bool in_col32) {
+__global__ void
+ker_arrange_encself_qkv_i8I(const int8_t *ori_qkv, const T *qkv_bias,
+                            T *new_qkv, int max_batch_dim, int batch_seq_len,
+                            int dim_per_head, int head_num, float dequant_scale,
+                            bool in_col32) {
   int hidden_size = dim_per_head * head_num;
   int batch_id = blockIdx.x / batch_seq_len;
   int token_id = blockIdx.x % batch_seq_len;
@@ -1411,8 +1428,7 @@ __global__ void ker_arrange_decself_qkv_i8I_i8O(
     float val = float(ori_qkv[qkv_index]) * dequant_scale +
                 __ldg(&qkv_bias[blockIdx.y * hidden_size + i]);
     int8_t quant_val = float2int8(val, quant_scale);
-    int seq_id =
-        blockIdx.x;  // obvious, seq_id = batch_id * beam_size + beam_id
+    int seq_id = blockIdx.x; // obvious, seq_id = batch_id * beam_size + beam_id
     if (blockIdx.y == 0) {
       // for query
       new_q[seq_id * hidden_size + i] = quant_val;
@@ -1451,8 +1467,7 @@ __global__ void ker_arrange_decself_qkv_i8I_i8O<__half>(
     float val = float(ori_qkv[qkv_index]) * dequant_scale +
                 __half2float(__ldg(&qkv_bias[blockIdx.y * hidden_size + i]));
     int8_t quant_val = float2int8(val, quant_scale);
-    int seq_id =
-        blockIdx.x;  // obvious, seq_id = batch_id * beam_size + beam_id
+    int seq_id = blockIdx.x; // obvious, seq_id = batch_id * beam_size + beam_id
     if (blockIdx.y == 0) {
       // for query
       new_q[seq_id * hidden_size + i] = quant_val;
@@ -1534,19 +1549,22 @@ __global__ void ker_fuse_softmax_new_value_i32I_i8O(
 
   float max_val = blockReduceMax(val);
   __shared__ float smax;
-  if (threadIdx.x == 0) smax = max_val;
+  if (threadIdx.x == 0)
+    smax = max_val;
   __syncthreads();
 
   val = threadIdx.x < step_num ? expf(val - smax) : 0;
 
   float rsum = blockReduceSum(val);
   __shared__ float ssum;
-  if (threadIdx.x == 0) ssum = rsum;
+  if (threadIdx.x == 0)
+    ssum = rsum;
   __syncthreads();
 
   extern __shared__ float block_new_value[];
   float *step_probs = &block_new_value[dim_per_head];
-  if (threadIdx.x < step_num) step_probs[threadIdx.x] = val / ssum;
+  if (threadIdx.x < step_num)
+    step_probs[threadIdx.x] = val / ssum;
   __syncthreads();
 
   for (int i = threadIdx.x, end = step_num * dim_per_head; i < end;
@@ -1697,18 +1715,18 @@ __global__ void select_beam_rough_topk_i8I(
   if (cur_step != 0 && alive_seq[blockIdx.x * max_step + cur_step] == end_id) {
     // this is a finished beam
     if (threadIdx.x == 0) {
-      num_beam_can[blockIdx.x + 1] = 1;      // generate one candidate
-      int pos = atomicAdd(num_beam_can, 1);  // get a candidate pos
+      num_beam_can[blockIdx.x + 1] = 1;     // generate one candidate
+      int pos = atomicAdd(num_beam_can, 1); // get a candidate pos
       if (diverse_lambda == 0) {
         can_score[pos] =
-            seq_score[blockIdx.x];  // this beam's score will not be change
+            seq_score[blockIdx.x]; // this beam's score will not be change
       } else {
         // add the beam id offset in score to sort in each beam
         int batch_id = blockIdx.x / beam_size;
         can_score[pos] = seq_score[blockIdx.x] +
                          (blockIdx.x - batch_id) * min_log_probability;
       }
-      can_idx[pos] = end_id + (blockIdx.x % beam_size) * vocab_size;  // EOS
+      can_idx[pos] = end_id + (blockIdx.x % beam_size) * vocab_size; // EOS
     }
     return;
   }
@@ -1763,9 +1781,9 @@ __global__ void select_beam_rough_topk_i8I(
       s_log_prob_base
   */
   __shared__ float
-      s_log_prob_base;      // prefix sequence log prob - log_sum_exp_logit
-  __shared__ float s_topk;  // rough top k-th value of logits
-  __shared__ int num_cur_beam_can;  // candidate number for this beam
+      s_log_prob_base;     // prefix sequence log prob - log_sum_exp_logit
+  __shared__ float s_topk; // rough top k-th value of logits
+  __shared__ int num_cur_beam_can; // candidate number for this beam
   sum_exp_logit = blockReduceSum(sum_exp_logit);
   rough_top_kth_logit = blockRoughTopK<float, beam_size>(rough_top_kth_logit);
   if (threadIdx.x == 0) {
@@ -1784,14 +1802,15 @@ __global__ void select_beam_rough_topk_i8I(
   int batch_start_pos = batch_id * beam_size * vocab_size;
   // int unk_vocab_id = vocab_size - 3;  // last three element: unk, start,
   // eos
-  __shared__ int l_n;  // current iteration candidate number
+  __shared__ int l_n; // current iteration candidate number
   for (int iter = 0; iter < (vocab_size + blockDim.x - 1) / blockDim.x;
        iter++) {
     // zero the counter
-    if (threadIdx.x == 0) l_n = 0;
+    if (threadIdx.x == 0)
+      l_n = 0;
     __syncthreads();
 
-    float lgt = CUDA_FLOAT_INF_NEG - 1.f;  // min s_topk is CUDA_FLOAT_INF_NEG
+    float lgt = CUDA_FLOAT_INF_NEG - 1.f; // min s_topk is CUDA_FLOAT_INF_NEG
     int pos;
     int vocab_id = idx - block_start;
 
@@ -1823,7 +1842,7 @@ __global__ void select_beam_rough_topk_i8I(
 
     // threads with true predicates write their elements
     if ((lgt >= s_topk)) {
-      pos += l_n;  // increment local pos by global counter
+      pos += l_n; // increment local pos by global counter
       if (diverse_lambda == 0) {
         can_score[pos] = fmaxf((lgt + s_log_prob_base) * length_norm,
                                min_log_probability + 1.f) +
@@ -1994,7 +2013,8 @@ __global__ void ker_topk_sample_i8I(const int8_t *logits, const T *logit_bias,
     // }
     // __syncthreads();
 
-    if (topk_tid == vocab_size) topk_exp = 0;
+    if (topk_tid == vocab_size)
+      topk_exp = 0;
     topk_exp_sum = blockReduceSum(topk_exp);
     if (threadIdx.x == 0) {
       s_topk_exp_sum = topk_exp_sum;
@@ -2022,7 +2042,8 @@ __global__ void ker_topk_sample_i8I(const int8_t *logits, const T *logit_bias,
     int threadID = threadIdx.x;
     __shared__ int s_threadID;
     __shared__ float s_max_prob;
-    if (random_x > prefix_sum_prob) threadID = blockDim.x;
+    if (random_x > prefix_sum_prob)
+      threadID = blockDim.x;
     threadID = blockReduceMin(threadID);
     float max_prob = blockReduceMax(topk_prob);
     if (threadIdx.x == 0) {
@@ -2063,7 +2084,8 @@ __global__ void ker_topk_sample_i8I(const int8_t *logits, const T *logit_bias,
 
   /* if new sampled tid is not EOS, set unfinish TRUE */
   if (threadIdx.x == 0) {
-    if (s_tid != eos_id) unfinished[0] = 1;
+    if (s_tid != eos_id)
+      unfinished[0] = 1;
   }
 
   /* step3 write back new sampled ids */
@@ -2228,7 +2250,8 @@ __global__ void ker_topp_sample_i8I(const int8_t *logits, const T *logit_bias,
     float logit = (float)logits[logits_idx] * dequant_scale +
                   (float)__ldg(&logit_bias[idx - left_logit_idx + threadIdx.x]);
     float logit_exp = expf(fmaxf(logit - s_max_logit, logit_thresh_min));
-    if (logit >= s_logit_threshold) test_num++;
+    if (logit >= s_logit_threshold)
+      test_num++;
     if (logit >= s_logit_threshold && logit_exp > topk_exp) {
       topk_exp = logit_exp;
       topk_tid = idx - left_logit_idx + threadIdx.x;
@@ -2237,7 +2260,8 @@ __global__ void ker_topp_sample_i8I(const int8_t *logits, const T *logit_bias,
 
   test_num = blockReduceSum(test_num);
 
-  if (topk_tid == vocab_size) topk_exp = 0;
+  if (topk_tid == vocab_size)
+    topk_exp = 0;
   topk_exp_sum = blockReduceSum(topk_exp);
   if (threadIdx.x == 0) {
     s_topk_exp_sum = topk_exp_sum;
@@ -2264,7 +2288,8 @@ __global__ void ker_topp_sample_i8I(const int8_t *logits, const T *logit_bias,
   int threadID = threadIdx.x;
   __shared__ int s_threadID;
   __shared__ float s_max_prob;
-  if (random_x > prefix_sum_prob) threadID = blockDim.x;
+  if (random_x > prefix_sum_prob)
+    threadID = blockDim.x;
   threadID = blockReduceMin(threadID);
   float max_prob = blockReduceMax(topk_prob);
   if (threadIdx.x == 0) {
@@ -2284,7 +2309,8 @@ __global__ void ker_topp_sample_i8I(const int8_t *logits, const T *logit_bias,
 
   /* if new sampled tid is not EOS, set unfinish TRUE */
   if (threadIdx.x == 0) {
-    if (s_tid != eos_id) unfinished[0] = 1;
+    if (s_tid != eos_id)
+      unfinished[0] = 1;
   }
 
   /* step3 write back new sampled ids */
@@ -2320,5 +2346,5 @@ template void ker_topp_sample_i8I_launcher<__half>(
     const int vocab_size, const float p, int *unfinished,
     curandState *curandstate, int eos_id, float dequant_scale, bool in_col32);
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

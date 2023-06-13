@@ -1,11 +1,11 @@
 #pragma once
 
+#include <cublasLt.h>
 #include <cublas_v2.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
-#include <cublasLt.h>
 
 #include <algorithm>
 #include <chrono>
@@ -26,9 +26,8 @@ QuantViT encoder, composed by gemm lib and
 namespace lightseq {
 namespace cuda {
 
-template <OperationType OpType_>
-class QuantVitEncoder {
- private:
+template <OperationType OpType_> class QuantVitEncoder {
+private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   const cudaDataType_t _computeType = _optraits::computeType;
@@ -41,7 +40,7 @@ class QuantVitEncoder {
   void ffn_add_norm();
 
   const int _max_batch_size;
-  int *_p_d_padding_mask;  // true sequence length(remove padding), [batch_size]
+  int *_p_d_padding_mask; // true sequence length(remove padding), [batch_size]
 
   const QuantVitWeight<OpType_> &_tw;
   cudaStream_t _stream;
@@ -82,7 +81,7 @@ class QuantVitEncoder {
 
   std::vector<int8_t *> _int8_p_d_enc_wei;
   const float _quant_range = 127;
-  const std::vector<float> _enc_clip_max;  // size: 11 * enc_layer_num
+  const std::vector<float> _enc_clip_max; // size: 11 * enc_layer_num
   std::vector<_DataType *> _scaled_ffn2_colsum;
 
   int _batch_size;
@@ -91,11 +90,11 @@ class QuantVitEncoder {
   int _layer_id;
   int _weight_offset;
 
- public:
-  const float *_p_d_pixel_input;  // input pixels [batch_size, channel_input,
-                                  // image_size, image_size]
+public:
+  const float *_p_d_pixel_input; // input pixels [batch_size, channel_input,
+                                 // image_size, image_size]
   _DataType
-      *_p_d_output;  // encoder output, [batch_size, batch_seq_len, hidden_size]
+      *_p_d_output; // encoder output, [batch_size, batch_seq_len, hidden_size]
 
   QuantVitEncoder(int max_batch_size, const float *p_d_pixel_input,
                   int *p_d_padding_mask, _DataType *p_d_output,
@@ -106,5 +105,5 @@ class QuantVitEncoder {
   void run_one_infer(int batch_size);
 };
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

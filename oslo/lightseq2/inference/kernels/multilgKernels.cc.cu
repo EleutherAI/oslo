@@ -29,9 +29,9 @@ padding_mask: record the padding token, [batch_size, batch_seq_len]
 padding_id, the padding token id
 */
 template <typename T>
-__global__ void ker_multilg_enc_emb(const T* token_emb, const T* pos_emb,
-                                    const T* src_lang_emb, const int* token_id,
-                                    T* output, int* padding_mask,
+__global__ void ker_multilg_enc_emb(const T *token_emb, const T *pos_emb,
+                                    const T *src_lang_emb, const int *token_id,
+                                    T *output, int *padding_mask,
                                     int padding_id, const int hidden_size) {
   int target_pos = blockIdx.x * gridDim.y + blockIdx.y;
   int start = target_pos * hidden_size + threadIdx.x;
@@ -40,7 +40,8 @@ __global__ void ker_multilg_enc_emb(const T* token_emb, const T* pos_emb,
   int lang_id = token_id[blockIdx.x * gridDim.y];
   if (tid == padding_id) {
     // for padding id
-    if (threadIdx.x == 0) padding_mask[target_pos] = 1;
+    if (threadIdx.x == 0)
+      padding_mask[target_pos] = 1;
     for (uint i = start; i < end; i += blockDim.x) {
       // output[target_pos * blockDim.x + threadIdx.x] = 0.f;
       output[i] = 0.f;
@@ -59,22 +60,22 @@ __global__ void ker_multilg_enc_emb(const T* token_emb, const T* pos_emb,
 }
 
 template <>
-__global__ void ker_multilg_enc_emb<__half>(const __half* token_emb,
-                                            const __half* pos_emb,
-                                            const __half* src_lang_emb,
-                                            const int* token_id, __half* output,
-                                            int* padding_mask, int padding_id,
-                                            const int half_hidden_size) {
+__global__ void
+ker_multilg_enc_emb<__half>(const __half *token_emb, const __half *pos_emb,
+                            const __half *src_lang_emb, const int *token_id,
+                            __half *output, int *padding_mask, int padding_id,
+                            const int half_hidden_size) {
   int target_pos = blockIdx.x * gridDim.y + blockIdx.y;
   int start = target_pos * half_hidden_size + threadIdx.x;
   int end = (target_pos + 1) * half_hidden_size;
   int tid = token_id[target_pos];
   int lang_id = token_id[blockIdx.x * gridDim.y];
-  half2* output_h = (half2*)output;
+  half2 *output_h = (half2 *)output;
 
   if (tid == padding_id) {
     // for padding id
-    if (threadIdx.x == 0) padding_mask[target_pos] = 1;
+    if (threadIdx.x == 0)
+      padding_mask[target_pos] = 1;
     for (uint i = start; i < end; i += blockDim.x) {
       output_h[i] = __float2half2_rn(0.f);
     }
@@ -86,11 +87,11 @@ __global__ void ker_multilg_enc_emb<__half>(const __half* token_emb,
   for (uint i = start; i < end; i += blockDim.x) {
     int offset = i - target_pos * half_hidden_size;
     float2 te = __half22float2(
-        ((const half2*)token_emb)[tid * half_hidden_size + offset]);
+        ((const half2 *)token_emb)[tid * half_hidden_size + offset]);
     float2 pe = __half22float2(
-        ((const half2*)pos_emb)[blockIdx.y * half_hidden_size + offset]);
+        ((const half2 *)pos_emb)[blockIdx.y * half_hidden_size + offset]);
     float2 le = __half22float2(
-        ((const half2*)src_lang_emb)[lang_id * half_hidden_size + offset]);
+        ((const half2 *)src_lang_emb)[lang_id * half_hidden_size + offset]);
     te.x = te.x + pe.x + le.x;
     te.y = te.y + pe.y + le.y;
 
@@ -101,9 +102,9 @@ __global__ void ker_multilg_enc_emb<__half>(const __half* token_emb,
 template <typename T>
 void ker_multilg_enc_emb_launcher(int batch_size, int batch_seq_len,
                                   int hidden_size, cudaStream_t stream,
-                                  const T* token_emb, const T* pos_emb,
-                                  const T* src_lang_emb, const int* token_id,
-                                  T* output, int* padding_mask, int padding_id,
+                                  const T *token_emb, const T *pos_emb,
+                                  const T *src_lang_emb, const int *token_id,
+                                  T *output, int *padding_mask, int padding_id,
                                   int max_thread_per_block) {
   ker_multilg_enc_emb<T>
       <<<dim3(batch_size, batch_seq_len), max_thread_per_block, 0, stream>>>(
@@ -114,8 +115,8 @@ void ker_multilg_enc_emb_launcher(int batch_size, int batch_seq_len,
 template <>
 void ker_multilg_enc_emb_launcher<__half>(
     int batch_size, int batch_seq_len, int hidden_size, cudaStream_t stream,
-    const __half* token_emb, const __half* pos_emb, const __half* src_lang_emb,
-    const int* token_id, __half* output, int* padding_mask, int padding_id,
+    const __half *token_emb, const __half *pos_emb, const __half *src_lang_emb,
+    const int *token_id, __half *output, int *padding_mask, int padding_id,
     int max_thread_per_block) {
   ker_multilg_enc_emb<__half>
       <<<dim3(batch_size, batch_seq_len), max_thread_per_block, 0, stream>>>(
@@ -125,14 +126,14 @@ void ker_multilg_enc_emb_launcher<__half>(
 
 template void ker_multilg_enc_emb_launcher<float>(
     int batch_size, int batch_seq_len, int hidden_size, cudaStream_t stream,
-    const float* token_emb, const float* pos_emb, const float* src_lang_emb,
-    const int* token_id, float* output, int* padding_mask, int padding_id,
+    const float *token_emb, const float *pos_emb, const float *src_lang_emb,
+    const int *token_id, float *output, int *padding_mask, int padding_id,
     int max_thread_per_block);
 
 template void ker_multilg_enc_emb_launcher<__half>(
     int batch_size, int batch_seq_len, int hidden_size, cudaStream_t stream,
-    const __half* token_emb, const __half* pos_emb, const __half* src_lang_emb,
-    const int* token_id, __half* output, int* padding_mask, int padding_id,
+    const __half *token_emb, const __half *pos_emb, const __half *src_lang_emb,
+    const int *token_id, __half *output, int *padding_mask, int padding_id,
     int max_thread_per_block);
 
 /**
@@ -157,11 +158,12 @@ max_step: max decoder steps
 vocab_size: vocabulary size
 */
 template <typename T>
-__global__ void ker_multilg_dec_emb(
-    const T* token_emb, const T* pos_emb, const T* src_lang_emb,
-    const T* trg_lang_emb, const int* src_token_id, const int* token_id,
-    T* output, int step, int max_step, int vocab_size, int hidden_size,
-    int beam_size, int src_seq_len) {
+__global__ void
+ker_multilg_dec_emb(const T *token_emb, const T *pos_emb, const T *src_lang_emb,
+                    const T *trg_lang_emb, const int *src_token_id,
+                    const int *token_id, T *output, int step, int max_step,
+                    int vocab_size, int hidden_size, int beam_size,
+                    int src_seq_len) {
   int batch_id = blockIdx.x / beam_size;
   // src seq is in [src_lang_id, trg_lang_id, tokens...] format
   int src_lang_id = src_token_id[batch_id * src_seq_len];
@@ -179,11 +181,11 @@ __global__ void ker_multilg_dec_emb(
 
 template <typename T>
 void ker_multilg_dec_emb_launcher(int step_token_num, int hidden_size,
-                                  cudaStream_t stream, const T* token_emb,
-                                  const T* pos_emb, const T* src_lang_emb,
-                                  const T* trg_lang_emb,
-                                  const int* src_token_id, const int* token_id,
-                                  T* output, int step, int max_step,
+                                  cudaStream_t stream, const T *token_emb,
+                                  const T *pos_emb, const T *src_lang_emb,
+                                  const T *trg_lang_emb,
+                                  const int *src_token_id, const int *token_id,
+                                  T *output, int step, int max_step,
                                   int vocab_size, int beam_size,
                                   int src_seq_len, int max_thread_per_block) {
   ker_multilg_dec_emb<T><<<step_token_num, max_thread_per_block, 0, stream>>>(
@@ -193,16 +195,16 @@ void ker_multilg_dec_emb_launcher(int step_token_num, int hidden_size,
 
 template void ker_multilg_dec_emb_launcher<float>(
     int step_token_num, int hidden_size, cudaStream_t stream,
-    const float* token_emb, const float* pos_emb, const float* src_lang_emb,
-    const float* trg_lang_emb, const int* src_token_id, const int* token_id,
-    float* output, int step, int max_step, int vocab_size, int beam_size,
+    const float *token_emb, const float *pos_emb, const float *src_lang_emb,
+    const float *trg_lang_emb, const int *src_token_id, const int *token_id,
+    float *output, int step, int max_step, int vocab_size, int beam_size,
     int src_seq_len, int max_thread_per_block);
 
 template void ker_multilg_dec_emb_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
-    const __half* token_emb, const __half* pos_emb, const __half* src_lang_emb,
-    const __half* trg_lang_emb, const int* src_token_id, const int* token_id,
-    __half* output, int step, int max_step, int vocab_size, int beam_size,
+    const __half *token_emb, const __half *pos_emb, const __half *src_lang_emb,
+    const __half *trg_lang_emb, const int *src_token_id, const int *token_id,
+    __half *output, int step, int max_step, int vocab_size, int beam_size,
     int src_seq_len, int max_thread_per_block);
 
 /**
@@ -236,26 +238,26 @@ diverse_lambda: lambda for diverse beam search
 */
 template <typename T, int beam_size>
 __global__ void select_beam_rough_topk_multilg(
-    const T* logits, const T* logit_bias, const float* seq_probs,
-    const float* seq_score, const int* alive_seq, const int* vocab_mask,
-    const int* src_token_id, int* can_idx, float* can_score, int* num_beam_can,
+    const T *logits, const T *logit_bias, const float *seq_probs,
+    const float *seq_score, const int *alive_seq, const int *vocab_mask,
+    const int *src_token_id, int *can_idx, float *can_score, int *num_beam_can,
     int vocab_size, int max_step, float length_norm, int cur_step,
     float diverse_lambda, int end_id, int src_seq_len) {
   if (alive_seq[blockIdx.x * max_step + cur_step] == end_id) {
     // this is a finished beam
     if (threadIdx.x == 0) {
-      num_beam_can[blockIdx.x + 1] = 1;      // generate one candidate
-      int pos = atomicAdd(num_beam_can, 1);  // get a candidate pos
+      num_beam_can[blockIdx.x + 1] = 1;     // generate one candidate
+      int pos = atomicAdd(num_beam_can, 1); // get a candidate pos
       if (diverse_lambda == 0) {
         can_score[pos] =
-            seq_score[blockIdx.x];  // this beam's score will not be change
+            seq_score[blockIdx.x]; // this beam's score will not be change
       } else {
         // add the beam id offset in score to sort in each beam
         int batch_id = blockIdx.x / beam_size;
         can_score[pos] = seq_score[blockIdx.x] +
                          (blockIdx.x - batch_id) * min_log_probability;
       }
-      can_idx[pos] = end_id + (blockIdx.x % beam_size) * vocab_size;  // EOS
+      can_idx[pos] = end_id + (blockIdx.x % beam_size) * vocab_size; // EOS
     }
     return;
   }
@@ -301,9 +303,9 @@ __global__ void select_beam_rough_topk_multilg(
       s_log_prob_base
   */
   __shared__ float
-      s_log_prob_base;      // prefix sequence log prob - log_sum_exp_logit
-  __shared__ float s_topk;  // rough top k-th value of logits
-  __shared__ int num_cur_beam_can;  // candidate number for this beam
+      s_log_prob_base;     // prefix sequence log prob - log_sum_exp_logit
+  __shared__ float s_topk; // rough top k-th value of logits
+  __shared__ int num_cur_beam_can; // candidate number for this beam
   sum_exp_logit = blockReduceSum(sum_exp_logit);
   rough_top_kth_logit = blockRoughTopK<float, beam_size>(rough_top_kth_logit);
   if (threadIdx.x == 0) {
@@ -320,14 +322,15 @@ __global__ void select_beam_rough_topk_multilg(
   int idx = left_idx;
   int batch_start_pos = batch_id * beam_size * vocab_size;
   // int unk_vocab_id = vocab_size - 3;  // last three element: unk, start, eos
-  __shared__ int l_n;  // current iteration candidate number
+  __shared__ int l_n; // current iteration candidate number
   for (int iter = 0; iter < (vocab_size + blockDim.x - 1) / blockDim.x;
        iter++) {
     // zero the counter
-    if (threadIdx.x == 0) l_n = 0;
+    if (threadIdx.x == 0)
+      l_n = 0;
     __syncthreads();
 
-    float lgt = CUDA_FLOAT_INF_NEG - 1.f;  // min s_topk is CUDA_FLOAT_INF_NEG
+    float lgt = CUDA_FLOAT_INF_NEG - 1.f; // min s_topk is CUDA_FLOAT_INF_NEG
     int pos;
     int vocab_id = idx - block_start;
 
@@ -352,7 +355,7 @@ __global__ void select_beam_rough_topk_multilg(
 
     // threads with true predicates write their elements
     if ((lgt >= s_topk)) {
-      pos += l_n;  // increment local pos by global counter
+      pos += l_n; // increment local pos by global counter
       if (diverse_lambda == 0) {
         can_score[pos] = fmaxf((lgt + s_log_prob_base) * length_norm,
                                min_log_probability + 1.f) +
@@ -374,9 +377,9 @@ __global__ void select_beam_rough_topk_multilg(
 
 template <typename T>
 void select_beam_rough_topk_multilg_launcher(
-    const T* logits, const T* logit_bias, const float* seq_probs,
-    const float* seq_score, const int* alive_seq, const int* vocab_mask,
-    const int* src_token_id, int* can_idx, float* can_score, int* num_beam_can,
+    const T *logits, const T *logit_bias, const float *seq_probs,
+    const float *seq_score, const int *alive_seq, const int *vocab_mask,
+    const int *src_token_id, int *can_idx, float *can_score, int *num_beam_can,
     int vocab_size, int max_step, float length_norm, int cur_step,
     int step_token_num, int max_thread_per_block, cudaStream_t stream,
     int beam_size, float diverse_lambda, int end_id, int src_seq_len) {
@@ -425,20 +428,20 @@ void select_beam_rough_topk_multilg_launcher(
 }
 
 template void select_beam_rough_topk_multilg_launcher<float>(
-    const float* logits, const float* logit_bias, const float* seq_probs,
-    const float* seq_score, const int* alive_seq, const int* vocab_mask,
-    const int* src_token_id, int* can_idx, float* can_score, int* num_beam_can,
+    const float *logits, const float *logit_bias, const float *seq_probs,
+    const float *seq_score, const int *alive_seq, const int *vocab_mask,
+    const int *src_token_id, int *can_idx, float *can_score, int *num_beam_can,
     int vocab_size, int max_step, float length_norm, int cur_step,
     int step_token_num, int max_thread_per_block, cudaStream_t stream,
     int beam_size, float diverse_lambda, int end_id, int src_seq_len);
 
 template void select_beam_rough_topk_multilg_launcher<__half>(
-    const __half* logits, const __half* logit_bias, const float* seq_probs,
-    const float* seq_score, const int* alive_seq, const int* vocab_mask,
-    const int* src_token_id, int* can_idx, float* can_score, int* num_beam_can,
+    const __half *logits, const __half *logit_bias, const float *seq_probs,
+    const float *seq_score, const int *alive_seq, const int *vocab_mask,
+    const int *src_token_id, int *can_idx, float *can_score, int *num_beam_can,
     int vocab_size, int max_step, float length_norm, int cur_step,
     int step_token_num, int max_thread_per_block, cudaStream_t stream,
     int beam_size, float diverse_lambda, int end_id, int src_seq_len);
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

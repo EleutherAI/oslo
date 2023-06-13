@@ -4,16 +4,16 @@
 */
 #pragma once
 
+#include "util.h"
+#include <cublasLt.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <string>
 #include <utility>
-#include <fstream>
 #include <vector>
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <cublasLt.h>
-#include "util.h"
 
 namespace lightseq {
 namespace cuda {
@@ -39,14 +39,14 @@ typedef struct {
 } cublasLtMatmulAlgo_info;
 
 class cublasAlgoMap {
- private:
-  std::map<std::vector<int>, std::map<std::string, cublasLtMatmulAlgo_info> >
+private:
+  std::map<std::vector<int>, std::map<std::string, cublasLtMatmulAlgo_info>>
       _algo_map;
   std::string _config_filename;
   int _workspace_size;
-  void* _workspace = NULL;
+  void *_workspace = NULL;
 
- public:
+public:
   cublasAlgoMap();
   ~cublasAlgoMap();
 
@@ -55,14 +55,14 @@ class cublasAlgoMap {
   void loadGemmConfig();
   bool isExist(int m, int n, int k);
   cublasLtMatmulAlgo_info defaultAlgo();
-  cublasLtMatmulAlgo_info findBestAlgo(
-      std::map<std::string, cublasLtMatmulAlgo_info> mp,
-      std::string data_order);
+  cublasLtMatmulAlgo_info
+  findBestAlgo(std::map<std::string, cublasLtMatmulAlgo_info> mp,
+               std::string data_order);
   cublasLtMatmulAlgo_info getAlgo(int m, int n, int k,
                                   std::string data_order = "");
-  void* get_workspace();
+  void *get_workspace();
   int get_workspace_size();
 };
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

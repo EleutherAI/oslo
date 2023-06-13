@@ -6,9 +6,8 @@
 namespace lightseq {
 
 // add bias and transform 20314, execute after qkv_linear
-template <typename T1, typename T2>
-class BiasAddTrans20314 : public Operator {
- private:
+template <typename T1, typename T2> class BiasAddTrans20314 : public Operator {
+private:
   size_t _max_batch_tokens;
   size_t _batch;
   size_t _seq_len;
@@ -16,20 +15,17 @@ class BiasAddTrans20314 : public Operator {
   size_t _hidden_size;
   size_t _trans_count;
 
-  Variable* _res;
+  Variable *_res;
 
- public:
+public:
   BiasAddTrans20314(size_t max_batch_tokens, size_t heads, size_t hidden_size,
                     size_t trans_count)
-      : Operator("BiasAddTrans20314"),
-        _max_batch_tokens(max_batch_tokens),
-        _heads(heads),
-        _hidden_size(hidden_size),
-        _trans_count(trans_count) {}
+      : Operator("BiasAddTrans20314"), _max_batch_tokens(max_batch_tokens),
+        _heads(heads), _hidden_size(hidden_size), _trans_count(trans_count) {}
 
   virtual ~BiasAddTrans20314() {}
 
-  Variable* operator()(Variable* inp, Variable* bias);
+  Variable *operator()(Variable *inp, Variable *bias);
 
   void before_forward(size_t batch, size_t seq_len) {
     _batch = batch, _seq_len = seq_len;
@@ -41,4 +37,4 @@ class BiasAddTrans20314 : public Operator {
 
   void backward() override;
 };
-}  // namespace lightseq
+} // namespace lightseq

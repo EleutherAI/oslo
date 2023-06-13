@@ -68,88 +68,88 @@ void QuantVit::Infer() {
 
 void QuantVit::set_input_ptr(int index, void *input_ptr) {
   switch (index) {
-    case 0:
-      encoder_->_p_d_pixel_input = static_cast<float *>(input_ptr);
-      break;
+  case 0:
+    encoder_->_p_d_pixel_input = static_cast<float *>(input_ptr);
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
 void QuantVit::set_output_ptr(int index, void *output_ptr) {
   switch (index) {
-    case 0:
-      encoder_->_p_d_output = static_cast<optraits::DataType *>(output_ptr);
-      break;
+  case 0:
+    encoder_->_p_d_output = static_cast<optraits::DataType *>(output_ptr);
+    break;
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 const void *QuantVit::get_output_ptr(int index) {
   switch (index) {
-    case 0:
-      return static_cast<void *>(encoder_->_p_d_output);
+  case 0:
+    return static_cast<void *>(encoder_->_p_d_output);
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 std::vector<int> QuantVit::get_input_max_shape(int index) {
   switch (index) {
-    case 0:
-      return {_max_batch_size, tw_._channel_input, tw_._image_size,
-              tw_._image_size};
+  case 0:
+    return {_max_batch_size, tw_._channel_input, tw_._image_size,
+            tw_._image_size};
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 std::vector<int> QuantVit::get_output_max_shape(int index) {
   switch (index) {
-    case 0:
-      return {_max_batch_size, tw_._max_step, tw_._hidden_size};
+  case 0:
+    return {_max_batch_size, tw_._max_step, tw_._hidden_size};
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 DataType QuantVit::get_input_dtype(int index) {
   switch (index) {
-    case 0:
-      return DataType::kFloat32;
-      break;
+  case 0:
+    return DataType::kFloat32;
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
 DataType QuantVit::get_output_dtype(int index) {
   switch (index) {
-    case 0:
-      if (vit_optype == OperationType::FP32) {
-        return DataType::kFloat32;
-      } else {
-        return DataType::kFloat16;
-      }
-      break;
+  case 0:
+    if (vit_optype == OperationType::FP32) {
+      return DataType::kFloat32;
+    } else {
+      return DataType::kFloat16;
+    }
+    break;
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

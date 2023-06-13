@@ -24,9 +24,8 @@ Bert encoder, composed by gemm lib and
 namespace lightseq {
 namespace cuda {
 
-template <OperationType OpType_>
-class BertEncoder {
- private:
+template <OperationType OpType_> class BertEncoder {
+private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   const cudaDataType_t _computeType = _optraits::computeType;
@@ -39,7 +38,7 @@ class BertEncoder {
   void ffn_add_norm();
 
   const int _max_batch_size;
-  int *_p_d_padding_mask;  // true sequence length(remove padding), [batch_size]
+  int *_p_d_padding_mask; // true sequence length(remove padding), [batch_size]
 
   const int *_p_d_lang_id;
   const BertWeight<OpType_> &_tw;
@@ -74,10 +73,10 @@ class BertEncoder {
   int _layer_id;
   int _weight_offset;
 
- public:
-  const int *_p_d_token_id;  // input token id [batch_size, batch_seq_len]
+public:
+  const int *_p_d_token_id; // input token id [batch_size, batch_seq_len]
   _DataType
-      *_p_d_output;  // encoder output, [batch_size, batch_seq_len, hidden_size]
+      *_p_d_output; // encoder output, [batch_size, batch_seq_len, hidden_size]
 
   BertEncoder(int max_batch_size, const int *p_d_token_id,
               int *p_d_padding_mask, _DataType *p_d_output,
@@ -89,5 +88,5 @@ class BertEncoder {
   void run_one_infer(int batch_size, int batch_seq_len);
 };
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

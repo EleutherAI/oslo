@@ -9,9 +9,8 @@
 #include "cuda_util.h"
 namespace lightseq {
 namespace cuda {
-template <typename T>
-class TransformerEmbeddingLayer {
- public:
+template <typename T> class TransformerEmbeddingLayer {
+public:
   TransformerEmbeddingLayer(int layer_id, const T *pos_embeddings_ptr,
                             int max_batch_tokens, int embedding_dim,
                             int vocab_size, int max_seq_len,
@@ -65,7 +64,7 @@ class TransformerEmbeddingLayer {
     _grad_clip_max_ptr = gptr;
   }
 
- private:
+private:
   void allocate_mem_buffer() {
     // allocate local gpu memory
     _dropout_mask = cuda_malloc<uint8_t>(_max_batch_tokens * _embedding_dim);
@@ -106,5 +105,5 @@ class TransformerEmbeddingLayer {
   T *_grad_embeddings_ptr;
   T *_grad_clip_max_ptr;
 };
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

@@ -1,6 +1,6 @@
-#include "vit_encoder.h"
 #include "../kernels/embKernels.h"
 #include "../kernels/transformerKernels.h"
+#include "vit_encoder.h"
 
 /**
 @file
@@ -17,16 +17,10 @@ VitEncoder<OpType_>::VitEncoder(int max_batch_size,
                                 int *p_d_padding_mask, _DataType *p_d_output,
                                 const VitWeight<OpType_> &tw,
                                 cudaStream_t stream, cublasHandle_t hd)
-    : _max_batch_size(max_batch_size),
-      _p_d_pixel_input(p_d_pixel_input),
-      _p_d_padding_mask(p_d_padding_mask),
-      _p_d_output(p_d_output),
-      _tw(tw),
-      _stream(stream),
-      _hd(hd),
-      _p_d_src_emb_wei(tw.get_src_emb_wei()),
-      _p_d_enc_wei(tw.get_enc_wei()),
-      _fone((_DataType)1.f),
+    : _max_batch_size(max_batch_size), _p_d_pixel_input(p_d_pixel_input),
+      _p_d_padding_mask(p_d_padding_mask), _p_d_output(p_d_output), _tw(tw),
+      _stream(stream), _hd(hd), _p_d_src_emb_wei(tw.get_src_emb_wei()),
+      _p_d_enc_wei(tw.get_enc_wei()), _fone((_DataType)1.f),
       _fzero((_DataType)0.f),
       _atten_scaler((_DataType)sqrt(1.f / tw._dim_per_head)),
       _max_batch_dim(max_batch_size * tw._max_step * tw._hidden_size),
@@ -66,8 +60,7 @@ void VitEncoder<OpType_>::init_buffer(void *pbuf) {
 /**
 Some requirements needed by custom cuda kernel function
 */
-template <OperationType OpType_>
-std::string VitEncoder<OpType_>::check() {
+template <OperationType OpType_> std::string VitEncoder<OpType_>::check() {
   // if (_max_thread_per_block < _tw._hidden_size) {
   //   return "violate hidden_size <= max_thread_per_block";
   // }
@@ -111,8 +104,8 @@ void VitEncoder<OpType_>::run_one_infer(int batch_size) {
                               _tw._image_size, _batch_size, _tw._max_step,
                               _tw._hidden_size, _tw._channel_input, _stream);
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {  // batch_id
-    for (int j = 0; j < 10; j++) {         // patch_id
+  for (int i = 0; i < _batch_size; i++) { // batch_id
+    for (int j = 0; j < 10; j++) {        // patch_id
       std::cout << "emb out: patch-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
@@ -131,8 +124,8 @@ void VitEncoder<OpType_>::run_one_infer(int batch_size) {
       _p_d_src_emb_wei[4], _p_d_src_emb_wei[5], _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // patch_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // patch_id
       std::cout << "encoder output: token-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
@@ -146,8 +139,7 @@ void VitEncoder<OpType_>::run_one_infer(int batch_size) {
 /**
 Encoder self attention
 */
-template <OperationType OpType_>
-void VitEncoder<OpType_>::self_attention() {
+template <OperationType OpType_> void VitEncoder<OpType_>::self_attention() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_q,
@@ -239,8 +231,7 @@ void VitEncoder<OpType_>::self_attention() {
   return;
 }
 
-template <OperationType OpType_>
-void VitEncoder<OpType_>::ffn_add_norm() {
+template <OperationType OpType_> void VitEncoder<OpType_>::ffn_add_norm() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_ffn_buf1,
@@ -297,5 +288,5 @@ void VitEncoder<OpType_>::ffn_add_norm() {
 template class VitEncoder<OperationType::FP16>;
 template class VitEncoder<OperationType::FP32>;
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

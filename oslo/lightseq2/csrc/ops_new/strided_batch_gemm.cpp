@@ -3,8 +3,8 @@
 namespace lightseq {
 
 template <typename T1, typename T2>
-Variable* StridedBatchGemmOp<T1, T2>::operator()(Variable* inpA,
-                                                 Variable* inpB) {
+Variable *StridedBatchGemmOp<T1, T2>::operator()(Variable *inpA,
+                                                 Variable *inpB) {
   _result = new Variable("StridedBatchGemmOp_out", _max_ele_num, g_dtype<T1>(),
                          g_dtype<T2>());
   set_parents({inpA, inpB});
@@ -12,11 +12,10 @@ Variable* StridedBatchGemmOp<T1, T2>::operator()(Variable* inpA,
   return _result;
 }
 
-template <typename T1, typename T2>
-void StridedBatchGemmOp<T1, T2>::forward() {
-  T1* _buffer_a = (T1*)parent(0)->value();
-  T1* _buffer_b = (T1*)parent(1)->value();
-  T1* output = (T1*)child(0)->value();
+template <typename T1, typename T2> void StridedBatchGemmOp<T1, T2>::forward() {
+  T1 *_buffer_a = (T1 *)parent(0)->value();
+  T1 *_buffer_b = (T1 *)parent(1)->value();
+  T1 *output = (T1 *)child(0)->value();
 
   if (!_context_ptr->is_built()) {
     return;
@@ -47,13 +46,13 @@ void StridedBatchGemmOp<T1, T2>::backward() {
   int stride_b = _n * kb;
   int stride_c = _m * _k;
 
-  T1* _buffer_a = (T1*)parent(0)->value();
-  T1* _buffer_b = (T1*)parent(1)->value();
+  T1 *_buffer_a = (T1 *)parent(0)->value();
+  T1 *_buffer_b = (T1 *)parent(1)->value();
 
-  T2* d_output = (T2*)child(0)->grad();
+  T2 *d_output = (T2 *)child(0)->grad();
 
-  T2* inpGradA = (T2*)parent(0)->grad();
-  T2* inpGradB = (T2*)parent(1)->grad();
+  T2 *inpGradA = (T2 *)parent(0)->grad();
+  T2 *inpGradB = (T2 *)parent(1)->grad();
 
   if (!_context_ptr->is_built()) {
     return;
@@ -93,4 +92,4 @@ template class StridedBatchGemmOp<float, float>;
 #ifdef LIGHTSEQ_cuda
 template class StridedBatchGemmOp<__half, __half>;
 #endif
-}  // namespace lightseq
+} // namespace lightseq

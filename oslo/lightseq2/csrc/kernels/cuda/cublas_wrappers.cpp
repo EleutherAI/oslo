@@ -555,5 +555,5 @@ void cublasLtMM_withAlgo_i8IO(int8_t *res, int batchCount, int m, int n, int k,
   CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(BtransformDesc));
   CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(CtransformDesc));
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

@@ -19,7 +19,7 @@ const lightseq::cuda::OperationType decoder_optype =
 namespace lightseq {
 namespace cuda {
 class TransformerDecoder {
- private:
+private:
   typedef lightseq::cuda::OperationTypeTraits<decoder_optype> optraits;
   lightseq::cuda::Decoder<decoder_optype> *decoder_;
 
@@ -31,7 +31,7 @@ class TransformerDecoder {
   cublasHandle_t hd_;
   lightseq::cuda::TransformerWeight<decoder_optype> tw_;
 
- public:
+public:
   TransformerDecoder(const std::string weight_path, const int max_batch_size)
       : stream_(nullptr), hd_(nullptr), decoder_(nullptr) {
     /* ---step1. init environment--- */
@@ -82,9 +82,9 @@ class TransformerDecoder {
         &d_encoder_output_, _max_batch_size * tw_._max_step * tw_._hidden_size *
                                 sizeof(optraits::DataType)));
 
-    lightseq::cuda::CHECK_GPU_ERROR(cudaMalloc(
-        &d_output_,
-        _max_batch_size * tw_._beam_size * tw_._max_step * sizeof(int)));
+    lightseq::cuda::CHECK_GPU_ERROR(
+        cudaMalloc(&d_output_, _max_batch_size * tw_._beam_size *
+                                   tw_._max_step * sizeof(int)));
 
     decoder_ = new lightseq::cuda::Decoder<decoder_optype>(
         _max_batch_size, d_padding_mask_, d_encoder_output_, d_output_, tw_,
@@ -99,7 +99,7 @@ class TransformerDecoder {
               << "MB GPU buffer for transformer decoder" << std::endl;
 
     void *d_buf_;
-    // encoder and decoder use the same buffer to save gpu memory useage
+    // encoder and decoder use the same buffer to save gpu memory usage
     lightseq::cuda::CHECK_GPU_ERROR(
         cudaMalloc((void **)&d_buf_, (size_t)buf_bytesize));
     decoder_->init_buffer(d_buf_);
@@ -110,11 +110,11 @@ class TransformerDecoder {
     }
   }
 
-  py::array_t<int> infer(
-      py::array_t<float, py::array::c_style | py::array::forcecast>
-          encoder_output,
-      py::array_t<int, py::array::c_style | py::array::forcecast>
-          encoder_mask) {
+  py::array_t<int>
+  infer(py::array_t<float, py::array::c_style | py::array::forcecast>
+            encoder_output,
+        py::array_t<int, py::array::c_style | py::array::forcecast>
+            encoder_mask) {
     auto encoder_out = encoder_output.mutable_unchecked<3>();
     auto encoder_mask_out = encoder_mask.mutable_unchecked<2>();
     const float *encoder_output_data = encoder_out.data(0, 0, 0);
@@ -152,5 +152,5 @@ class TransformerDecoder {
     return tokens;
   }
 };
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

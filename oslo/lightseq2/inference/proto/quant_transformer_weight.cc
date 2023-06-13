@@ -23,8 +23,8 @@ float QuantTransformerWeight<OperationType::FP32>::float2required(float value) {
 fp16 version, cast fp32 into fp16
 */
 template <>
-__half QuantTransformerWeight<OperationType::FP16>::float2required(
-    float value) {
+__half
+QuantTransformerWeight<OperationType::FP16>::float2required(float value) {
   return __float2half_rn(value);
 }
 
@@ -119,24 +119,31 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_emb_wei(
   offset.push_back(idx);
   if (layer.position_embedding_size() != _max_step * _hidden_size)
     return "Wrong position_embedding_size !";
-  for (float ele : layer.position_embedding()) value.push_back(ele);
+  for (float ele : layer.position_embedding())
+    value.push_back(ele);
   idx += _max_step * _hidden_size;
 
   offset.push_back(idx);
-  if (layer.norm_scale_size() != _hidden_size) return "Wrong norm_scale_size !";
-  for (float ele : layer.norm_scale()) value.push_back(ele);
+  if (layer.norm_scale_size() != _hidden_size)
+    return "Wrong norm_scale_size !";
+  for (float ele : layer.norm_scale())
+    value.push_back(ele);
   idx += _hidden_size;
 
   offset.push_back(idx);
-  if (layer.norm_bias_size() != _hidden_size) return "Wrong norm_bias_size !";
-  for (float ele : layer.norm_bias()) value.push_back(ele);
+  if (layer.norm_bias_size() != _hidden_size)
+    return "Wrong norm_bias_size !";
+  for (float ele : layer.norm_bias())
+    value.push_back(ele);
   idx += _hidden_size;
 
   if (source == "src") {
     std::vector<_DataType> raw_value;
-    for (float e : value) raw_value.push_back(float2required(e));
+    for (float e : value)
+      raw_value.push_back(float2required(e));
     _d_src_emb_wei = raw_value;
-    for (int e : offset) _p_d_src_emb_wei.push_back(_d_src_emb_wei.data() + e);
+    for (int e : offset)
+      _p_d_src_emb_wei.push_back(_d_src_emb_wei.data() + e);
   } else {
     // for trg, encdec_kv_kernel, encdec_kv_bias, logit_bias
 
@@ -173,16 +180,18 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_emb_wei(
     offset.push_back(idx);
     if (layer.shared_bias_size() != vocab_size)
       return "Wrong shared_bias_size !";
-    for (float ele : layer.shared_bias()) value.push_back(ele);
+    for (float ele : layer.shared_bias())
+      value.push_back(ele);
     idx += vocab_size;
 
     std::vector<_DataType> raw_value;
-    for (float e : value) raw_value.push_back(float2required(e));
+    for (float e : value)
+      raw_value.push_back(float2required(e));
     _d_trg_emb_wei = raw_value;
     for (int e : offset) {
       _p_d_trg_emb_wei.push_back(_d_trg_emb_wei.data() + e);
     }
-  }  // trg
+  } // trg
 
   if (_multilg_type != 0) {
     // fill in language embedding
@@ -222,13 +231,15 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_enc_wei(
     offset.push_back(idx);
     if (enc_layer.multihead_norm_scale_size() != _hidden_size)
       return "Wrong multihead_norm_scale_size !";
-    for (float ele : enc_layer.multihead_norm_scale()) value.push_back(ele);
+    for (float ele : enc_layer.multihead_norm_scale())
+      value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (enc_layer.multihead_norm_bias_size() != _hidden_size)
       return "Wrong multihead_norm_bias_size !";
-    for (float ele : enc_layer.multihead_norm_bias()) value.push_back(ele);
+    for (float ele : enc_layer.multihead_norm_bias())
+      value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -272,13 +283,15 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_enc_wei(
     offset.push_back(idx);
     if (enc_layer.ffn_norm_scale_size() != _hidden_size)
       return "Wrong ffn_norm_scale_size !";
-    for (float ele : enc_layer.ffn_norm_scale()) value.push_back(ele);
+    for (float ele : enc_layer.ffn_norm_scale())
+      value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (enc_layer.ffn_norm_bias_size() != _hidden_size)
       return "Wrong ffn_norm_bias_size !";
-    for (float ele : enc_layer.ffn_norm_bias()) value.push_back(ele);
+    for (float ele : enc_layer.ffn_norm_bias())
+      value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -294,7 +307,8 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_enc_wei(
     offset.push_back(idx);
     if (enc_layer.ffn_first_bias_size() != _inner_size)
       return "Wrong ffn_first_bias_size !";
-    for (float ele : enc_layer.ffn_first_bias()) value.push_back(ele);
+    for (float ele : enc_layer.ffn_first_bias())
+      value.push_back(ele);
     idx += _inner_size;
 
     offset.push_back(idx);
@@ -310,7 +324,8 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_enc_wei(
     offset.push_back(idx);
     if (enc_layer.ffn_second_bias_size() != _hidden_size)
       return "Wrong ffn_second_bias_size !";
-    for (float ele : enc_layer.ffn_second_bias()) value.push_back(ele);
+    for (float ele : enc_layer.ffn_second_bias())
+      value.push_back(ele);
     idx += _hidden_size;
 
     _enc_clip_max.push_back(enc_layer.multihead_project_kernel_qkv_clip_max());
@@ -327,13 +342,15 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_enc_wei(
     _enc_clip_max.push_back(enc_layer.ffn_first_output_clip_max());
     _enc_clip_max.push_back(enc_layer.ffn_second_output_clip_max());
 
-  }  // for
+  } // for
 
   std::vector<_DataType> raw_value;
-  for (float e : value) raw_value.push_back(float2required(e));
+  for (float e : value)
+    raw_value.push_back(float2required(e));
   _d_enc_wei = raw_value;
 
-  for (int e : offset) _p_d_enc_wei.push_back((_d_enc_wei.data()) + e);
+  for (int e : offset)
+    _p_d_enc_wei.push_back((_d_enc_wei.data()) + e);
   std::cout << "Finish loading enc_wei from host to device" << std::endl;
   return "";
 }
@@ -352,13 +369,15 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_dec_wei(
     offset.push_back(idx);
     if (dec_layer.self_norm_scale_size() != _hidden_size)
       return "Wrong self_norm_scale size !";
-    for (float ele : dec_layer.self_norm_scale()) value.push_back(ele);
+    for (float ele : dec_layer.self_norm_scale())
+      value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (dec_layer.self_norm_bias_size() != _hidden_size)
       return "Wrong self_norm_bias_size !";
-    for (float ele : dec_layer.self_norm_bias()) value.push_back(ele);
+    for (float ele : dec_layer.self_norm_bias())
+      value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -375,7 +394,8 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_dec_wei(
     offset.push_back(idx);
     if (dec_layer.self_project_bias_qkv_size() != _hidden_size * 3)
       return "Wrong self_project_bias_qkv size !";
-    for (float ele : dec_layer.self_project_bias_qkv()) value.push_back(ele);
+    for (float ele : dec_layer.self_project_bias_qkv())
+      value.push_back(ele);
     idx += _hidden_size * 3;
 
     offset.push_back(idx);
@@ -392,19 +412,22 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_dec_wei(
     offset.push_back(idx);
     if (dec_layer.self_project_bias_output_size() != _hidden_size)
       return "Wrong self_project_bias_output size !";
-    for (float ele : dec_layer.self_project_bias_output()) value.push_back(ele);
+    for (float ele : dec_layer.self_project_bias_output())
+      value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (dec_layer.encdec_norm_scale_size() != _hidden_size)
       return "Wrong encdec_norm_scale size !";
-    for (float ele : dec_layer.encdec_norm_scale()) value.push_back(ele);
+    for (float ele : dec_layer.encdec_norm_scale())
+      value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (dec_layer.encdec_norm_bias_size() != _hidden_size)
       return "Wrong encdec_norm_bias_size !";
-    for (float ele : dec_layer.encdec_norm_bias()) value.push_back(ele);
+    for (float ele : dec_layer.encdec_norm_bias())
+      value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -421,7 +444,8 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_dec_wei(
     offset.push_back(idx);
     if (dec_layer.encdec_project_bias_q_size() != _hidden_size)
       return "Wrong encdec_project_bias_q size !";
-    for (float ele : dec_layer.encdec_project_bias_q()) value.push_back(ele);
+    for (float ele : dec_layer.encdec_project_bias_q())
+      value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -446,13 +470,15 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_dec_wei(
     offset.push_back(idx);
     if (dec_layer.ffn_norm_scale_size() != _hidden_size)
       return "Wrong ffn_norm_scale_size !";
-    for (float ele : dec_layer.ffn_norm_scale()) value.push_back(ele);
+    for (float ele : dec_layer.ffn_norm_scale())
+      value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (dec_layer.ffn_norm_bias_size() != _hidden_size)
       return "Wrong ffn_norm_bias_size !";
-    for (float ele : dec_layer.ffn_norm_bias()) value.push_back(ele);
+    for (float ele : dec_layer.ffn_norm_bias())
+      value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -468,7 +494,8 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_dec_wei(
     offset.push_back(idx);
     if (dec_layer.ffn_first_bias_size() != _inner_size)
       return "Wrong ffn_first_bias_size !";
-    for (float ele : dec_layer.ffn_first_bias()) value.push_back(ele);
+    for (float ele : dec_layer.ffn_first_bias())
+      value.push_back(ele);
     idx += _inner_size;
 
     offset.push_back(idx);
@@ -484,7 +511,8 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_dec_wei(
     offset.push_back(idx);
     if (dec_layer.ffn_second_bias_size() != _hidden_size)
       return "Wrong ffn_second_bias_size !";
-    for (float ele : dec_layer.ffn_second_bias()) value.push_back(ele);
+    for (float ele : dec_layer.ffn_second_bias())
+      value.push_back(ele);
     idx += _hidden_size;
 
     _dec_clip_max.push_back(dec_layer.self_project_kernel_qkv_clip_max());
@@ -507,13 +535,15 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_dec_wei(
     _dec_clip_max.push_back(dec_layer.ffn_second_output_clip_max());
     _dec_clip_max.push_back(dec_layer.self_qkv_bias_out_clip_max());
 
-  }  // for
+  } // for
 
   std::vector<_DataType> raw_value;
-  for (float e : value) raw_value.push_back(float2required(e));
+  for (float e : value)
+    raw_value.push_back(float2required(e));
   _d_dec_wei = raw_value;
 
-  for (int e : offset) _p_d_dec_wei.push_back(_d_dec_wei.data() + e);
+  for (int e : offset)
+    _p_d_dec_wei.push_back(_d_dec_wei.data() + e);
   std::cout << "Finish loading dec_wei from host to device" << std::endl;
   return "";
 }
@@ -587,7 +617,7 @@ void QuantTransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
   // special handling for string reading
   // string were converted to numpy array of np.int8 in python
   // hence needed to be read as an char array here
-  char _sampling_method_buf[128];  // get 128 character for sampling method
+  char _sampling_method_buf[128]; // get 128 character for sampling method
   int _sampling_method_strlen = read_hdf5_dataset_data(
       hdf5_file, "model_conf/sampling_method", H5T_NATIVE_CHAR,
       _sampling_method_buf, [](int size) { return size > 128; },
@@ -644,7 +674,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
   }
 
   std::vector<int> offset;
-  std::vector<float> value(value_size);  // preallocate vector for performance
+  std::vector<float> value(value_size); // preallocate vector for performance
   std::vector<unsigned char> value_i8(value_size);
   std::cout << "loading " << value_size * sizeof(OpType_) / (1024 * 1024)
             << " MB of embedding weight." << std::endl;
@@ -682,25 +712,27 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
   idx += _max_step * _hidden_size;
 
   offset.push_back(idx);
-  read_hdf5_dataset_data(
-      hdf5_file, dataset_prefix + "/norm_scale", H5T_NATIVE_FLOAT,
-      value.data() + idx, [=](int size) { return size != _hidden_size; },
-      "Wrong norm_scale_size !");
+  read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/norm_scale",
+                         H5T_NATIVE_FLOAT, value.data() + idx,
+                         [=](int size) { return size != _hidden_size; },
+                         "Wrong norm_scale_size !");
   idx += _hidden_size;
 
   offset.push_back(idx);
-  read_hdf5_dataset_data(
-      hdf5_file, dataset_prefix + "/norm_bias", H5T_NATIVE_FLOAT,
-      value.data() + idx, [=](int size) { return size != _hidden_size; },
-      "Wrong norm_bias_size !");
+  read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/norm_bias",
+                         H5T_NATIVE_FLOAT, value.data() + idx,
+                         [=](int size) { return size != _hidden_size; },
+                         "Wrong norm_bias_size !");
   idx += _hidden_size;
 
   if (source == "src") {
     std::vector<_DataType> raw_value;
     raw_value.reserve(value.size());
-    for (float e : value) raw_value.push_back(float2required(e));
+    for (float e : value)
+      raw_value.push_back(float2required(e));
     _d_src_emb_wei = raw_value;
-    for (int e : offset) _p_d_src_emb_wei.push_back(_d_src_emb_wei.data() + e);
+    for (int e : offset)
+      _p_d_src_emb_wei.push_back(_d_src_emb_wei.data() + e);
   } else {
     // for trg, encdec_kv_kernel, encdec_kv_bias, logit_bias
 
@@ -736,27 +768,29 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
     idx += _hidden_size * 2 * _n_dec_layer;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/shared_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != vocab_size; },
-        "Wrong shared_bias_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/shared_bias",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != vocab_size; },
+                           "Wrong shared_bias_size !");
     idx += vocab_size;
 
     std::vector<_DataType> raw_value;
     raw_value.reserve(value.size());
-    for (float e : value) raw_value.push_back(float2required(e));
+    for (float e : value)
+      raw_value.push_back(float2required(e));
     _d_trg_emb_wei = raw_value;
     for (int e : offset) {
       _p_d_trg_emb_wei.push_back(_d_trg_emb_wei.data() + e);
     }
-  }  // trg
+  } // trg
 
   if (_multilg_type) {
     // fill in language embedding
     std::vector<float> raw_value_float = read_hdf5_dataset_data_float(
         hdf5_file, dataset_prefix + "/lang_emb", H5T_NATIVE_FLOAT);
     std::vector<_DataType> raw_value;
-    for (float e : raw_value_float) raw_value.push_back(float2required(e));
+    for (float e : raw_value_float)
+      raw_value.push_back(float2required(e));
 
     if (source == "src") {
       _d_src_lang_emb = raw_value;
@@ -798,17 +832,17 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     std::string dataset_prefix = "encoder_stack/" + std::to_string(layer_id);
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/multihead_norm_scale", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong multihead_norm_scale_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/multihead_norm_scale",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong multihead_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/multihead_norm_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong multihead_norm_bias_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/multihead_norm_bias",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong multihead_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -826,11 +860,11 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/multihead_project_bias_qkv",
-        H5T_NATIVE_FLOAT, value.data() + idx,
-        [=](int size) { return size != _hidden_size * 3; },
-        "Wrong multihead_project_bias_qkv_size !");
+    read_hdf5_dataset_data(hdf5_file,
+                           dataset_prefix + "/multihead_project_bias_qkv",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size * 3; },
+                           "Wrong multihead_project_bias_qkv_size !");
     idx += _hidden_size * 3;
 
     offset.push_back(idx);
@@ -848,25 +882,25 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/multihead_project_bias_output",
-        H5T_NATIVE_FLOAT, value.data() + idx,
-        [=](int size) { return size != _hidden_size; },
-        "Wrong multihead_project_bias_output_size !");
+    read_hdf5_dataset_data(hdf5_file,
+                           dataset_prefix + "/multihead_project_bias_output",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong multihead_project_bias_output_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/ffn_norm_scale", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong ffn_norm_scale_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_norm_scale",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong ffn_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/ffn_norm_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong ffn_norm_bias_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_norm_bias",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong ffn_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -884,10 +918,10 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/ffn_first_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _inner_size; },
-        "Wrong ffn_first_bias_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_first_bias",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _inner_size; },
+                           "Wrong ffn_first_bias_size !");
     idx += _inner_size;
 
     offset.push_back(idx);
@@ -905,10 +939,10 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/ffn_second_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong ffn_second_bias_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_second_bias",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong ffn_second_bias_size !");
     idx += _hidden_size;
 
     read_hdf5_dataset_scalar(hdf5_file,
@@ -939,14 +973,16 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
                              H5T_NATIVE_FLOAT, &clip_max);
     _enc_clip_max.push_back(clip_max);
     _enc_clip_max.push_back(0.0);
-  }  // for
+  } // for
 
   std::vector<_DataType> raw_value;
   raw_value.reserve(value.size());
-  for (float e : value) raw_value.push_back(float2required(e));
+  for (float e : value)
+    raw_value.push_back(float2required(e));
   _d_enc_wei = raw_value;
 
-  for (int e : offset) _p_d_enc_wei.push_back((_d_enc_wei.data()) + e);
+  for (int e : offset)
+    _p_d_enc_wei.push_back((_d_enc_wei.data()) + e);
   std::cout << "Finish loading enc_wei from host to device" << std::endl;
 }
 
@@ -975,17 +1011,17 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     std::string dataset_prefix = "decoder_stack/" + std::to_string(layer_id);
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/self_norm_scale", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong self_norm_scale_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/self_norm_scale",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong self_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/self_norm_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong self_norm_bias_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/self_norm_bias",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong self_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -1003,10 +1039,10 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/self_project_bias_qkv", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size * 3; },
-        "Wrong self_project_bias_qkv_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/self_project_bias_qkv",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size * 3; },
+                           "Wrong self_project_bias_qkv_size !");
     idx += _hidden_size * 3;
 
     offset.push_back(idx);
@@ -1024,25 +1060,25 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/self_project_bias_output",
-        H5T_NATIVE_FLOAT, value.data() + idx,
-        [=](int size) { return size != _hidden_size; },
-        "Wrong self_project_bias_output_size !");
+    read_hdf5_dataset_data(hdf5_file,
+                           dataset_prefix + "/self_project_bias_output",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong self_project_bias_output_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/encdec_norm_scale", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong encdec_norm_scale_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/encdec_norm_scale",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong encdec_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/encdec_norm_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong encdec_norm_bias_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/encdec_norm_bias",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong encdec_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -1060,10 +1096,10 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/encdec_project_bias_q", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong encdec_project_bias_q_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/encdec_project_bias_q",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong encdec_project_bias_q_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -1081,25 +1117,25 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/encdec_project_bias_output",
-        H5T_NATIVE_FLOAT, value.data() + idx,
-        [=](int size) { return size != _hidden_size; },
-        "Wrong encdec_project_bias_output_size !");
+    read_hdf5_dataset_data(hdf5_file,
+                           dataset_prefix + "/encdec_project_bias_output",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong encdec_project_bias_output_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/ffn_norm_scale", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong ffn_norm_scale_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_norm_scale",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong ffn_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/ffn_norm_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong ffn_norm_bias_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_norm_bias",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong ffn_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -1117,10 +1153,10 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/ffn_first_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _inner_size; },
-        "Wrong ffn_first_bias_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_first_bias",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _inner_size; },
+                           "Wrong ffn_first_bias_size !");
     idx += _inner_size;
 
     offset.push_back(idx);
@@ -1138,10 +1174,10 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/ffn_second_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong ffn_second_bias_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_second_bias",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong ffn_second_bias_size !");
     idx += _hidden_size;
 
     read_hdf5_dataset_scalar(hdf5_file, dataset_prefix + "/self_ln_clip_max",
@@ -1190,14 +1226,16 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
                              dataset_prefix + "/self_qkv_bias_out_clip_max",
                              H5T_NATIVE_FLOAT, &clip_max);
     _dec_clip_max.push_back(clip_max);
-  }  // for
+  } // for
 
   std::vector<_DataType> raw_value;
   raw_value.reserve(value.size());
-  for (float e : value) raw_value.push_back(float2required(e));
+  for (float e : value)
+    raw_value.push_back(float2required(e));
   _d_dec_wei = raw_value;
 
-  for (int e : offset) _p_d_dec_wei.push_back(_d_dec_wei.data() + e);
+  for (int e : offset)
+    _p_d_dec_wei.push_back(_d_dec_wei.data() + e);
   std::cout << "Finish loading dec_wei from host to device" << std::endl;
 }
 
@@ -1205,8 +1243,9 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
 Load the proto file into CPU memory and parse it.
 */
 template <OperationType OpType_>
-std::string QuantTransformerWeight<OpType_>::initializing(
-    std::string weight_path, bool only_decoder) {
+std::string
+QuantTransformerWeight<OpType_>::initializing(std::string weight_path,
+                                              bool only_decoder) {
   // If weight is of type pb, parse using proto parser.
   if (endswith(weight_path, ".pb")) {
     std::cout << "Parsing protobuf: " << weight_path << std::endl;
@@ -1230,19 +1269,23 @@ std::string QuantTransformerWeight<OpType_>::initializing(
     std::string res;
     if (!only_decoder) {
       res = proto_parse_emb_wei(transformer.src_embedding(), "src");
-      if (!res.empty()) return res;
+      if (!res.empty())
+        return res;
     }
 
     res = proto_parse_emb_wei(transformer.trg_embedding(), "trg");
-    if (!res.empty()) return res;
+    if (!res.empty())
+      return res;
 
     if (!only_decoder) {
       res = proto_parse_enc_wei(transformer);
-      if (!res.empty()) return res;
+      if (!res.empty())
+        return res;
     }
 
     res = proto_parse_dec_wei(transformer);
-    if (!res.empty()) return res;
+    if (!res.empty())
+      return res;
 
     std::cout << "Finish loading all weight from host to device" << std::endl;
     // Optional:  Delete all global objects allocated by libprotobuf.
@@ -1275,7 +1318,7 @@ std::string QuantTransformerWeight<OpType_>::initializing(
     std::cout << "Finish loading all weight from host to device" << std::endl;
     return "";
   } else {
-    return "Unsupported weight extention for [" + weight_path +
+    return "Unsupported weight extension for [" + weight_path +
            "]; Supported extensions: .pb, .hdf5\n";
   }
 }
@@ -1283,5 +1326,5 @@ std::string QuantTransformerWeight<OpType_>::initializing(
 template class QuantTransformerWeight<OperationType::FP16>;
 template class QuantTransformerWeight<OperationType::FP32>;
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

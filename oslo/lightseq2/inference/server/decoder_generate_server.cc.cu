@@ -7,12 +7,12 @@
 
 #include "../model/decoder.h"
 #include "../model/encoder.h"
-#include "model_config.pb.h"
 #include "../proto/transformer_weight.h"
 #include "../server/custom.h"
 #include "../server/model_config.h"
 #include "../server/model_config_cuda.h"
 #include "../tools/util.h"
+#include "model_config.pb.h"
 
 /**
 @file
@@ -62,8 +62,8 @@ enum ErrorCodes {
 
 // Context object. All state must be kept in this object.
 class Context {
- public:
-  Context(const std::string& instance_name, const ModelConfig& config,
+public:
+  Context(const std::string &instance_name, const ModelConfig &config,
           const int gpu_device);
   ~Context();
 
@@ -72,19 +72,19 @@ class Context {
   int Init();
 
   // Perform custom execution on the payloads.
-  int Execute(const uint32_t payload_cnt, CustomPayload* payloads,
+  int Execute(const uint32_t payload_cnt, CustomPayload *payloads,
               CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
- private:
+private:
   typedef lightseq::cuda::OperationTypeTraits<OPTYPE> _optraits;
   int FreeCudaBuffers();
-  int AllocateCudaBuffers(void** pdata, size_t byte_size);
+  int AllocateCudaBuffers(void **pdata, size_t byte_size);
 
-  int GetInputTensorGPU(CustomGetNextInputFn_t input_fn, void* input_context,
-                        const char* name, const size_t expected_byte_size,
-                        void* input);
+  int GetInputTensorGPU(CustomGetNextInputFn_t input_fn, void *input_context,
+                        const char *name, const size_t expected_byte_size,
+                        void *input);
 
-  int ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
+  int ExecuteGPU(const uint32_t payload_cnt, CustomPayload *payloads,
                  CustomGetNextInputFn_t input_fn,
                  CustomGetOutputFn_t output_fn);
 
@@ -104,10 +104,10 @@ class Context {
   int datatype_bytesize_;
 
   // CUDA memory buffers for input and output tensors.
-  void* d_padding_mask_;
-  void* d_encoder_output_;
-  void* d_buf_;
-  void* d_output_;
+  void *d_padding_mask_;
+  void *d_encoder_output_;
+  void *d_buf_;
+  void *d_output_;
 
   // The contexts executing on a GPU, the CUDA stream to use for the
   // execution.
@@ -118,18 +118,12 @@ class Context {
   std::shared_ptr<lightseq::cuda::Decoder<OPTYPE>> decoder_;
 };
 
-Context::Context(const std::string& instance_name,
-                 const ModelConfig& model_config, const int gpu_device)
-    : instance_name_(instance_name),
-      model_config_(model_config),
-      gpu_device_(gpu_device),
-      datatype_(DataType::TYPE_INVALID),
-      d_padding_mask_(nullptr),
-      d_encoder_output_(nullptr),
-      d_buf_(nullptr),
-      d_output_(nullptr),
-      stream_(nullptr),
-      hd_(nullptr) {}
+Context::Context(const std::string &instance_name,
+                 const ModelConfig &model_config, const int gpu_device)
+    : instance_name_(instance_name), model_config_(model_config),
+      gpu_device_(gpu_device), datatype_(DataType::TYPE_INVALID),
+      d_padding_mask_(nullptr), d_encoder_output_(nullptr), d_buf_(nullptr),
+      d_output_(nullptr), stream_(nullptr), hd_(nullptr) {}
 
 Context::~Context() {
   FreeCudaBuffers();
@@ -188,7 +182,7 @@ int Context::FreeCudaBuffers() {
   return kSuccess;
 }
 
-int Context::AllocateCudaBuffers(void** pdata, size_t byte_size) {
+int Context::AllocateCudaBuffers(void **pdata, size_t byte_size) {
   // Allocate GPU memory buffers large enough for each input and
   // output. For performance we allocate once during initialization
   // instead of doing it each time we execute.
@@ -278,7 +272,7 @@ int Context::Init() {
     return kOutputName;
   }
 
-  char* mz = getenv("MODEL_ZOO");
+  char *mz = getenv("MODEL_ZOO");
   if (mz == NULL) {
     LOG_ERROR << "plz set environment variable MODEL_ZOO !" << std::endl;
     return kWeightLoad;
@@ -293,7 +287,8 @@ int Context::Init() {
     LOG_ERROR << res << std::endl;
     return kWeightLoad;
   }
-  if (tw_._sampling_method != "") tw_._beam_size = 1;
+  if (tw_._sampling_method != "")
+    tw_._beam_size = 1;
   int max_batch_size = model_config_.max_batch_size();
   int err;
   err = AllocateCudaBuffers(&d_padding_mask_,
@@ -301,9 +296,9 @@ int Context::Init() {
   if (err != kSuccess) {
     return err;
   }
-  err = AllocateCudaBuffers(
-      &d_encoder_output_,
-      max_batch_size * tw_._max_step * tw_._hidden_size * datatype_bytesize_);
+  err = AllocateCudaBuffers(&d_encoder_output_, max_batch_size * tw_._max_step *
+                                                    tw_._hidden_size *
+                                                    datatype_bytesize_);
   if (err != kSuccess) {
     return err;
   }
@@ -314,9 +309,9 @@ int Context::Init() {
   }
 
   decoder_ = std::make_shared<lightseq::cuda::Decoder<OPTYPE>>(
-      max_batch_size, reinterpret_cast<int*>(d_padding_mask_),
-      reinterpret_cast<_optraits::DataType*>(d_encoder_output_),
-      reinterpret_cast<int*>(d_output_), tw_, stream_, hd_, true);
+      max_batch_size, reinterpret_cast<int *>(d_padding_mask_),
+      reinterpret_cast<_optraits::DataType *>(d_encoder_output_),
+      reinterpret_cast<int *>(d_output_), tw_, stream_, hd_, true);
   res = decoder_->check();
   if (!res.empty()) {
     LOG_ERROR << res << std::endl;
@@ -328,7 +323,7 @@ int Context::Init() {
   if (err != kSuccess) {
     return err;
   }
-  // encoder and decoder use the same buffer to save gpu memory useage
+  // encoder and decoder use the same buffer to save gpu memory usage
   decoder_->init_buffer(d_buf_);
 
   // Wait for all init finish.
@@ -344,15 +339,15 @@ int Context::Init() {
 }
 
 int Context::GetInputTensorGPU(CustomGetNextInputFn_t input_fn,
-                               void* input_context, const char* name,
-                               const size_t expected_byte_size, void* input) {
+                               void *input_context, const char *name,
+                               const size_t expected_byte_size, void *input) {
   // The values for an input tensor are not necessarily in one
   // contiguous chunk, so we copy the chunks into 'input', which
   // points to CUDA memory.
   uint64_t total_content_byte_size = 0;
 
   while (true) {
-    const void* content;
+    const void *content;
     uint64_t content_byte_size = expected_byte_size;
     if (!input_fn(input_context, name, &content, &content_byte_size)) {
       return kInputContents;
@@ -370,7 +365,7 @@ int Context::GetInputTensorGPU(CustomGetNextInputFn_t input_fn,
     }
 
     cudaError_t cuerr = cudaMemcpyAsync(
-        reinterpret_cast<char*>(input) + total_content_byte_size, content,
+        reinterpret_cast<char *>(input) + total_content_byte_size, content,
         content_byte_size, cudaMemcpyHostToDevice, stream_);
     if (cuerr != cudaSuccess) {
       LOG_ERROR << "failed to copy input values to GPU for transformer: "
@@ -391,7 +386,7 @@ int Context::GetInputTensorGPU(CustomGetNextInputFn_t input_fn,
   return kSuccess;
 }
 
-int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
+int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload *payloads,
                         CustomGetNextInputFn_t input_fn,
                         CustomGetOutputFn_t output_fn) {
   // Each payload represents a related set of inputs and required
@@ -402,13 +397,13 @@ int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
     return kSuccess;
   }
 
-  std::vector<int64_t> shape(
-      payloads[0].input_shape_dims[0],
-      payloads[0].input_shape_dims[0] + payloads[0].input_shape_dim_cnts[0]);
+  std::vector<int64_t> shape(payloads[0].input_shape_dims[0],
+                             payloads[0].input_shape_dims[0] +
+                                 payloads[0].input_shape_dim_cnts[0]);
 
   int err;
   for (uint32_t pidx = 0; pidx < payload_cnt; ++pidx) {
-    CustomPayload& payload = payloads[pidx];
+    CustomPayload &payload = payloads[pidx];
 
     // For this payload the expected size of the input and output
     // tensors is determined by the batch-size of this payload.
@@ -440,15 +435,15 @@ int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
         output_shape[0] * output_shape[1] * output_shape[2] * sizeof(int);
     int64_t score_bytesize = output_shape[0] * output_shape[1] * sizeof(float);
 
-    const char* output_name = "trg_ids:0";
-    const char* score_name = "score";
-    void* obuffer;
+    const char *output_name = "trg_ids:0";
+    const char *score_name = "score";
+    void *obuffer;
     if (!output_fn(payload.output_context, output_name, output_shape.size(),
                    &output_shape[0], output_bytesize, &obuffer)) {
       payload.error_code = kOutputBuffer;
       break;
     }
-    void* sbuffer;
+    void *sbuffer;
     if (!output_fn(payload.output_context, score_name, 2, &output_shape[0],
                    score_bytesize, &sbuffer)) {
       payload.error_code = kOutputBuffer;
@@ -490,7 +485,7 @@ int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
   return kSuccess;
 }
 
-int Context::Execute(const uint32_t payload_cnt, CustomPayload* payloads,
+int Context::Execute(const uint32_t payload_cnt, CustomPayload *payloads,
                      CustomGetNextInputFn_t input_fn,
                      CustomGetOutputFn_t output_fn) {
   if (gpu_device_ == CUSTOM_NO_GPU_DEVICE) {
@@ -504,7 +499,7 @@ int Context::Execute(const uint32_t payload_cnt, CustomPayload* payloads,
 
 extern "C" {
 
-int CustomInitialize(const CustomInitializeData* data, void** custom_context) {
+int CustomInitialize(const CustomInitializeData *data, void **custom_context) {
   // Convert the serialized model config to a ModelConfig object.
   ModelConfig model_config;
   if (!model_config.ParseFromString(std::string(
@@ -514,89 +509,89 @@ int CustomInitialize(const CustomInitializeData* data, void** custom_context) {
 
   // Create the context and validate that the model configuration is
   // something that we can handle.
-  Context* context = new Context(std::string(data->instance_name), model_config,
+  Context *context = new Context(std::string(data->instance_name), model_config,
                                  data->gpu_device_id);
   int err = context->Init();
   if (err != kSuccess) {
     return err;
   }
 
-  *custom_context = static_cast<void*>(context);
+  *custom_context = static_cast<void *>(context);
 
   return kSuccess;
 }
 
-int CustomFinalize(void* custom_context) {
+int CustomFinalize(void *custom_context) {
   if (custom_context != nullptr) {
-    Context* context = static_cast<Context*>(custom_context);
+    Context *context = static_cast<Context *>(custom_context);
     delete context;
   }
 
   return kSuccess;
 }
 
-const char* CustomErrorString(void* custom_context, int errcode) {
+const char *CustomErrorString(void *custom_context, int errcode) {
   switch (errcode) {
-    case kSuccess:
-      return "success";
-    case kInvalidModelConfig:
-      return "invalid model configuration";
-    case kGpuNotSupported:
-      return "execution on GPU not supported";
-    case kInputOutputShape:
-      return "model must one inputs and two outputs with the same shape";
-    case kInputName:
-      return "model inputs must be named 'encoder_output:0' and 'INPUT1'";
-    case kOutputName:
-      return "model outputs must be named 'trg_ids:0' and 'OUTPUT1'";
-    case kInputOutputDataType:
-      return "model inputs and outputs must have TYPE_INT32 or TYPE_FP32 "
-             "data-type";
-    case kInputContents:
-      return "unable to get input tensor values";
-    case kInputSize:
-      return "unexpected size for input tensor";
-    case kOutputBuffer:
-      return "unable to get buffer for output tensor values";
-    case kCudaDevice:
-      return "cudaSetDevice failed";
-    case kCudaMalloc:
-      return "cudaMalloc failed";
-    case kCudaMemcpy:
-      return "cudaMemcpy failed";
-    case kCudaExecute:
-      return "cuda execution failed";
-    case kCudaStream:
-      return "failed to create CUDA stream";
-    case kCublas:
-      return "failed to create Cublas handle";
-    case kCpuExecute:
-      return "cpu execution failed";
-    case kWeightLoad:
-      return "load transformer weight in .pb failed";
-    case kModelSize:
-      return "inappropriate transformer model size";
-    default:
-      break;
+  case kSuccess:
+    return "success";
+  case kInvalidModelConfig:
+    return "invalid model configuration";
+  case kGpuNotSupported:
+    return "execution on GPU not supported";
+  case kInputOutputShape:
+    return "model must one inputs and two outputs with the same shape";
+  case kInputName:
+    return "model inputs must be named 'encoder_output:0' and 'INPUT1'";
+  case kOutputName:
+    return "model outputs must be named 'trg_ids:0' and 'OUTPUT1'";
+  case kInputOutputDataType:
+    return "model inputs and outputs must have TYPE_INT32 or TYPE_FP32 "
+           "data-type";
+  case kInputContents:
+    return "unable to get input tensor values";
+  case kInputSize:
+    return "unexpected size for input tensor";
+  case kOutputBuffer:
+    return "unable to get buffer for output tensor values";
+  case kCudaDevice:
+    return "cudaSetDevice failed";
+  case kCudaMalloc:
+    return "cudaMalloc failed";
+  case kCudaMemcpy:
+    return "cudaMemcpy failed";
+  case kCudaExecute:
+    return "cuda execution failed";
+  case kCudaStream:
+    return "failed to create CUDA stream";
+  case kCublas:
+    return "failed to create Cublas handle";
+  case kCpuExecute:
+    return "cpu execution failed";
+  case kWeightLoad:
+    return "load transformer weight in .pb failed";
+  case kModelSize:
+    return "inappropriate transformer model size";
+  default:
+    break;
   }
 
   return "unknown error";
 }
 
-int CustomExecute(void* custom_context, const uint32_t payload_cnt,
-                  CustomPayload* payloads, CustomGetNextInputFn_t input_fn,
+int CustomExecute(void *custom_context, const uint32_t payload_cnt,
+                  CustomPayload *payloads, CustomGetNextInputFn_t input_fn,
                   CustomGetOutputFn_t output_fn) {
   if (custom_context == nullptr) {
     return kUnknown;
   }
 
-  Context* context = static_cast<Context*>(custom_context);
+  Context *context = static_cast<Context *>(custom_context);
   return context->Execute(payload_cnt, payloads, input_fn, output_fn);
 }
 
-}  // extern "C"
+} // extern "C"
 
-}  // namespace generate
-}  // namespace custom
-}  // namespace inferenceserver
-}  // namespace nvidia
+} // namespace generate
+} // namespace custom
+} // namespace inferenceserver
+} // namespace nvidia

@@ -84,7 +84,7 @@ class TensorQuantizer(nn.Module):
     ):
         """Initialize quantizer and set up required variables"""
         super(TensorQuantizer, self).__init__()
-        # Expand quant_desc. Use quant_desc.dict would be eaiser, but adding one-by-one explicitly gives more control
+        # Expand quant_desc. Use quant_desc.dict would be easier, but adding one-by-one explicitly gives more control
         self._num_bits = quant_desc.num_bits
         self._fake_quant = quant_desc.fake_quant
         self._axis = quant_desc.axis

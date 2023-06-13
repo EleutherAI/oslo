@@ -24,9 +24,8 @@ ViT encoder, composed by gemm lib and
 namespace lightseq {
 namespace cuda {
 
-template <OperationType OpType_>
-class VitEncoder {
- private:
+template <OperationType OpType_> class VitEncoder {
+private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   const cudaDataType_t _computeType = _optraits::computeType;
@@ -39,7 +38,7 @@ class VitEncoder {
   void ffn_add_norm();
 
   const int _max_batch_size;
-  int *_p_d_padding_mask;  // true sequence length(remove padding), [batch_size]
+  int *_p_d_padding_mask; // true sequence length(remove padding), [batch_size]
 
   const VitWeight<OpType_> &_tw;
   cudaStream_t _stream;
@@ -73,11 +72,11 @@ class VitEncoder {
   int _layer_id;
   int _weight_offset;
 
- public:
-  const float *_p_d_pixel_input;  // input pixels [batch_size, channel_input,
-                                  // image_size, image_size]
+public:
+  const float *_p_d_pixel_input; // input pixels [batch_size, channel_input,
+                                 // image_size, image_size]
   _DataType
-      *_p_d_output;  // encoder output, [batch_size, batch_seq_len, hidden_size]
+      *_p_d_output; // encoder output, [batch_size, batch_seq_len, hidden_size]
 
   VitEncoder(int max_batch_size, const float *p_d_pixel_input,
              int *p_d_padding_mask, _DataType *p_d_output,
@@ -89,5 +88,5 @@ class VitEncoder {
   void run_one_infer(int batch_size);
 };
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

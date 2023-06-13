@@ -3,10 +3,10 @@
    This block_reduce_n is adapted from Tencent/TurboTransformers
 */
 #pragma once
+#include "common.h"
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
-#include "common.h"
 namespace lightseq {
 namespace cuda {
 enum class ReduceType { kMax = 0, kSum };
@@ -34,10 +34,10 @@ __inline__ __device__ void warpReduce<ReduceType::kMax, 1>(float *pval) {
 template <>
 __inline__ __device__ void warpReduce<ReduceType::kMax, 2>(float *pval) {
   float val0_tmp, val1_tmp;
-#define WarpReduceMaxOneStep(a, b)                                 \
-  val0_tmp = __shfl_xor_sync(WARP_REDUCE_MASK, *(pval), a, b);     \
-  val1_tmp = __shfl_xor_sync(WARP_REDUCE_MASK, *(pval + 1), a, b); \
-  *(pval) = max(val0_tmp, *(pval));                                \
+#define WarpReduceMaxOneStep(a, b)                                             \
+  val0_tmp = __shfl_xor_sync(WARP_REDUCE_MASK, *(pval), a, b);                 \
+  val1_tmp = __shfl_xor_sync(WARP_REDUCE_MASK, *(pval + 1), a, b);             \
+  *(pval) = max(val0_tmp, *(pval));                                            \
   *(pval + 1) = max(val1_tmp, *(pval + 1));
 
   WarpReduceMaxOneStep(16, 32);
@@ -59,17 +59,17 @@ __inline__ __device__ void warpReduce<ReduceType::kSum, 1>(float *pval) {
 
 /*
  * Unorll for loop for warpreduce to
- * imporve instruction issue efficiency
+ * improve instruction issue efficiency
  * ElemX means there are X numbers to be summed
  */
 
 template <>
 __inline__ __device__ void warpReduce<ReduceType::kSum, 2>(float *pval) {
   float val0_tmp, val1_tmp;
-#define WarpReduceSumOneStep(a, b)                                 \
-  val0_tmp = __shfl_xor_sync(WARP_REDUCE_MASK, *(pval + 0), a, b); \
-  val1_tmp = __shfl_xor_sync(WARP_REDUCE_MASK, *(pval + 1), a, b); \
-  *(pval + 0) += val0_tmp;                                         \
+#define WarpReduceSumOneStep(a, b)                                             \
+  val0_tmp = __shfl_xor_sync(WARP_REDUCE_MASK, *(pval + 0), a, b);             \
+  val1_tmp = __shfl_xor_sync(WARP_REDUCE_MASK, *(pval + 1), a, b);             \
+  *(pval + 0) += val0_tmp;                                                     \
   *(pval + 1) += val1_tmp
 
   WarpReduceSumOneStep(16, 32);
@@ -84,14 +84,14 @@ __inline__ __device__ void warpReduce<ReduceType::kSum, 2>(float *pval) {
 template <>
 __inline__ __device__ void warpReduce<ReduceType::kSum, 4>(float *pval) {
   float val0_tmp, val1_tmp, val2_tmp, val3_tmp;
-#define WarpReduceSumOneStep(a, b)                                 \
-  val0_tmp = __shfl_xor_sync(WARP_REDUCE_MASK, *(pval + 0), a, b); \
-  val1_tmp = __shfl_xor_sync(WARP_REDUCE_MASK, *(pval + 1), a, b); \
-  val2_tmp = __shfl_xor_sync(WARP_REDUCE_MASK, *(pval + 2), a, b); \
-  val3_tmp = __shfl_xor_sync(WARP_REDUCE_MASK, *(pval + 3), a, b); \
-  *(pval + 0) += val0_tmp;                                         \
-  *(pval + 1) += val1_tmp;                                         \
-  *(pval + 2) += val2_tmp;                                         \
+#define WarpReduceSumOneStep(a, b)                                             \
+  val0_tmp = __shfl_xor_sync(WARP_REDUCE_MASK, *(pval + 0), a, b);             \
+  val1_tmp = __shfl_xor_sync(WARP_REDUCE_MASK, *(pval + 1), a, b);             \
+  val2_tmp = __shfl_xor_sync(WARP_REDUCE_MASK, *(pval + 2), a, b);             \
+  val3_tmp = __shfl_xor_sync(WARP_REDUCE_MASK, *(pval + 3), a, b);             \
+  *(pval + 0) += val0_tmp;                                                     \
+  *(pval + 1) += val1_tmp;                                                     \
+  *(pval + 2) += val2_tmp;                                                     \
   *(pval + 3) += val3_tmp
 
   WarpReduceSumOneStep(16, 32);
@@ -287,5 +287,5 @@ __inline__ __device__ void blockReduce<ReduceType::kMax, 4>(float *pval) {
   }
   warpReduce<ReduceType::kMax, num>(pval);
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

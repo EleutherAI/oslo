@@ -23,11 +23,11 @@ using namespace std;
 #include <time.h>
 #include <vector>
 // cuda
+#include "cuda_util.h"
+#include "kernels.h"
 #include <cublasLt.h>
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
-#include "kernels.h"
-#include "cuda_util.h"
 
 #define Value 127
 
@@ -38,8 +38,7 @@ string tmp_str;
 namespace lightseq {
 namespace cuda {
 // mat is column-major
-template <typename T>
-void transpose(T* matT, T* mat, int rows, int cols) {
+template <typename T> void transpose(T *matT, T *mat, int rows, int cols) {
   for (int c = 0; c < cols; c++) {
     for (int r = 0; r < rows; r++) {
       int indexIn = r + c * rows;
@@ -51,19 +50,19 @@ void transpose(T* matT, T* mat, int rows, int cols) {
 }
 
 template <typename T>
-void matMul(int m, int n, int k, const T* A, int lda, const T* B, int ldb,
-            float* C, int ldc) {
+void matMul(int m, int n, int k, const T *A, int lda, const T *B, int ldb,
+            float *C, int ldc) {
   float sum;
   for (int c = 0; c < n; c++) {
     // printf("CPU gemm : %f\n", float(c)/float(n));
     for (int r = 0; r < m; r++) {
       sum = 0;
       for (int kk = 0; kk < k; kk++) {
-        int idxA = kk * lda + r;  // A[r][kk]
-        int idxB = c * ldb + kk;  // B[kk][c]
+        int idxA = kk * lda + r; // A[r][kk]
+        int idxB = c * ldb + kk; // B[kk][c]
         sum += float(A[idxA]) * float(B[idxB]);
       }
-      C[c * ldc + r] = sum;  // C[r][c]
+      C[c * ldc + r] = sum; // C[r][c]
     }
   }
 }
@@ -71,7 +70,7 @@ void matMul(int m, int n, int k, const T* A, int lda, const T* B, int ldb,
 int roundoff(int v, int d) { return ((v + d - 1) / d) * d; }
 
 // initialize matrix
-void matInit(half* p, int8_t* p2, int size) {
+void matInit(half *p, int8_t *p2, int size) {
   srand(time(NULL));
   for (int index = 0; index < size; index++) {
     float tmp = rand() % 10 - 5;
@@ -80,9 +79,8 @@ void matInit(half* p, int8_t* p2, int size) {
   }
 }
 
-template <typename T>
-int checkNonZero(T* A, int size) {
-  T* h_A = (T*)malloc(sizeof(T) * size);
+template <typename T> int checkNonZero(T *A, int size) {
+  T *h_A = (T *)malloc(sizeof(T) * size);
   CHECK_GPU_ERROR(cudaMemcpy(h_A, A, sizeof(T) * size, cudaMemcpyDeviceToHost));
   int noneZeroNum = 0;
   for (int ii = 0; ii < size; ii++) {
@@ -94,10 +92,9 @@ int checkNonZero(T* A, int size) {
   return noneZeroNum;
 }
 
-template <typename TA, typename TB>
-void checkMat(TA* A, TB* B, int size) {
-  TA* matA = (TA*)malloc(sizeof(TA) * size);
-  TB* matB = (TB*)malloc(sizeof(TB) * size);
+template <typename TA, typename TB> void checkMat(TA *A, TB *B, int size) {
+  TA *matA = (TA *)malloc(sizeof(TA) * size);
+  TB *matB = (TB *)malloc(sizeof(TB) * size);
   int not_passed = 0;
   CHECK_GPU_ERROR(
       cudaMemcpy(matA, A, sizeof(TA) * size, cudaMemcpyDeviceToHost));
@@ -121,9 +118,8 @@ void checkMat(TA* A, TB* B, int size) {
   free(matB);
 }
 
-template <typename T>
-int checkNonZero2(T* A, int size) {
-  T* h_A = A;
+template <typename T> int checkNonZero2(T *A, int size) {
+  T *h_A = A;
   int noneZeroNum = 0;
   for (int ii = 0; ii < size; ii++) {
     if (fabs(float(h_A[ii]) - 0.0f) > 0.0001f) {
@@ -134,9 +130,9 @@ int checkNonZero2(T* A, int size) {
 }
 
 template <typename TA, typename TB>
-void checkMat2(TA* A, TB* B, int size, string mark) {
-  TA* matA = A;
-  TB* matB = (TB*)malloc(sizeof(TB) * size);
+void checkMat2(TA *A, TB *B, int size, string mark) {
+  TA *matA = A;
+  TB *matB = (TB *)malloc(sizeof(TB) * size);
   int not_passed = 0;
   CHECK_GPU_ERROR(
       cudaMemcpy(matB, B, sizeof(TB) * size, cudaMemcpyDeviceToHost));
@@ -163,9 +159,9 @@ void checkMat2(TA* A, TB* B, int size, string mark) {
 }
 
 template <typename TA, typename TB>
-void checkMat3(TA* A, TB* B, int size, float alpha, string mark) {
-  TA* matA = A;
-  TB* matB = (TB*)malloc(sizeof(TB) * size);
+void checkMat3(TA *A, TB *B, int size, float alpha, string mark) {
+  TA *matA = A;
+  TB *matB = (TB *)malloc(sizeof(TB) * size);
   int not_passed = 0;
   CHECK_GPU_ERROR(
       cudaMemcpy(matB, B, sizeof(TB) * size, cudaMemcpyDeviceToHost));
@@ -191,13 +187,13 @@ void checkMat3(TA* A, TB* B, int size, float alpha, string mark) {
            not_passed);
   free(matB);
 }
-template <typename T>
-float getAMax(T* A, int size) {
-  T* h_A = (T*)malloc(sizeof(T) * size);
+template <typename T> float getAMax(T *A, int size) {
+  T *h_A = (T *)malloc(sizeof(T) * size);
   CHECK_GPU_ERROR(cudaMemcpy(h_A, A, sizeof(T) * size, cudaMemcpyDeviceToHost));
   float amax = -1000;
   for (int i = 0; i < size; i++)
-    if (fabs(float(h_A[i])) > amax) amax = fabs(float(h_A[i]));
+    if (fabs(float(h_A[i])) > amax)
+      amax = fabs(float(h_A[i]));
   free(h_A);
   return amax;
 }
@@ -212,7 +208,7 @@ typedef struct {
   cublasLtMatmulAlgo_t algo;
   cublasStatus_t status;
   float time;
-  size_t workspaceSize;  // actual memory workspace needed
+  size_t workspaceSize; // actual memory workspace needed
   cublasMath_t mathMode;
   cublasLtReductionScheme_t reductionScheme;
   int customOption;
@@ -220,18 +216,18 @@ typedef struct {
 } customMatmulPerf_t;
 
 /* CAUTION : must match cublasLtMatmulTile_t */
-const char* const matmulTileName[] = {
+const char *const matmulTileName[] = {
     "UNDEF",  "8x8",    "8x16",    "16x8",    "8x32",   "16x16",  "32x8",
     "8x64",   "16x32",  "32x16",   "64x8",    "32x32",  "32x64",  "64x32",
     "32x128", "64x64",  "128x32",  "64x128",  "128x64", "64x256", "128x128",
     "256x64", "64x512", "128x256", "256x128", "512x64",
 };
 // Utility function to print customMatmulPerf_t structure
-void printPerfStructure(int m, int n, int k, const customMatmulPerf_t& perf,
-                        cublasLtMatmulAlgo_info& best_algo, int algoI) {
+void printPerfStructure(int m, int n, int k, const customMatmulPerf_t &perf,
+                        cublasLtMatmulAlgo_info &best_algo, int algoI) {
   int algoId, tile, swizzle, customOption, numSplitsK, reductionScheme, stages;
 
-  const cublasLtMatmulAlgo_t* matmulAlgo = &perf.algo;
+  const cublasLtMatmulAlgo_t *matmulAlgo = &perf.algo;
   CHECK_GPU_ERROR(cublasLtMatmulAlgoConfigGetAttribute(
       matmulAlgo, CUBLASLT_ALGO_CONFIG_ID, &algoId, sizeof(algoId), NULL));
   CHECK_GPU_ERROR(cublasLtMatmulAlgoConfigGetAttribute(
@@ -275,23 +271,23 @@ void printPerfStructure(int m, int n, int k, const customMatmulPerf_t& perf,
   }
 }
 
-static inline bool time_compare(const customMatmulPerf_t& perf_a,
-                                const customMatmulPerf_t& perf_b) {
+static inline bool time_compare(const customMatmulPerf_t &perf_a,
+                                const customMatmulPerf_t &perf_b) {
   return ((perf_a.status == CUBLAS_STATUS_SUCCESS) &&
           (perf_a.time < perf_b.time));
 }
 
 static cublasStatus_t customMatmulRun(
-    cublasLtHandle_t ltHandle,  // to get the capabilities (required a GPU)
+    cublasLtHandle_t ltHandle, // to get the capabilities (required a GPU)
     cublasLtMatmulDesc_t operationDesc,
-    const void* alpha, /* host or device pointer */
-    const void* A, cublasLtMatrixLayout_t Adesc, const void* B,
-    cublasLtMatrixLayout_t Bdesc, const void* beta, /* host or device pointer */
-    const void* C, cublasLtMatrixLayout_t Cdesc, void* D,
-    cublasLtMatrixLayout_t Ddesc, const cublasLtMatmulAlgo_t& algo,
-    int kernelRepeats, void* workSpace, size_t workSpaceSizeInBytes,
-    customMatmulPerf_t& perfResults, cudaStream_t stream,
-    cudaEvent_t& startEvent, cudaEvent_t& stopEvent) {
+    const void *alpha, /* host or device pointer */
+    const void *A, cublasLtMatrixLayout_t Adesc, const void *B,
+    cublasLtMatrixLayout_t Bdesc, const void *beta, /* host or device pointer */
+    const void *C, cublasLtMatrixLayout_t Cdesc, void *D,
+    cublasLtMatrixLayout_t Ddesc, const cublasLtMatmulAlgo_t &algo,
+    int kernelRepeats, void *workSpace, size_t workSpaceSizeInBytes,
+    customMatmulPerf_t &perfResults, cudaStream_t stream,
+    cudaEvent_t &startEvent, cudaEvent_t &stopEvent) {
   cublasLtMatmulHeuristicResult_t heurResult;
   /* Looping over the Algo */
   int repeats = kernelRepeats;
@@ -325,7 +321,7 @@ static cublasStatus_t customMatmulRun(
         perfResults.wavesCount = heurResult.wavesCount;
       }
     } else {
-      algoStatus = CUBLAS_STATUS_NOT_SUPPORTED;  // Not enough workspace
+      algoStatus = CUBLAS_STATUS_NOT_SUPPORTED; // Not enough workspace
     }
   }
 
@@ -335,13 +331,13 @@ static cublasStatus_t customMatmulRun(
 // find the best algo for INT8 gemm + cublasLt + INT8 Output
 int LtIgemmCustomFindINT8OutputCOL32_2R_4R4(
     cublasLtHandle_t ltHandle, int m, int n, int k,
-    const float* alpha,                                  /* host pointer */
-    const int8_t* A, const int8_t* B, const float* beta, /* host pointer */
-    int8_t* C, cublasLtMatmulAlgo_info& best_algo) {
-  void* workSpace = NULL;
+    const float *alpha,                                  /* host pointer */
+    const int8_t *A, const int8_t *B, const float *beta, /* host pointer */
+    int8_t *C, cublasLtMatmulAlgo_info &best_algo) {
+  void *workSpace = NULL;
   size_t workSpaceSize =
-      std::min(8 * size_t(1 << 20), sizeof(char*) * 64 * m * n);
-  CHECK_GPU_ERROR(cudaMalloc((void**)&workSpace, workSpaceSize));
+      std::min(8 * size_t(1 << 20), sizeof(char *) * 64 * m * n);
+  CHECK_GPU_ERROR(cudaMalloc((void **)&workSpace, workSpaceSize));
   cudaEvent_t startEvent;
   cudaEvent_t stopEvent;
   CHECK_GPU_ERROR(cudaEventCreate(&startEvent, cudaEventBlockingSync));
@@ -353,7 +349,7 @@ int LtIgemmCustomFindINT8OutputCOL32_2R_4R4(
   cublasLtMatrixLayout_t Adesc = NULL, Bdesc = NULL, Cdesc = NULL;
   float transformAlpha = 1.0f, transformBeta = 0.0f;
   int8_t *Atransform = NULL, *Btransform = NULL;
-  int32_t* Ctransform = NULL;
+  int32_t *Ctransform = NULL;
   cublasLtMatrixLayout_t AtransformDesc = NULL, BtransformDesc = NULL,
                          CtransformDesc = NULL;
   cudaStream_t stream = 0;
@@ -365,7 +361,7 @@ int LtIgemmCustomFindINT8OutputCOL32_2R_4R4(
   int AlgoCombinations = ALGO_COMBINATIONS;
   int AlgoCount = 0;
   int kernelRepeats =
-      10;  // number of time the CUDA kernels will be run back to back
+      10; // number of time the CUDA kernels will be run back to back
   customMatmulPerf_t perfResults[ALGO_COMBINATIONS];
   int nbAlgoIds = 0;
 #define ALGO_IDS 100
@@ -386,12 +382,12 @@ int LtIgemmCustomFindINT8OutputCOL32_2R_4R4(
     ldbTransform = 32 * roundoff(n, 32);
   int ldcTransform = 32 * m;
 
-  CHECK_GPU_ERROR(cudaMalloc(
-      &Atransform, sizeof(int8_t) * roundoff(k, 32) / 32 * ldaTransform));
-  CHECK_GPU_ERROR(cudaMalloc(
-      &Btransform, sizeof(int8_t) * roundoff(k, 32) / 32 * ldbTransform));
-  CHECK_GPU_ERROR(cudaMalloc(
-      &Ctransform, sizeof(int8_t) * roundoff(n, 32) / 32 * ldcTransform));
+  CHECK_GPU_ERROR(cudaMalloc(&Atransform, sizeof(int8_t) * roundoff(k, 32) /
+                                              32 * ldaTransform));
+  CHECK_GPU_ERROR(cudaMalloc(&Btransform, sizeof(int8_t) * roundoff(k, 32) /
+                                              32 * ldbTransform));
+  CHECK_GPU_ERROR(cudaMalloc(&Ctransform, sizeof(int8_t) * roundoff(n, 32) /
+                                              32 * ldcTransform));
 
   cublasLtMatrixTransformDescCreate(&transformDesc, CUDA_R_32F);
 
@@ -466,7 +462,7 @@ int LtIgemmCustomFindINT8OutputCOL32_2R_4R4(
     CHECK_GPU_ERROR(cublasLtMatmulAlgoCapGetAttribute(
         &algo, CUBLASLT_ALGO_CAP_TILE_IDS, NULL, 0, &sizeWritten));
     int nbTiles = int(sizeWritten / sizeof(int));
-    int* tileA = new int[nbTiles == 0 ? 1 : nbTiles];
+    int *tileA = new int[nbTiles == 0 ? 1 : nbTiles];
     if (nbTiles == 0) {
       tileA[0] = CUBLASLT_MATMUL_TILE_UNDEFINED;
       nbTiles = 1;
@@ -522,7 +518,7 @@ int LtIgemmCustomFindINT8OutputCOL32_2R_4R4(
                   sizeof(splitKSequenceA) / sizeof(splitKSequenceA[0]);
             }
             // Loop over the splitK value over a fixed sequence splitKSequenceA
-            // in addtion to the case where splitK is not enabled
+            // in addition to the case where splitK is not enabled
             for (int l = 0;
                  (l < (1 + splitK_trial)) && (AlgoCount < AlgoCombinations);
                  l++) {
@@ -541,7 +537,7 @@ int LtIgemmCustomFindINT8OutputCOL32_2R_4R4(
                   &algo, CUBLASLT_ALGO_CONFIG_REDUCTION_SCHEME, &redScheme,
                   sizeof(int)));
 
-              if (l > 0) {  // Split-K case
+              if (l > 0) { // Split-K case
                 splitK_val = splitKSequenceA[l - 1];
                 CHECK_GPU_ERROR(cublasLtMatmulAlgoConfigSetAttribute(
                     &algo, CUBLASLT_ALGO_CONFIG_SPLITK_NUM,
@@ -564,10 +560,11 @@ int LtIgemmCustomFindINT8OutputCOL32_2R_4R4(
                         algo, kernelRepeats, workSpace, workSpaceSize,
                         perfResults[AlgoCount], stream, startEvent, stopEvent);
                     perfResults[AlgoCount].status = status;
-                    if (status == CUBLAS_STATUS_SUCCESS) AlgoCount++;
-                  }     // end if
-                }       // end for
-              } else {  // Non-splitK case
+                    if (status == CUBLAS_STATUS_SUCCESS)
+                      AlgoCount++;
+                  }    // end if
+                }      // end for
+              } else { // Non-splitK case
                 /* if user preference is ok with workspace */
                 if (AlgoCount < AlgoCombinations) {
                   status = customMatmulRun(
@@ -579,16 +576,17 @@ int LtIgemmCustomFindINT8OutputCOL32_2R_4R4(
                       algo, kernelRepeats, workSpace, workSpaceSize,
                       perfResults[AlgoCount], stream, startEvent, stopEvent);
                   perfResults[AlgoCount].status = status;
-                  if (status == CUBLAS_STATUS_SUCCESS) AlgoCount++;
+                  if (status == CUBLAS_STATUS_SUCCESS)
+                    AlgoCount++;
                 }
               }
-            }  // end l
-          }    // end k
-        }      // end customOption
+            } // end l
+          }   // end k
+        }     // end customOption
       }
-    }  // end tileIdx
+    } // end tileIdx
     delete[] tileA;
-  }  // end idx
+  } // end idx
   // Sort the results per run duration
   std::sort(perfResults, perfResults + AlgoCount, time_compare);
   // Print timing and perf details
@@ -605,32 +603,42 @@ int LtIgemmCustomFindINT8OutputCOL32_2R_4R4(
   }
 
   // Descriptors are no longer needed as all GPU work was already enqueued
-  if (Cdesc) CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Cdesc));
-  if (Bdesc) CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Bdesc));
-  if (Adesc) CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Adesc));
+  if (Cdesc)
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Cdesc));
+  if (Bdesc)
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Bdesc));
+  if (Adesc)
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Adesc));
   if (CtransformDesc)
     CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(CtransformDesc));
   if (BtransformDesc)
     CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(BtransformDesc));
   if (AtransformDesc)
     CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(AtransformDesc));
-  if (operationDesc) CHECK_GPU_ERROR(cublasLtMatmulDescDestroy(operationDesc));
+  if (operationDesc)
+    CHECK_GPU_ERROR(cublasLtMatmulDescDestroy(operationDesc));
   if (transformDesc)
     CHECK_GPU_ERROR(cublasLtMatrixTransformDescDestroy(transformDesc));
-  if (Atransform) CHECK_GPU_ERROR(cudaFree(Atransform));
-  if (Btransform) CHECK_GPU_ERROR(cudaFree(Btransform));
-  if (Ctransform) CHECK_GPU_ERROR(cudaFree(Ctransform));
-  if (workSpace) CHECK_GPU_ERROR(cudaFree(workSpace));
-  if (startEvent) CHECK_GPU_ERROR(cudaEventDestroy(startEvent));
-  if (stopEvent) CHECK_GPU_ERROR(cudaEventDestroy(stopEvent));
+  if (Atransform)
+    CHECK_GPU_ERROR(cudaFree(Atransform));
+  if (Btransform)
+    CHECK_GPU_ERROR(cudaFree(Btransform));
+  if (Ctransform)
+    CHECK_GPU_ERROR(cudaFree(Ctransform));
+  if (workSpace)
+    CHECK_GPU_ERROR(cudaFree(workSpace));
+  if (startEvent)
+    CHECK_GPU_ERROR(cudaEventDestroy(startEvent));
+  if (stopEvent)
+    CHECK_GPU_ERROR(cudaEventDestroy(stopEvent));
 
   return status == CUBLAS_STATUS_SUCCESS ? 0 : 1;
 }
 
 void int8gemm_with_cublasLtMatmul_ORDER_COL32_2R_4R4(
-    int m, int n, int k, float alpha2, float beta2, int8_t* d_int8_A,
-    int8_t* d_int8_B, int8_t* d_int8_C,
-    cublasLtMatmulAlgo_info& INT8_gemm_cublasLt_INT8Output_best_algo,
+    int m, int n, int k, float alpha2, float beta2, int8_t *d_int8_A,
+    int8_t *d_int8_B, int8_t *d_int8_C,
+    cublasLtMatmulAlgo_info &INT8_gemm_cublasLt_INT8Output_best_algo,
     cublasLtHandle_t ltHandle, cudaStream_t stream) {
   cublasStatus_t cublasStat;
 
@@ -660,7 +668,7 @@ void int8gemm_with_cublasLtMatmul_ORDER_COL32_2R_4R4(
   CHECK_GPU_ERROR(
       cublasLtMatrixTransformDescCreate(&transformDesc, CUDA_R_32F));
 
-  int8_t* Ctransform2 = NULL;
+  int8_t *Ctransform2 = NULL;
   cudaDataType_t scaleType, Atype, Btype, Ctype;
   cublasComputeType_t computeType;
   computeType = CUBLAS_COMPUTE_32I, scaleType = CUDA_R_32F, Atype = CUDA_R_8I,
@@ -670,12 +678,12 @@ void int8gemm_with_cublasLtMatmul_ORDER_COL32_2R_4R4(
   cublasLtMatrixLayout_t Cdesc2 = NULL;
   cublasLtMatrixLayout_t CtransformDesc2 = NULL;
 
-  CHECK_GPU_ERROR(cudaMalloc(
-      &Atransform, sizeof(int8_t) * roundoff(k, 32) / 32 * ldaTransform));
-  CHECK_GPU_ERROR(cudaMalloc(
-      &Btransform, sizeof(int8_t) * roundoff(k, 32) / 32 * ldbTransform));
-  CHECK_GPU_ERROR(cudaMalloc(
-      &Ctransform2, sizeof(int8_t) * roundoff(n, 32) / 32 * ldcTransform));
+  CHECK_GPU_ERROR(cudaMalloc(&Atransform, sizeof(int8_t) * roundoff(k, 32) /
+                                              32 * ldaTransform));
+  CHECK_GPU_ERROR(cudaMalloc(&Btransform, sizeof(int8_t) * roundoff(k, 32) /
+                                              32 * ldbTransform));
+  CHECK_GPU_ERROR(cudaMalloc(&Ctransform2, sizeof(int8_t) * roundoff(n, 32) /
+                                               32 * ldcTransform));
 
   // --------------------------------------
   // Create descriptors for the original matrices
@@ -722,7 +730,7 @@ void int8gemm_with_cublasLtMatmul_ORDER_COL32_2R_4R4(
 
   // get algo
   cublasLtMatmulAlgo_t algo2;
-  char* workSpace2 = NULL;
+  char *workSpace2 = NULL;
   int workspaceSize = 0;
   workspaceSize = INT8_gemm_cublasLt_INT8Output_best_algo.workspaceSize;
   CHECK_GPU_ERROR(cublasLtMatmulAlgoInit(
@@ -753,7 +761,7 @@ void int8gemm_with_cublasLtMatmul_ORDER_COL32_2R_4R4(
       sizeof(INT8_gemm_cublasLt_INT8Output_best_algo.stages)));
   if (INT8_gemm_cublasLt_INT8Output_best_algo.workspaceSize != 0) {
     CHECK_GPU_ERROR(cudaMalloc(
-        (void**)&workSpace2,
+        (void **)&workSpace2,
         sizeof(char) * INT8_gemm_cublasLt_INT8Output_best_algo.workspaceSize));
   }
 
@@ -800,9 +808,12 @@ void int8gemm_with_cublasLtMatmul_ORDER_COL32_2R_4R4(
       ltHandle, transformDesc, &transformAlpha, Ctransform2, CtransformDesc2,
       &transformBeta, NULL, NULL, d_int8_C, Cdesc2, stream);
 
-  if (Cdesc2) CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Cdesc2));
-  if (Bdesc) CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Bdesc));
-  if (Adesc) CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Adesc));
+  if (Cdesc2)
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Cdesc2));
+  if (Bdesc)
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Bdesc));
+  if (Adesc)
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Adesc));
   if (CtransformDesc2)
     CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(CtransformDesc2));
   if (BtransformDesc)
@@ -813,10 +824,14 @@ void int8gemm_with_cublasLtMatmul_ORDER_COL32_2R_4R4(
     CHECK_GPU_ERROR(cublasLtMatmulDescDestroy(operationDesc2));
   if (transformDesc)
     CHECK_GPU_ERROR(cublasLtMatrixTransformDescDestroy(transformDesc));
-  if (Atransform) CHECK_GPU_ERROR(cudaFree(Atransform));
-  if (Btransform) CHECK_GPU_ERROR(cudaFree(Btransform));
-  if (Ctransform2) CHECK_GPU_ERROR(cudaFree(Ctransform2));
-  if (workSpace2) CHECK_GPU_ERROR(cudaFree(workSpace2));
+  if (Atransform)
+    CHECK_GPU_ERROR(cudaFree(Atransform));
+  if (Btransform)
+    CHECK_GPU_ERROR(cudaFree(Btransform));
+  if (Ctransform2)
+    CHECK_GPU_ERROR(cudaFree(Ctransform2));
+  if (workSpace2)
+    CHECK_GPU_ERROR(cudaFree(workSpace2));
 
   CHECK_GPU_ERROR(cudaEventDestroy(start));
   CHECK_GPU_ERROR(cudaEventDestroy(stop));
@@ -825,16 +840,16 @@ void int8gemm_with_cublasLtMatmul_ORDER_COL32_2R_4R4(
 // find the best algo for INT8 gemm + cublasLt + INT8 Output
 int LtIgemmCustomFindINT8OutputColMajor(cublasLtHandle_t ltHandle, int m, int n,
                                         int k,
-                                        const float* alpha, /* host pointer */
-                                        const int8_t* A,    // k * m col-major
-                                        const int8_t* B,    // k * n col-major
-                                        const float* beta,  /* host pointer */
-                                        int8_t* C,          // m * n col-major
-                                        cublasLtMatmulAlgo_info& best_algo) {
-  void* workSpace = NULL;
+                                        const float *alpha, /* host pointer */
+                                        const int8_t *A,    // k * m col-major
+                                        const int8_t *B,    // k * n col-major
+                                        const float *beta,  /* host pointer */
+                                        int8_t *C,          // m * n col-major
+                                        cublasLtMatmulAlgo_info &best_algo) {
+  void *workSpace = NULL;
   size_t workSpaceSize =
-      std::min(8 * size_t(1 << 20), sizeof(char*) * 64 * m * n);
-  CHECK_GPU_ERROR(cudaMalloc((void**)&workSpace, workSpaceSize));
+      std::min(8 * size_t(1 << 20), sizeof(char *) * 64 * m * n);
+  CHECK_GPU_ERROR(cudaMalloc((void **)&workSpace, workSpaceSize));
   cudaEvent_t startEvent;
   cudaEvent_t stopEvent;
   CHECK_GPU_ERROR(cudaEventCreate(&startEvent, cudaEventBlockingSync));
@@ -846,7 +861,7 @@ int LtIgemmCustomFindINT8OutputColMajor(cublasLtHandle_t ltHandle, int m, int n,
   cublasLtMatrixLayout_t Adesc = NULL, Bdesc = NULL, Cdesc = NULL;
   float transformAlpha = 1.0f, transformBeta = 0.0f;
   int8_t *Atransform = NULL, *Btransform = NULL;
-  int32_t* Ctransform = NULL;
+  int32_t *Ctransform = NULL;
   cublasLtMatrixLayout_t AtransformDesc = NULL, BtransformDesc = NULL,
                          CtransformDesc = NULL;
   cudaStream_t stream = 0;
@@ -858,7 +873,7 @@ int LtIgemmCustomFindINT8OutputColMajor(cublasLtHandle_t ltHandle, int m, int n,
   int AlgoCombinations = ALGO_COMBINATIONS;
   int AlgoCount = 0;
   int kernelRepeats =
-      10;  // number of time the CUDA kernels will be run back to back
+      10; // number of time the CUDA kernels will be run back to back
   customMatmulPerf_t perfResults[ALGO_COMBINATIONS];
   int nbAlgoIds = 0;
 #define ALGO_IDS 100
@@ -919,7 +934,7 @@ int LtIgemmCustomFindINT8OutputColMajor(cublasLtHandle_t ltHandle, int m, int n,
     CHECK_GPU_ERROR(cublasLtMatmulAlgoCapGetAttribute(
         &algo, CUBLASLT_ALGO_CAP_TILE_IDS, NULL, 0, &sizeWritten));
     int nbTiles = int(sizeWritten / sizeof(int));
-    int* tileA = new int[nbTiles == 0 ? 1 : nbTiles];
+    int *tileA = new int[nbTiles == 0 ? 1 : nbTiles];
     if (nbTiles == 0) {
       tileA[0] = CUBLASLT_MATMUL_TILE_UNDEFINED;
       nbTiles = 1;
@@ -975,7 +990,7 @@ int LtIgemmCustomFindINT8OutputColMajor(cublasLtHandle_t ltHandle, int m, int n,
                   sizeof(splitKSequenceA) / sizeof(splitKSequenceA[0]);
             }
             // Loop over the splitK value over a fixed sequence splitKSequenceA
-            // in addtion to the case where splitK is not enabled
+            // in addition to the case where splitK is not enabled
             for (int l = 0;
                  (l < (1 + splitK_trial)) && (AlgoCount < AlgoCombinations);
                  l++) {
@@ -994,7 +1009,7 @@ int LtIgemmCustomFindINT8OutputColMajor(cublasLtHandle_t ltHandle, int m, int n,
                   &algo, CUBLASLT_ALGO_CONFIG_REDUCTION_SCHEME, &redScheme,
                   sizeof(int)));
 
-              if (l > 0) {  // Split-K case
+              if (l > 0) { // Split-K case
                 splitK_val = splitKSequenceA[l - 1];
                 CHECK_GPU_ERROR(cublasLtMatmulAlgoConfigSetAttribute(
                     &algo, CUBLASLT_ALGO_CONFIG_SPLITK_NUM,
@@ -1016,10 +1031,11 @@ int LtIgemmCustomFindINT8OutputColMajor(cublasLtHandle_t ltHandle, int m, int n,
                         workSpaceSize, perfResults[AlgoCount], stream,
                         startEvent, stopEvent);
                     perfResults[AlgoCount].status = status;
-                    if (status == CUBLAS_STATUS_SUCCESS) AlgoCount++;
-                  }     // end if
-                }       // end for
-              } else {  // Non-splitK case
+                    if (status == CUBLAS_STATUS_SUCCESS)
+                      AlgoCount++;
+                  }    // end if
+                }      // end for
+              } else { // Non-splitK case
                 /* if user preference is ok with workspace */
                 if (AlgoCount < AlgoCombinations) {
                   status = customMatmulRun(
@@ -1030,16 +1046,17 @@ int LtIgemmCustomFindINT8OutputColMajor(cublasLtHandle_t ltHandle, int m, int n,
                       workSpaceSize, perfResults[AlgoCount], stream, startEvent,
                       stopEvent);
                   perfResults[AlgoCount].status = status;
-                  if (status == CUBLAS_STATUS_SUCCESS) AlgoCount++;
+                  if (status == CUBLAS_STATUS_SUCCESS)
+                    AlgoCount++;
                 }
               }
-            }  // end l
-          }    // end k
-        }      // end customOption
+            } // end l
+          }   // end k
+        }     // end customOption
       }
-    }  // end tileIdx
+    } // end tileIdx
     delete[] tileA;
-  }  // end idx
+  } // end idx
   // Sort the results per run duration
   std::sort(perfResults, perfResults + AlgoCount, time_compare);
   // Print timing and perf details
@@ -1054,20 +1071,27 @@ int LtIgemmCustomFindINT8OutputColMajor(cublasLtHandle_t ltHandle, int m, int n,
   }
 
   // Descriptors are no longer needed as all GPU work was already enqueued
-  if (Cdesc) CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Cdesc));
-  if (Bdesc) CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Bdesc));
-  if (Adesc) CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Adesc));
-  if (operationDesc) CHECK_GPU_ERROR(cublasLtMatmulDescDestroy(operationDesc));
-  if (workSpace) CHECK_GPU_ERROR(cudaFree(workSpace));
-  if (startEvent) CHECK_GPU_ERROR(cudaEventDestroy(startEvent));
-  if (stopEvent) CHECK_GPU_ERROR(cudaEventDestroy(stopEvent));
+  if (Cdesc)
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Cdesc));
+  if (Bdesc)
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Bdesc));
+  if (Adesc)
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Adesc));
+  if (operationDesc)
+    CHECK_GPU_ERROR(cublasLtMatmulDescDestroy(operationDesc));
+  if (workSpace)
+    CHECK_GPU_ERROR(cudaFree(workSpace));
+  if (startEvent)
+    CHECK_GPU_ERROR(cudaEventDestroy(startEvent));
+  if (stopEvent)
+    CHECK_GPU_ERROR(cudaEventDestroy(stopEvent));
 
   return status == CUBLAS_STATUS_SUCCESS ? 0 : 1;
 }
 
 void int8gemm_with_cublasLtMatmul_COL_MAJOR(
-    int m, int n, int k, float alpha2, float beta2, int8_t* A, int8_t* B,
-    int8_t* C, cublasLtMatmulAlgo_info& INT8_gemm_cublasLt_INT8Output_best_algo,
+    int m, int n, int k, float alpha2, float beta2, int8_t *A, int8_t *B,
+    int8_t *C, cublasLtMatmulAlgo_info &INT8_gemm_cublasLt_INT8Output_best_algo,
     cublasLtHandle_t ltHandle, cudaStream_t stream) {
   cublasStatus_t cublasStat;
 
@@ -1125,7 +1149,7 @@ void int8gemm_with_cublasLtMatmul_COL_MAJOR(
 
   // get algo
   cublasLtMatmulAlgo_t algo2;
-  char* workSpace2 = NULL;
+  char *workSpace2 = NULL;
   int workspaceSize = 0;
   workspaceSize = INT8_gemm_cublasLt_INT8Output_best_algo.workspaceSize;
   CHECK_GPU_ERROR(cublasLtMatmulAlgoInit(
@@ -1156,7 +1180,7 @@ void int8gemm_with_cublasLtMatmul_COL_MAJOR(
       sizeof(INT8_gemm_cublasLt_INT8Output_best_algo.stages)));
   if (INT8_gemm_cublasLt_INT8Output_best_algo.workspaceSize != 0) {
     CHECK_GPU_ERROR(cudaMalloc(
-        (void**)&workSpace2,
+        (void **)&workSpace2,
         sizeof(char) * INT8_gemm_cublasLt_INT8Output_best_algo.workspaceSize));
   }
 
@@ -1187,12 +1211,16 @@ void int8gemm_with_cublasLtMatmul_COL_MAJOR(
     gemm_test_result += tmp_str;
   }
 
-  if (Cdesc2) CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Cdesc2));
-  if (Bdesc) CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Bdesc));
-  if (Adesc) CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Adesc));
+  if (Cdesc2)
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Cdesc2));
+  if (Bdesc)
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Bdesc));
+  if (Adesc)
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(Adesc));
   if (operationDesc2)
     CHECK_GPU_ERROR(cublasLtMatmulDescDestroy(operationDesc2));
-  if (workSpace2) CHECK_GPU_ERROR(cudaFree(workSpace2));
+  if (workSpace2)
+    CHECK_GPU_ERROR(cudaFree(workSpace2));
 
   CHECK_GPU_ERROR(cudaEventDestroy(start));
   CHECK_GPU_ERROR(cudaEventDestroy(stop));
@@ -1205,30 +1233,30 @@ string launch_gemm_test(int m, int n, int k) {
   tmp_str = string(tmp_cstr);
   gemm_test_result += tmp_str;
 
-  half* h_half_A = NULL;
-  half* h_half_A_transpose = NULL;
-  half* h_half_B_transpose = NULL;
-  half* h_half_B = NULL;
-  int8_t* h_int8_A = NULL;
-  int8_t* h_int8_B = NULL;
-  int8_t* h_int8_A_transpose = NULL;
-  int8_t* h_int8_B_transpose = NULL;
-  float* h_float_C = NULL;
+  half *h_half_A = NULL;
+  half *h_half_A_transpose = NULL;
+  half *h_half_B_transpose = NULL;
+  half *h_half_B = NULL;
+  int8_t *h_int8_A = NULL;
+  int8_t *h_int8_B = NULL;
+  int8_t *h_int8_A_transpose = NULL;
+  int8_t *h_int8_B_transpose = NULL;
+  float *h_float_C = NULL;
 
-  half* d_half_A = NULL;
-  half* d_half_A_transpose = NULL;
-  half* d_half_B_transpose = NULL;
-  half* d_half_B = NULL;
-  half* d_half_C = NULL;
-  int8_t* d_int8_A = NULL;
-  int8_t* d_int8_B = NULL;
-  int8_t* d_int8_A_transpose = NULL;
-  int8_t* d_int8_B_transpose = NULL;
-  int8_t* d_int8_C = NULL;
-  int8_t* d_int8_C_col_major = NULL;
-  int32_t* d_int_C = NULL;
-  int32_t* d_int_C2 = NULL;
-  float* d_float_C = NULL;
+  half *d_half_A = NULL;
+  half *d_half_A_transpose = NULL;
+  half *d_half_B_transpose = NULL;
+  half *d_half_B = NULL;
+  half *d_half_C = NULL;
+  int8_t *d_int8_A = NULL;
+  int8_t *d_int8_B = NULL;
+  int8_t *d_int8_A_transpose = NULL;
+  int8_t *d_int8_B_transpose = NULL;
+  int8_t *d_int8_C = NULL;
+  int8_t *d_int8_C_col_major = NULL;
+  int32_t *d_int_C = NULL;
+  int32_t *d_int_C2 = NULL;
+  float *d_float_C = NULL;
 
   int devID = 0;
 
@@ -1252,42 +1280,42 @@ string launch_gemm_test(int m, int n, int k) {
   cudaStream_t stream = 0;
 
   // allocate memory
-  h_half_A = (half*)malloc(sizeof(half) * m * k);
-  h_half_A_transpose = (half*)malloc(sizeof(half) * m * k);
-  h_half_B_transpose = (half*)malloc(sizeof(half) * n * k);
-  h_half_B = (half*)malloc(sizeof(half) * n * k);
-  h_float_C = (float*)malloc(sizeof(float) * n * m);
-  h_int8_A = (int8_t*)malloc(sizeof(int8_t) * m * k);
-  h_int8_B = (int8_t*)malloc(sizeof(int8_t) * n * k);
-  h_int8_A_transpose = (int8_t*)malloc(sizeof(int8_t) * m * k);
-  h_int8_B_transpose = (int8_t*)malloc(sizeof(int8_t) * n * k);
+  h_half_A = (half *)malloc(sizeof(half) * m * k);
+  h_half_A_transpose = (half *)malloc(sizeof(half) * m * k);
+  h_half_B_transpose = (half *)malloc(sizeof(half) * n * k);
+  h_half_B = (half *)malloc(sizeof(half) * n * k);
+  h_float_C = (float *)malloc(sizeof(float) * n * m);
+  h_int8_A = (int8_t *)malloc(sizeof(int8_t) * m * k);
+  h_int8_B = (int8_t *)malloc(sizeof(int8_t) * n * k);
+  h_int8_A_transpose = (int8_t *)malloc(sizeof(int8_t) * m * k);
+  h_int8_B_transpose = (int8_t *)malloc(sizeof(int8_t) * n * k);
 
-  CHECK_GPU_ERROR(cudaMalloc((void**)&d_half_A, sizeof(half) * m * k));
-  CHECK_GPU_ERROR(cudaMalloc((void**)&d_half_B, sizeof(half) * n * k));
+  CHECK_GPU_ERROR(cudaMalloc((void **)&d_half_A, sizeof(half) * m * k));
+  CHECK_GPU_ERROR(cudaMalloc((void **)&d_half_B, sizeof(half) * n * k));
   CHECK_GPU_ERROR(
-      cudaMalloc((void**)&d_half_A_transpose, sizeof(half) * m * k));
+      cudaMalloc((void **)&d_half_A_transpose, sizeof(half) * m * k));
   CHECK_GPU_ERROR(
-      cudaMalloc((void**)&d_half_B_transpose, sizeof(half) * n * k));
-  CHECK_GPU_ERROR(cudaMalloc((void**)&d_half_C, sizeof(half) * m * n));
-  CHECK_GPU_ERROR(cudaMalloc((void**)&d_int8_A, sizeof(int8_t) * m * k));
-  CHECK_GPU_ERROR(cudaMalloc((void**)&d_int8_B, sizeof(int8_t) * n * k));
+      cudaMalloc((void **)&d_half_B_transpose, sizeof(half) * n * k));
+  CHECK_GPU_ERROR(cudaMalloc((void **)&d_half_C, sizeof(half) * m * n));
+  CHECK_GPU_ERROR(cudaMalloc((void **)&d_int8_A, sizeof(int8_t) * m * k));
+  CHECK_GPU_ERROR(cudaMalloc((void **)&d_int8_B, sizeof(int8_t) * n * k));
   CHECK_GPU_ERROR(
-      cudaMalloc((void**)&d_int8_A_transpose, sizeof(int8_t) * m * k));
+      cudaMalloc((void **)&d_int8_A_transpose, sizeof(int8_t) * m * k));
   CHECK_GPU_ERROR(
-      cudaMalloc((void**)&d_int8_B_transpose, sizeof(int8_t) * n * k));
-  CHECK_GPU_ERROR(cudaMalloc((void**)&d_int_C, sizeof(int) * m * n));
-  CHECK_GPU_ERROR(cudaMalloc((void**)&d_int_C2, sizeof(int) * m * n));
-  CHECK_GPU_ERROR(cudaMalloc((void**)&d_float_C, sizeof(float) * m * n));
-  CHECK_GPU_ERROR(cudaMalloc((void**)&d_int8_C, sizeof(int8_t) * m * n));
+      cudaMalloc((void **)&d_int8_B_transpose, sizeof(int8_t) * n * k));
+  CHECK_GPU_ERROR(cudaMalloc((void **)&d_int_C, sizeof(int) * m * n));
+  CHECK_GPU_ERROR(cudaMalloc((void **)&d_int_C2, sizeof(int) * m * n));
+  CHECK_GPU_ERROR(cudaMalloc((void **)&d_float_C, sizeof(float) * m * n));
+  CHECK_GPU_ERROR(cudaMalloc((void **)&d_int8_C, sizeof(int8_t) * m * n));
   CHECK_GPU_ERROR(
-      cudaMalloc((void**)&d_int8_C_col_major, sizeof(int8_t) * m * n));
+      cudaMalloc((void **)&d_int8_C_col_major, sizeof(int8_t) * m * n));
 
   cublasHandle_t handle;
   CHECK_GPU_ERROR(cublasCreate(&handle));
   cublasLtHandle_t ltHandle;
   CHECK_GPU_ERROR(cublasLtCreate(&ltHandle));
 
-  float time_used = 0.0;  // ms
+  float time_used = 0.0; // ms
 
   cudaEvent_t start, stop;
   CHECK_GPU_ERROR(cudaEventCreate(&start));
@@ -1296,8 +1324,8 @@ string launch_gemm_test(int m, int n, int k) {
   cublasStatus_t cublasStat;
 
   // step 1: initialize A and B, do gemm in CPU
-  matInit(h_half_A, h_int8_A, m * k);  // m*k
-  matInit(h_half_B, h_int8_B, n * k);  // n*k
+  matInit(h_half_A, h_int8_A, m * k); // m*k
+  matInit(h_half_B, h_int8_B, n * k); // n*k
   transpose(h_half_B_transpose, h_half_B, n, k);
   transpose(h_half_A_transpose, h_half_A, m, k);
   // matMul(n, m, k, h_half_B, n, h_half_A_transpose, k, h_float_C, n);
@@ -1430,5 +1458,5 @@ string launch_gemm_test(int m, int n, int k) {
 
   return gemm_test_result;
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

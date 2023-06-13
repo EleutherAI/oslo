@@ -1,31 +1,29 @@
 #include <ATen/cuda/CUDAContext.h>
-#include <torch/extension.h>
 #include <string>
+#include <torch/extension.h>
 
 #include "context.h"
 #include "cuda_util.h"
 #include "multihead_attention_layer.h"
-#include "transformer_encoder_layer.h"
-#include "transformer_decoder_layer.h"
 #include "sdpa_layer.h"
+#include "transformer_decoder_layer.h"
+#include "transformer_encoder_layer.h"
 
 // x is torch::Tensor
 #define CHECK_CUDA(x) AT_ASSERTM(x.is_cuda(), #x " must be a CUDA tensor")
-#define CHECK_CONTIGUOUS(x) \
+#define CHECK_CONTIGUOUS(x)                                                    \
   AT_ASSERTM(x.is_contiguous(), #x " must be contiguous")
-#define CHECK_INPUT(x) \
-  CHECK_CUDA(x);       \
+#define CHECK_INPUT(x)                                                         \
+  CHECK_CUDA(x);                                                               \
   CHECK_CONTIGUOUS(x)
 
 namespace lightseq {
 
-template <typename T>
-const T *rptr(const torch::Tensor &tensor) {
+template <typename T> const T *rptr(const torch::Tensor &tensor) {
   return reinterpret_cast<const T *>(tensor.data_ptr());
 }
 
-template <typename T>
-T *rptr(torch::Tensor &tensor) {
+template <typename T> T *rptr(torch::Tensor &tensor) {
   return reinterpret_cast<T *>(tensor.data_ptr());
 }
 
@@ -48,7 +46,7 @@ void set_global_context(int context_id) {
 }
 
 void set_training_mode(bool is_training) {
-  if (is_training) 
+  if (is_training)
     Context::global_instance()->convert_into_train();
   else
     Context::global_instance()->convert_into_inference();
@@ -82,8 +80,9 @@ int create_transformer_encoder_layer_new(
 }
 
 template <typename T1, typename T2>
-std::vector<torch::Tensor> transformer_encoder_layer_fw(
-    int layer_id, const torch::Tensor &input, const torch::Tensor &input_mask) {
+std::vector<torch::Tensor>
+transformer_encoder_layer_fw(int layer_id, const torch::Tensor &input,
+                             const torch::Tensor &input_mask) {
   CHECK_INPUT(input);
   CHECK_INPUT(input_mask);
 
@@ -207,11 +206,12 @@ int create_transformer_decoder_layer(
 }
 
 template <typename T1, typename T2>
-std::vector<torch::Tensor> transformer_decoder_layer_fw(
-    int layer_id, const torch::Tensor &dec_input,
-    const torch::Tensor &enc_output, const torch::Tensor &enc_mask,
-    bool prelayernorm, bool quant_mode, std::vector<torch::Tensor> &cache,
-    int cur_step = -1) {
+std::vector<torch::Tensor>
+transformer_decoder_layer_fw(int layer_id, const torch::Tensor &dec_input,
+                             const torch::Tensor &enc_output,
+                             const torch::Tensor &enc_mask, bool prelayernorm,
+                             bool quant_mode, std::vector<torch::Tensor> &cache,
+                             int cur_step = -1) {
   CHECK_INPUT(dec_input);
   CHECK_INPUT(enc_output);
   CHECK_INPUT(enc_mask);
@@ -299,28 +299,30 @@ int create_multihead_attention_layer_new(
     bool mask_future_tokens, bool is_post_ln) {
   auto layer = std::make_shared<MultiheadAttentionLayer<T1, T2>>(
       layer_id, max_batch_tokens, max_seq_len, hidden_dim, num_heads,
-      attn_prob_dropout_ratio, hidden_dropout_ratio,
-      is_post_ln, mask_future_tokens);
+      attn_prob_dropout_ratio, hidden_dropout_ratio, is_post_ln,
+      mask_future_tokens);
 
   Variable *inp(new Variable("input", g_dtype<T1>(), g_dtype<T2>()));
   Variable *inp_mask(new Variable("inp_mask", g_dtype<T1>()));
 
-  Variable* attn_out = (*layer)(inp, inp_mask);
+  Variable *attn_out = (*layer)(inp, inp_mask);
 
   Context::regist_pybind_layer("MultiheadAttentionLayer", layer_id, layer);
 
   std::string T1_dtype = (std::is_same<T1, __half>::value) ? "half" : "float";
   std::string T2_dtype = (std::is_same<T2, __half>::value) ? "half" : "float";
 
-  std::cout << "MultiHead Attention layer #" << layer_id << " is created with date type ["
-            << T1_dtype << ", " << T2_dtype << "]." << std::endl;
+  std::cout << "MultiHead Attention layer #" << layer_id
+            << " is created with date type [" << T1_dtype << ", " << T2_dtype
+            << "]." << std::endl;
 
   return 0;
 }
 
 template <typename T1, typename T2>
-std::vector<torch::Tensor> multihead_attention_layer_fw(
-    int layer_id, const torch::Tensor &input, const torch::Tensor &input_mask) {
+std::vector<torch::Tensor>
+multihead_attention_layer_fw(int layer_id, const torch::Tensor &input,
+                             const torch::Tensor &input_mask) {
   CHECK_INPUT(input);
   CHECK_INPUT(input_mask);
 
@@ -440,7 +442,7 @@ int create_sdpa_layer(int layer_id, int max_batch_tokens, int max_seq_len,
   Variable *q_var = new Variable("query", g_dtype<T1>());
   Variable *k_var = new Variable("key", g_dtype<T1>());
   Variable *v_var = new Variable("value", g_dtype<T1>());
-  Variable *mask_var = nullptr;  // FIXME later, only cover non mask
+  Variable *mask_var = nullptr; // FIXME later, only cover non mask
 
   std::shared_ptr<SDPALayer<T1, T2>> sdpal =
       std::make_shared<SDPALayer<T1, T2>>(max_batch_tokens, max_seq_len,
@@ -454,10 +456,11 @@ int create_sdpa_layer(int layer_id, int max_batch_tokens, int max_seq_len,
 }
 
 template <typename T1, typename T2>
-std::vector<torch::Tensor> sdpa_layer_fw(
-    int layer_id, const torch::Tensor &query, const torch::Tensor &key,
-    const torch::Tensor &value, const torch::Tensor &mask, int batch_size,
-    int query_len, int kv_len, int kv_size, bool mask_future) {
+std::vector<torch::Tensor>
+sdpa_layer_fw(int layer_id, const torch::Tensor &query,
+              const torch::Tensor &key, const torch::Tensor &value,
+              const torch::Tensor &mask, int batch_size, int query_len,
+              int kv_len, int kv_size, bool mask_future) {
   CHECK_INPUT(query);
   CHECK_INPUT(key);
   CHECK_INPUT(value);
@@ -522,7 +525,7 @@ void torch_sdpa_layer(const torch::Tensor &query, const torch::Tensor &key,
   k_var->set_value(key_ptr);
   Variable *v_var = new Variable("value", g_dtype<T1>());
   v_var->set_value(value_ptr);
-  Variable *mask_var = nullptr;  // FIXME later, only cover non mask
+  Variable *mask_var = nullptr; // FIXME later, only cover non mask
 
   SDPALayer<T1, T2> *sdpal =
       new SDPALayer<T1, T2>(max_batch_tokens, max_seq_len, head_dim, num_heads,
@@ -541,7 +544,7 @@ void torch_sdpa_layer(const torch::Tensor &query, const torch::Tensor &key,
   print_time_duration(start, "layer cost");
 }
 
-}  // namespace lightseq
+} // namespace lightseq
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   // create default context

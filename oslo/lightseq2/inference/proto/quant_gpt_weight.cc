@@ -86,23 +86,30 @@ std::string QuantGptWeight<OpType_>::proto_parse_emb_wei(
   offset.push_back(idx);
   if (layer.position_embedding_size() != _max_step * _hidden_size)
     return "wrong position_embedding_size !";
-  for (float ele : layer.position_embedding()) value.push_back(ele);
+  for (float ele : layer.position_embedding())
+    value.push_back(ele);
   idx += _max_step * _hidden_size;
 
   offset.push_back(idx);
-  if (layer.norm_scale_size() != _hidden_size) return "wrong norm_scale_size !";
-  for (float ele : layer.norm_scale()) value.push_back(ele);
+  if (layer.norm_scale_size() != _hidden_size)
+    return "wrong norm_scale_size !";
+  for (float ele : layer.norm_scale())
+    value.push_back(ele);
   idx += _hidden_size;
 
   offset.push_back(idx);
-  if (layer.norm_bias_size() != _hidden_size) return "wrong norm_bias_size !";
-  for (float ele : layer.norm_bias()) value.push_back(ele);
+  if (layer.norm_bias_size() != _hidden_size)
+    return "wrong norm_bias_size !";
+  for (float ele : layer.norm_bias())
+    value.push_back(ele);
   idx += _hidden_size;
 
   std::vector<_DataType> raw_value;
-  for (float e : value) raw_value.push_back(float2required(e));
+  for (float e : value)
+    raw_value.push_back(float2required(e));
   _d_src_emb_wei = raw_value;
-  for (int e : offset) _p_d_src_emb_wei.push_back(_d_src_emb_wei.data() + e);
+  for (int e : offset)
+    _p_d_src_emb_wei.push_back(_d_src_emb_wei.data() + e);
 
   std::cout << "finish initializing emb_wei from host to device" << std::endl;
   return "";
@@ -121,13 +128,15 @@ std::string QuantGptWeight<OpType_>::proto_parse_enc_wei(const QuantGpt &gpt) {
     offset.push_back(idx);
     if (enc_layer.multihead_norm_scale_size() != _hidden_size)
       return "wrong multihead_norm_scale_size !";
-    for (float ele : enc_layer.multihead_norm_scale()) value.push_back(ele);
+    for (float ele : enc_layer.multihead_norm_scale())
+      value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (enc_layer.multihead_norm_bias_size() != _hidden_size)
       return "wrong multihead_norm_bias_size !";
-    for (float ele : enc_layer.multihead_norm_bias()) value.push_back(ele);
+    for (float ele : enc_layer.multihead_norm_bias())
+      value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -167,13 +176,15 @@ std::string QuantGptWeight<OpType_>::proto_parse_enc_wei(const QuantGpt &gpt) {
     offset.push_back(idx);
     if (enc_layer.ffn_norm_scale_size() != _hidden_size)
       return "wrong ffn_norm_scale_size !";
-    for (float ele : enc_layer.ffn_norm_scale()) value.push_back(ele);
+    for (float ele : enc_layer.ffn_norm_scale())
+      value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (enc_layer.ffn_norm_bias_size() != _hidden_size)
       return "wrong ffn_norm_bias_size !";
-    for (float ele : enc_layer.ffn_norm_bias()) value.push_back(ele);
+    for (float ele : enc_layer.ffn_norm_bias())
+      value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -187,7 +198,8 @@ std::string QuantGptWeight<OpType_>::proto_parse_enc_wei(const QuantGpt &gpt) {
     offset.push_back(idx);
     if (enc_layer.ffn_first_bias_size() != _inner_size)
       return "wrong ffn_first_bias_size !";
-    for (float ele : enc_layer.ffn_first_bias()) value.push_back(ele);
+    for (float ele : enc_layer.ffn_first_bias())
+      value.push_back(ele);
     idx += _inner_size;
 
     offset.push_back(idx);
@@ -201,7 +213,8 @@ std::string QuantGptWeight<OpType_>::proto_parse_enc_wei(const QuantGpt &gpt) {
     offset.push_back(idx);
     if (enc_layer.ffn_second_bias_size() != _hidden_size)
       return "wrong ffn_second_bias_size !";
-    for (float ele : enc_layer.ffn_second_bias()) value.push_back(ele);
+    for (float ele : enc_layer.ffn_second_bias())
+      value.push_back(ele);
     idx += _hidden_size;
 
     _enc_clip_max.push_back(enc_layer.multihead_project_kernel_qkv_clip_max());
@@ -218,13 +231,15 @@ std::string QuantGptWeight<OpType_>::proto_parse_enc_wei(const QuantGpt &gpt) {
     _enc_clip_max.push_back(enc_layer.ffn_first_output_clip_max());
     _enc_clip_max.push_back(enc_layer.self_qkv_bias_out_clip_max());
 
-  }  // for
+  } // for
 
   std::vector<_DataType> raw_value;
-  for (float e : value) raw_value.push_back(float2required(e));
+  for (float e : value)
+    raw_value.push_back(float2required(e));
   _d_enc_wei = raw_value;
 
-  for (int e : offset) _p_d_enc_wei.push_back(_d_enc_wei.data() + e);
+  for (int e : offset)
+    _p_d_enc_wei.push_back(_d_enc_wei.data() + e);
   std::cout << "finish initializing enc_wei from host to device" << std::endl;
   return "";
 }
@@ -264,7 +279,7 @@ void QuantGptWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
   // special handling for string reading
   // string were converted to numpy array of np.int8 in python
   // hence needed to be read as an char array here
-  char _sampling_method_buf[128];  // get 128 character for sampling method
+  char _sampling_method_buf[128]; // get 128 character for sampling method
   int _sampling_method_strlen = read_hdf5_dataset_data(
       hdf5_file, "model_conf/sampling_method", H5T_NATIVE_CHAR,
       _sampling_method_buf, [](int size) { return size > 128; },
@@ -316,7 +331,7 @@ void QuantGptWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
                       _max_step * _hidden_size + _hidden_size * 2;
 
   std::vector<int> offset;
-  std::vector<float> value(value_size);  // preallocate vector for performance
+  std::vector<float> value(value_size); // preallocate vector for performance
   std::vector<unsigned char> value_i8(value_size);
   std::cout << "loading " << value_size * sizeof(OpType_) / (1024 * 1024)
             << " MB of embedding weight." << std::endl;
@@ -347,24 +362,26 @@ void QuantGptWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   idx += _max_step * _hidden_size;
 
   offset.push_back(idx);
-  read_hdf5_dataset_data(
-      hdf5_file, dataset_prefix + "/norm_scale", H5T_NATIVE_FLOAT,
-      value.data() + idx, [=](int size) { return size != _hidden_size; },
-      "Wrong norm_scale_size !");
+  read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/norm_scale",
+                         H5T_NATIVE_FLOAT, value.data() + idx,
+                         [=](int size) { return size != _hidden_size; },
+                         "Wrong norm_scale_size !");
   idx += _hidden_size;
 
   offset.push_back(idx);
-  read_hdf5_dataset_data(
-      hdf5_file, dataset_prefix + "/norm_bias", H5T_NATIVE_FLOAT,
-      value.data() + idx, [=](int size) { return size != _hidden_size; },
-      "Wrong norm_bias_size !");
+  read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/norm_bias",
+                         H5T_NATIVE_FLOAT, value.data() + idx,
+                         [=](int size) { return size != _hidden_size; },
+                         "Wrong norm_bias_size !");
   idx += _hidden_size;
 
   std::vector<_DataType> raw_value;
   raw_value.reserve(value.size());
-  for (float e : value) raw_value.push_back(float2required(e));
+  for (float e : value)
+    raw_value.push_back(float2required(e));
   _d_src_emb_wei = raw_value;
-  for (int e : offset) _p_d_src_emb_wei.push_back(_d_src_emb_wei.data() + e);
+  for (int e : offset)
+    _p_d_src_emb_wei.push_back(_d_src_emb_wei.data() + e);
 
   std::cout << "finish initializing emb_wei from host to device" << std::endl;
 }
@@ -392,17 +409,17 @@ void QuantGptWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     std::string dataset_prefix = "encoder_stack/" + std::to_string(layer_id);
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/multihead_norm_scale", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong multihead_norm_scale_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/multihead_norm_scale",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong multihead_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/multihead_norm_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong multihead_norm_bias_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/multihead_norm_bias",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong multihead_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -420,11 +437,11 @@ void QuantGptWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/multihead_project_bias_qkv",
-        H5T_NATIVE_FLOAT, value.data() + idx,
-        [=](int size) { return size != _hidden_size * 3; },
-        "Wrong multihead_project_bias_qkv_size !");
+    read_hdf5_dataset_data(hdf5_file,
+                           dataset_prefix + "/multihead_project_bias_qkv",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size * 3; },
+                           "Wrong multihead_project_bias_qkv_size !");
     idx += _hidden_size * 3;
 
     offset.push_back(idx);
@@ -442,25 +459,25 @@ void QuantGptWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/multihead_project_bias_output",
-        H5T_NATIVE_FLOAT, value.data() + idx,
-        [=](int size) { return size != _hidden_size; },
-        "Wrong multihead_project_bias_output_size !");
+    read_hdf5_dataset_data(hdf5_file,
+                           dataset_prefix + "/multihead_project_bias_output",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong multihead_project_bias_output_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/ffn_norm_scale", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong ffn_norm_scale_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_norm_scale",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong ffn_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/ffn_norm_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong ffn_norm_bias_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_norm_bias",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong ffn_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -478,10 +495,10 @@ void QuantGptWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/ffn_first_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _inner_size; },
-        "Wrong ffn_first_bias_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_first_bias",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _inner_size; },
+                           "Wrong ffn_first_bias_size !");
     idx += _inner_size;
 
     offset.push_back(idx);
@@ -499,10 +516,10 @@ void QuantGptWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/ffn_second_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong ffn_second_bias_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_second_bias",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong ffn_second_bias_size !");
     idx += _hidden_size;
 
     read_hdf5_dataset_scalar(hdf5_file,
@@ -536,13 +553,15 @@ void QuantGptWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
                              dataset_prefix + "/self_qkv_bias_out_clip_max",
                              H5T_NATIVE_FLOAT, &clip_max);
     _enc_clip_max.push_back(clip_max);
-  }  // for
+  } // for
 
   std::vector<_DataType> raw_value;
-  for (float e : value) raw_value.push_back(float2required(e));
+  for (float e : value)
+    raw_value.push_back(float2required(e));
   _d_enc_wei = raw_value;
 
-  for (int e : offset) _p_d_enc_wei.push_back(_d_enc_wei.data() + e);
+  for (int e : offset)
+    _p_d_enc_wei.push_back(_d_enc_wei.data() + e);
   std::cout << "finish initializing enc_wei from host to device" << std::endl;
 }
 
@@ -567,10 +586,12 @@ std::string QuantGptWeight<OpType_>::initializing(std::string weight_path) {
     proto_get_model_config(gpt);
 
     std::string res = proto_parse_emb_wei(gpt.src_embedding());
-    if (!res.empty()) return res;
+    if (!res.empty())
+      return res;
 
     res = proto_parse_enc_wei(gpt);
-    if (!res.empty()) return res;
+    if (!res.empty())
+      return res;
 
     std::cout << "finish initializing all weight from host to device"
               << std::endl;
@@ -594,7 +615,7 @@ std::string QuantGptWeight<OpType_>::initializing(std::string weight_path) {
     std::cout << "Finish loading all weight from host to device" << std::endl;
     return "";
   } else {
-    return "Unsupported weight extention for [" + weight_path +
+    return "Unsupported weight extension for [" + weight_path +
            "]; Supported extensions: .pb, .hdf5\n";
   }
 }
@@ -602,5 +623,5 @@ std::string QuantGptWeight<OpType_>::initializing(std::string weight_path) {
 template class QuantGptWeight<OperationType::FP16>;
 template class QuantGptWeight<OperationType::FP32>;
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

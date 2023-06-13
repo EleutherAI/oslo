@@ -6,14 +6,13 @@
 
 #include <type_traits>
 
-#include "feed_forward.h"
 #include "cublas_wrappers.h"
 #include "cuda_util.h"
+#include "feed_forward.h"
 namespace lightseq {
 namespace cuda {
-template <typename T>
-class QuantLinearLayer {
- public:
+template <typename T> class QuantLinearLayer {
+public:
   QuantLinearLayer(int layer_id, int in_features, int out_features,
                    int max_batch_tokens);
 
@@ -27,7 +26,7 @@ class QuantLinearLayer {
   void SetQuantMode(bool enable_quant);
   inline bool IsTrainingMode() const { return _training; }
 
- private:
+private:
   void allocate_mem_buffer() {
     // allocate local gpu memory
     _quant_input_ptr = cuda_malloc<T>(_max_batch_tokens * _in_features);
@@ -68,5 +67,5 @@ class QuantLinearLayer {
   float *_igemm_alpha_ptr;
   float *_igemm_beta_ptr;
 };
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

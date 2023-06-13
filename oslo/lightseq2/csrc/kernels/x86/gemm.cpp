@@ -8,7 +8,7 @@ namespace x86 {
 
 // means inpA * inpB
 template <>
-void matrix_gemm(const float* inpA, const float* inpB, float* outC, int m,
+void matrix_gemm(const float *inpA, const float *inpB, float *outC, int m,
                  int n, int k) {
   const int64_t lda = k;
   const int64_t ldb = n;
@@ -25,9 +25,9 @@ void matrix_gemm(const float* inpA, const float* inpB, float* outC, int m,
 template <>
 void gemm(bool a_is_packed, bool b_is_packed, bool transpose_a,
           bool transpose_b, int64_t m, int64_t n, int64_t k, float alpha,
-          const uint8_t* a, int64_t lda, const int8_t* b, int64_t ldb,
-          float beta, int32_t* c, int64_t ldc,
-          const int32_t* a_shift_compensation) {
+          const uint8_t *a, int64_t lda, const int8_t *b, int64_t ldb,
+          float beta, int32_t *c, int64_t ldc,
+          const int32_t *a_shift_compensation) {
   const bool use_packed_api = a_is_packed || b_is_packed;
 
   const CBLAS_TRANSPOSE trans_a = transpose_a ? CblasTrans : CblasNoTrans;
@@ -49,5 +49,5 @@ void gemm(bool a_is_packed, bool b_is_packed, bool transpose_a,
   return;
 }
 
-}  // namespace x86
-}  // namespace lightseq
+} // namespace x86
+} // namespace lightseq

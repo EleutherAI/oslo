@@ -22,9 +22,8 @@ namespace cuda {
 /*
 Load the model weights which stored in custom proto file into GPU memory.
 */
-template <OperationType OpType_>
-class MoeWeight {
- private:
+template <OperationType OpType_> class MoeWeight {
+private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   _DataType float2required(float value);
@@ -47,10 +46,8 @@ class MoeWeight {
   std::vector<const _DataType *> _p_d_trg_emb_wei;  // size: 4
   std::vector<const _DataType *> _p_d_enc_wei;      // size: 12 * enc_layer_num
   std::vector<const _DataType *> _p_d_dec_wei;      // size: 18 * dec_layer_num
-  std::vector<const _DataType *>
-      _p_d_enc_gate_wei;  // size: _n_moelayer_encoder
-  std::vector<const _DataType *>
-      _p_d_dec_gate_wei;  // size: _n_moelayer_decoder
+  std::vector<const _DataType *> _p_d_enc_gate_wei; // size: _n_moelayer_encoder
+  std::vector<const _DataType *> _p_d_dec_gate_wei; // size: _n_moelayer_decoder
 
   // store the weights on gpu memo
   thrust::device_vector<_DataType> _d_src_emb_wei;
@@ -62,7 +59,7 @@ class MoeWeight {
   thrust::device_vector<_DataType> _d_enc_gate_wei;
   thrust::device_vector<_DataType> _d_dec_gate_wei;
 
- public:
+public:
   std::string initializing(std::string proto_path, int max_batch_size,
                            bool only_decoder = false);
 
@@ -112,18 +109,18 @@ class MoeWeight {
   int _max_batch_size;
   int _src_vocab_size;
   int _trg_vocab_size;
-  int _n_enc_layer;  // number of encoder layer
-  int _n_dec_layer;  // number of decoder layer
+  int _n_enc_layer; // number of encoder layer
+  int _n_dec_layer; // number of decoder layer
   int _dim_per_head;
-  int _weight_per_enc_layer;  // 12
-  int _weight_per_dec_layer;  // 18
+  int _weight_per_enc_layer; // 12
+  int _weight_per_dec_layer; // 18
 
   int _head_num;
   int _beam_size;
   int _extra_decode_length;
   float _length_penalty;
-  int _padding_id;  // for src
-  int _start_id;    // for trg
+  int _padding_id; // for src
+  int _start_id;   // for trg
   int _end_id;
   float _diverse_lambda;
   std::string _sampling_method;
@@ -183,5 +180,5 @@ class MoeWeight {
   }
 };
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

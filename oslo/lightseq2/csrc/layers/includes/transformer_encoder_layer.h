@@ -1,25 +1,24 @@
 #pragma once
 
-#include <string>
+#include <algorithm>
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <cuda_runtime_api.h>
-#include <algorithm>
+#include <string>
 #include <type_traits>
 
+#include "cublas_algo_map.h"
 #include "cuda_util.h"
 #include "dropout.h"
 #include "feed_forward.h"
 #include "normalize_layer.h"
 #include "softmax.h"
 #include "strided_batch_gemm.h"
-#include "cublas_algo_map.h"
 
 namespace lightseq {
 namespace cuda {
-template <typename T>
-class TransformerEncoderLayer {
- public:
+template <typename T> class TransformerEncoderLayer {
+public:
   TransformerEncoderLayer(int layer_id, int max_batch_tokens, int _max_seq_len,
                           int hidden_size, int num_heads, int intermediate_size,
                           float attn_dropout_ratio,
@@ -145,7 +144,7 @@ class TransformerEncoderLayer {
     gptr += 1;
   }
 
- private:
+private:
   void allocate_mem_buffer() {
     // allocate local gpu memory
     allocate_layer_memory();
@@ -320,5 +319,5 @@ class TransformerEncoderLayer {
   T *_grad_output_cmax_ptr;
   T *_grad_attn_qkv_cache_cmax_ptr;
 };
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

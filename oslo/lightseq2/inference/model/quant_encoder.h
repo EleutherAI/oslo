@@ -1,11 +1,11 @@
 #pragma once
 
+#include <cublasLt.h>
 #include <cublas_v2.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
-#include <cublasLt.h>
 
 #include <algorithm>
 #include <chrono>
@@ -26,9 +26,8 @@ QuantTransformer encoder, composed by gemm lib and
 namespace lightseq {
 namespace cuda {
 
-template <OperationType OpType_>
-class QuantEncoder {
- private:
+template <OperationType OpType_> class QuantEncoder {
+private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   const cudaDataType_t _computeType = _optraits::computeType;
@@ -41,9 +40,9 @@ class QuantEncoder {
   void ffn_add_norm();
 
   const int _max_batch_size;
-  int *_p_d_padding_mask;  // true sequence length(remove padding), [batch_size]
+  int *_p_d_padding_mask; // true sequence length(remove padding), [batch_size]
   _DataType
-      *_p_d_output;  // encoder output, [batch_size, batch_seq_len, hidden_size]
+      *_p_d_output; // encoder output, [batch_size, batch_seq_len, hidden_size]
   const QuantTransformerWeight<OpType_> &_tw;
   cudaStream_t _stream;
   cublasHandle_t _hd;
@@ -88,7 +87,7 @@ class QuantEncoder {
   int8_t *_int8_p_d_src_emb_wei;
   const float _quant_range = 127;
   const float _src_emb_clip_max;
-  const std::vector<float> _enc_clip_max;  // size: 12 * enc_layer_num
+  const std::vector<float> _enc_clip_max; // size: 12 * enc_layer_num
   std::vector<_DataType *> _scaled_ffn2_colsum;
 
   int _batch_size;
@@ -97,7 +96,7 @@ class QuantEncoder {
   int _layer_id;
   int _weight_offset;
 
- public:
+public:
   QuantEncoder(int max_batch_size, int *p_d_token_id, int *p_d_padding_mask,
                _DataType *p_d_output, const QuantTransformerWeight<OpType_> &tw,
                cudaStream_t stream, cublasHandle_t hd,
@@ -105,9 +104,9 @@ class QuantEncoder {
   void init_buffer();
   std::string check();
   void run_one_infer(int batch_size, int batch_seq_len);
-  int *_p_d_token_id;  // input token id [batch_size, batch_seq_len]
+  int *_p_d_token_id; // input token id [batch_size, batch_seq_len]
   const int *_p_d_lang_id;
 };
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

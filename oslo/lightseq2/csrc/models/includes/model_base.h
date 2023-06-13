@@ -25,7 +25,7 @@ enum DataType {
   kFloat64 = 12
 };
 
-// Bellow is an usage example for lightseq cpp API
+// Below is an usage example for lightseq cpp API
 //
 // auto model = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
 //     "Transformer", model_weights_path, max_batch_size);
@@ -57,7 +57,7 @@ enum DataType {
 //   lightseq::cuda::print_vec(d_output, "output", 5);
 // }
 class LSModel {
- public:
+public:
   LSModel(std::vector<std::string> input_names,
           std::vector<std::string> output_names)
       : kInputNames(input_names), kOutputNames(output_names) {
@@ -69,7 +69,7 @@ class LSModel {
   virtual void Infer() = 0;
 
   // input getter and setter
-  virtual void set_input_ptr(int index, void* input_ptr) = 0;
+  virtual void set_input_ptr(int index, void *input_ptr) = 0;
   void set_input_shape(int index, std::vector<int> shape) {
     input_shapes_.at(index) = std::move(shape);
   }
@@ -79,8 +79,8 @@ class LSModel {
   virtual DataType get_input_dtype(int index) = 0;
 
   // output getter and setter
-  virtual void set_output_ptr(int index, void* output_ptr) = 0;
-  virtual const void* get_output_ptr(int index) = 0;
+  virtual void set_output_ptr(int index, void *output_ptr) = 0;
+  virtual const void *get_output_ptr(int index) = 0;
   std::string get_output_name(int index) { return kOutputNames[index]; }
   int get_output_size() { return kOutputNames.size(); }
   std::vector<int> get_output_shape(int index) { return output_shapes_[index]; }
@@ -89,7 +89,7 @@ class LSModel {
 
   virtual void benchmark_mode(bool is_benchmark) = 0;
 
- protected:
+protected:
   void set_output_shape(int index, std::vector<int> shape) {
     output_shapes_.at(index) = std::move(shape);
   }
@@ -99,16 +99,16 @@ class LSModel {
   std::vector<std::vector<int>> output_shapes_;
 };
 
-typedef LSModel* (*LSModelConstructor)(const std::string, const int);
+typedef LSModel *(*LSModelConstructor)(const std::string, const int);
 
 class LSModelFactory {
- private:
+private:
   LSModelFactory() {}
   ~LSModelFactory() {}
   std::map<std::string, LSModelConstructor> object_map_;
 
- public:
-  static LSModelFactory& GetInstance() {
+public:
+  static LSModelFactory &GetInstance() {
     static LSModelFactory factory;
     return factory;
   }
@@ -120,7 +120,7 @@ class LSModelFactory {
     }
   }
 
-  LSModel* CreateModel(std::string class_name, const std::string weight_path,
+  LSModel *CreateModel(std::string class_name, const std::string weight_path,
                        const int max_batch_size) {
     std::map<std::string, LSModelConstructor>::const_iterator iter =
         object_map_.find(class_name);
@@ -133,20 +133,20 @@ class LSModelFactory {
 };
 
 class Reflector {
- public:
+public:
   Reflector(std::string name, LSModelConstructor obj) {
     LSModelFactory::GetInstance().ModelRegister(name, obj);
   }
   virtual ~Reflector() {}
 };
 
-#define LSMODEL_REGISTER(className)                                 \
-  LSModel* create_object_##className(const std::string weight_path, \
-                                     const int max_batch_size) {    \
-    return new className(weight_path, max_batch_size);              \
-  }                                                                 \
+#define LSMODEL_REGISTER(className)                                            \
+  LSModel *create_object_##className(const std::string weight_path,            \
+                                     const int max_batch_size) {               \
+    return new className(weight_path, max_batch_size);                         \
+  }                                                                            \
   Reflector reflector_##className(#className, create_object_##className);
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq
 #endif

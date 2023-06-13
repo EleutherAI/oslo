@@ -28,19 +28,18 @@ constexpr int depth_to_max_blocks[5] = {320, 320, 320, 320, 320};
 #endif
 namespace lightseq {
 namespace cuda {
-template <int n>
-struct TensorListMetadata {
-  void* addresses[n][depth_to_max_tensors[n - 1]];
+template <int n> struct TensorListMetadata {
+  void *addresses[n][depth_to_max_tensors[n - 1]];
   int sizes[depth_to_max_tensors[n - 1]];
   unsigned char block_to_tensor[depth_to_max_blocks[n - 1]];
-  int block_to_chunk[depth_to_max_blocks[n - 1]];  // I fear this needs to be a
-                                                   // full int.
+  int block_to_chunk[depth_to_max_blocks[n - 1]]; // I fear this needs to be a
+                                                  // full int.
   int start_tensor_this_launch;
 };
 
 template <typename T, typename U, typename... ArgTypes>
 __global__ void multi_tensor_apply_kernel(int chunk_size,
-                                          volatile int* noop_flag, T tl,
+                                          volatile int *noop_flag, T tl,
                                           U callable, ArgTypes... args) {
   // Hand the chunk information to the user-supplied functor to process however
   // it likes.
@@ -49,8 +48,8 @@ __global__ void multi_tensor_apply_kernel(int chunk_size,
 
 template <int depth, typename T, typename... ArgTypes>
 void multi_tensor_apply(
-    int block_size, int chunk_size, const at::Tensor& noop_flag,
-    const std::vector<std::vector<at::Tensor>>& tensor_lists, T callable,
+    int block_size, int chunk_size, const at::Tensor &noop_flag,
+    const std::vector<std::vector<at::Tensor>> &tensor_lists, T callable,
     ArgTypes... args) {
   TORCH_CHECK(tensor_lists.size() == depth, "tensor_lists.size() != depth");
   int len0 = tensor_lists[0].size();
@@ -58,7 +57,7 @@ void multi_tensor_apply(
   auto ref_device = tensor_lists[0][0].device();
   TORCH_CHECK(ref_device.type() == at::kCUDA, "expected input to be on cuda");
   for (int l = 0; l < tensor_lists.size();
-       l++)  // No range-based for because I need indices
+       l++) // No range-based for because I need indices
   {
     TORCH_CHECK(tensor_lists[l].size() == len0,
                 "Size mismatch among tensor lists");
@@ -134,5 +133,5 @@ void multi_tensor_apply(
     }
   }
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

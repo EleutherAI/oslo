@@ -1,23 +1,22 @@
 #pragma once
-#include "layer_normalize.h"
 #include "launch_enc_emb.h"
 #include "layer.h"
+#include "layer_normalize.h"
 
 namespace lightseq {
 
-template <typename T>
-class LaunchEncEmbLayer : public Layer {
- private:
+template <typename T> class LaunchEncEmbLayer : public Layer {
+private:
   // operators
-  LaunchEncEmbOp<T>* _launch_enc_op = nullptr;
+  LaunchEncEmbOp<T> *_launch_enc_op = nullptr;
 
   // parameters
-  Variable* _token_emb;
-  Variable* _pos_emb;
-  Variable* _lang_emb;
-  Variable* _lang_id;
+  Variable *_token_emb;
+  Variable *_pos_emb;
+  Variable *_lang_emb;
+  Variable *_lang_id;
 
- public:
+public:
   LaunchEncEmbLayer(int max_batch_tokens, int pad_id, int hidden_dim,
                     int multilg_type)
       : Layer("LaunchEncEmbLayer"),
@@ -28,15 +27,15 @@ class LaunchEncEmbLayer : public Layer {
     _lang_emb = new Variable("lang_emb", g_dtype<T>());
     _lang_id = new Variable("lang_id", g_dtype<T>());
 
-    this->_context_ptr->exit_layer();  // necessary
+    this->_context_ptr->exit_layer(); // necessary
   }
 
   virtual ~LaunchEncEmbLayer() {}
 
-  std::tuple<Variable*, Variable*> operator()(Variable* inp) {
+  std::tuple<Variable *, Variable *> operator()(Variable *inp) {
     set_inputs({inp});
 
-    std::tuple<Variable*, Variable*> out =
+    std::tuple<Variable *, Variable *> out =
         (*_launch_enc_op)(inp, _token_emb, _pos_emb, _lang_emb, _lang_id);
 
     set_outputs({std::get<0>(out), std::get<1>(out)});
@@ -49,10 +48,10 @@ class LaunchEncEmbLayer : public Layer {
 
   void before_backward() {}
 
-  int load_params(const std::vector<const T*>& para_vec, int offset) {
-    _token_emb->set_value((char*)para_vec[offset]);
+  int load_params(const std::vector<const T *> &para_vec, int offset) {
+    _token_emb->set_value((char *)para_vec[offset]);
     // _token_emb->set_shape();
-    _pos_emb->set_value((char*)para_vec[offset + 1]);
+    _pos_emb->set_value((char *)para_vec[offset + 1]);
     // _pos_emb->set_shape();
     // _lang_emb->set_value((char*)para_vec[offset + 4]);
     return 0;
@@ -67,4 +66,4 @@ template class LaunchEncEmbLayer<__half>;
 template <class T>
 using LaunchEncEmbLayerPtr = std::shared_ptr<LaunchEncEmbLayer<T>>;
 
-}  // namespace lightseq
+} // namespace lightseq

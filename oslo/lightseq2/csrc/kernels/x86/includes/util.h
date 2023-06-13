@@ -1,14 +1,14 @@
 #pragma once
 
-#include <type_traits>
+#include <algorithm>
 #include <chrono>
 #include <fstream>
-#include <iostream>
-#include <string>
-#include <vector>
-#include <stdexcept>
 #include <functional>
-#include <algorithm>
+#include <iostream>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
+#include <vector>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -23,14 +23,13 @@ namespace x86 {
 // smaller as the number of computations per indices increases.
 constexpr int64_t GRAIN_SIZE = 32768;
 
-template <typename T>
-inline T ceil_divide(const T& x, const T& y) {
+template <typename T> inline T ceil_divide(const T &x, const T &y) {
   return (x + y - 1) / y;
 }
 
 template <typename Function>
 inline void parallel_for(const int64_t begin, const int64_t end,
-                         const int64_t grain_size, const Function& f) {
+                         const int64_t grain_size, const Function &f) {
   if (begin >= end) {
     return;
   }
@@ -61,14 +60,14 @@ inline void parallel_for(const int64_t begin, const int64_t end,
 }
 
 template <typename T1, typename T2, typename Function>
-inline void unary_transform(const T1* x, T2* y, int64_t size,
-                            const Function& func) {
+inline void unary_transform(const T1 *x, T2 *y, int64_t size,
+                            const Function &func) {
   std::transform(x, x + size, y, func);
 }
 
 template <typename T1, typename T2, typename Function>
-inline void parallel_unary_transform(const T1* x, T2* y, int64_t size,
-                                     int64_t work_size, const Function& func) {
+inline void parallel_unary_transform(const T1 *x, T2 *y, int64_t size,
+                                     int64_t work_size, const Function &func) {
   parallel_for(0, size, GRAIN_SIZE / work_size,
                [x, y, &func](int64_t begin, int64_t end) {
                  std::transform(x + begin, x + end, y + begin, func);
@@ -76,23 +75,23 @@ inline void parallel_unary_transform(const T1* x, T2* y, int64_t size,
 }
 
 template <typename T1, typename T2, typename T3, typename Function>
-inline void binary_transform(const T1* a, const T2* b, T3* c, int64_t size,
-                             const Function& func) {
+inline void binary_transform(const T1 *a, const T2 *b, T3 *c, int64_t size,
+                             const Function &func) {
   std::transform(a, a + size, b, c, func);
 }
 
 template <typename T1, typename T2, typename T3, typename Function>
-inline void parallel_binary_transform(const T1* a, const T2* b, T3* c,
+inline void parallel_binary_transform(const T1 *a, const T2 *b, T3 *c,
                                       int64_t size, int64_t work_size,
-                                      const Function& func) {
+                                      const Function &func) {
   parallel_for(0, size, GRAIN_SIZE / work_size,
                [a, b, c, &func](int64_t begin, int64_t end) {
                  std::transform(a + begin, a + end, b + begin, c + begin, func);
                });
 }
-}  // namespace x86
+} // namespace x86
 
 template <typename T>
-void print_vec(const T* outv, std::string outn, int num_output_ele);
+void print_vec(const T *outv, std::string outn, int num_output_ele);
 
-}  // namespace lightseq
+} // namespace lightseq

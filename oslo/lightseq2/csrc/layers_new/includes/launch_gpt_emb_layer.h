@@ -4,17 +4,16 @@
 
 namespace lightseq {
 
-template <typename T>
-class LaunchGptEmbLayer : public Layer {
- private:
+template <typename T> class LaunchGptEmbLayer : public Layer {
+private:
   // operators
-  LaunchGptEmbOp<T>* _launch_gpt_op = nullptr;
+  LaunchGptEmbOp<T> *_launch_gpt_op = nullptr;
 
   // parameters
-  Variable* _token_emb;
-  Variable* _pos_emb;
+  Variable *_token_emb;
+  Variable *_pos_emb;
 
- public:
+public:
   LaunchGptEmbLayer(int max_batch_tokens, int max_step, int max_batch_size,
                     int beam_size, int pad_id, int hidden_dim)
       : Layer("LaunchGptEmbLayer"),
@@ -24,15 +23,15 @@ class LaunchGptEmbLayer : public Layer {
     _token_emb = new Variable("token_emb", g_dtype<T>());
     _pos_emb = new Variable("pos_emb", g_dtype<T>());
 
-    this->_context_ptr->exit_layer();  // necessary
+    this->_context_ptr->exit_layer(); // necessary
   }
 
   virtual ~LaunchGptEmbLayer() {}
 
-  std::tuple<Variable*, Variable*, Variable*> operator()(Variable* inp) {
+  std::tuple<Variable *, Variable *, Variable *> operator()(Variable *inp) {
     set_inputs({inp});
 
-    std::tuple<Variable*, Variable*, Variable*> out =
+    std::tuple<Variable *, Variable *, Variable *> out =
         (*_launch_gpt_op)(inp, _token_emb, _pos_emb);
 
     set_outputs({std::get<0>(out), std::get<1>(out), std::get<2>(out)});
@@ -45,10 +44,10 @@ class LaunchGptEmbLayer : public Layer {
 
   void before_backward() {}
 
-  int load_params(const std::vector<const T*>& para_vec, int offset) {
-    _token_emb->set_value((char*)para_vec[offset]);
+  int load_params(const std::vector<const T *> &para_vec, int offset) {
+    _token_emb->set_value((char *)para_vec[offset]);
     // _token_emb->set_shape({});
-    _pos_emb->set_value((char*)para_vec[offset + 1]);
+    _pos_emb->set_value((char *)para_vec[offset + 1]);
     // _pos_emb->set_shape();
     return 0;
   }
@@ -62,4 +61,4 @@ template class LaunchGptEmbLayer<__half>;
 template <class T>
 using LaunchGptEmbLayerPtr = std::shared_ptr<LaunchGptEmbLayer<T>>;
 
-}  // namespace lightseq
+} // namespace lightseq

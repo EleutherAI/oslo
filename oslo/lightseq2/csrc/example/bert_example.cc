@@ -6,7 +6,7 @@
 Example of how to run Bert inference using our implementation.
 */
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   std::string model_weights_path = argv[1];
   std::vector<int> example_input{};
 
@@ -33,7 +33,7 @@ int main(int argc, char* argv[]) {
   auto model = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
       "Bert", model_weights_path, max_batch_size);
 
-  void* d_input;
+  void *d_input;
   CHECK_GPU_ERROR(
       cudaMalloc(&d_input, sizeof(int) * max_batch_size * batch_seq_len));
   CHECK_GPU_ERROR(cudaMemcpy(d_input, host_input.data(),
@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
   model->set_input_shape(0, {max_batch_size, batch_seq_len});
 
   for (int i = 0; i < model->get_output_size(); i++) {
-    void* d_output;
+    void *d_output;
     std::vector<int> shape = model->get_output_max_shape(i);
     int total_size = 1;
     for (int j = 0; j < shape.size(); j++) {
@@ -64,8 +64,8 @@ int main(int argc, char* argv[]) {
   }
 
   for (int i = 0; i < model->get_output_size(); i++) {
-    const float* d_output;
-    d_output = static_cast<const float*>(model->get_output_ptr(i));
+    const float *d_output;
+    d_output = static_cast<const float *>(model->get_output_ptr(i));
     std::vector<int> shape = model->get_output_shape(i);
     std::cout << "output shape: ";
     for (int j = 0; j < shape.size(); j++) {

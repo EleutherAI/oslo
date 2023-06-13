@@ -2,92 +2,69 @@
 
 namespace lightseq {
 
-template <typename T>
-cuda::DataType g_dtype() {
+template <typename T> cuda::DataType g_dtype() {
   return cuda::DataType::kNotSupported;
 }
 #ifdef LIGHTSEQ_cuda
-template <>
-cuda::DataType g_dtype<__half>() {
+template <> cuda::DataType g_dtype<__half>() {
   return cuda::DataType::kFloat16;
 }
 #endif
-template <>
-cuda::DataType g_dtype<float>() {
-  return cuda::DataType::kFloat32;
-}
-template <>
-cuda::DataType g_dtype<double>() {
+template <> cuda::DataType g_dtype<float>() { return cuda::DataType::kFloat32; }
+template <> cuda::DataType g_dtype<double>() {
   return cuda::DataType::kFloat64;
 }
-template <>
-cuda::DataType g_dtype<int8_t>() {
-  return cuda::DataType::kInt8;
-}
-template <>
-cuda::DataType g_dtype<int16_t>() {
-  return cuda::DataType::kInt16;
-}
-template <>
-cuda::DataType g_dtype<int>() {
-  return cuda::DataType::kInt32;
-}
-template <>
-cuda::DataType g_dtype<long long>() {
+template <> cuda::DataType g_dtype<int8_t>() { return cuda::DataType::kInt8; }
+template <> cuda::DataType g_dtype<int16_t>() { return cuda::DataType::kInt16; }
+template <> cuda::DataType g_dtype<int>() { return cuda::DataType::kInt32; }
+template <> cuda::DataType g_dtype<long long>() {
   return cuda::DataType::kInt64;
 }
-template <>
-cuda::DataType g_dtype<uint8_t>() {
-  return cuda::DataType::kUInt8;
-}
-template <>
-cuda::DataType g_dtype<uint16_t>() {
+template <> cuda::DataType g_dtype<uint8_t>() { return cuda::DataType::kUInt8; }
+template <> cuda::DataType g_dtype<uint16_t>() {
   return cuda::DataType::kUInt16;
 }
-template <>
-cuda::DataType g_dtype<uint32_t>() {
+template <> cuda::DataType g_dtype<uint32_t>() {
   return cuda::DataType::kUInt32;
 }
-template <>
-cuda::DataType g_dtype<uint64_t>() {
+template <> cuda::DataType g_dtype<uint64_t>() {
   return cuda::DataType::kUInt64;
 }
 
 int dtype_size(cuda::DataType dtype) {
   switch (dtype) {
-    case cuda::DataType::kFloat16:
-      return 2;
-    case cuda::DataType::kFloat32:
-      return 4;
-    case cuda::DataType::kFloat64:
-      return 8;
-    case cuda::DataType::kInt8:
-      return 1;
-    case cuda::DataType::kInt16:
-      return 2;
-    case cuda::DataType::kInt32:
-      return 4;
-    case cuda::DataType::kInt64:
-      return 8;
-    case cuda::DataType::kByte:
-      return 1;
-    case cuda::DataType::kUInt8:
-      return 1;
-    case cuda::DataType::kUInt16:
-      return 2;
-    case cuda::DataType::kUInt32:
-      return 4;
-    case cuda::DataType::kUInt64:
-      return 8;
-    case cuda::DataType::kNotSupported: {
-      // throw std::runtime_error(
-      //     "call dtype_size(cuda::DataType ) with kNotSupported
-      //     cuda::DataType");
-      printf(
-          "call dtype_size(cuda::DataType ) with kNotSupported "
-          "cuda::DataType\n");
-      return 0;
-    }
+  case cuda::DataType::kFloat16:
+    return 2;
+  case cuda::DataType::kFloat32:
+    return 4;
+  case cuda::DataType::kFloat64:
+    return 8;
+  case cuda::DataType::kInt8:
+    return 1;
+  case cuda::DataType::kInt16:
+    return 2;
+  case cuda::DataType::kInt32:
+    return 4;
+  case cuda::DataType::kInt64:
+    return 8;
+  case cuda::DataType::kByte:
+    return 1;
+  case cuda::DataType::kUInt8:
+    return 1;
+  case cuda::DataType::kUInt16:
+    return 2;
+  case cuda::DataType::kUInt32:
+    return 4;
+  case cuda::DataType::kUInt64:
+    return 8;
+  case cuda::DataType::kNotSupported: {
+    // throw std::runtime_error(
+    //     "call dtype_size(cuda::DataType ) with kNotSupported
+    //     cuda::DataType");
+    printf("call dtype_size(cuda::DataType ) with kNotSupported "
+           "cuda::DataType\n");
+    return 0;
+  }
   }
   throw std::runtime_error(
       "call dtype_size(cuda::DataType ) with undecalared cuda::DataType.");
@@ -96,10 +73,8 @@ int dtype_size(cuda::DataType dtype) {
 
 int Tensor::global_tensor_id = 0;
 Tensor::Tensor(std::string name, cuda::DataType dtype, size_t mx_shape_size)
-    : _id(global_tensor_id++),
-      _ctx_ptr(Context::global_instance().get()),
-      _dtype(dtype),
-      _mx_shape_size(mx_shape_size) {
+    : _id(global_tensor_id++), _ctx_ptr(Context::global_instance().get()),
+      _dtype(dtype), _mx_shape_size(mx_shape_size) {
   std::string prefix_name =
       _ctx_ptr->last_node() ? (_ctx_ptr->last_node()->name() + ":") : "";
 
@@ -121,7 +96,7 @@ Tensor::Tensor(std::string name, TensorPtr ori_tensor)
   _mtype = LSMemoryType::OffsetMemory;
 }
 
-void Tensor::set_tensor(char* inp) {
+void Tensor::set_tensor(char *inp) {
   if (_mtype == LSMemoryType::FixedMemory) {
     _ptr = inp;
     return;
@@ -136,7 +111,9 @@ void Tensor::set_tensor(char* inp) {
   }
 }
 
-void Tensor::set_tensor(const char* inp) { set_tensor(const_cast<char*>(inp)); }
+void Tensor::set_tensor(const char *inp) {
+  set_tensor(const_cast<char *>(inp));
+}
 
 void Tensor::set_shape(Shape shape) { _shape = shape; }
 
@@ -155,7 +132,7 @@ void Tensor::set_offset(size_t offset, Shape shape) {
   _offset = offset;
 }
 
-char* Tensor::tensor(bool is_open_interval) {
+char *Tensor::tensor(bool is_open_interval) {
   if (_mtype == LSMemoryType::OffsetMemory) {
     return _original_tensor->tensor(is_open_interval) +
            _offset * dtype_size(_dtype);
@@ -190,7 +167,8 @@ void Tensor::update_life_idx(int node_idx) {
 
 void Tensor::remove_life_cycle() {
   _mtype = LSMemoryType::FixedMemory;
-  if (_mm_ptr) _mm_ptr->remove_life_cycle(_id);
+  if (_mm_ptr)
+    _mm_ptr->remove_life_cycle(_id);
 }
 
 void Tensor::reset_fixed() {
@@ -234,37 +212,36 @@ void Tensor::print_tensor(int size) {
 
   size = std::min(size, ele_siz);
   switch (_dtype) {
-    case cuda::DataType::kFloat16: {
+  case cuda::DataType::kFloat16: {
 #ifdef LIGHTSEQ_cuda
-      print_vec((__half*)tensor(), _name + " head", size);
-      print_vec((__half*)tensor() + ele_siz - size, _name + " tail", size);
+    print_vec((__half *)tensor(), _name + " head", size);
+    print_vec((__half *)tensor() + ele_siz - size, _name + " tail", size);
 #else
-      printf("error! float16 can not be used without cuda!");
-      throw std::runtime_error("error! float16 can not be used without cuda!");
+    printf("error! float16 can not be used without cuda!");
+    throw std::runtime_error("error! float16 can not be used without cuda!");
 #endif
-      break;
-    }
-    case cuda::DataType::kFloat32: {
-      print_vec((float*)tensor(), _name + " head", size);
-      print_vec((float*)tensor() + ele_siz - size, _name + " tail", size);
-      break;
-    }
-    case cuda::DataType::kInt32: {
-      print_vec((int*)tensor(), _name + " head", size);
-      print_vec((int*)tensor() + ele_siz - size, _name + " tail", size);
-      break;
-    }
-    case cuda::DataType::kNotSupported: {
-      printf("error! print tensor with kNotSupported cuda::DataType");
-      throw std::runtime_error(
-          "error! print tensor with kNotSupported cuda::DataType");
-      break;
-    }
-    default: {
-      printf("Please add tensor printing function of %d cuda::DataType",
-             _dtype);
-    }
+    break;
+  }
+  case cuda::DataType::kFloat32: {
+    print_vec((float *)tensor(), _name + " head", size);
+    print_vec((float *)tensor() + ele_siz - size, _name + " tail", size);
+    break;
+  }
+  case cuda::DataType::kInt32: {
+    print_vec((int *)tensor(), _name + " head", size);
+    print_vec((int *)tensor() + ele_siz - size, _name + " tail", size);
+    break;
+  }
+  case cuda::DataType::kNotSupported: {
+    printf("error! print tensor with kNotSupported cuda::DataType");
+    throw std::runtime_error(
+        "error! print tensor with kNotSupported cuda::DataType");
+    break;
+  }
+  default: {
+    printf("Please add tensor printing function of %d cuda::DataType", _dtype);
+  }
   }
 }
 
-}  // namespace lightseq
+} // namespace lightseq

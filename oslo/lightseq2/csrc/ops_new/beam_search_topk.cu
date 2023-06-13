@@ -3,7 +3,8 @@
 namespace lightseq {
 
 float host_length_norm_func(int length, float alpha) {
-  if (alpha < 0.f) return 1.f / length;
+  if (alpha < 0.f)
+    return 1.f / length;
   return std::pow((5.f + length) / 6.f, -alpha);
 }
 
@@ -15,17 +16,11 @@ BeamSearchTopOp<T>::BeamSearchTopOp(size_t nshared_dec_layer,
                                     size_t beam_size, size_t diverse_lambda,
                                     size_t dim_per_head, int end_id,
                                     size_t head_num, float length_penalty)
-    : Operator("BeamSearchTopOp"),
-      _max_batch_size(max_batch_size),
-      _max_step(max_step),
-      _trg_vocab_size(trg_vocab_size),
-      _hidden_size(hidden_size),
-      _max_thread_per_block(max_thread_per_block),
-      _beam_size(beam_size),
-      _diverse_lambda(diverse_lambda),
-      _dim_per_head(dim_per_head),
-      _end_id(end_id),
-      _head_num(head_num),
+    : Operator("BeamSearchTopOp"), _max_batch_size(max_batch_size),
+      _max_step(max_step), _trg_vocab_size(trg_vocab_size),
+      _hidden_size(hidden_size), _max_thread_per_block(max_thread_per_block),
+      _beam_size(beam_size), _diverse_lambda(diverse_lambda),
+      _dim_per_head(dim_per_head), _end_id(end_id), _head_num(head_num),
       _cub_sort_buffer_bytes(max_batch_size * beam_size * trg_vocab_size *
                              sizeof(T)),
       _cache_size(max_batch_size * max_step * hidden_size * beam_size),
@@ -46,8 +41,8 @@ BeamSearchTopOp<T>::BeamSearchTopOp(size_t nshared_dec_layer,
 }
 
 template <typename T>
-std::tuple<Variable*, Variable*> BeamSearchTopOp<T>::operator()(
-    Variable* logits, Variable* logit_bias, Variable* alive_seq) {
+std::tuple<Variable *, Variable *> BeamSearchTopOp<T>::
+operator()(Variable *logits, Variable *logit_bias, Variable *alive_seq) {
   set_parents({logits, logit_bias, alive_seq});
 
   _alive_seq_out =
@@ -89,19 +84,18 @@ std::tuple<Variable*, Variable*> BeamSearchTopOp<T>::operator()(
   return std::make_tuple(_alive_seq_out, _seq_score);
 }
 
-template <typename T>
-void BeamSearchTopOp<T>::forward() {
-  T* logits_ptr = (T*)parent(0)->value();
-  T* logits_bias_ptr = (T*)parent(1)->value();
-  int* alive_seq_ptr = (int*)parent(2)->value();
+template <typename T> void BeamSearchTopOp<T>::forward() {
+  T *logits_ptr = (T *)parent(0)->value();
+  T *logits_bias_ptr = (T *)parent(1)->value();
+  int *alive_seq_ptr = (int *)parent(2)->value();
 
-  int* alive_seq_out = (int*)child(0)->value();
-  float* seq_score_ptr = (float*)child(1)->value();
+  int *alive_seq_out = (int *)child(0)->value();
+  float *seq_score_ptr = (float *)child(1)->value();
 
-  float* seq_probs_ptr = (float*)_seq_prob->value();
-  int* can_idx_ptr = (int*)_can_idx->value();
-  float* can_score_ptr = (float*)_can_score->value();
-  int* num_beam_can_ptr = (int*)_num_beam_can->value();
+  float *seq_probs_ptr = (float *)_seq_prob->value();
+  int *can_idx_ptr = (int *)_can_idx->value();
+  float *can_score_ptr = (float *)_can_score->value();
+  int *num_beam_can_ptr = (int *)_num_beam_can->value();
 
   if (!_context_ptr->is_built()) {
     return;
@@ -111,7 +105,7 @@ void BeamSearchTopOp<T>::forward() {
   cudaStream_t stream = _context_ptr->get_stream();
   if (_step == 0) {
     CHECK_GPU_ERROR(cudaMemcpyAsync(
-        (void*)seq_probs_ptr, (void*)_host_alive_seq_probs.data(),
+        (void *)seq_probs_ptr, (void *)_host_alive_seq_probs.data(),
         sizeof(float) * _batch_size * _beam_size, cudaMemcpyDefault, stream));
   }
 
@@ -141,7 +135,7 @@ void BeamSearchTopOp<T>::forward() {
   if (_diverse_lambda != 0) {
     if (_host_can_num_batch < _cub_sort_buffer_bytes / 160) {
       CHECK_GPU_ERROR(cub::DeviceRadixSort::SortPairsDescending(
-          (void*)logits_ptr, _cub_sort_buffer_bytes, can_score_ptr,
+          (void *)logits_ptr, _cub_sort_buffer_bytes, can_score_ptr,
           can_score_ptr, can_idx_ptr, can_idx_ptr, _host_can_num_batch, 0,
           sizeof(float) * 8, stream));
     } else {
@@ -192,25 +186,26 @@ void BeamSearchTopOp<T>::forward() {
 }
 
 template <typename T>
-void BeamSearchTopOp<T>::refresh_cache(Variable* caches_k, Variable* caches_v) {
+void BeamSearchTopOp<T>::refresh_cache(Variable *caches_k, Variable *caches_v) {
   /* ---step 4. refresh cache: k, v for decoder self attention--- */
 
   if (_step > 0) {
     cudaStream_t stream = _context_ptr->get_stream();
-    float* seq_probs_ptr = (float*)_seq_prob->value();
-    int* can_idx_ptr = (int*)_can_idx->value();
-    float* can_score_ptr = (float*)_can_score->value();
-    int* num_beam_can_ptr = (int*)_num_beam_can->value();
-    T* caches_k_ptr = (T*)caches_k->value();
-    T* caches_v_ptr = (T*)caches_v->value();
-    T* caches_k_buf_ptr = (T*)_caches_k_buf->value();
-    T* caches_v_buf_ptr = (T*)_caches_v_buf->value();
+    float *seq_probs_ptr = (float *)_seq_prob->value();
+    int *can_idx_ptr = (int *)_can_idx->value();
+    float *can_score_ptr = (float *)_can_score->value();
+    int *num_beam_can_ptr = (int *)_num_beam_can->value();
+    T *caches_k_ptr = (T *)caches_k->value();
+    T *caches_v_ptr = (T *)caches_v->value();
+    T *caches_k_buf_ptr = (T *)_caches_k_buf->value();
+    T *caches_v_buf_ptr = (T *)_caches_v_buf->value();
     cuda::ker_refresh_cache_launcher<T>(
         _nshared_dec_layer * (_cur_pos + 1), _step_token_num * 2,
         _max_thread_per_block, stream, num_beam_can_ptr + 1, can_idx_ptr,
-        (T*)caches_k_ptr, (T*)caches_v_ptr, (T*)caches_k_buf_ptr,
-        (T*)caches_v_buf_ptr, _cache_size, _beam_size, _dim_per_head, _head_num,
-        _trg_vocab_size, _cur_pos, _max_step, _diverse_lambda != 0, _end_id);
+        (T *)caches_k_ptr, (T *)caches_v_ptr, (T *)caches_k_buf_ptr,
+        (T *)caches_v_buf_ptr, _cache_size, _beam_size, _dim_per_head,
+        _head_num, _trg_vocab_size, _cur_pos, _max_step, _diverse_lambda != 0,
+        _end_id);
     Variable::swap_tensor(caches_k, _caches_k_buf);
     Variable::swap_tensor(caches_v, _caches_v_buf);
   }
@@ -221,4 +216,4 @@ template class BeamSearchTopOp<float>;
 template class BeamSearchTopOp<__half>;
 #endif
 
-}  // namespace lightseq
+} // namespace lightseq

@@ -2,8 +2,8 @@
 #include <cub/block/block_scan.cuh>
 #include <cub/block/block_store.cuh>
 
-#include "kernels.h"
 #include "cstdio"
+#include "kernels.h"
 
 using namespace cub;
 
@@ -32,9 +32,10 @@ __global__ void bias_add_transform_20314_new(T *q_out, T *k_out, T *v_out,
                                              int batch_ele);
 
 template <>
-__global__ void bias_add_transform_20314_new<float>(
-    float *q_out, float *k_out, float *v_out, const float *input,
-    const float *bias, int dim_3, int dim_4, int batch_ele) {
+__global__ void
+bias_add_transform_20314_new<float>(float *q_out, float *k_out, float *v_out,
+                                    const float *input, const float *bias,
+                                    int dim_3, int dim_4, int batch_ele) {
   int id0 = blockIdx.x;
   int id1 = blockIdx.y;
   int id2 = blockIdx.z;
@@ -281,5 +282,5 @@ __global__ void transform_20314_bwd_new(T *output, const T *q_inp,
   else
     res4[trg_offset] = q_inp4[offset];
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

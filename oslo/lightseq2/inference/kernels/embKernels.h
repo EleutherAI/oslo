@@ -30,5 +30,5 @@ void launch_patch_emb(const T *conv_weight, const T *conv_bias,
                       int max_step, int hidden_dim, int channel_input,
                       cudaStream_t stream);
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

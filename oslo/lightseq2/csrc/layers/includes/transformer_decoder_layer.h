@@ -1,24 +1,23 @@
 #pragma once
 
-#include <string>
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <cuda_runtime_api.h>
+#include <string>
 
 #include <type_traits>
 
+#include "cublas_algo_map.h"
 #include "cuda_util.h"
 #include "dropout.h"
 #include "feed_forward.h"
 #include "normalize_layer.h"
 #include "softmax.h"
 #include "strided_batch_gemm.h"
-#include "cublas_algo_map.h"
 namespace lightseq {
 namespace cuda {
-template <typename T>
-class TransformerDecoderLayer {
- public:
+template <typename T> class TransformerDecoderLayer {
+public:
   TransformerDecoderLayer(int layer_id, int max_batch_tokens, int _max_seq_len,
                           int hidden_size, int num_heads, int intermediate_size,
                           float attn_dropout_ratio,
@@ -64,7 +63,7 @@ class TransformerDecoderLayer {
   void set_cur_batch_shape(int batch_size, int trg_seq_len, int src_seq_len,
                            int step = -1) {
     _batch_size = batch_size;
-    _trg_seq_len = trg_seq_len;  // beam_size for inference
+    _trg_seq_len = trg_seq_len; // beam_size for inference
     _src_seq_len = src_seq_len;
     _batch_tokens = batch_size * trg_seq_len;
     _batch_heads = batch_size * _heads;
@@ -250,7 +249,7 @@ class TransformerDecoderLayer {
     }
   }
 
- private:
+private:
   void allocate_buffer() {
     // allocate local gpu memory
 
@@ -498,5 +497,5 @@ class TransformerDecoderLayer {
   T *_grad_attn_qkv_cache_cmax_ptr;
 };
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

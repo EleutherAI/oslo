@@ -1,9 +1,9 @@
 #pragma once
 
-#include <cuda_runtime.h>
-#include <cuda_fp16.h>
-#include <curand_kernel.h>
 #include <cstdint>
+#include <cuda_fp16.h>
+#include <cuda_runtime.h>
+#include <curand_kernel.h>
 
 namespace lightseq {
 namespace cuda {
@@ -142,5 +142,5 @@ void ker_topp_sample_i8I_launcher(int batch_size, int batch_seq_len,
                                   int eos_id, float dequant_scale,
                                   bool in_col32 = false);
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

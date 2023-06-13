@@ -9,20 +9,20 @@ option optimize_for = LITE_RUNTIME;
 
 message QuantGptEncoderLayer {
   // decoder-self-attention
-  repeated float multihead_norm_scale = 1;          // [hidden_size]
-  repeated float multihead_norm_bias = 2;           // [hidden_size]
+  repeated float multihead_norm_scale = 1; // [hidden_size]
+  repeated float multihead_norm_bias = 2;  // [hidden_size]
   bytes multihead_project_kernel_qkv = 3;  // [hidden_size, 3, hidden_size]
-  repeated float multihead_project_bias_qkv = 4;    // [3, hidden_size]
-  bytes multihead_project_kernel_output = 5;  // [hidden_size, hidden_size]
-  repeated float multihead_project_bias_output = 6;    // [hidden_size]
+  repeated float multihead_project_bias_qkv = 4; // [3, hidden_size]
+  bytes multihead_project_kernel_output = 5;     // [hidden_size, hidden_size]
+  repeated float multihead_project_bias_output = 6; // [hidden_size]
 
   // "Feed-Forward Networks"
-  repeated float ffn_norm_scale = 7;     // [hidden_size]
-  repeated float ffn_norm_bias = 8;      // [hidden_size]
-  bytes ffn_first_kernel = 9;   // [hidden_size, inner_size]
-  repeated float ffn_first_bias = 10;     // [inner_size]
-  bytes ffn_second_kernel = 11;  // [inner_size, hidden_size]
-  repeated float ffn_second_bias = 12;    // [hidden_size]
+  repeated float ffn_norm_scale = 7;   // [hidden_size]
+  repeated float ffn_norm_bias = 8;    // [hidden_size]
+  bytes ffn_first_kernel = 9;          // [hidden_size, inner_size]
+  repeated float ffn_first_bias = 10;  // [inner_size]
+  bytes ffn_second_kernel = 11;        // [inner_size, hidden_size]
+  repeated float ffn_second_bias = 12; // [hidden_size]
 
   // clip max
   float multihead_project_kernel_qkv_clip_max = 13;

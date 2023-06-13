@@ -1,11 +1,11 @@
 #pragma once
 
+#include <cublasLt.h>
 #include <cublas_v2.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
-#include <cublasLt.h>
 
 #include <algorithm>
 #include <chrono>
@@ -26,9 +26,8 @@ QuantBert encoder, composed by gemm lib and
 namespace lightseq {
 namespace cuda {
 
-template <OperationType OpType_>
-class QuantBertEncoder {
- private:
+template <OperationType OpType_> class QuantBertEncoder {
+private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   const cudaDataType_t _computeType = _optraits::computeType;
@@ -41,7 +40,7 @@ class QuantBertEncoder {
   void ffn_add_norm();
 
   const int _max_batch_size;
-  int *_p_d_padding_mask;  // true sequence length(remove padding), [batch_size]
+  int *_p_d_padding_mask; // true sequence length(remove padding), [batch_size]
 
   const int *_p_d_lang_id;
   const QuantBertWeight<OpType_> &_tw;
@@ -86,7 +85,7 @@ class QuantBertEncoder {
   int8_t *_int8_p_d_src_emb_wei;
   const float _quant_range = 127;
   const float _src_emb_clip_max;
-  const std::vector<float> _enc_clip_max;  // size: 11 * enc_layer_num
+  const std::vector<float> _enc_clip_max; // size: 11 * enc_layer_num
   std::vector<_DataType *> _scaled_ffn2_colsum;
 
   int _batch_size;
@@ -95,10 +94,10 @@ class QuantBertEncoder {
   int _layer_id;
   int _weight_offset;
 
- public:
-  const int *_p_d_token_id;  // input token id [batch_size, batch_seq_len]
+public:
+  const int *_p_d_token_id; // input token id [batch_size, batch_seq_len]
   _DataType
-      *_p_d_output;  // encoder output, [batch_size, batch_seq_len, hidden_size]
+      *_p_d_output; // encoder output, [batch_size, batch_seq_len, hidden_size]
 
   QuantBertEncoder(int max_batch_size, const int *p_d_token_id,
                    int *p_d_padding_mask, _DataType *p_d_output,
@@ -109,5 +108,5 @@ class QuantBertEncoder {
   void run_one_infer(int batch_size, int batch_seq_len);
 };
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

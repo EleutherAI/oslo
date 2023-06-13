@@ -9,8 +9,8 @@ option optimize_for = LITE_RUNTIME;
 
 message QuantEncoderLayer {
   // encoder-self-attention
-  repeated float multihead_norm_scale = 1;  // [hidden_size]
-  repeated float multihead_norm_bias = 2;   // [hidden_size]
+  repeated float multihead_norm_scale = 1; // [hidden_size]
+  repeated float multihead_norm_bias = 2;  // [hidden_size]
   // "Multi-Head Attention" linearly project weights kernel for query, key,
   // value,
   // before "Scaled Dot-Product Attention, with shape (hidden_size,
@@ -20,22 +20,20 @@ message QuantEncoderLayer {
   // perform numpy.dot(input, multihead_project_kernel_qkv) will get the [query,
   // key, value] of
   // "Scaled Dot-Product Attention"
-  bytes multihead_project_kernel_qkv =
-      3;  // [hidden_size, 3, hidden_size]
-  repeated float multihead_project_bias_qkv = 4;  // [3, hidden_size]
+  bytes multihead_project_kernel_qkv = 3; // [hidden_size, 3, hidden_size]
+  repeated float multihead_project_bias_qkv = 4; // [3, hidden_size]
   // "Multi-Head Attention" linearly project weights kernel for output
   // after "Scaled Dot-Product Attention", with shape (hidden_size, hidden_size)
-  bytes multihead_project_kernel_output =
-      5;  // [hidden_size, hidden_size]
-  repeated float multihead_project_bias_output = 6;  // [hidden_size]
+  bytes multihead_project_kernel_output = 5; // [hidden_size, hidden_size]
+  repeated float multihead_project_bias_output = 6; // [hidden_size]
 
   // "Feed-Forward Networks"
-  repeated float ffn_norm_scale = 7;      // [hidden_size]
-  repeated float ffn_norm_bias = 8;       // [hidden_size]
-  bytes ffn_first_kernel = 9;    // [hidden_size, inner_size]
-  repeated float ffn_first_bias = 10;     // [inner_size]
-  bytes ffn_second_kernel = 11;  // [inner_size, hidden_size]
-  repeated float ffn_second_bias = 12;    // [hidden_size]
+  repeated float ffn_norm_scale = 7;   // [hidden_size]
+  repeated float ffn_norm_bias = 8;    // [hidden_size]
+  bytes ffn_first_kernel = 9;          // [hidden_size, inner_size]
+  repeated float ffn_first_bias = 10;  // [inner_size]
+  bytes ffn_second_kernel = 11;        // [inner_size, hidden_size]
+  repeated float ffn_second_bias = 12; // [hidden_size]
 
   // clip max
   float multihead_project_kernel_qkv_clip_max = 13;
@@ -56,27 +54,26 @@ message QuantDecoderLayer {
   // decoder-self-attention
   repeated float self_norm_scale = 1;          // [hidden_size]
   repeated float self_norm_bias = 2;           // [hidden_size]
-  bytes self_project_kernel_qkv = 3;  // [hidden_size, 3, hidden_size]
+  bytes self_project_kernel_qkv = 3;           // [hidden_size, 3, hidden_size]
   repeated float self_project_bias_qkv = 4;    // [3, hidden_size]
-  bytes self_project_kernel_output = 5;  // [hidden_size, hidden_size]
-  repeated float self_project_bias_output = 6;    // [hidden_size]
+  bytes self_project_kernel_output = 5;        // [hidden_size, hidden_size]
+  repeated float self_project_bias_output = 6; // [hidden_size]
 
   // decoder-encode-attention
-  repeated float encdec_norm_scale = 7;        // [hidden_size]
-  repeated float encdec_norm_bias = 8;         // [hidden_size]
-  bytes encdec_project_kernel_q = 9;  // [hidden_size, hidden_size]
-  repeated float encdec_project_bias_q = 10;   // [hidden_size]
-  bytes encdec_project_kernel_output =
-      11;                                          // [hidden_size, hidden_size]
-  repeated float encdec_project_bias_output = 12;  // [hidden_size]
+  repeated float encdec_norm_scale = 7;           // [hidden_size]
+  repeated float encdec_norm_bias = 8;            // [hidden_size]
+  bytes encdec_project_kernel_q = 9;              // [hidden_size, hidden_size]
+  repeated float encdec_project_bias_q = 10;      // [hidden_size]
+  bytes encdec_project_kernel_output = 11;        // [hidden_size, hidden_size]
+  repeated float encdec_project_bias_output = 12; // [hidden_size]
 
   // "Feed-Forward Networks"
-  repeated float ffn_norm_scale = 13;     // [hidden_size]
-  repeated float ffn_norm_bias = 14;      // [hidden_size]
-  bytes ffn_first_kernel = 15;   // [hidden_size, inner_size]
-  repeated float ffn_first_bias = 16;     // [inner_size]
-  bytes ffn_second_kernel = 17;  // [inner_size, hidden_size]
-  repeated float ffn_second_bias = 18;    // [hidden_size]
+  repeated float ffn_norm_scale = 13;  // [hidden_size]
+  repeated float ffn_norm_bias = 14;   // [hidden_size]
+  bytes ffn_first_kernel = 15;         // [hidden_size, inner_size]
+  repeated float ffn_first_bias = 16;  // [inner_size]
+  bytes ffn_second_kernel = 17;        // [inner_size, hidden_size]
+  repeated float ffn_second_bias = 18; // [hidden_size]
 
   // clip max
   float self_project_kernel_qkv_clip_max = 19;
@@ -104,15 +101,15 @@ message QuantEmbeddingLayer {
   // token embedding table
   // for encoder, it is in [src_vocab_size, hidden_size]
   // for decoder, it is in [hidden_size, trg_vocab_size]
-  // notice, it shoule have been multiply by sqrt(hidden_size)
+  // notice, it should have been multiply by sqrt(hidden_size)
   // so, look it up directly will get the input token embedding, there is no
   // need
   // to multiply by sqrt(hidden_size) during inference.
   bytes token_embedding = 1;
-  repeated float position_embedding = 2;  // [max_step, hidden_size]
+  repeated float position_embedding = 2; // [max_step, hidden_size]
   // the last layer_norm of encoder or decoder
-  repeated float norm_scale = 3;  // [hidden_size]
-  repeated float norm_bias = 4;   // [hidden_size]
+  repeated float norm_scale = 3; // [hidden_size]
+  repeated float norm_bias = 4;  // [hidden_size]
 
   // only for trg, not in src
   // [dec_layer_num, hidden_size, 2, hidden_size]
@@ -122,7 +119,7 @@ message QuantEmbeddingLayer {
   repeated float encode_output_project_bias_kv = 6;
   // only for trg, not in src
   // decoder vocab logit bias
-  repeated float shared_bias = 7;  // [target_vocab_size]
+  repeated float shared_bias = 7; // [target_vocab_size]
 
   // For multi lingual model, [num_lang, hidden_size]
   repeated float lang_emb = 8;
@@ -135,21 +132,21 @@ message QuantEmbeddingLayer {
 }
 
 message QuantModelConf {
-  int32 head_num = 1;   // head number for multi-head attention
-  int32 beam_size = 2;  // beam size of beam search
+  int32 head_num = 1;  // head number for multi-head attention
+  int32 beam_size = 2; // beam size of beam search
   int32 extra_decode_length =
-      3;                     // extra decode length compared with source length
-  float length_penalty = 4;  // length penalty of beam search
-  int32 src_padding_id = 5;  // source padding id
-  int32 trg_start_id = 6;    // target start id
-  float diverse_lambda = 7; // diverse beam search lambda
+      3;                      // extra decode length compared with source length
+  float length_penalty = 4;   // length penalty of beam search
+  int32 src_padding_id = 5;   // source padding id
+  int32 trg_start_id = 6;     // target start id
+  float diverse_lambda = 7;   // diverse beam search lambda
   string sampling_method = 8; // choice of beam_search, topk, topp, topk_greedy
-  float topp = 9; // parameter for topp sampling
-  int32 topk = 10; // parameter for topk sampling
-  int32 trg_end_id = 11; // eos of target embedding
-  bool is_post_ln = 12; // Pre-LN or Post-LN
+  float topp = 9;             // parameter for topp sampling
+  int32 topk = 10;            // parameter for topk sampling
+  int32 trg_end_id = 11;      // eos of target embedding
+  bool is_post_ln = 12;       // Pre-LN or Post-LN
   bool no_scale_embedding = 13; // whether to scale embedding by sqrt(emb_dim)
-  bool use_gelu = 14; // use gelu for activation otherwise relu
+  bool use_gelu = 14;           // use gelu for activation otherwise relu
   // Multilingual model type, 0 for bilingual
   // 1 for token level multilingual,
   // 2 for sentence level multilingual
@@ -157,9 +154,9 @@ message QuantModelConf {
 }
 
 message QuantTransformer {
-  QuantEmbeddingLayer src_embedding = 1;         // source embedding
-  repeated QuantEncoderLayer encoder_stack = 2;  // encoder weights
-  QuantEmbeddingLayer trg_embedding = 3;         // target embedding
-  repeated QuantDecoderLayer decoder_stack = 4;  // decoder weighs
-  QuantModelConf model_conf = 5;                 // model_config
+  QuantEmbeddingLayer src_embedding = 1;        // source embedding
+  repeated QuantEncoderLayer encoder_stack = 2; // encoder weights
+  QuantEmbeddingLayer trg_embedding = 3;        // target embedding
+  repeated QuantDecoderLayer decoder_stack = 4; // decoder weighs
+  QuantModelConf model_conf = 5;                // model_config
 }

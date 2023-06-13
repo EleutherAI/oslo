@@ -21,5 +21,5 @@ void launch_dec_emb_i8I(const int8_t *token_emb, const T *pos_emb, int *tokens,
                         int multilg_type, cudaStream_t stream,
                         float dequant_scale, bool scaled = true);
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

@@ -3,21 +3,21 @@
 */
 
 #pragma once
-#include "memory"
-#include "thread"
-#include <stdio.h>
-#include <fstream>
-#include "unordered_set"
-#include <unistd.h>
 #include "cmath"
-#include <type_traits>
-#include <chrono>
-#include <iostream>
-#include <string>
-#include <vector>
-#include <stdexcept>
-#include <functional>
+#include "memory"
 #include "model_base.h"
+#include "thread"
+#include "unordered_set"
+#include <chrono>
+#include <fstream>
+#include <functional>
+#include <iostream>
+#include <stdexcept>
+#include <stdio.h>
+#include <string>
+#include <type_traits>
+#include <unistd.h>
+#include <vector>
 
 #include "kernel_headers.h"
 
@@ -77,4 +77,4 @@ const int MB_SIZE = 1024 * 1024;
 
 enum class GenerateMethod { Topk, Topp, BeamSearch, UnDefined };
 
-}  // namespace lightseq
+} // namespace lightseq

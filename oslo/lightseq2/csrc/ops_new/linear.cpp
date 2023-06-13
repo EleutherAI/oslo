@@ -3,7 +3,7 @@
 namespace lightseq {
 
 template <typename T1, typename T2>
-Variable* LinearOp<T1, T2>::operator()(Variable* inp, Variable* weight) {
+Variable *LinearOp<T1, T2>::operator()(Variable *inp, Variable *weight) {
   // size_t max_size = _max_batch_tokens * _output_size;
   _result = new Variable("LinearOp_out", _max_batch_tokens * _output_size,
                          g_dtype<T1>(), g_dtype<T2>());
@@ -12,13 +12,12 @@ Variable* LinearOp<T1, T2>::operator()(Variable* inp, Variable* weight) {
   return _result;
 }
 
-template <typename T1, typename T2>
-void LinearOp<T1, T2>::forward() {
+template <typename T1, typename T2> void LinearOp<T1, T2>::forward() {
   float beta = float(0.);
 
-  T1* input_ptr = (T1*)parent(0)->value();
-  T1* weights = (T1*)parent(1)->value();
-  T1* out_ptr = (T1*)child(0)->value();
+  T1 *input_ptr = (T1 *)parent(0)->value();
+  T1 *weights = (T1 *)parent(1)->value();
+  T1 *out_ptr = (T1 *)child(0)->value();
 
   if (!_context_ptr->is_built()) {
     return;
@@ -37,17 +36,16 @@ void LinearOp<T1, T2>::forward() {
 #endif
 }
 
-template <typename T1, typename T2>
-void LinearOp<T1, T2>::backward() {
+template <typename T1, typename T2> void LinearOp<T1, T2>::backward() {
   float bw_alpha = 1. / _alpha;
   float w_beta = (float)0.0, inp_beta = (float)0.0;
 
-  T2* out_grad = (T2*)child(0)->grad();
-  T1* input_ptr = (T1*)parent(0)->value();
-  T1* weights = (T1*)parent(1)->value();
+  T2 *out_grad = (T2 *)child(0)->grad();
+  T1 *input_ptr = (T1 *)parent(0)->value();
+  T1 *weights = (T1 *)parent(1)->value();
 
-  T2* inp_grad = (T2*)parent(0)->grad();
-  T2* weights_grad = (T2*)parent(1)->grad();
+  T2 *inp_grad = (T2 *)parent(0)->grad();
+  T2 *weights_grad = (T2 *)parent(1)->grad();
 
   if (!parent(0)->is_cover()) {
     inp_beta = (float)1.0;
@@ -59,7 +57,7 @@ void LinearOp<T1, T2>::backward() {
 
 #ifdef LIGHTSEQ_cuda
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
-  // Q: how to adpat _opA & _opB
+  // Q: how to adapt _opA & _opB
   // calculate weights_grad
   cuda::cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_T, _input_size,
                        _output_size, _batch_tokens, &bw_alpha, &w_beta,
@@ -78,4 +76,4 @@ template class LinearOp<float, float>;
 #ifdef LIGHTSEQ_cuda
 template class LinearOp<__half, __half>;
 #endif
-}  // namespace lightseq
+} // namespace lightseq

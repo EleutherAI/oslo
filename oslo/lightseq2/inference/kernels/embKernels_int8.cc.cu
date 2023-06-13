@@ -11,11 +11,10 @@ namespace lightseq {
 namespace cuda {
 
 template <typename T>
-__global__ void ker_enc_emb_i8I(const int8_t *token_emb, const T *pos_emb,
-                                const int *tokens, T *output, int *pad_mask,
-                                int pad_id, int batch_size, int seq_len,
-                                int hidden_dim, float dequant_scale,
-                                bool scaled) {
+__global__ void
+ker_enc_emb_i8I(const int8_t *token_emb, const T *pos_emb, const int *tokens,
+                T *output, int *pad_mask, int pad_id, int batch_size,
+                int seq_len, int hidden_dim, float dequant_scale, bool scaled) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= batch_size * seq_len * hidden_dim) {
     return;
@@ -41,7 +40,8 @@ __global__ void ker_enc_emb_i8I(const int8_t *token_emb, const T *pos_emb,
     char4 value_i4 = ((char4 *)token_emb)[token * hidden_dim + dim_idx];
     float4 pemb = ((float4 *)pos_emb)[seq_idx * hidden_dim + dim_idx];
     float scale = dequant_scale;
-    if (scaled) scale *= sqrtf(hidden_dim << 2);
+    if (scaled)
+      scale *= sqrtf(hidden_dim << 2);
     value.x = float(value_i4.x) * scale + pemb.x;
     value.y = float(value_i4.y) * scale + pemb.y;
     value.z = float(value_i4.z) * scale + pemb.z;
@@ -51,10 +51,11 @@ __global__ void ker_enc_emb_i8I(const int8_t *token_emb, const T *pos_emb,
 }
 
 template <>
-__global__ void ker_enc_emb_i8I<__half>(
-    const int8_t *token_emb, const __half *pos_emb, const int *tokens,
-    __half *output, int *pad_mask, int pad_id, int batch_size, int seq_len,
-    int hidden_dim, float dequant_scale, bool scaled) {
+__global__ void
+ker_enc_emb_i8I<__half>(const int8_t *token_emb, const __half *pos_emb,
+                        const int *tokens, __half *output, int *pad_mask,
+                        int pad_id, int batch_size, int seq_len, int hidden_dim,
+                        float dequant_scale, bool scaled) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= batch_size * seq_len * hidden_dim) {
     return;
@@ -83,7 +84,8 @@ __global__ void ker_enc_emb_i8I<__half>(
     char2 *value_i2 = (char2 *)(&value_i8);
     __half2 *pemb_h2 = (__half2 *)(&pemb);
     float scale = dequant_scale;
-    if (scaled) scale *= sqrtf(hidden_dim << 3);
+    if (scaled)
+      scale *= sqrtf(hidden_dim << 3);
 #pragma unroll
     for (int i = 0; i < 4; i++) {
       float2 value_f2;
@@ -172,7 +174,8 @@ __global__ void ker_dec_emb_i8I(const int8_t *token_emb, const T *pos_emb,
   int token = tokens[flat_3dim(batch_idx, beam_idx, step, beam_size, max_step)];
   emb = token_emb[flat_2dim(dim_idx, token, vocab_size)];
   float scale = dequant_scale;
-  if (scaled) scale *= sqrtf(hidden_dim);
+  if (scaled)
+    scale *= sqrtf(hidden_dim);
   float value =
       float(emb) * scale + float(pos_emb[flat_2dim(step, dim_idx, hidden_dim)]);
   output[idx] = T(value);
@@ -210,5 +213,5 @@ template void launch_dec_emb_i8I<__half>(
     const __half *lang_emb, const int *lang_id, __half *output, int batch_size,
     int beam_size, int hidden_dim, int vocab_size, int step, int max_step,
     int multilg_type, cudaStream_t stream, float dequant_scale, bool scaled);
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

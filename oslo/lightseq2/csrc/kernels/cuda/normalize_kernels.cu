@@ -12,8 +12,7 @@ namespace cuda {
 const float LN_EPSILON = 1e-12f;
 #define TILE_DIM 32
 
-template <typename T>
-__forceinline__ __device__ T add_eps(T x) {
+template <typename T> __forceinline__ __device__ T add_eps(T x) {
   return fabsf(x) > LN_EPSILON ? x : (x < 0 ? -LN_EPSILON : LN_EPSILON);
 }
 
@@ -266,10 +265,11 @@ __global__ void ker_layer_norm_i8(int8_t *q_out, uint8_t *clip_mask_out,
 }
 
 template <>
-__global__ void ker_layer_norm_i8<__half>(
-    int8_t *q_out, uint8_t *clip_mask_out, __half *vars, __half *means,
-    const __half *inp, const __half *scale, const __half *bias,
-    const __half *clip_max_out, int hidden_size) {
+__global__ void
+ker_layer_norm_i8<__half>(int8_t *q_out, uint8_t *clip_mask_out, __half *vars,
+                          __half *means, const __half *inp, const __half *scale,
+                          const __half *bias, const __half *clip_max_out,
+                          int hidden_size) {
   // step 0. compute local sum
   float l_sum = 0;
   float l_square_sum = 0;
@@ -381,7 +381,7 @@ void launch_layer_norm_i8<__half>(int8_t *q_out, uint8_t *clip_mask_out,
 
 /**
 @brief: ker_ln_bw_dgamma_dbetta
-Layer norm backword kernel, compute the gradient of gamma and betta.
+Layer norm backward kernel, compute the gradient of gamma and betta.
 dbetta = sum(dout, dim=0)
 dgamma = sum(xhat * dout, dim=0)
 xhat = (input - mean) * rsqrt(var) or
@@ -410,12 +410,11 @@ means: [batch_size * seq_len], mean of ln forward,
 (gamma && betta) ^ (vars && means) should be true
 */
 template <typename T>
-__global__ void ker_ln_bw_dgamma_dbetta(T *gamma_grad, T *betta_grad,
-                                        T *cmax_grad, const T *out_grad,
-                                        const T *inp_or_out, const T *gamma,
-                                        const T *betta, const T *vars,
-                                        const T *means, const uint8_t *cmask,
-                                        int rows, int width) {
+__global__ void
+ker_ln_bw_dgamma_dbetta(T *gamma_grad, T *betta_grad, T *cmax_grad,
+                        const T *out_grad, const T *inp_or_out, const T *gamma,
+                        const T *betta, const T *vars, const T *means,
+                        const uint8_t *cmask, int rows, int width) {
   __shared__ float betta_buffer[TILE_DIM][TILE_DIM];
   __shared__ float gamma_buffer[TILE_DIM][TILE_DIM];
 
@@ -465,7 +464,8 @@ __global__ void ker_ln_bw_dgamma_dbetta(T *gamma_grad, T *betta_grad,
     }
   }
   __shared__ float block_cmax_g;
-  if (threadIdx.x == 0 && threadIdx.y == 0) block_cmax_g = 0;
+  if (threadIdx.x == 0 && threadIdx.y == 0)
+    block_cmax_g = 0;
 
   // Sum the shared buffer.
   betta_buffer[threadIdx.x][threadIdx.y] = dbetta;
@@ -500,7 +500,7 @@ __global__ void ker_ln_bw_dgamma_dbetta(T *gamma_grad, T *betta_grad,
 
 /**
 @brief: ker_ln_bw_dinp
-Layer norm backword kernel, compute the gradient of input.
+Layer norm backward kernel, compute the gradient of input.
 dinp = (dxhat - (sum(dxhat) + xhat * sum(dxhat * xhat)) / hidden_dim)
   * rsqrt(var)
 xhat = (input - mean) * rsqrt(var) if mean is not nullptr
@@ -738,7 +738,7 @@ __global__ void ker_ln_bw_dinp<__half>(__half *inp_grad, const __half *out_grad,
 }
 
 /**
-Layer norm backword,
+Layer norm backward,
   compute the gradient of gamma, betta and input.
 dbetta = sum(dout, dim=0)
 xhat = (input - mean) * rsqrt(var) if mean is not nullptr
@@ -856,5 +856,5 @@ void launch_quant_ln_bw<__half>(
       inp_grad, out_grad, residual_grad, inp_or_out, gamma, betta, vars, means,
       cmask, hidden_dim);
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

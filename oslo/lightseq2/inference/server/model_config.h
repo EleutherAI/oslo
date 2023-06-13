@@ -25,9 +25,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "model_config.pb.h"
 #include <google/protobuf/any.pb.h>
 #include <stdint.h>
-#include "model_config.pb.h"
 
 namespace nvidia {
 namespace inferenceserver {
@@ -67,29 +67,29 @@ enum Platform {
 /// \param dims The shape.
 /// \return The number of elements, or -1 if the number of elements
 /// cannot be determined because the shape contains one or more
-/// wilcard dimensions.
-int64_t GetElementCount(const DimsList& dims);
+/// wildcard dimensions.
+int64_t GetElementCount(const DimsList &dims);
 
 /// Get the number of elements in a shape.
 /// \param dims The shape.
 /// \return The number of elements, or -1 if the number of elements
 /// cannot be determined because the shape contains one or more
-/// wilcard dimensions.
-int64_t GetElementCount(const std::vector<int64_t>& dims);
+/// wildcard dimensions.
+int64_t GetElementCount(const std::vector<int64_t> &dims);
 
 /// Get the number of elements in the shape of a model input.
 /// \param mio The model input.
 /// \return The number of elements, or -1 if the number of elements
 /// cannot be determined because the shape contains one or more
-/// wilcard dimensions.
-int64_t GetElementCount(const ModelInput& mio);
+/// wildcard dimensions.
+int64_t GetElementCount(const ModelInput &mio);
 
 /// Get the number of elements in the shape of a model output.
 /// \param mio The model output.
 /// \return The number of elements, or -1 if the number of elements
 /// cannot be determined because the shape contains one or more
-/// wilcard dimensions.
-int64_t GetElementCount(const ModelOutput& mio);
+/// wildcard dimensions.
+int64_t GetElementCount(const ModelOutput &mio);
 
 /// Are values of a datatype fixed-size, or variable-sized.
 /// \param dtype The data-type.
@@ -111,7 +111,7 @@ size_t GetDataTypeByteSize(const DataType dtype);
 /// \param dims The shape.
 /// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
-int64_t GetByteSize(const DataType& dtype, const DimsList& dims);
+int64_t GetByteSize(const DataType &dtype, const DimsList &dims);
 
 /// Get the size, in bytes, of a tensor based on datatype and
 /// shape.
@@ -119,7 +119,7 @@ int64_t GetByteSize(const DataType& dtype, const DimsList& dims);
 /// \param dims The shape.
 /// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
-int64_t GetByteSize(const DataType& dtype, const std::vector<int64_t>& dims);
+int64_t GetByteSize(const DataType &dtype, const std::vector<int64_t> &dims);
 
 /// Get the size, in bytes, of a tensor based on batch-size, datatype
 /// and shape. A tensor that has empty shape [] and non-zero
@@ -130,8 +130,8 @@ int64_t GetByteSize(const DataType& dtype, const std::vector<int64_t>& dims);
 /// \param dims The shape.
 /// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
-int64_t GetByteSize(const int batch_size, const DataType& dtype,
-                    const DimsList& dims);
+int64_t GetByteSize(const int batch_size, const DataType &dtype,
+                    const DimsList &dims);
 
 /// Get the size, in bytes, of a tensor based on batch-size, datatype
 /// and shape. A tensor that has empty shape [] and non-zero
@@ -142,32 +142,32 @@ int64_t GetByteSize(const int batch_size, const DataType& dtype,
 /// \param dims The shape.
 /// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
-int64_t GetByteSize(const int batch_size, const DataType& dtype,
-                    const std::vector<int64_t>& dims);
+int64_t GetByteSize(const int batch_size, const DataType &dtype,
+                    const std::vector<int64_t> &dims);
 
 /// Get the size, in bytes, of a tensor based on ModelInput.
 /// \param mio The ModelInput protobuf.
 /// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
-int64_t GetByteSize(const ModelInput& mio);
+int64_t GetByteSize(const ModelInput &mio);
 
 /// Get the size, in bytes, of a tensor based on ModelOutput.
 /// \param mio The ModelOutput protobuf.
 /// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
-int64_t GetByteSize(const ModelOutput& mio);
+int64_t GetByteSize(const ModelOutput &mio);
 
 /// Get the Platform value for a platform name.
 /// \param platform_name The platform name.
 /// \return The Platform or Platform::UNKNOWN if the platform string
 /// is not recognized.
-Platform GetPlatform(const std::string& platform_name);
+Platform GetPlatform(const std::string &platform_name);
 
 /// Get the CPU thread nice level associate with a model
 /// configuration's priority.
 /// \param config The model configuration.
 /// \return The nice level.
-int GetCpuNiceLevel(const ModelConfig& config);
+int GetCpuNiceLevel(const ModelConfig &config);
 
 /// Compare two model configuration shapes for equality. Wildcard
 /// dimensions (that is, dimensions with size WILDCARD_DIM) are
@@ -176,7 +176,7 @@ int GetCpuNiceLevel(const ModelConfig& config);
 /// \params dims0 The first shape.
 /// \params dims1 The second shape.
 /// \return True if the shapes are equal, false if not equal.
-bool CompareDims(const DimsList& dims0, const DimsList& dims1);
+bool CompareDims(const DimsList &dims0, const DimsList &dims1);
 
 /// Compare two model configuration shapes for equality. Wildcard
 /// dimensions (that is, dimensions with size WILDCARD_DIM) are
@@ -186,7 +186,7 @@ bool CompareDims(const DimsList& dims0, const DimsList& dims1);
 /// \params dims0 The first shape.
 /// \params dims1 The second shape.
 /// \return True if the shapes are equal, false if not equal.
-bool CompareDimsWithWildcard(const DimsList& dims0, const DimsList& dims1);
+bool CompareDimsWithWildcard(const DimsList &dims0, const DimsList &dims1);
 
 /// Compare two model configuration shapes for equality. Wildcard
 /// dimensions (that is, dimensions with size WILDCARD_DIM) are
@@ -196,19 +196,19 @@ bool CompareDimsWithWildcard(const DimsList& dims0, const DimsList& dims1);
 /// \params dims0 The first shape.
 /// \params dims1 The second shape.
 /// \return True if the shapes are equal, false if not equal.
-bool CompareDimsWithWildcard(const DimsList& dims0,
-                             const std::vector<int64_t>& dims1);
+bool CompareDimsWithWildcard(const DimsList &dims0,
+                             const std::vector<int64_t> &dims1);
 
 /// Convert a DimsList to string representation.
 /// \param dims The DimsList to be converted.
 /// \return String representation of the DimsList in pattern
 /// "[d0,d1,...,dn]"
-std::string DimsListToString(const DimsList& dims);
+std::string DimsListToString(const DimsList &dims);
 
 /// Convert a vector representing a shape to string representation.
 /// \param dims The vector of dimensions to be converted.
 /// \return String representation of the vector in pattern
 /// "[d0,d1,...,dn]"
-std::string DimsListToString(const std::vector<int64_t>& dims);
-}  // namespace inferenceserver
-}  // namespace nvidia
+std::string DimsListToString(const std::vector<int64_t> &dims);
+} // namespace inferenceserver
+} // namespace nvidia

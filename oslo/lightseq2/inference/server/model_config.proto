@@ -79,8 +79,7 @@ enum DataType {
 //@@   A group of one or more instances of a model and resources made
 //@@   available for those instances.
 //@@
-message ModelInstanceGroup
-{
+message ModelInstanceGroup {
   //@@
   //@@  .. cpp:enum:: Kind
   //@@
@@ -140,7 +139,7 @@ message ModelInstanceGroup
   //@@
   //@@     GPU(s) where instances should be available. For each GPU listed,
   //@@     'count' instances of the model will be available. Setting 'gpus'
-  //@@     to empty (or not specifying at all) is eqivalent to listing all
+  //@@     to empty (or not specifying at all) is equivalent to listing all
   //@@     available GPUs.
   //@@
   repeated int32 gpus = 3;
@@ -151,8 +150,7 @@ message ModelInstanceGroup
 //@@
 //@@   Reshape specification for input and output tensors.
 //@@
-message ModelTensorReshape
-{
+message ModelTensorReshape {
   //@@  .. cpp:var:: int64 shape (repeated)
   //@@
   //@@     The shape to use for reshaping.
@@ -165,8 +163,7 @@ message ModelTensorReshape
 //@@
 //@@   An input required by the model.
 //@@
-message ModelInput
-{
+message ModelInput {
   //@@
   //@@  .. cpp:enum:: Format
   //@@
@@ -240,8 +237,7 @@ message ModelInput
 //@@
 //@@   An output produced by the model.
 //@@
-message ModelOutput
-{
+message ModelOutput {
   //@@  .. cpp:var:: string name
   //@@
   //@@     The name of the output.
@@ -263,7 +259,7 @@ message ModelOutput
   //@@  .. cpp:var:: ModelTensorReshape reshape
   //@@
   //@@     The shape produced for this output by the backend. The output will
-  //@@     be reshaped from this to the shape specifed in 'dims' before being
+  //@@     be reshaped from this to the shape specified in 'dims' before being
   //@@     returned in the inference response. The reshape must have the same
   //@@     number of elements as the output shape specified by 'dims'. Optional.
   //@@
@@ -283,15 +279,13 @@ message ModelOutput
 //@@   Policy indicating which versions of a model should be made
 //@@   available by the inference server.
 //@@
-message ModelVersionPolicy
-{
+message ModelVersionPolicy {
   //@@  .. cpp:var:: message Latest
   //@@
   //@@     Serve only the latest version(s) of a model. This is
   //@@     the default policy.
   //@@
-  message Latest
-  {
+  message Latest {
     //@@    .. cpp:var:: uint32 num_versions
     //@@
     //@@       Serve only the 'num_versions' highest-numbered versions. T
@@ -312,8 +306,7 @@ message ModelVersionPolicy
   //@@
   //@@     Serve only specific versions of the model.
   //@@
-  message Specific
-  {
+  message Specific {
     //@@    .. cpp:var:: int64 versions (repeated)
     //@@
     //@@       The specific versions of the model that will be served.
@@ -326,8 +319,7 @@ message ModelVersionPolicy
   //@@     Each model must implement only a single version policy. The
   //@@     default policy is 'Latest'.
   //@@
-  oneof policy_choice
-  {
+  oneof policy_choice {
     //@@    .. cpp:var:: Latest latest
     //@@
     //@@       Serve only latest version(s) of the model.
@@ -355,8 +347,7 @@ message ModelVersionPolicy
 //@@   model is optimized and prioritized by the backend framework when
 //@@   it is loaded.
 //@@
-message ModelOptimizationPolicy
-{
+message ModelOptimizationPolicy {
   //@@
   //@@  .. cpp:var:: message Graph
   //@@
@@ -365,8 +356,7 @@ message ModelOptimizationPolicy
   //@@     only supported for TensorFlow graphdef and savedmodel models and
   //@@     causes XLA to be enabled/disabled for the model.
   //@@
-  message Graph
-  {
+  message Graph {
     //@@    .. cpp:var:: int32 level
     //@@
     //@@       The optimization level. Defaults to 0 (zero) if not specified.
@@ -411,8 +401,7 @@ message ModelOptimizationPolicy
   //@@
   //@@     CUDA-specific optimization settings.
   //@@
-  message Cuda
-  {
+  message Cuda {
     //@@    .. cpp:var:: bool graphs
     //@@
     //@@       Use CUDA graphs API to capture model operations and execute
@@ -447,8 +436,7 @@ message ModelOptimizationPolicy
 //@@   Dynamic batching configuration. These settings control how dynamic
 //@@   batching operates for the model.
 //@@
-message ModelDynamicBatching
-{
+message ModelDynamicBatching {
   //@@  .. cpp:var:: int32 preferred_batch_size (repeated)
   //@@
   //@@     Preferred batch sizes for dynamic batching. If a batch of one of
@@ -473,8 +461,7 @@ message ModelDynamicBatching
 //@@   Sequence batching configuration. These settings control how sequence
 //@@   batching operates for the model.
 //@@
-message ModelSequenceBatching
-{
+message ModelSequenceBatching {
   //@@  .. cpp:var:: uint64 max_sequence_idle_microseconds
   //@@
   //@@     The maximum time, in microseconds, that a sequence is allowed to
@@ -491,8 +478,7 @@ message ModelSequenceBatching
   //@@
   //@@     A control is a binary signal to a backend.
   //@@
-  message Control
-  {
+  message Control {
     //@@
     //@@    .. cpp:enum:: Kind
     //@@
@@ -547,8 +533,7 @@ message ModelSequenceBatching
   //@@
   //@@     The sequence control values to communicate by a model input.
   //@@
-  message ControlInput
-  {
+  message ControlInput {
     //@@    .. cpp:var:: string name
     //@@
     //@@       The name of the model input.
@@ -578,16 +563,14 @@ message ModelSequenceBatching
 //@@   Model ensembling configuration. These settings specify the models that
 //@@   compose the ensemble and how data flows between the models.
 //@@
-message ModelEnsembling
-{
+message ModelEnsembling {
   //@@  .. cpp:var:: message Step
   //@@
   //@@     Each step specifies a model included in the ensemble,
   //@@     maps ensemble tensor names to the model input tensors,
   //@@     and maps model output tensors to ensemble tensor names
   //@@
-  message Step
-  {
+  message Step {
     //@@  .. cpp:var:: string model_name
     //@@
     //@@     The name of the model to execute for this step of the ensemble.
@@ -634,8 +617,7 @@ message ModelEnsembling
 //@@
 //@@   A model parameter.
 //@@
-message ModelParameter
-{
+message ModelParameter {
   //@@  .. cpp:var:: string string_value
   //@@
   //@@     The string value of the parameter.
@@ -648,8 +630,7 @@ message ModelParameter
 //@@
 //@@   A model configuration.
 //@@
-message ModelConfig
-{
+message ModelConfig {
   //@@  .. cpp:var:: string name
   //@@
   //@@     The name of the model.
@@ -714,8 +695,7 @@ message ModelConfig
   //@@     default scheduling policy is used for the model. The default
   //@@     policy is to execute each inference request independently.
   //@@
-  oneof scheduling_choice
-  {
+  oneof scheduling_choice {
     //@@    .. cpp:var:: ModelDynamicBatching dynamic_batching
     //@@
     //@@       If specified, enables the dynamic-batching scheduling

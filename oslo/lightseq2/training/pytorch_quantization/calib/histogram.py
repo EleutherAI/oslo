@@ -77,7 +77,7 @@ class HistogramCalibrator(_Calibrator):
             )
 
         if grow_method is not None:
-            logger.warning("grow_method is deprecated. Got %s, ingored!", grow_method)
+            logger.warning("grow_method is deprecated. Got %s, ignored!", grow_method)
 
     def collect(self, x):
         """Collect histogram"""
@@ -376,7 +376,7 @@ def calibrate_weights(
     .. note::
         This function uses `method` specified by the argument to decide which method to use, NOT the one
         specified by the calibrator embedded in weight_quantizer.
-        We haven't moved calibration to GPU, so everything is transfered to CPU
+        We haven't moved calibration to GPU, so everything is transferred to CPU
 
     Args:
         model: A torch.nn.Module.

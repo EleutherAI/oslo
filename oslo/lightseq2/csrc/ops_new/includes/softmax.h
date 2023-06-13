@@ -4,9 +4,8 @@
 
 namespace lightseq {
 
-template <typename T1, typename T2>
-class SoftmaxOp : public Operator {
- private:
+template <typename T1, typename T2> class SoftmaxOp : public Operator {
+private:
   size_t _nhead;
   size_t _max_batch_tokens;
   size_t _max_seq_len;
@@ -18,20 +17,18 @@ class SoftmaxOp : public Operator {
   bool _config_mask_future;
   bool _mask_future;
 
-  Variable* _result;
+  Variable *_result;
 
- public:
+public:
   SoftmaxOp(size_t max_batch_tokens, size_t max_seq_len, size_t nhead,
             bool mask_future = false)
-      : Operator("SoftmaxOp"),
-        _max_batch_tokens(max_batch_tokens),
-        _max_seq_len(max_seq_len),
-        _nhead(nhead),
+      : Operator("SoftmaxOp"), _max_batch_tokens(max_batch_tokens),
+        _max_seq_len(max_seq_len), _nhead(nhead),
         _config_mask_future(mask_future) {}
 
   virtual ~SoftmaxOp() {}
 
-  Variable* operator()(Variable* inp, Variable* mask = nullptr);
+  Variable *operator()(Variable *inp, Variable *mask = nullptr);
 
   void forward() override;
 
@@ -48,4 +45,4 @@ class SoftmaxOp : public Operator {
   void backward() override;
 };
 
-}  // namespace lightseq
+} // namespace lightseq

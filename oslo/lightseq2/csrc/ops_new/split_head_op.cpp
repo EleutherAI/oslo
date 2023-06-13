@@ -4,22 +4,22 @@ namespace lightseq {
 
 // without cache
 template <typename T1, typename T2>
-std::vector<Variable*> SplitHeadOp<T1, T2>::operator()(Variable* inp,
-                                                       Variable* bias) {
+std::vector<Variable *> SplitHeadOp<T1, T2>::operator()(Variable *inp,
+                                                        Variable *bias) {
   if (_cache_sz > 0) {
     throw std::runtime_error("Call the wrong version, should provide cache.");
   }
   set_parents({inp, bias});
   size_t trans_size = _max_query_tokens * _hidden_size;
-  Variable* query =
+  Variable *query =
       new Variable("splited_query", trans_size, g_dtype<T1>(), g_dtype<T2>());
   if (_qkv_num == 1) {
     this->set_children({query});
     return {query};
   }
-  Variable* key =
+  Variable *key =
       new Variable("splited_key", trans_size, g_dtype<T1>(), g_dtype<T2>());
-  Variable* value =
+  Variable *value =
       new Variable("splited_value", trans_size, g_dtype<T1>(), g_dtype<T2>());
   this->set_children({query, key, value});
   return {query, key, value};
@@ -27,46 +27,45 @@ std::vector<Variable*> SplitHeadOp<T1, T2>::operator()(Variable* inp,
 
 // with cache
 template <typename T1, typename T2>
-Variable* SplitHeadOp<T1, T2>::operator()(Variable* inp, Variable* bias,
-                                          Variable* key, Variable* value) {
+Variable *SplitHeadOp<T1, T2>::operator()(Variable *inp, Variable *bias,
+                                          Variable *key, Variable *value) {
   if (_cache_sz == 0) {
     printf("Call the wrong version, should not provided cache.\n");
     throw std::runtime_error(
         "Call the wrong version, should not provided cache.");
   }
   if (_qkv_num != 3) {
-    printf("qkv_num shoule be 3 when with cache.\n");
-    throw std::runtime_error("qkv_num shoule be 3 when with cache.");
+    printf("qkv_num should be 3 when with cache.\n");
+    throw std::runtime_error("qkv_num should be 3 when with cache.");
   }
   this->set_parents({inp, bias, key, value});
 
   size_t trans_size = _max_query_tokens * _hidden_size;
-  Variable* query =
+  Variable *query =
       new Variable("splited_query", trans_size, g_dtype<T1>(), g_dtype<T2>());
 
   this->set_children({query});
   return query;
 }
 
-template <typename T1, typename T2>
-void SplitHeadOp<T1, T2>::forward() {
+template <typename T1, typename T2> void SplitHeadOp<T1, T2>::forward() {
   cudaStream_t _stream = _context_ptr->get_stream();
 
-  T1* inp_ptr = (T1*)parent(0)->value();
-  T1* bias_ptr = (T1*)parent(1)->value();
+  T1 *inp_ptr = (T1 *)parent(0)->value();
+  T1 *bias_ptr = (T1 *)parent(1)->value();
 
-  T1* q_ptr = (T1*)child(0)->value();
-  T1* k_ptr = nullptr;
-  T1* v_ptr = nullptr;
+  T1 *q_ptr = (T1 *)child(0)->value();
+  T1 *k_ptr = nullptr;
+  T1 *v_ptr = nullptr;
   if (_qkv_num == 3) {
     if (_cache_sz == 0) {
       // without cache
-      k_ptr = (T1*)child(1)->value();
-      v_ptr = (T1*)child(2)->value();
+      k_ptr = (T1 *)child(1)->value();
+      v_ptr = (T1 *)child(2)->value();
     } else {
       // with cache
-      k_ptr = (T1*)parent(2)->value();
-      v_ptr = (T1*)parent(3)->value();
+      k_ptr = (T1 *)parent(2)->value();
+      v_ptr = (T1 *)parent(3)->value();
     }
   }
 
@@ -82,8 +81,7 @@ void SplitHeadOp<T1, T2>::forward() {
 #endif
 }
 
-template <typename T1, typename T2>
-void SplitHeadOp<T1, T2>::backward() {
+template <typename T1, typename T2> void SplitHeadOp<T1, T2>::backward() {
   return;
 }
 
@@ -92,4 +90,4 @@ template class SplitHeadOp<float, float>;
 template class SplitHeadOp<__half, __half>;
 #endif
 
-}  // namespace lightseq
+} // namespace lightseq

@@ -10,7 +10,7 @@ option optimize_for = LITE_RUNTIME;
 message BertEncoderLayer {
   // layer norm before "Multi-Head Attention"
   repeated float multihead_norm_scale = 1; // [hidden_size]
-  repeated float multihead_norm_bias = 2; // [hidden_size]
+  repeated float multihead_norm_bias = 2;  // [hidden_size]
 
   // "Multi-Head Attention" linearly project weights kernel for query, key,
   // value,
@@ -21,38 +21,40 @@ message BertEncoderLayer {
   // perform numpy.dot(input, multihead_project_kernel_qkv) will get the [query,
   // key, value] of
   // "Scaled Dot-Product Attention"
-  repeated float multihead_project_kernel_qkv = 3; // [hidden_size, 3, hidden_size]
+  repeated float multihead_project_kernel_qkv =
+      3; // [hidden_size, 3, hidden_size]
   repeated float multihead_project_bias_qkv = 4; // [3, hidden_size]
-  repeated float multihead_project_kernel_output = 5; // [hidden_size, hidden_size]
+  repeated float multihead_project_kernel_output =
+      5; // [hidden_size, hidden_size]
   repeated float multihead_project_bias_output = 6; // [hidden_size]
 
   // layer norm before "Feed-Forward Networks"
   repeated float ffn_norm_scale = 7; // [hidden_size]
-  repeated float ffn_norm_bias = 8; // [hidden_size]
+  repeated float ffn_norm_bias = 8;  // [hidden_size]
 
   // "Feed-Forward Networks"
-  repeated float ffn_first_kernel = 9; // [hidden_size, inner_size]
-  repeated float ffn_first_bias = 10; // [inner_size]
+  repeated float ffn_first_kernel = 9;   // [hidden_size, inner_size]
+  repeated float ffn_first_bias = 10;    // [inner_size]
   repeated float ffn_second_kernel = 11; // [inner_size, hidden_size]
-  repeated float ffn_second_bias = 12; // [hidden_size]
+  repeated float ffn_second_bias = 12;   // [hidden_size]
 }
 
 message BertEmbeddingLayer {
   // token embedding table
   // look it up directly will get the input token embedding
-  repeated float token_embedding = 1; // [vocab_size, hidden_size]
+  repeated float token_embedding = 1;    // [vocab_size, hidden_size]
   repeated float position_embedding = 2; // [max_seq_len, hidden_size]
   // the last layer_norm of encoder,
   // only for pre layer norm,
   repeated float norm_scale = 3; // [hidden_size]
-  repeated float norm_bias = 4; // [hidden_size]
+  repeated float norm_bias = 4;  // [hidden_size]
 }
 
 message BertModelConf {
   int32 head_num = 1;
   int32 src_padding_id = 2;
   bool is_post_ln = 3; // Pre-LN or Post-LN
-  bool use_gelu = 4; // use gelu for activation otherwise relu
+  bool use_gelu = 4;   // use gelu for activation otherwise relu
   // Multilingual model type, 0 for bilingual
   // 1 for token level multilingual,
   // 2 for sentence level multilingual

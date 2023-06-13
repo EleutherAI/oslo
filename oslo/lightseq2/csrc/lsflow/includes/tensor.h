@@ -3,24 +3,23 @@
 */
 
 #pragma once
+#include "context.h"
 #include "declaration.h"
 #include "manager.h"
-#include "context.h"
 #include "shape.h"
 
 namespace lightseq {
 
 // Convert C++ basic data types to custom data types.
-template <typename T>
-cuda::DataType g_dtype();
+template <typename T> cuda::DataType g_dtype();
 
 // return byte size of cuda::DataType.
 int dtype_size(cuda::DataType dtype);
 
 class Tensor {
- private:
+private:
   LSMemoryType _mtype;
-  char* _ptr = nullptr;
+  char *_ptr = nullptr;
   cuda::DataType _dtype;
 
   // If mx_shape is 0, then tensor's memory type is FixedMemory or OffsetMemory.
@@ -30,13 +29,13 @@ class Tensor {
   int _id = -1;
   std::string _name;
   MemoryManagerPtr _mm_ptr = nullptr;
-  Context* _ctx_ptr;
+  Context *_ctx_ptr;
 
   static int global_tensor_id;
   TensorPtr _original_tensor;
   size_t _offset = 0;
 
- public:
+public:
   // Applies to tensors using FixedMemory and SharedMemory memory types.
   // When the mx_shape parameter is empty, it means that the tensor uses the
   // FixedMemory memory type, and then manually set the specific pointer address
@@ -54,8 +53,8 @@ class Tensor {
   // Set the specific memory space address and max tensor shape for the tensor
   // object. After setting, the memory space type of the tensor object is
   // changed to FixedMemroy.
-  void set_tensor(char* inp);
-  void set_tensor(const char* inp);
+  void set_tensor(char *inp);
+  void set_tensor(const char *inp);
 
   // Just only set tensor shape for tensor object.
   void set_shape(Shape shape);
@@ -75,18 +74,17 @@ class Tensor {
   //
   // After the context is constructed, this method will return the real pointer
   // address.
-  char* tensor(bool is_open_interval = false);
+  char *tensor(bool is_open_interval = false);
 
-  template <typename T>
-  T* tensor(bool is_open_interval = false) {
-    return (T*)tensor(is_open_interval);
+  template <typename T> T *tensor(bool is_open_interval = false) {
+    return (T *)tensor(is_open_interval);
   }
 
   size_t dim_t() { return _shape.view().size(); }
   int element_size() { return _shape.element_size(); }
-  const size_t& mx_shape_size() const { return _mx_shape_size; }
-  const std::vector<size_t>& shape() const { return _shape.view(); }
-  const cuda::DataType& dtype() const { return _dtype; }
+  const size_t &mx_shape_size() const { return _mx_shape_size; }
+  const std::vector<size_t> &shape() const { return _shape.view(); }
+  const cuda::DataType &dtype() const { return _dtype; }
 
   // unique id of the tensor.
   int unique_id() { return _id; }
@@ -114,4 +112,4 @@ class Tensor {
   friend class Variable;
 };
 
-}  // namespace lightseq
+} // namespace lightseq

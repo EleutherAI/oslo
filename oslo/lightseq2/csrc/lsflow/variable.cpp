@@ -4,23 +4,18 @@ namespace lightseq {
 
 Variable::Variable(std::string name, cuda::DataType fw_dtype,
                    cuda::DataType bw_dtype)
-    : Node(name, NodeType::Variable),
-      _mx_shape_size(0),
-      _fw_dtype(fw_dtype),
-      _bw_dtype(bw_dtype),
-      _variable_type(VariableType::FixedVariable) {
+    : Node(name, NodeType::Variable), _mx_shape_size(0), _fw_dtype(fw_dtype),
+      _bw_dtype(bw_dtype), _variable_type(VariableType::FixedVariable) {
   _value.reset(new Tensor("value", fw_dtype));
-  if (_context_ptr->is_training()) _grad.reset(new Tensor("grad", bw_dtype));
+  if (_context_ptr->is_training())
+    _grad.reset(new Tensor("grad", bw_dtype));
 }
 
 Variable::Variable(std::string name, size_t mx_shape_size,
                    cuda::DataType fw_dtype, cuda::DataType bw_dtype,
                    VariableType vt)
-    : Node(name, NodeType::Variable),
-      _mx_shape_size(mx_shape_size),
-      _fw_dtype(fw_dtype),
-      _bw_dtype(bw_dtype),
-      _variable_type(vt) {
+    : Node(name, NodeType::Variable), _mx_shape_size(mx_shape_size),
+      _fw_dtype(fw_dtype), _bw_dtype(bw_dtype), _variable_type(vt) {
   _value.reset(new Tensor("value", _fw_dtype, _mx_shape_size));
   if (_context_ptr->is_training() && bw_dtype != cuda::DataType::kNotSupported)
     _grad.reset(new Tensor("grad", _bw_dtype, _mx_shape_size));
@@ -36,12 +31,10 @@ Variable::Variable(std::string name, size_t mx_shape_size,
   }
 }
 
-Variable::Variable(std::string name, Variable* parent_variable)
-    : Node(name, NodeType::Variable),
-      _mx_shape_size(0),
+Variable::Variable(std::string name, Variable *parent_variable)
+    : Node(name, NodeType::Variable), _mx_shape_size(0),
       _fw_dtype(parent_variable->fw_dtype()),
-      _bw_dtype(parent_variable->bw_dtype()),
-      _parent_variable(parent_variable),
+      _bw_dtype(parent_variable->bw_dtype()), _parent_variable(parent_variable),
       _variable_type(VariableType::OffsetVariable) {
   _value.reset(new Tensor("value", parent_variable->_value));
   if (_context_ptr->is_training()) {
@@ -71,7 +64,7 @@ void Variable::fixed_memory() {
   return;
 }
 
-void Variable::swap_tensor(Variable* var_a, Variable* var_b) {
+void Variable::swap_tensor(Variable *var_a, Variable *var_b) {
   Tensor temp = *(var_a->_value.get());
   *(var_a->_value.get()) = *(var_b->_value.get());
   *(var_b->_value.get()) = temp;
@@ -82,17 +75,17 @@ void Variable::swap_tensor(Variable* var_a, Variable* var_b) {
   }
 }
 
-void Variable::set_value(char* value_ptr) {
+void Variable::set_value(char *value_ptr) {
   _value->reset_fixed();
   _value->set_tensor(value_ptr);
 }
 
-void Variable::set_value(const char* value_ptr) {
+void Variable::set_value(const char *value_ptr) {
   _value->reset_fixed();
   _value->set_tensor(value_ptr);
 }
 
-void Variable::set_grad(char* grad_ptr) {
+void Variable::set_grad(char *grad_ptr) {
   if (_context_ptr->is_training()) {
     _grad->reset_fixed();
     _grad->set_tensor(grad_ptr);
@@ -102,7 +95,8 @@ void Variable::set_grad(char* grad_ptr) {
 void Variable::set_shape(Shape shape) {
   _shape = shape;
   _value->set_shape(shape);
-  if (_grad != nullptr) _grad->set_shape(shape);
+  if (_grad != nullptr)
+    _grad->set_shape(shape);
 }
 
 void Variable::malloc_memory(size_t size) {
@@ -110,29 +104,28 @@ void Variable::malloc_memory(size_t size) {
   size_t grad_byte_size =
       _context_ptr->is_training() ? size * dtype_size(_bw_dtype) : 0;
 #ifdef MEM_DEBUG
-  printf(
-      "Varaible %s malloc memory, value size: %zu "
-      "MB, grad size: %zu MB\n",
-      name().c_str(), value_byte_size / MB_SIZE, grad_byte_size / MB_SIZE);
+  printf("Variable %s malloc memory, value size: %zu "
+         "MB, grad size: %zu MB\n",
+         name().c_str(), value_byte_size / MB_SIZE, grad_byte_size / MB_SIZE);
 #endif
   _variable_type = VariableType::FixedVariable;
 
-  char* value_ptr = _context_ptr->allocator()->malloc_mem(value_byte_size);
+  char *value_ptr = _context_ptr->allocator()->malloc_mem(value_byte_size);
 
   _value->remove_life_cycle();
   _value->set_tensor(value_ptr);
   if (_context_ptr->is_training() && grad_byte_size) {
-    char* grad_ptr = _context_ptr->allocator()->malloc_mem(grad_byte_size);
+    char *grad_ptr = _context_ptr->allocator()->malloc_mem(grad_byte_size);
     _grad->remove_life_cycle();
     _grad->set_tensor(grad_ptr);
   }
 }
 
-char* Variable::value(bool is_open_interval) {
+char *Variable::value(bool is_open_interval) {
   return _value->tensor(is_open_interval);
 }
 
-char* Variable::grad(bool is_open_interval) {
+char *Variable::grad(bool is_open_interval) {
   return _grad->tensor(is_open_interval);
 }
 
@@ -156,7 +149,7 @@ bool Variable::enable_override_grad() {
   }
 }
 
-void Variable::add_descendants(Variable* var) {
+void Variable::add_descendants(Variable *var) {
   _children_variable.insert(var);
 }
 
@@ -201,4 +194,4 @@ void Variable::print_var(bool is_fw, int size) {
 }
 #endif
 
-}  // namespace lightseq
+} // namespace lightseq

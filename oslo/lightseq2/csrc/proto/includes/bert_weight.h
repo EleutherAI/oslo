@@ -8,9 +8,8 @@ namespace lightseq {
 /*
 Load the model weights which stored in custom proto file into GPU memory.
 */
-template <typename T>
-class BertWeight {
- private:
+template <typename T> class BertWeight {
+private:
   T float2required(float value);
   void proto_get_model_config(const Bert &bert);
   std::string proto_parse_emb_wei(const BertEmbeddingLayer &layer);
@@ -20,8 +19,8 @@ class BertWeight {
   void hdf5_parse_emb_wei(hid_t hdf5_file);
   void hdf5_parse_enc_wei(hid_t hdf5_file);
   // store the weights pointer
-  std::vector<const T *> _p_d_src_emb_wei;  // size: 4
-  std::vector<const T *> _p_d_enc_wei;      // size: 12 * enc_layer_num
+  std::vector<const T *> _p_d_src_emb_wei; // size: 4
+  std::vector<const T *> _p_d_enc_wei;     // size: 12 * enc_layer_num
 
 #ifdef LIGHTSEQ_cuda
   // store the weights on gpu memory
@@ -29,7 +28,7 @@ class BertWeight {
   thrust::device_vector<T> _d_enc_wei;
 #endif
 
- public:
+public:
   std::string initializing(std::string proto_path);
 
   const std::vector<const T *> &get_src_emb_wei() const {
@@ -50,12 +49,12 @@ class BertWeight {
   int _inner_size;
   int _max_step;
   int _src_vocab_size;
-  int _n_enc_layer;  // number of encoder layer
+  int _n_enc_layer; // number of encoder layer
   int _dim_per_head;
-  int _weight_per_enc_layer;  // 12
+  int _weight_per_enc_layer; // 12
 
   int _head_num;
-  int _padding_id;  // for src
+  int _padding_id; // for src
   bool _is_post_ln;
   bool _use_gelu;
   int _multilg_type;
@@ -77,4 +76,4 @@ class BertWeight {
   }
 };
 
-}  // namespace lightseq
+} // namespace lightseq

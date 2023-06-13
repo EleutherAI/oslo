@@ -3,7 +3,7 @@
 namespace lightseq {
 
 template <typename T1, typename T2>
-Variable* DropoutOp<T1, T2>::operator()(Variable* inp) {
+Variable *DropoutOp<T1, T2>::operator()(Variable *inp) {
   _result =
       new Variable("DropoutOp_out", _max_ele_num, g_dtype<T1>(), g_dtype<T2>());
   set_parents({inp});
@@ -11,11 +11,10 @@ Variable* DropoutOp<T1, T2>::operator()(Variable* inp) {
   return _result;
 }
 
-template <typename T1, typename T2>
-void DropoutOp<T1, T2>::forward() {
-  T1* input = parent(0)->value<T1>();
-  T1* output = child(0)->value<T1>();
-  uint8_t* mask_ptr = _mask->tensor<uint8_t>();
+template <typename T1, typename T2> void DropoutOp<T1, T2>::forward() {
+  T1 *input = parent(0)->value<T1>();
+  T1 *output = child(0)->value<T1>();
+  uint8_t *mask_ptr = _mask->tensor<uint8_t>();
 
   if (!_context_ptr->is_built()) {
     return;
@@ -30,11 +29,10 @@ void DropoutOp<T1, T2>::forward() {
 #endif
 }
 
-template <typename T1, typename T2>
-void DropoutOp<T1, T2>::backward() {
-  T2* input_grad = (T2*)parent(0)->grad();
-  T2* output_grad = (T2*)child(0)->grad();
-  uint8_t* mask_ptr = (uint8_t*)_mask->tensor();
+template <typename T1, typename T2> void DropoutOp<T1, T2>::backward() {
+  T2 *input_grad = (T2 *)parent(0)->grad();
+  T2 *output_grad = (T2 *)child(0)->grad();
+  uint8_t *mask_ptr = (uint8_t *)_mask->tensor();
 
   if (!_context_ptr->is_built()) {
     return;
@@ -55,4 +53,4 @@ template class DropoutOp<float, float>;
 #ifdef LIGHTSEQ_cuda
 template class DropoutOp<__half, __half>;
 #endif
-}  // namespace lightseq
+} // namespace lightseq

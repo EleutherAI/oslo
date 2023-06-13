@@ -1,6 +1,6 @@
-#include "kernels.h"
-#include "common.h"
 #include "block_reduce.h"
+#include "common.h"
+#include "kernels.h"
 
 #include <cooperative_groups.h>
 
@@ -9,8 +9,8 @@ namespace lightseq {
 namespace cuda {
 static const int invalid_tag = -1;
 
-__device__ void warp_reduce_max(cg::thread_block_tile<WARP_SIZE> g, float* val,
-                                int* index) {
+__device__ void warp_reduce_max(cg::thread_block_tile<WARP_SIZE> g, float *val,
+                                int *index) {
   float cur_max_v = *val;
   int cur_max_idx = *index;
   for (int i = 1; i < WARP_SIZE; i <<= 1) {
@@ -20,7 +20,7 @@ __device__ void warp_reduce_max(cg::thread_block_tile<WARP_SIZE> g, float* val,
       cur_max_v = v;
       cur_max_idx = idx;
     }
-  }  // note: only thread 0 will return result
+  } // note: only thread 0 will return result
   *val = cur_max_v;
   *index = cur_max_idx;
 }
@@ -51,17 +51,17 @@ history: [batch_size, seq_len, num_tags]:
 best_tag: [batch_size, seq_len]
 */
 template <typename T>
-__global__ void ker_viterbi(const T* start_transition, const T* end_transition,
-                            const T* transition, const T* emission,
-                            const T* mask, const T* bias, float* best_score,
-                            int* history, int* best_tags, int num_tags,
+__global__ void ker_viterbi(const T *start_transition, const T *end_transition,
+                            const T *transition, const T *emission,
+                            const T *mask, const T *bias, float *best_score,
+                            int *history, int *best_tags, int num_tags,
                             int seq_len) {
   cg::thread_block b = cg::this_thread_block();
   cg::thread_block_tile<WARP_SIZE> g = cg::tiled_partition<WARP_SIZE>(b);
 
   extern __shared__ float smen[];
-  float* s_score = smen;
-  float* s_next_score = smen + num_tags;
+  float *s_score = smen;
+  float *s_next_score = smen + num_tags;
 
   // step 1. compute first step's score
   if (threadIdx.y == 0) {
@@ -84,7 +84,7 @@ __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
     for (int cur_tag = threadIdx.y; cur_tag < num_tags; cur_tag += blockDim.y) {
       float max_score = REDUCE_FLOAT_INF_NEG;
       int idx = 0;
-      const T* cur_transition = transition + cur_tag * num_tags;
+      const T *cur_transition = transition + cur_tag * num_tags;
       for (int pre_tag = threadIdx.x; pre_tag < num_tags;
            pre_tag += blockDim.x) {
         float s = (float)s_score[pre_tag] + (float)cur_transition[pre_tag];
@@ -92,7 +92,7 @@ __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
           max_score = s;
           idx = pre_tag;
         }
-      }  // col
+      } // col
       g.sync();
       warp_reduce_max(g, &max_score, &idx);
       if (threadIdx.x == 0) {
@@ -105,12 +105,12 @@ __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
         history[flat_3dim(blockIdx.x, seq_idx - 1, cur_tag, seq_len,
                           num_tags)] = idx;
       }
-    }  // row
-    float* tmp = s_next_score;
+    } // row
+    float *tmp = s_next_score;
     s_next_score = s_score;
     s_score = tmp;
     b.sync();
-  }  // seq_len
+  } // seq_len
 
   // step 3. compute last tag
   if (threadIdx.y != 0) {
@@ -133,7 +133,7 @@ __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
     return;
   }
   if (best_score) {
-    best_score[blockIdx.x] = max_score;  // for debug
+    best_score[blockIdx.x] = max_score; // for debug
   }
   seq_idx--;
   best_tags[flat_2dim(blockIdx.x, seq_idx, seq_len)] = last_tag;
@@ -147,19 +147,18 @@ __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
 }
 
 template <>
-__global__ void ker_viterbi<__half>(const __half* start_transition,
-                                    const __half* end_transition,
-                                    const __half* transition,
-                                    const __half* emission, const __half* mask,
-                                    const __half* bias, float* best_score,
-                                    int* history, int* best_tags, int num_tags,
-                                    int seq_len) {
+__global__ void
+ker_viterbi<__half>(const __half *start_transition,
+                    const __half *end_transition, const __half *transition,
+                    const __half *emission, const __half *mask,
+                    const __half *bias, float *best_score, int *history,
+                    int *best_tags, int num_tags, int seq_len) {
   cg::thread_block b = cg::this_thread_block();
   cg::thread_block_tile<WARP_SIZE> g = cg::tiled_partition<WARP_SIZE>(b);
 
   extern __shared__ float smen[];
-  float* s_score = smen;
-  float* s_next_score = smen + num_tags;
+  float *s_score = smen;
+  float *s_next_score = smen + num_tags;
 
   // step 1. compute first step's score
   if (threadIdx.y == 0) {
@@ -183,7 +182,7 @@ __global__ void ker_viterbi<__half>(const __half* start_transition,
     for (int cur_tag = threadIdx.y; cur_tag < num_tags; cur_tag += blockDim.y) {
       float max_score = REDUCE_FLOAT_INF_NEG;
       int idx = 0;
-      const __half* cur_transition = transition + cur_tag * num_tags;
+      const __half *cur_transition = transition + cur_tag * num_tags;
       for (int pre_tag = threadIdx.x; pre_tag < num_tags;
            pre_tag += blockDim.x) {
         float s = (float)s_score[pre_tag] + (float)cur_transition[pre_tag];
@@ -191,7 +190,7 @@ __global__ void ker_viterbi<__half>(const __half* start_transition,
           max_score = s;
           idx = pre_tag;
         }
-      }  // col
+      } // col
       g.sync();
       warp_reduce_max(g, &max_score, &idx);
       if (threadIdx.x == 0) {
@@ -204,12 +203,12 @@ __global__ void ker_viterbi<__half>(const __half* start_transition,
         history[flat_3dim(blockIdx.x, seq_idx - 1, cur_tag, seq_len,
                           num_tags)] = idx;
       }
-    }  // row
-    float* tmp = s_next_score;
+    } // row
+    float *tmp = s_next_score;
     s_next_score = s_score;
     s_score = tmp;
     b.sync();
-  }  // seq_len
+  } // seq_len
 
   // step 3. compute last tag
   if (threadIdx.y != 0) {
@@ -232,7 +231,7 @@ __global__ void ker_viterbi<__half>(const __half* start_transition,
     return;
   }
   if (best_score) {
-    best_score[blockIdx.x] = max_score;  // for debug
+    best_score[blockIdx.x] = max_score; // for debug
   }
   seq_idx--;
   best_tags[flat_2dim(blockIdx.x, seq_idx, seq_len)] = last_tag;
@@ -246,13 +245,13 @@ __global__ void ker_viterbi<__half>(const __half* start_transition,
 }
 
 template <>
-void launch_viterbi<__half>(const __half* start_transition,
-                            const __half* end_transition,
-                            const __half* transition, const __half* emission,
-                            const __half* mask, float* best_score, int* history,
-                            int* best_tags, int num_tags, int seq_len,
+void launch_viterbi<__half>(const __half *start_transition,
+                            const __half *end_transition,
+                            const __half *transition, const __half *emission,
+                            const __half *mask, float *best_score, int *history,
+                            int *best_tags, int num_tags, int seq_len,
                             int batch_size, cudaStream_t stream,
-                            const __half* bias) {
+                            const __half *bias) {
   dim3 grid_dim(batch_size);
   dim3 block_dim(WARP_SIZE, WARP_SIZE);
 
@@ -263,12 +262,12 @@ void launch_viterbi<__half>(const __half* start_transition,
 }
 
 template <>
-void launch_viterbi<float>(const float* start_transition,
-                           const float* end_transition, const float* transition,
-                           const float* emission, const float* mask,
-                           float* best_score, int* history, int* best_tags,
+void launch_viterbi<float>(const float *start_transition,
+                           const float *end_transition, const float *transition,
+                           const float *emission, const float *mask,
+                           float *best_score, int *history, int *best_tags,
                            int num_tags, int seq_len, int batch_size,
-                           cudaStream_t stream, const float* bias) {
+                           cudaStream_t stream, const float *bias) {
   dim3 grid_dim(batch_size);
   dim3 block_dim(WARP_SIZE, WARP_SIZE);
 
@@ -278,5 +277,5 @@ void launch_viterbi<float>(const float* start_transition,
           best_score, history, best_tags, num_tags, seq_len);
 }
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

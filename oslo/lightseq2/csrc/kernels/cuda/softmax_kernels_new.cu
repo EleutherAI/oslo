@@ -4,8 +4,8 @@
 #include <cub/cub.cuh>
 
 #include "block_reduce.h"
-#include "kernels.h"
 #include "cuda_util.h"
+#include "kernels.h"
 
 #include <cooperative_groups.h>
 
@@ -29,7 +29,7 @@ inp: [batch_size, nhead, from_len, to_len], softmax input.
 attn_mask: [batch_size, to_len], padding tokens are -inf,
   non padding tokens are 0.
   attn_mask!=nullptr for enc-self-attn and enc-dec-attn
-  attn_mask=nullptr and mask_future=ture for dec-self-attn training
+  attn_mask=nullptr and mask_future=true for dec-self-attn training
   attn_mask=nullptr and mask_future=false for dec-self-attn infer
 */
 template <typename T, int block_dim, int ele_per_thread>
@@ -125,7 +125,7 @@ __global__ void ker_attn_softmax(T *out, T *inp, const T *attn_mask,
       BlockStore(ts_store).Store(out + (token_id + i) * to_len, inp_val[i],
                                  to_len);
     }
-  }  // blockIdx.x
+  } // blockIdx.x
 }
 
 template <typename T, int block_dim, int ele_per_thread>
@@ -206,12 +206,12 @@ __global__ void ker_attn_softmax_lt32(T *out, T *inp, const T *attn_mask,
       BlockStore(ts_store).Store(out + (token_id + i) * to_len, inp_val[i],
                                  to_len);
     }
-  }  // blockIdx.x
+  } // blockIdx.x
 }
 
 /*
   attn_mask!=nullptr for enc-self-attn and enc-dec-attn
-  attn_mask=nullptr and mask_future=ture for dec-self-attn training
+  attn_mask=nullptr and mask_future=true for dec-self-attn training
   attn_mask=nullptr and mask_future=false for dec-self-attn infer
 */
 template <>
@@ -324,7 +324,8 @@ __global__ void ker_attn_softmax_bw(T *inp_grad, const T *out_grad,
   cg::thread_block b = cg::this_thread_block();
   cg::thread_block_tile<WARP_SIZE> g = cg::tiled_partition<WARP_SIZE>(b);
 
-  for (int i = 1; i < WARP_SIZE; i <<= 1) sum += g.shfl_xor(sum, i);
+  for (int i = 1; i < WARP_SIZE; i <<= 1)
+    sum += g.shfl_xor(sum, i);
 
 #pragma unroll
   for (int i = 0; i < ITERATIONS; ++i) {
@@ -342,7 +343,8 @@ void launch_attn_softmax_bw_new(T *inp_grad, const T *out_grad,
   const int warps_per_block = 4;
   // rows = batch_size * nhead * from_len
   int ngrid = rows / warps_per_block;
-  if (ngrid == 0) ngrid = 1;
+  if (ngrid == 0)
+    ngrid = 1;
   dim3 grid_dim(ngrid);
   dim3 block_dim(WARP_SIZE, warps_per_block);
 
@@ -390,5 +392,5 @@ template void launch_attn_softmax_bw_new<float>(float *inp_grad,
                                                 const float *soft_inp, int rows,
                                                 int softmax_len,
                                                 cudaStream_t stream);
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

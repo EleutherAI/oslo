@@ -16,4 +16,4 @@ void print_time_duration(
 cublasOperation_t op_from_custom(MATRIX_OP op_type);
 #endif
 
-}  // namespace lightseq
+} // namespace lightseq

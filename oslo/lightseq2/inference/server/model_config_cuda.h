@@ -25,8 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <stdint.h>
 #include "model_config.pb.h"
+#include <stdint.h>
 
 namespace nvidia {
 namespace inferenceserver {
@@ -36,5 +36,5 @@ namespace inferenceserver {
 /// \param cuda_stream_priority Returns the CUDA stream priority.
 /// \return The error status.
 int GetCudaStreamPriority(ModelOptimizationPolicy::ModelPriority priority);
-}  // namespace inferenceserver
-}  // namespace nvidia
+} // namespace inferenceserver
+} // namespace nvidia

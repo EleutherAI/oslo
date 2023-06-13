@@ -1,12 +1,12 @@
 #pragma once
 
+#include <cublasLt.h>
 #include <cublas_v2.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
-#include <cublasLt.h>
 
 #include <algorithm>
 #include <chrono>
@@ -21,9 +21,8 @@
 namespace lightseq {
 namespace cuda {
 
-template <OperationType OpType_>
-class QuantGptEncoder {
- private:
+template <OperationType OpType_> class QuantGptEncoder {
+private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   const cudaDataType_t _computeType = _optraits::computeType;
@@ -73,11 +72,11 @@ class QuantGptEncoder {
   _DataType *_p_d_ffn_buf1;
   _DataType *_p_d_ffn_buf2;
   _DataType *_p_d_logit;
-  int *_p_d_real_seq_len;   // [batch_size]
-  int *_p_d_sample_id_buf;  // [batch_size, max_step]
+  int *_p_d_real_seq_len;  // [batch_size]
+  int *_p_d_sample_id_buf; // [batch_size, max_step]
   int *_p_d_last_sample_id;
   int *_p_d_unfinished;
-  curandState *_p_d_curandstate;  //[batch_size]
+  curandState *_p_d_curandstate; //[batch_size]
 
   int8_t *_int8_ffn_in_buf;
   int32_t *_int32_ffn_out_buf;
@@ -107,7 +106,7 @@ class QuantGptEncoder {
   const float _src_emb_clip_max;
   const float _output_ln_clip_max;
   const float _logits_clip_max;
-  const std::vector<float> _enc_clip_max;  // size: 12 * enc_layer_num
+  const std::vector<float> _enc_clip_max; // size: 12 * enc_layer_num
   std::vector<_DataType *> _scaled_ffn2_colsum;
 
   int _batch_size;
@@ -119,10 +118,10 @@ class QuantGptEncoder {
 
   const std::set<std::string> kSamplingMethods = {"topk", "topp", "ppl"};
 
- public:
+public:
   int _batch_seq_len;
-  const int *_p_d_token_id;  // input token id, [batch_size, batch_seq_len]
-  float *_p_d_ppl;           // ppl for every seq, [batch_size]
+  const int *_p_d_token_id; // input token id, [batch_size, batch_seq_len]
+  float *_p_d_ppl;          // ppl for every seq, [batch_size]
   int *_p_d_sample_id;
 
   QuantGptEncoder(int max_batch_size, const int *p_d_token_id, float *p_d_ppl,
@@ -137,5 +136,5 @@ class QuantGptEncoder {
   void benchmark_mode(bool is_benchmark);
 };
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

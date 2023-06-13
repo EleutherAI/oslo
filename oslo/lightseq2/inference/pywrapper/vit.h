@@ -1,8 +1,8 @@
 
-#include "model_base.h"
 #include "../model/vit_encoder.h"
 #include "../proto/vit_weight.h"
 #include "../tools/util.h"
+#include "model_base.h"
 
 #ifdef FP16_MODE
 const lightseq::cuda::OperationType vit_optype =
@@ -15,7 +15,7 @@ const lightseq::cuda::OperationType vit_optype =
 namespace lightseq {
 namespace cuda {
 class Vit : public LSModel {
- private:
+private:
   typedef OperationTypeTraits<vit_optype> optraits;
   std::shared_ptr<VitEncoder<vit_optype>> encoder_;
 
@@ -28,7 +28,7 @@ class Vit : public LSModel {
   void *d_buf_;
   VitWeight<vit_optype> tw_;
 
- public:
+public:
   Vit(const std::string weight_path, const int max_batch_size);
 
   ~Vit();
@@ -46,5 +46,5 @@ class Vit : public LSModel {
 
 LSMODEL_REGISTER(Vit);
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

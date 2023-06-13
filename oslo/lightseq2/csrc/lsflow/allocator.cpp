@@ -16,14 +16,14 @@ Allocator::~Allocator() {
   _ptr_set.clear();
 }
 
-char* Allocator::malloc_mem(size_t size) {
-  char* ptr = nullptr;
+char *Allocator::malloc_mem(size_t size) {
+  char *ptr = nullptr;
 
   try {
 #ifdef LIGHTSEQ_cuda
     ptr = cuda::cuda_malloc<char>(size);
 #else
-    ptr = (char*)malloc(size);
+    ptr = (char *)malloc(size);
 #endif
   } catch (...) {
     std::string error_message =
@@ -40,7 +40,7 @@ char* Allocator::malloc_mem(size_t size) {
   return ptr;
 }
 
-void Allocator::free_mem(char* ptr) {
+void Allocator::free_mem(char *ptr) {
   if (_ptr_set.find(ptr) == _ptr_set.end() || ptr == nullptr) {
     return;
   }
@@ -52,4 +52,4 @@ void Allocator::free_mem(char* ptr) {
 #endif
 }
 
-}  // namespace lightseq
+} // namespace lightseq

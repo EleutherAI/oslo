@@ -12,13 +12,11 @@ typedef torch::Tensor ts;
 
 namespace lightseq {
 namespace cuda {
-template <typename T>
-const T *rptr(const torch::Tensor &tensor) {
+template <typename T> const T *rptr(const torch::Tensor &tensor) {
   return reinterpret_cast<const T *>(tensor.data_ptr());
 }
 
-template <typename T>
-T *rptr(torch::Tensor &tensor) {
+template <typename T> T *rptr(torch::Tensor &tensor) {
   return reinterpret_cast<T *>(tensor.data_ptr());
 }
 
@@ -117,15 +115,16 @@ template <typename T>
 void torch_launch_attn_softmax_new(torch::Tensor &out, torch::Tensor &inp,
                                    const torch::Tensor &attn_mask,
                                    int batch_size, int nhead, int from_len,
-                                   int to_len, int kv_size, bool is_dec_self_attn,
-                                   bool mask_future) {
+                                   int to_len, int kv_size,
+                                   bool is_dec_self_attn, bool mask_future) {
   const T *attn_mask_ptr = rptr<T>(attn_mask);
   if (is_dec_self_attn) {
     attn_mask_ptr = nullptr;
   }
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   launch_attn_softmax_new(rptr<T>(out), rptr<T>(inp), attn_mask_ptr, batch_size,
-                          nhead, from_len, to_len, kv_size, mask_future, stream);
+                          nhead, from_len, to_len, kv_size, mask_future,
+                          stream);
   //     cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
@@ -420,8 +419,8 @@ void torch_launch_viterbi(const torch::Tensor &start_transition,
   cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_transform_0213_fp32",

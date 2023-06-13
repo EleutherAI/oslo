@@ -38,7 +38,7 @@ def reduce_amax(input, axis=None, keepdims=True):
         axis: The dimensions to reduce. None or int or tuple of ints. If None (the default),
             reduces all dimensions. Must be in the range [-rank(input_tensor), rank(input_tensor)).
         keepdims: A boolean. If true, retains reduced dimensions with length 1. Default True
-        granularity: DEPRECTED. specifies if the statistic has to be calculated at tensor or channel granularity
+        granularity: DEPRECATED. specifies if the statistic has to be calculated at tensor or channel granularity
 
     Returns:
         The reduced tensor.

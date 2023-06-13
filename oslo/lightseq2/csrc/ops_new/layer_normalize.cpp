@@ -6,8 +6,8 @@ template <typename T1, typename T2>
 LayerNormalizeOp<T1, T2>::~LayerNormalizeOp() {}
 
 template <typename T1, typename T2>
-Variable* LayerNormalizeOp<T1, T2>::operator()(Variable* inp, Variable* gamma,
-                                               Variable* betta) {
+Variable *LayerNormalizeOp<T1, T2>::operator()(Variable *inp, Variable *gamma,
+                                               Variable *betta) {
   size_t max_size = _max_batch_tokens * _hidden_dim;
   _result =
       new Variable("LayerNormalizeOp_out", _max_batch_tokens * _hidden_dim,
@@ -24,14 +24,13 @@ void LayerNormalizeOp<T1, T2>::before_forward(size_t batch_size,
   _result->set_shape({batch_size, seq_len, _hidden_dim});
 }
 
-template <typename T1, typename T2>
-void LayerNormalizeOp<T1, T2>::forward() {
-  T1* inp_val = (T1*)parent(0)->value();
-  T1* gamma_val = (T1*)parent(1)->value();
-  T1* betta_val = (T1*)parent(2)->value();
-  T1* vars_val = (T1*)vars_->tensor();
-  T1* ln_res_val = (T1*)child(0)->value();
-  T1* means_val = _use_mean ? (T1*)means_->tensor() : nullptr;
+template <typename T1, typename T2> void LayerNormalizeOp<T1, T2>::forward() {
+  T1 *inp_val = (T1 *)parent(0)->value();
+  T1 *gamma_val = (T1 *)parent(1)->value();
+  T1 *betta_val = (T1 *)parent(2)->value();
+  T1 *vars_val = (T1 *)vars_->tensor();
+  T1 *ln_res_val = (T1 *)child(0)->value();
+  T1 *means_val = _use_mean ? (T1 *)means_->tensor() : nullptr;
 
   if (!_context_ptr->is_built()) {
     return;
@@ -44,20 +43,19 @@ void LayerNormalizeOp<T1, T2>::forward() {
 #endif
 }
 
-template <typename T1, typename T2>
-void LayerNormalizeOp<T1, T2>::backward() {
-  T2* gamma_grad = (T2*)parent(1)->grad();
-  T2* betta_grad = (T2*)parent(2)->grad();
-  T2* inp_grad = (T2*)parent(0)->grad();
-  T2* out_grad = (T2*)child(0)->grad();
-  T2* residual_grad = nullptr;
+template <typename T1, typename T2> void LayerNormalizeOp<T1, T2>::backward() {
+  T2 *gamma_grad = (T2 *)parent(1)->grad();
+  T2 *betta_grad = (T2 *)parent(2)->grad();
+  T2 *inp_grad = (T2 *)parent(0)->grad();
+  T2 *out_grad = (T2 *)child(0)->grad();
+  T2 *residual_grad = nullptr;
 
-  T1* out_val = (T1*)child(0)->value();
-  T1* gamma_val = (T1*)parent(1)->value();
-  T1* betta_val = (T1*)parent(2)->value();
-  T1* vars_val = (T1*)vars_->tensor();
+  T1 *out_val = (T1 *)child(0)->value();
+  T1 *gamma_val = (T1 *)parent(1)->value();
+  T1 *betta_val = (T1 *)parent(2)->value();
+  T1 *vars_val = (T1 *)vars_->tensor();
 
-  T1* means_val = _use_mean ? (T1*)means_->tensor() : nullptr;
+  T1 *means_val = _use_mean ? (T1 *)means_->tensor() : nullptr;
 
   bool is_res_cover = parent(0)->is_cover();
   if (!is_res_cover) {
@@ -81,4 +79,4 @@ template class LayerNormalizeOp<float, float>;
 #ifdef LIGHTSEQ_cuda
 template class LayerNormalizeOp<__half, __half>;
 #endif
-}  // namespace lightseq
+} // namespace lightseq

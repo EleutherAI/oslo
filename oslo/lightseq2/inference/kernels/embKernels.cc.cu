@@ -114,11 +114,10 @@ __global__ void ker_enc_emb(const T *token_emb, const T *pos_emb,
 }
 
 template <>
-__global__ void ker_enc_emb<__half>(const __half *token_emb,
-                                    const __half *pos_emb, const int *tokens,
-                                    __half *output, int *pad_mask, int pad_id,
-                                    int batch_size, int seq_len,
-                                    int hidden_dim) {
+__global__ void
+ker_enc_emb<__half>(const __half *token_emb, const __half *pos_emb,
+                    const int *tokens, __half *output, int *pad_mask,
+                    int pad_id, int batch_size, int seq_len, int hidden_dim) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= batch_size * seq_len * hidden_dim) {
     return;
@@ -493,7 +492,7 @@ __global__ void ker_dec_emb(const T *token_emb, const T *pos_emb, int *tokens,
 
   T emb;
   if ((multilg_type == 2 || multilg_type == 3) && step == 0) {
-    // the bos of sentense level multilg is target lang id
+    // the bos of sentence level multilg is target lang id
     int lid = lang_id[batch_idx];
     emb = lang_emb[flat_2dim(lid, dim_idx, hidden_dim)];
     tokens[flat_3dim(batch_idx, beam_idx, 0, beam_size, max_step)] = lid;
@@ -617,11 +616,12 @@ void launch_patch_emb(const T *conv_weight, const T *conv_bias,
           image_size, channel_input);
 }
 
-template void launch_patch_emb<float>(
-    const float *conv_weight, const float *conv_bias, const float *pos_emb,
-    const float *cls_emb, const float *input, float *output, int patch_size,
-    int image_size, int batch_size, int max_step, int hidden_dim,
-    int channel_input, cudaStream_t stream);
+template void
+launch_patch_emb<float>(const float *conv_weight, const float *conv_bias,
+                        const float *pos_emb, const float *cls_emb,
+                        const float *input, float *output, int patch_size,
+                        int image_size, int batch_size, int max_step,
+                        int hidden_dim, int channel_input, cudaStream_t stream);
 
 template void launch_patch_emb<__half>(
     const __half *conv_weight, const __half *conv_bias, const __half *pos_emb,
@@ -629,5 +629,5 @@ template void launch_patch_emb<__half>(
     int image_size, int batch_size, int max_step, int hidden_dim,
     int channel_input, cudaStream_t stream);
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

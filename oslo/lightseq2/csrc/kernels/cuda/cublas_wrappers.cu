@@ -90,5 +90,5 @@ int cublas_strided_batched_gemm(cublasHandle_t handle, int m, int n, int k,
 
   return 0;
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

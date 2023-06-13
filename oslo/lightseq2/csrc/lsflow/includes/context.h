@@ -3,15 +3,15 @@
 */
 #pragma once
 #include "cstdio"
-#include "queue"
 #include "deque"
+#include "queue"
 #include "stack"
 #include "unordered_map"
 
-#include "declaration.h"
-#include "manager.h"
-#include "layer.h"
 #include "allocator.h"
+#include "declaration.h"
+#include "layer.h"
+#include "manager.h"
 
 namespace lightseq {
 
@@ -34,16 +34,16 @@ namespace lightseq {
   allocation of the entire model.
 */
 class Context {
- private:
+private:
   // just for pybind interface.
   static std::unordered_map<std::string, std::shared_ptr<void>> pybind_layers;
-  std::unordered_map<std::string, void*> _resources_pool;
+  std::unordered_map<std::string, void *> _resources_pool;
 
-  std::vector<Node*> _all_node_vec{};
-  std::vector<Operator*> _model_ops{};
-  std::vector<Layer*> _root_layers{};
-  std::vector<Layer*> _all_layers{};
-  std::deque<Layer*> _layer_context;
+  std::vector<Node *> _all_node_vec{};
+  std::vector<Operator *> _model_ops{};
+  std::vector<Layer *> _root_layers{};
+  std::vector<Layer *> _all_layers{};
+  std::deque<Layer *> _layer_context;
   StatusType _status_type;
 
   bool _built = false;
@@ -65,7 +65,7 @@ class Context {
   int _regress_end_idx = -1;
   bool _in_regress = false;
 
- public:
+public:
   Context(StatusType status_type = StatusType::Inference, int device_id = 0);
   virtual ~Context();
 
@@ -76,8 +76,9 @@ class Context {
   void convert_into_eval();
 
   // Create a process-level global object
-  static int create_global_context(
-      StatusType status_type = StatusType::Inference, int device_id = -1);
+  static int
+  create_global_context(StatusType status_type = StatusType::Inference,
+                        int device_id = -1);
   static std::shared_ptr<Context> global_instance();
   static void set_global_context(int context_id);
   static bool global_is_inference() {
@@ -89,7 +90,7 @@ class Context {
   // some steps to test.
   size_t mx_tensor_size = 0;
   std::string mx_tensor_name = "";
-  char* temporary_buffer_ = nullptr;
+  char *temporary_buffer_ = nullptr;
 
   std::map<std::string, int> layer_name_cnt;
   std::map<std::string, int> node_name_cnt;
@@ -97,16 +98,16 @@ class Context {
   // property field
   bool is_training() { return _status_type == StatusType::Training; }
   bool is_inference() { return _status_type == StatusType::Inference; }
-  const int& node_idx() const { return _node_idx; }
+  const int &node_idx() const { return _node_idx; }
   void update_node_idx();
-  const bool& is_built() const { return _built; }
-  const bool& is_building() const { return _building; }
+  const bool &is_built() const { return _built; }
+  const bool &is_building() const { return _building; }
   MemoryManagerPtr memory_manager_ptr() { return _mm_ptr; }
 
-  void add_op(Operator* op);
-  void add_node(Node* node);
+  void add_op(Operator *op);
+  void add_node(Node *node);
 
-  void enter_layer(Layer* cur_layer, bool is_initial = true);
+  void enter_layer(Layer *cur_layer, bool is_initial = true);
 
   // collaborate with enter_layer()
   void exit_layer() { _layer_context.pop_back(); }
@@ -115,8 +116,8 @@ class Context {
 
   void draw_all_context();
 
-  Layer* last_layer();
-  Node* last_node();
+  Layer *last_layer();
+  Node *last_node();
 
   // During the model network construction process, mark the start and end
   // positions of the autoregressive part.
@@ -136,11 +137,11 @@ class Context {
 
   // Register model-level global resources in the context object, which is
   // stored in _resources_pool as untyped.
-  void register_object(std::string object_name, void* object);
+  void register_object(std::string object_name, void *object);
 
   // Obtain the untyped object registered globally by the model from
   // _resources_pool, and then the user converts it to the required type
-  void* get_object(std::string object_name);
+  void *get_object(std::string object_name);
 
   // Synchronous processing of asynchronous operations, usually used for IO
   // processing or debug mode.
@@ -152,15 +153,15 @@ class Context {
                                                 int layer_id);
 
 #ifdef LIGHTSEQ_cuda
- private:
+private:
   cudaStream_t _stream;
   cublasHandle_t _cublasHandle;
 
- public:
-  const cudaStream_t& get_stream() const { return _stream; }
-  const cublasHandle_t& get_cublashandle() const { return _cublasHandle; }
+public:
+  const cudaStream_t &get_stream() const { return _stream; }
+  const cublasHandle_t &get_cublashandle() const { return _cublasHandle; }
   void set_stream(cudaStream_t stream);
 #endif
 };
 
-}  // namespace lightseq
+} // namespace lightseq

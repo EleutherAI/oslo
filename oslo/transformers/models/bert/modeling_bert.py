@@ -16,7 +16,9 @@ from oslo.torch.nn import (
     VocabParallelCrossEntropyLoss2p5D,
 )
 from oslo.transformers.modeling_utils import OsloModel
-from oslo.lightseq2.training.ops.pytorch.multihead_attention_layer import LSMultiheadAttentionLayer
+from oslo.lightseq2.training.ops.pytorch.multihead_attention_layer import (
+    LSMultiheadAttentionLayer,
+)
 
 try:
     from transformers.modeling_outputs import (
@@ -166,7 +168,7 @@ class BertEmbeddings(nn.Module):
 class BertSelfAttention(nn.Module):
     def __init__(self, config, position_embedding_type=None):
         super().__init__()
-        
+
         if config.hidden_size % config.num_attention_heads != 0 and not hasattr(
             config, "embedding_size"
         ):

@@ -1,16 +1,15 @@
 #pragma once
 
-#include <string>
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <stdio.h>
+#include <string>
 
 #include "kernels.h"
 namespace lightseq {
 namespace cuda {
-template <typename T>
-class Dropout {
- public:
+template <typename T> class Dropout {
+public:
   struct Config {
     float ratio;
     bool training;
@@ -191,10 +190,10 @@ class Dropout {
 
   uint8_t *get_mask() { return _mask; }
 
- private:
+private:
   uint8_t *_mask;
   Config _config;
   int _max_ele_num;
 };
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

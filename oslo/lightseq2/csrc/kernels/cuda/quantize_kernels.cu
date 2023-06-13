@@ -13,7 +13,7 @@ __device__ __host__ int row_major2cublaslt_weight(int col_id, int row_id,
     int new_col = col_id >> 5;
     int row_in_tile = row_id & 31;
     int col_in_tile = col_id & 31;
-    int new_row =  // CUBLASLT_ORDER_COL32_2R_4R4
+    int new_row = // CUBLASLT_ORDER_COL32_2R_4R4
         (((row_id >> 5) << 10) +
          //(((row%8)/2*4+row/8)*2+row%2)*32+col
          (((((((row_in_tile & 7) >> 1) << 2) + (row_in_tile >> 3)) << 1) +
@@ -23,10 +23,10 @@ __device__ __host__ int row_major2cublaslt_weight(int col_id, int row_id,
     return new_col * m_32 + new_row;
   } else {
     int new_col = col_id >> 5;
-    int new_row =  // CUBLASLT_ORDER_COL4_4R2_8C
-                   ////row_id/8 is the number of tile of (8 rows 32 columns) --
-                   /// column-major /row_id%2 is even row, otherwise odd row
-                   ////col_id%COL32_/8 is the number tile of (8 rows 8 columns)
+    int new_row = // CUBLASLT_ORDER_COL4_4R2_8C
+                  ////row_id/8 is the number of tile of (8 rows 32 columns) --
+                  /// column-major /row_id%2 is even row, otherwise odd row
+                  ////col_id%COL32_/8 is the number tile of (8 rows 8 columns)
         (((((row_id >> 3) << 3) + ((row_id & 1) << 2) + ((col_id & 31) >> 3))
           << 5) +
          ////col_id%8 >= 4 is the right half of (8 rows 8 columns) tile
@@ -50,7 +50,8 @@ __global__ void quantize_kernel<float>(int8_t *q_ptr, uint8_t *clip_mask_ptr,
                                        int mask_start_bit) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 4 >= numel) return;
+  if (i * 4 >= numel)
+    return;
 
   float clip_max_val = clip_max_ptr[0];
 
@@ -86,7 +87,8 @@ __global__ void quantize_kernel<__half>(int8_t *q_ptr, uint8_t *clip_mask_ptr,
                                         int mask_start_bit) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 8 >= numel) return;
+  if (i * 8 >= numel)
+    return;
 
   float clip_max_val = __half2float(clip_max_ptr[0]);
 
@@ -159,7 +161,8 @@ __global__ void fake_quantize_kernel<float>(
     const float *clip_max_ptr, int numel, int mask_start_bit, bool symmetry) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 4 >= numel) return;
+  if (i * 4 >= numel)
+    return;
 
   float clip_max_val = clip_max_ptr[0];
 
@@ -197,15 +200,15 @@ __global__ void fake_quantize_kernel<float>(
 }
 
 template <>
-__global__ void fake_quantize_kernel<__half>(uint8_t *clip_mask_ptr,
-                                             float *alpha_ptr, __half *output,
-                                             const __half *input,
-                                             const __half *clip_max_ptr,
-                                             int numel, int mask_start_bit,
-                                             bool symmetry) {
+__global__ void
+fake_quantize_kernel<__half>(uint8_t *clip_mask_ptr, float *alpha_ptr,
+                             __half *output, const __half *input,
+                             const __half *clip_max_ptr, int numel,
+                             int mask_start_bit, bool symmetry) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 8 >= numel) return;
+  if (i * 8 >= numel)
+    return;
 
   float clip_max_val = __half2float(clip_max_ptr[0]);
 
@@ -277,7 +280,8 @@ __global__ void dequantize_kernel(float *f_ptr, const int8_t *q_ptr,
                                   int mask_start_bit) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 4 >= numel) return;
+  if (i * 4 >= numel)
+    return;
 
   float clip_max_val = clip_max_ptr[0];
 
@@ -300,7 +304,8 @@ __global__ void dequantize_kernel(__half *f_ptr, const int8_t *q_ptr,
                                   int mask_start_bit) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 8 >= numel) return;
+  if (i * 8 >= numel)
+    return;
 
   float clip_max_val = __half2float(clip_max_ptr[0]);
 
@@ -352,7 +357,8 @@ __global__ void quantize_bwd_kernel(float *f_ptr, float *cmax_grad_ptr,
                                     int mask_start_bit) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 4 >= numel) return;
+  if (i * 4 >= numel)
+    return;
 
   float4 *weight4_ptr = reinterpret_cast<float4 *>(f_ptr);
   const uint32_t *clip_mask4_ptr =
@@ -397,7 +403,8 @@ __global__ void quantize_bwd_kernel(__half *f_ptr, __half *cmax_grad_ptr,
                                     int mask_start_bit) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 8 >= numel) return;
+  if (i * 8 >= numel)
+    return;
 
   float4 *weight8_ptr = reinterpret_cast<float4 *>(f_ptr);
   const uint64_t *clip_mask8_ptr =
@@ -477,7 +484,8 @@ __global__ void d_cmax_kernel<float>(float *grad, float *grad_cmax,
                                      int mask_start_bit) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 4 >= numel) return;
+  if (i * 4 >= numel)
+    return;
 
   __shared__ float block_grad_cmax;
 
@@ -521,7 +529,8 @@ __global__ void d_cmax_kernel<__half>(__half *grad, __half *grad_cmax,
                                       int mask_start_bit) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 8 >= numel) return;
+  if (i * 8 >= numel)
+    return;
 
   __shared__ float block_grad_cmax;
 
@@ -598,14 +607,14 @@ void launch_d_cmax<__half>(__half *grad_ptr, __half *grad_cmax_ptr,
 }
 
 template <typename T>
-__global__ void quantize_kernel(int8_t *q_ptr, uint8_t *clip_mask_ptr,
-                                float *alpha_ptr, const T *f_ptr,
-                                const T *clip_max_ptr, int batch_tokens,
-                                int hidden_size, int mask_start_bit,
-                                LSLayout out_layout) {
+__global__ void
+quantize_kernel(int8_t *q_ptr, uint8_t *clip_mask_ptr, float *alpha_ptr,
+                const T *f_ptr, const T *clip_max_ptr, int batch_tokens,
+                int hidden_size, int mask_start_bit, LSLayout out_layout) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 4 >= (batch_tokens * hidden_size)) return;
+  if (i * 4 >= (batch_tokens * hidden_size))
+    return;
 
   float clip_max_val = clip_max_ptr[0];
 
@@ -661,15 +670,15 @@ __global__ void quantize_kernel(int8_t *q_ptr, uint8_t *clip_mask_ptr,
 }
 
 template <>
-__global__ void quantize_kernel<__half>(int8_t *q_ptr, uint8_t *clip_mask_ptr,
-                                        float *alpha_ptr, const __half *f_ptr,
-                                        const __half *clip_max_ptr,
-                                        int batch_tokens, int hidden_size,
-                                        int mask_start_bit,
-                                        LSLayout out_layout) {
+__global__ void
+quantize_kernel<__half>(int8_t *q_ptr, uint8_t *clip_mask_ptr, float *alpha_ptr,
+                        const __half *f_ptr, const __half *clip_max_ptr,
+                        int batch_tokens, int hidden_size, int mask_start_bit,
+                        LSLayout out_layout) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 8 >= (batch_tokens * hidden_size)) return;
+  if (i * 8 >= (batch_tokens * hidden_size))
+    return;
 
   float clip_max_val = __half2float(clip_max_ptr[0]);
 
@@ -763,7 +772,8 @@ __global__ void dequantize_kernel(float *f_ptr, const int8_t *q_ptr,
                                   bool in_col32) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 4 >= (batch_tokens * hidden_size)) return;
+  if (i * 4 >= (batch_tokens * hidden_size))
+    return;
 
   float clip_max_val = clip_max_ptr[0];
 
@@ -798,7 +808,8 @@ __global__ void dequantize_kernel(__half *f_ptr, const int8_t *q_ptr,
                                   bool in_col32) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 8 >= (batch_tokens * hidden_size)) return;
+  if (i * 8 >= (batch_tokens * hidden_size))
+    return;
 
   float clip_max_val = __half2float(clip_max_ptr[0]);
 
@@ -858,5 +869,5 @@ void launch_dequantize<__half>(__half *f_ptr, const int8_t *q_ptr,
       f_ptr, q_ptr, clip_max_ptr, batch_tokens, hidden_size, mask_start_bit,
       in_col32);
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

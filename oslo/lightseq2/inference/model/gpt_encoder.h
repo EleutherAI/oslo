@@ -19,9 +19,8 @@
 namespace lightseq {
 namespace cuda {
 
-template <OperationType OpType_>
-class GptEncoder {
- private:
+template <OperationType OpType_> class GptEncoder {
+private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   const cudaDataType_t _computeType = _optraits::computeType;
@@ -65,11 +64,11 @@ class GptEncoder {
   _DataType *_p_d_ffn_buf1;
   _DataType *_p_d_ffn_buf2;
   _DataType *_p_d_logit;
-  int *_p_d_real_seq_len;   // [batch_size]
-  int *_p_d_sample_id_buf;  // [batch_size, max_step]
+  int *_p_d_real_seq_len;  // [batch_size]
+  int *_p_d_sample_id_buf; // [batch_size, max_step]
   int *_p_d_last_sample_id;
   int *_p_d_unfinished;
-  curandState *_p_d_curandstate;  //[batch_size]
+  curandState *_p_d_curandstate; //[batch_size]
 
   // {token_emb, pos_emb, norm_scale, norm_bias}
   const std::vector<const _DataType *> &_p_d_src_emb_wei;
@@ -89,10 +88,10 @@ class GptEncoder {
 
   const std::set<std::string> kSamplingMethods = {"topk", "topp", "ppl"};
 
- public:
+public:
   int _batch_seq_len;
-  const int *_p_d_token_id;  // input token id, [batch_size, batch_seq_len]
-  float *_p_d_ppl;           // ppl for every seq, [batch_size]
+  const int *_p_d_token_id; // input token id, [batch_size, batch_seq_len]
+  float *_p_d_ppl;          // ppl for every seq, [batch_size]
   int *_p_d_sample_id;
 
   GptEncoder(int max_batch_size, const int *p_d_token_id, float *p_d_ppl,
@@ -107,5 +106,5 @@ class GptEncoder {
   void benchmark_mode(bool is_benchmark);
 };
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

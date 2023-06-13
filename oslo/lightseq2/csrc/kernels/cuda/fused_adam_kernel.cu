@@ -12,24 +12,24 @@
 #include "ATen/AccumulateType.h"
 #include "ATen/TensorUtils.h"
 #include "ATen/cuda/CUDAContext.h"
-#include "ATen/cuda/detail/IndexUtils.cuh"
 #include "ATen/cuda/Exceptions.h"
+#include "ATen/cuda/detail/IndexUtils.cuh"
 #include "fused_adam_kernel.h"
 #include "multi_tensor_apply.cuh"
 
 namespace lightseq {
 namespace cuda {
 typedef enum {
-  ADAM_MODE_0 = 0,  // eps under square root
-  ADAM_MODE_1 = 1   // eps outside square root
+  ADAM_MODE_0 = 0, // eps under square root
+  ADAM_MODE_1 = 1  // eps outside square root
 } adamMode_t;
 
 template <typename T, typename GRAD_T>
 __global__ void apex_adam_cuda_kernel(
-    T* __restrict__ p,
-    GRAD_T* __restrict__ p_copy,  // For mixed precision training, pass NULL if
-                                  // not needed
-    T* __restrict__ m, T* __restrict__ v, const GRAD_T* __restrict__ g,
+    T *__restrict__ p,
+    GRAD_T *__restrict__ p_copy, // For mixed precision training, pass NULL if
+                                 // not needed
+    T *__restrict__ m, T *__restrict__ v, const GRAD_T *__restrict__ g,
     const float b1, const float b2, const float eps, const float grad_scale,
     const float step_size, const size_t tsize, adamMode_t mode,
     const float decay) {
@@ -46,7 +46,7 @@ __global__ void apex_adam_cuda_kernel(
     float denom;
     if (mode == ADAM_MODE_0)
       denom = sqrtf(v[j] + eps);
-    else  // Mode 1
+    else // Mode 1
       denom = sqrtf(v[j]) + eps;
     float update = (m[j] / denom) + (decay * p[j]);
     p[j] = p[j] - (step_size * update);
@@ -58,16 +58,17 @@ __global__ void apex_adam_cuda_kernel(
 
 template <typename T, typename GRAD_T>
 __global__ void ls_adam_cuda_kernel(
-    T* __restrict__ p,
-    GRAD_T* __restrict__ p_copy,  // For mixed precision training, pass NULL if
-                                  // not needed
-    T* __restrict__ m, T* __restrict__ v, const GRAD_T* __restrict__ g,
+    T *__restrict__ p,
+    GRAD_T *__restrict__ p_copy, // For mixed precision training, pass NULL if
+                                 // not needed
+    T *__restrict__ m, T *__restrict__ v, const GRAD_T *__restrict__ g,
     const float b1, const float b2, const float eps, const float grad_scale,
     const float step_size, const size_t total_size, adamMode_t mode,
     const float decay) {
   int global_id = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (global_id >= total_size) return;
+  if (global_id >= total_size)
+    return;
 
   T scaled_grad = g[global_id] / grad_scale;
   m[global_id] = b1 * m[global_id] + (1 - b1) * scaled_grad;
@@ -75,30 +76,32 @@ __global__ void ls_adam_cuda_kernel(
   float denom;
   if (mode == ADAM_MODE_0)
     denom = sqrtf(v[global_id] + eps);
-  else  // Mode 1
+  else // Mode 1
     denom = sqrtf(v[global_id]) + eps;
   float update = (m[global_id] / denom) + (decay * p[global_id]);
   p[global_id] = p[global_id] - (step_size * update);
-  if (p_copy != NULL) p_copy[global_id] = (GRAD_T)p[global_id];
+  if (p_copy != NULL)
+    p_copy[global_id] = (GRAD_T)p[global_id];
 }
 
 template <>
 __global__ void ls_adam_cuda_kernel<float, float>(
-    float* __restrict__ p,
-    float* __restrict__ p_copy,  // For mixed precision training, pass NULL if
-                                 // not needed
-    float* __restrict__ m, float* __restrict__ v, const float* __restrict__ g,
+    float *__restrict__ p,
+    float *__restrict__ p_copy, // For mixed precision training, pass NULL if
+                                // not needed
+    float *__restrict__ m, float *__restrict__ v, const float *__restrict__ g,
     const float b1, const float b2, const float eps, const float grad_scale,
     const float step_size, const size_t total_size, adamMode_t mode,
     const float decay) {
   int global_id = (blockIdx.x * blockDim.x + threadIdx.x);
 
-  if (global_id * 4 >= total_size) return;
+  if (global_id * 4 >= total_size)
+    return;
 
-  const float4* g4_ptr = reinterpret_cast<const float4*>(g);
-  float4* p4_ptr = reinterpret_cast<float4*>(p);
-  float4* m4_ptr = reinterpret_cast<float4*>(m);
-  float4* v4_ptr = reinterpret_cast<float4*>(v);
+  const float4 *g4_ptr = reinterpret_cast<const float4 *>(g);
+  float4 *p4_ptr = reinterpret_cast<float4 *>(p);
+  float4 *m4_ptr = reinterpret_cast<float4 *>(m);
+  float4 *v4_ptr = reinterpret_cast<float4 *>(v);
 
   const float4 g4 = g4_ptr[global_id];
   const float4 p4 = p4_ptr[global_id];
@@ -145,8 +148,8 @@ __global__ void ls_adam_cuda_kernel<float, float>(
   v4_ptr[global_id] = new_v4;
 }
 
-void fused_adam_cuda(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m,
-                     at::Tensor& v, at::Tensor& g, float lr, float beta1,
+void fused_adam_cuda(at::Tensor &p, at::Tensor &p_copy, at::Tensor &m,
+                     at::Tensor &v, at::Tensor &g, float lr, float beta1,
                      float beta2, float eps, float grad_scale, int step,
                      int mode, int bias_correction, float decay) {
   // Get tensor size
@@ -172,7 +175,7 @@ void fused_adam_cuda(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m,
     AT_ASSERTM(p.scalar_type() == at::ScalarType::Float,
                "expected parameter to be of float type");
     // dispatch is done on the gradient type
-    using namespace at;  // prevents "toString is undefined" errors
+    using namespace at; // prevents "toString is undefined" errors
     DISPATCH_FLOAT_AND_HALF(
         g.scalar_type(), 0, "adam_cuda_kernel",
         using accscalar_t = at::acc_type<scalar_t_0, true>;
@@ -187,14 +190,15 @@ void fused_adam_cuda(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m,
     using namespace at;
     const int block_dim = 1024;
     int grid_dim = ((total_size + block_dim - 1) / block_dim) >> 2;
-    if (grid_dim == 0) grid_dim = 1;
+    if (grid_dim == 0)
+      grid_dim = 1;
     const dim3 blocks(grid_dim);
     DISPATCH_DOUBLE_AND_FLOAT(
         g.scalar_type(), 0, "adam_cuda_kernel",
         ls_adam_cuda_kernel<scalar_t_0, scalar_t_0>
         <<<blocks, block_dim, 0, stream>>>(
             p.DATA_PTR<scalar_t_0>(),
-            NULL,  // don't output p_copy for fp32, it's wasted write
+            NULL, // don't output p_copy for fp32, it's wasted write
             m.DATA_PTR<scalar_t_0>(), v.DATA_PTR<scalar_t_0>(),
             g.DATA_PTR<scalar_t_0>(), beta1, beta2, eps, grad_scale, step_size,
             total_size, (adamMode_t)mode, decay););
@@ -202,8 +206,8 @@ void fused_adam_cuda(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m,
   AT_CUDA_CHECK(cudaGetLastError());
 }
 
-void apex_fused_adam_cuda(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m,
-                          at::Tensor& v, at::Tensor& g, float lr, float beta1,
+void apex_fused_adam_cuda(at::Tensor &p, at::Tensor &p_copy, at::Tensor &m,
+                          at::Tensor &v, at::Tensor &g, float lr, float beta1,
                           float beta2, float eps, float grad_scale, int step,
                           int mode, int bias_correction, float decay) {
   // Get tensor size
@@ -229,7 +233,7 @@ void apex_fused_adam_cuda(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m,
     AT_ASSERTM(p.scalar_type() == at::ScalarType::Float,
                "expected parameter to be of float type");
     // dispatch is done on the gradient type
-    using namespace at;  // prevents "toString is undefined" errors
+    using namespace at; // prevents "toString is undefined" errors
     DISPATCH_FLOAT_AND_HALF(
         g.scalar_type(), 0, "apex_adam_cuda_kernel",
         using accscalar_t = at::acc_type<scalar_t_0, true>;
@@ -247,12 +251,12 @@ void apex_fused_adam_cuda(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m,
         apex_adam_cuda_kernel<scalar_t_0, scalar_t_0>
         <<<blocks, threadsPerBlock, 0, stream>>>(
             p.DATA_PTR<scalar_t_0>(),
-            NULL,  // don't output p_copy for fp32, it's wasted write
+            NULL, // don't output p_copy for fp32, it's wasted write
             m.DATA_PTR<scalar_t_0>(), v.DATA_PTR<scalar_t_0>(),
             g.DATA_PTR<scalar_t_0>(), beta1, beta2, eps, grad_scale, step_size,
             tsize, (adamMode_t)mode, decay););
   }
   AT_CUDA_CHECK(cudaGetLastError());
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

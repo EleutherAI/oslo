@@ -15,10 +15,8 @@ SDPALayer<T1, T2>::SDPALayer(size_t max_batch_tokens, size_t max_seq_len,
       // max(batch_size * seq_len) for inference,
       // max_batch_tokens = max(batch_size *
       // beam_size * seq_len)
-      _max_batch_tokens(max_batch_tokens),
-      _max_seq_len(max_seq_len),
-      _nhead(num_heads),
-      _head_dim(head_dim) {
+      _max_batch_tokens(max_batch_tokens), _max_seq_len(max_seq_len),
+      _nhead(num_heads), _head_dim(head_dim) {
   float scale = float(1.0) / sqrt(float(_head_dim));
   _attn_scores = new StridedBatchGemmOp<T1, T2>(
       max_batch_tokens * num_heads * max_seq_len, scale, T1(0.0),
@@ -29,20 +27,20 @@ SDPALayer<T1, T2>::SDPALayer(size_t max_batch_tokens, size_t max_seq_len,
   _attn_context = new StridedBatchGemmOp<T1, T2>(
       max_batch_tokens * num_heads * head_dim, T1(1.0), T1(0.0),
       MATRIX_OP::NonTranspose, MATRIX_OP::NonTranspose);
-  this->_context_ptr->exit_layer();  // necessary
+  this->_context_ptr->exit_layer(); // necessary
 }
 
 template <typename T1, typename T2>
-Variable* SDPALayer<T1, T2>::operator()(Variable* query, Variable* key,
-                                        Variable* value, Variable* mask) {
+Variable *SDPALayer<T1, T2>::operator()(Variable *query, Variable *key,
+                                        Variable *value, Variable *mask) {
   set_inputs({query, key, value, mask});
 
-  Variable* attn_score = (*_attn_scores)(key, query);
+  Variable *attn_score = (*_attn_scores)(key, query);
 
-  Variable* soft_out = (*_softmax)(attn_score, mask);
-  Variable* attn_context = nullptr;
+  Variable *soft_out = (*_softmax)(attn_score, mask);
+  Variable *attn_context = nullptr;
   if (_context_ptr->is_training()) {
-    Variable* prob_dropout = (*_attn_prob_dropout)(soft_out);
+    Variable *prob_dropout = (*_attn_prob_dropout)(soft_out);
     attn_context = (*_attn_context)(value, prob_dropout);
   } else {
     attn_context = (*_attn_context)(value, soft_out);
@@ -67,4 +65,4 @@ void SDPALayer<T1, T2>::before_forward(int batch_size, int query_len,
                                 kv_size);
 }
 
-}  // namespace lightseq
+} // namespace lightseq

@@ -1,8 +1,8 @@
-#include "model_base.h"
 #include "../model/t5_decoder.h"
 #include "../model/t5_encoder.h"
 #include "../proto/t5_weight.h"
 #include "../tools/util.h"
+#include "model_base.h"
 
 #ifdef FP16_MODE
 const lightseq::cuda::OperationType t5_optype =
@@ -15,7 +15,7 @@ const lightseq::cuda::OperationType t5_optype =
 namespace lightseq {
 namespace cuda {
 class T5 : public LSModel {
- private:
+private:
   typedef OperationTypeTraits<t5_optype> optraits;
   std::shared_ptr<T5Encoder<t5_optype>> encoder_;
   std::shared_ptr<T5Decoder<t5_optype>> decoder_;
@@ -39,7 +39,7 @@ class T5 : public LSModel {
   int get_max_step() { return tw_._max_step; }
   int get_beam_size() { return tw_._beam_size; }
 
- public:
+public:
   T5(const std::string weight_path, const int max_batch_size);
   ~T5();
 
@@ -55,5 +55,5 @@ class T5 : public LSModel {
 };
 
 LSMODEL_REGISTER(T5);
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

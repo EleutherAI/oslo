@@ -1,9 +1,9 @@
 #include "mt5_encoder.h"
 
-#include "../kernels/transformerKernels.h"
 #include "../kernels/embKernels.h"
-#include "../kernels/t5Kernels.h"
 #include "../kernels/t5EmbKernels.h"
+#include "../kernels/t5Kernels.h"
+#include "../kernels/transformerKernels.h"
 
 /**
 @file
@@ -20,20 +20,13 @@ MT5Encoder<OpType_>::MT5Encoder(int max_batch_size, int *p_d_token_id,
                                 const MT5Weight<OpType_> &tw,
                                 cudaStream_t stream, cublasHandle_t hd,
                                 const int *p_d_lang_id)
-    : _max_batch_size(max_batch_size),
-      _p_d_token_id(p_d_token_id),
-      _p_d_padding_mask(p_d_padding_mask),
-      _p_d_output(p_d_output),
-      _p_d_lang_id(p_d_lang_id),
-      _tw(tw),
-      _stream(stream),
-      _hd(hd),
-      _p_d_src_emb_wei(tw.get_src_emb_wei()),
-      _p_d_enc_wei(tw.get_enc_wei()),
-      _fone((_DataType)1.f),
-      _fzero((_DataType)0.f),
+    : _max_batch_size(max_batch_size), _p_d_token_id(p_d_token_id),
+      _p_d_padding_mask(p_d_padding_mask), _p_d_output(p_d_output),
+      _p_d_lang_id(p_d_lang_id), _tw(tw), _stream(stream), _hd(hd),
+      _p_d_src_emb_wei(tw.get_src_emb_wei()), _p_d_enc_wei(tw.get_enc_wei()),
+      _fone((_DataType)1.f), _fzero((_DataType)0.f),
 
-      _atten_scaler((_DataType)1.f),  // no atten_scaler
+      _atten_scaler((_DataType)1.f), // no atten_scaler
       _max_batch_dim(max_batch_size * tw._max_step * tw._hidden_size),
       _max_thread_per_block(1024) {}
 
@@ -68,15 +61,14 @@ void MT5Encoder<OpType_>::init_buffer(void *pbuf) {
   _p_d_ffn_buf2 = _p_d_ffn_buf1 + _max_batch_dim;
   _p_d_ffn_buf3 =
       _p_d_ffn_buf2 + _max_batch_size * _tw._max_step * _tw._inner_size;
-  // encoder and decoder use the same buffer to save gpu memory useage
+  // encoder and decoder use the same buffer to save gpu memory usage
   return;
 }
 
 /**
 Some requirements needed by custom cuda kernel function
 */
-template <OperationType OpType_>
-std::string MT5Encoder<OpType_>::check() {
+template <OperationType OpType_> std::string MT5Encoder<OpType_>::check() {
   // if (_max_thread_per_block < _tw._hidden_size) {
   //   return "violate hidden_size <= max_thread_per_block";
   // }
@@ -129,14 +121,14 @@ void MT5Encoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
                                batch_seq_len, _tw._hidden_size, _stream,
                                _p_d_src_emb_wei[4], _p_d_lang_id);
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // token_id
       std::cout << "emb out: token-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
                 "emb out", 10);
     }
-  }  // not normal
+  } // not normal
   print_vec(_p_d_src_emb_wei[0], "token embedding weight", 10);
   print_vec(_p_d_src_emb_wei[1], "position embedding weight", 10);
 #endif
@@ -153,14 +145,14 @@ void MT5Encoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
       _p_d_src_emb_wei[2], _p_d_src_emb_wei[3], _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // token_id
       std::cout << "encoder output: token-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
                 "encoder_output", _tw._dim_per_head);
     }
-  }  // not normal
+  } // not normal
 #endif
   return;
 }
@@ -168,8 +160,7 @@ void MT5Encoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
 /**
 Encoder self attention
 */
-template <OperationType OpType_>
-void MT5Encoder<OpType_>::self_attention() {
+template <OperationType OpType_> void MT5Encoder<OpType_>::self_attention() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
 
 #ifdef DEBUG_RESULT
@@ -184,12 +175,12 @@ void MT5Encoder<OpType_>::self_attention() {
       _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // token_id
       std::cout << "after pre-norm: token-" << j << std::endl;
-      print_vec(
-          _p_d_q + i * _batch_seq_len * _tw._hidden_size + j * _tw._hidden_size,
-          "hidden state: ", 10);
+      print_vec(_p_d_q + i * _batch_seq_len * _tw._hidden_size +
+                    j * _tw._hidden_size,
+                "hidden state: ", 10);
     }
   }
 #endif
@@ -262,8 +253,8 @@ void MT5Encoder<OpType_>::self_attention() {
       _CType, _tw._hidden_size, _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // token_id
       std::cout << "last of self-attention: token-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
@@ -275,8 +266,7 @@ void MT5Encoder<OpType_>::self_attention() {
   return;
 }
 
-template <OperationType OpType_>
-void MT5Encoder<OpType_>::ffn_add_norm() {
+template <OperationType OpType_> void MT5Encoder<OpType_>::ffn_add_norm() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
 
   t5_ker_norm_layer_launcher<_DataType>(
@@ -285,8 +275,8 @@ void MT5Encoder<OpType_>::ffn_add_norm() {
       _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // token_id
       std::cout << "after ffn-pre-norm: token-" << j << std::endl;
       print_vec(_p_d_ffn_buf1 + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
@@ -360,8 +350,8 @@ void MT5Encoder<OpType_>::ffn_add_norm() {
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // token_id
       std::cout << "last of ffn-layer: token-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
@@ -375,5 +365,5 @@ void MT5Encoder<OpType_>::ffn_add_norm() {
 template class MT5Encoder<OperationType::FP16>;
 template class MT5Encoder<OperationType::FP32>;
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

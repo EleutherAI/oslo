@@ -11,25 +11,23 @@ Weights in proto file will always be in fp32. For fp16, the weights
 namespace lightseq {
 namespace cuda {
 
-template <typename Type>
-void assign_zero_bias(Type *ptr, int size) {
-  for (int i = 0; i < size; i++) ptr[i] = 0;
+template <typename Type> void assign_zero_bias(Type *ptr, int size) {
+  for (int i = 0; i < size; i++)
+    ptr[i] = 0;
 }
 
 /**
 Cast weights into required datatype.
 The datatype of weights in custom proto file will always be in fp32.
 */
-template <>
-float MT5Weight<OperationType::FP32>::float2required(float value) {
+template <> float MT5Weight<OperationType::FP32>::float2required(float value) {
   return value;
 }
 
 /**
 fp16 version, cast fp32 into fp16
 */
-template <>
-__half MT5Weight<OperationType::FP16>::float2required(float value) {
+template <> __half MT5Weight<OperationType::FP16>::float2required(float value) {
   return __float2half_rn(value);
 }
 
@@ -103,7 +101,7 @@ void MT5Weight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
   // special handling for string reading
   // string were converted to numpy array of np.int8 in python
   // hence needed to be read as an char array here
-  char _sampling_method_buf[128];  // get 128 character for sampling method
+  char _sampling_method_buf[128]; // get 128 character for sampling method
   int _sampling_method_strlen = read_hdf5_dataset_data(
       hdf5_file, "model_conf/sampling_method", H5T_NATIVE_CHAR,
       _sampling_method_buf, [](int size) { return size > 128; },
@@ -162,7 +160,7 @@ void MT5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
   }
 
   std::vector<int> offset;
-  std::vector<float> value(value_size);  // preallocate vector for performance
+  std::vector<float> value(value_size); // preallocate vector for performance
   std::cout << "loading " << value_size * sizeof(OpType_) / (1024 * 1024)
             << " MB of embedding weight." << std::endl;
   int idx = 0;
@@ -177,20 +175,20 @@ void MT5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
 
   offset.push_back(idx);
 
-  read_hdf5_dataset_data(
-      hdf5_file, dataset_prefix + "/position_embedding", H5T_NATIVE_FLOAT,
-      value.data() + idx,
-      [=](int size) {
-        return size != _relative_attention_num_buckets * _head_num;
-      },
-      "Wrong position_embedding_size !");
+  read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/position_embedding",
+                         H5T_NATIVE_FLOAT, value.data() + idx,
+                         [=](int size) {
+                           return size !=
+                                  _relative_attention_num_buckets * _head_num;
+                         },
+                         "Wrong position_embedding_size !");
   idx += _relative_attention_num_buckets * _head_num;
 
   offset.push_back(idx);
-  read_hdf5_dataset_data(
-      hdf5_file, dataset_prefix + "/norm_scale", H5T_NATIVE_FLOAT,
-      value.data() + idx, [=](int size) { return size != _hidden_size; },
-      "Wrong norm_scale_size !");
+  read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/norm_scale",
+                         H5T_NATIVE_FLOAT, value.data() + idx,
+                         [=](int size) { return size != _hidden_size; },
+                         "Wrong norm_scale_size !");
   idx += _hidden_size;
 
   offset.push_back(idx);
@@ -202,7 +200,8 @@ void MT5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
   if (source == "src") {
     std::vector<_DataType> raw_value;
     raw_value.reserve(value.size());
-    for (float e : value) raw_value.push_back(float2required(e));
+    for (float e : value)
+      raw_value.push_back(float2required(e));
     _d_src_emb_wei = raw_value;
     for (int e : offset)
       _p_d_src_emb_wei.push_back(
@@ -242,20 +241,22 @@ void MT5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
 
     std::vector<_DataType> raw_value;
     raw_value.reserve(value.size());
-    for (float e : value) raw_value.push_back(float2required(e));
+    for (float e : value)
+      raw_value.push_back(float2required(e));
     _d_trg_emb_wei = raw_value;
     for (int e : offset) {
       _p_d_trg_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_trg_emb_wei.data()) + e);
     }
-  }  // trg
+  } // trg
 
   if (_multilg_type) {
     // fill in language embedding
     std::vector<float> raw_value_float = read_hdf5_dataset_data_float(
         hdf5_file, dataset_prefix + "/lang_emb", H5T_NATIVE_FLOAT);
     std::vector<_DataType> raw_value;
-    for (float e : raw_value_float) raw_value.push_back(float2required(e));
+    for (float e : raw_value_float)
+      raw_value.push_back(float2required(e));
 
     if (source == "src") {
       _d_src_lang_emb = raw_value;
@@ -297,10 +298,10 @@ void MT5Weight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     std::string dataset_prefix = "encoder_stack/" + std::to_string(layer_id);
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/multihead_norm_scale", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong multihead_norm_scale_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/multihead_norm_scale",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong multihead_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -339,10 +340,10 @@ void MT5Weight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/ffn_norm_scale", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong ffn_norm_scale_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_norm_scale",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong ffn_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -391,7 +392,8 @@ void MT5Weight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
 
   std::vector<_DataType> raw_value;
   raw_value.reserve(value.size());
-  for (float e : value) raw_value.push_back(float2required(e));
+  for (float e : value)
+    raw_value.push_back(float2required(e));
   _d_enc_wei = raw_value;
 
   for (int e : offset)
@@ -422,10 +424,10 @@ void MT5Weight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     std::string dataset_prefix = "decoder_stack/" + std::to_string(layer_id);
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/self_norm_scale", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong self_norm_scale_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/self_norm_scale",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong self_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -464,10 +466,10 @@ void MT5Weight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
 
     offset.push_back(idx);
 
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/encdec_norm_scale", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong encdec_norm_scale_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/encdec_norm_scale",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong encdec_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -505,10 +507,10 @@ void MT5Weight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size;
 
     offset.push_back(idx);
-    read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/ffn_norm_scale", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
-        "Wrong ffn_norm_scale_size !");
+    read_hdf5_dataset_data(hdf5_file, dataset_prefix + "/ffn_norm_scale",
+                           H5T_NATIVE_FLOAT, value.data() + idx,
+                           [=](int size) { return size != _hidden_size; },
+                           "Wrong ffn_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -552,11 +554,12 @@ void MT5Weight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
         [=](int size) { return size != _hidden_size * _inner_size; },
         "Wrong ffn_third_kernel_size !");
     idx += _hidden_size * _inner_size;
-  }  // for
+  } // for
 
   std::vector<_DataType> raw_value;
   raw_value.reserve(value.size());
-  for (float e : value) raw_value.push_back(float2required(e));
+  for (float e : value)
+    raw_value.push_back(float2required(e));
   _d_dec_wei = raw_value;
 
   for (int e : offset)
@@ -601,7 +604,7 @@ std::string MT5Weight<OpType_>::initializing(std::string weight_path,
     std::cout << "Finish loading all weight from host to device" << std::endl;
     return "";
   } else {
-    return "Unsupported weight extention for [" + weight_path +
+    return "Unsupported weight extension for [" + weight_path +
            "]; Supported extensions: .pb, .hdf5\n";
   }
 }
@@ -609,5 +612,5 @@ std::string MT5Weight<OpType_>::initializing(std::string weight_path,
 template class MT5Weight<OperationType::FP16>;
 template class MT5Weight<OperationType::FP32>;
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

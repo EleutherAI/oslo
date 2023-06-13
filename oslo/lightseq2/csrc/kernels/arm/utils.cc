@@ -48,4 +48,4 @@ template void print_vec<int8_t>(const int8_t *outv, std::string outn,
 
 template void print_vec<uint8_t>(const uint8_t *outv, std::string outn,
                                  int num_output_ele);
-}  // namespace lightseq
+} // namespace lightseq

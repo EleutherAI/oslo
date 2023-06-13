@@ -7,10 +7,9 @@ const float host_min_log_probability = -2000.f;
 
 float host_length_norm_func(int length, float alpha);
 
-template <typename T>
-class BeamSearchTopOp : public Operator {
- private:
-  // inital
+template <typename T> class BeamSearchTopOp : public Operator {
+private:
+  // initial
   size_t _max_batch_size;
   size_t _max_step;
   size_t _trg_vocab_size;
@@ -36,16 +35,16 @@ class BeamSearchTopOp : public Operator {
   std::vector<float> _host_length_norm;
   std::vector<int> _host_num_beam_can;
 
-  Variable* _num_beam_can;
-  Variable* _can_idx;
-  Variable* _can_score;
-  Variable* _seq_prob;
-  Variable* _seq_score;
-  Variable* _alive_seq_out;
-  Variable* _caches_k_buf;
-  Variable* _caches_v_buf;
+  Variable *_num_beam_can;
+  Variable *_can_idx;
+  Variable *_can_score;
+  Variable *_seq_prob;
+  Variable *_seq_score;
+  Variable *_alive_seq_out;
+  Variable *_caches_k_buf;
+  Variable *_caches_v_buf;
 
- public:
+public:
   BeamSearchTopOp(size_t nshared_dec_layer, size_t max_batch_size,
                   size_t max_step, size_t trg_vocab_size, size_t hidden_size,
                   size_t max_thread_per_block, size_t beam_size,
@@ -55,9 +54,8 @@ class BeamSearchTopOp : public Operator {
   virtual ~BeamSearchTopOp() {}
 
   // output: out_token_ids, token_scores
-  std::tuple<Variable*, Variable*> operator()(Variable* logits,
-                                              Variable* logit_bias,
-                                              Variable* alive_seq);
+  std::tuple<Variable *, Variable *>
+  operator()(Variable *logits, Variable *logit_bias, Variable *alive_seq);
 
   void forward() override;
 
@@ -72,7 +70,7 @@ class BeamSearchTopOp : public Operator {
     _seq_score->set_shape({_batch_size, _beam_size, size_t(_cur_pos + 1)});
   }
 
-  void refresh_cache(Variable* caches_k, Variable* caches_v);
+  void refresh_cache(Variable *caches_k, Variable *caches_v);
 
   void backward() override {}
 
@@ -81,4 +79,4 @@ class BeamSearchTopOp : public Operator {
   int is_stop() { return _host_can_num_batch == _step_token_num; }
 };
 
-}  // namespace lightseq
+} // namespace lightseq

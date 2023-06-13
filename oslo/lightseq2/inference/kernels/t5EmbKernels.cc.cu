@@ -54,11 +54,10 @@ __global__ void t5_ker_enc_emb(const T *token_emb, const int *tokens, T *output,
 }
 
 template <>
-__global__ void t5_ker_enc_emb<__half>(const __half *token_emb,
-                                       const int *tokens, __half *output,
-                                       int *pad_mask, int pad_id,
-                                       int batch_size, int seq_len,
-                                       int hidden_dim) {
+__global__ void
+t5_ker_enc_emb<__half>(const __half *token_emb, const int *tokens,
+                       __half *output, int *pad_mask, int pad_id,
+                       int batch_size, int seq_len, int hidden_dim) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= batch_size * seq_len * hidden_dim) {
     return;
@@ -204,5 +203,5 @@ template void t5_launch_dec_emb<__half>(const __half *token_emb, int *tokens,
                                         int step, int max_step,
                                         int multilg_type, cudaStream_t stream);
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

@@ -14,9 +14,8 @@
 
 namespace lightseq {
 namespace cuda {
-template <typename T>
-class StridedBatchGemm {
- public:
+template <typename T> class StridedBatchGemm {
+public:
   struct Config {
     int m;
     int n;
@@ -29,10 +28,7 @@ class StridedBatchGemm {
 
     Config(float param_alpha, float param_beta, cublasOperation_t opA,
            cublasOperation_t opB)
-        : alpha(param_alpha),
-          beta(param_beta),
-          op_A(opA),
-          op_B(opB),
+        : alpha(param_alpha), beta(param_beta), op_A(opA), op_B(opB),
           gemm_algos(std::array<int, 3>({99, 99, 99})) {}
     void SetConfig(int mm, int nn, int kk) {
       m = mm;
@@ -96,8 +92,8 @@ class StridedBatchGemm {
 
   inline void SetConfig(int m, int n, int k) { _config.SetConfig(m, n, k); }
 
- private:
+private:
   Config _config;
 };
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

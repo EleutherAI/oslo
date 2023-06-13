@@ -1,17 +1,17 @@
 
+#include "bert.h"
 #include "triton/backend/backend_common.h"
 #include "triton/backend/backend_input_collector.h"
 #include "triton/backend/backend_model.h"
 #include "triton/backend/backend_model_instance.h"
 #include "triton/backend/backend_output_responder.h"
 #include "triton/core/tritonbackend.h"
-#include "bert.h"
 
 #ifndef NEW_ARCH
 #include "gpt.h"
-#include "transformer.h"
 #include "model_base.h"
 #include "quant_transformer.h"
+#include "transformer.h"
 #endif
 
 namespace triton {
@@ -28,16 +28,16 @@ namespace lightseq {
 // functions.
 //
 class ModelState : public BackendModel {
- private:
+private:
   std::unordered_map<std::string, TRITONSERVER_DataType> input_data_type_map_;
   std::unordered_map<std::string, TRITONSERVER_DataType> output_data_type_map_;
 
- public:
-  static TRITONSERVER_Error* Create(TRITONBACKEND_Model* triton_model,
-                                    ModelState** state);
+public:
+  static TRITONSERVER_Error *Create(TRITONBACKEND_Model *triton_model,
+                                    ModelState **state);
   virtual ~ModelState() = default;
 
-  const std::string& ModelFileName() const { return file_name_; }
+  const std::string &ModelFileName() const { return file_name_; }
 
   // Datatype of the input and output tensor
   TRITONSERVER_DataType GetInputDataTypeByName(std::string input_name) {
@@ -62,22 +62,22 @@ class ModelState : public BackendModel {
   // Shape of the input and output tensor as given in the model
   // configuration file. This shape will not include the batch
   // dimension (if the model has one).
-  const std::vector<int64_t>& TensorNonBatchShape() const { return nb_shape_; }
+  const std::vector<int64_t> &TensorNonBatchShape() const { return nb_shape_; }
 
   // Shape of the input and output tensor, including the batch
   // dimension (if the model has one). This method cannot be called
   // until the model is completely loaded and initialized, including
   // all instances of the model. In practice, this means that backend
   // should only call it in TRITONBACKEND_ModelInstanceExecute.
-  TRITONSERVER_Error* TensorShape(std::vector<int64_t>& shape);
+  TRITONSERVER_Error *TensorShape(std::vector<int64_t> &shape);
 
   // Validate that this model is supported by this backend.
-  TRITONSERVER_Error* ValidateModelConfig();
+  TRITONSERVER_Error *ValidateModelConfig();
 
   std::string GetModelType() { return model_type_; }
 
- private:
-  ModelState(TRITONBACKEND_Model* triton_model);
+private:
+  ModelState(TRITONBACKEND_Model *triton_model);
 
   std::string file_name_;
 
@@ -88,18 +88,18 @@ class ModelState : public BackendModel {
   std::string model_type_;
 };
 
-ModelState::ModelState(TRITONBACKEND_Model* triton_model)
+ModelState::ModelState(TRITONBACKEND_Model *triton_model)
     : BackendModel(triton_model), shape_initialized_(false) {
   // Validate that the model's configuration matches what is supported
   // by this backend.
   THROW_IF_BACKEND_MODEL_ERROR(ValidateModelConfig());
 }
 
-TRITONSERVER_Error* ModelState::Create(TRITONBACKEND_Model* triton_model,
-                                       ModelState** state) {
+TRITONSERVER_Error *ModelState::Create(TRITONBACKEND_Model *triton_model,
+                                       ModelState **state) {
   try {
     *state = new ModelState(triton_model);
-  } catch (const BackendModelException& ex) {
+  } catch (const BackendModelException &ex) {
     RETURN_ERROR_IF_TRUE(
         ex.err_ == nullptr, TRITONSERVER_ERROR_INTERNAL,
         std::string("unexpected nullptr in BackendModelException"));
@@ -108,10 +108,10 @@ TRITONSERVER_Error* ModelState::Create(TRITONBACKEND_Model* triton_model,
 
   LOG_MESSAGE(TRITONSERVER_LOG_INFO, "ModelState Created success");
 
-  return nullptr;  // success
+  return nullptr; // success
 }
 
-TRITONSERVER_Error* ModelState::TensorShape(std::vector<int64_t>& shape) {
+TRITONSERVER_Error *ModelState::TensorShape(std::vector<int64_t> &shape) {
   // This backend supports models that batch along the first dimension
   // and those that don't batch. For non-batch models the output shape
   // will be the shape from the model configuration. For batch models
@@ -134,10 +134,10 @@ TRITONSERVER_Error* ModelState::TensorShape(std::vector<int64_t>& shape) {
 
   shape = shape_;
 
-  return nullptr;  // success
+  return nullptr; // success
 }
 
-TRITONSERVER_Error* ModelState::ValidateModelConfig() {
+TRITONSERVER_Error *ModelState::ValidateModelConfig() {
   // If verbose logging is enabled, dump the model's configuration as
   // JSON into the console output.
   if (TRITONSERVER_LogIsEnabled(TRITONSERVER_LOG_VERBOSE)) {
@@ -158,7 +158,7 @@ TRITONSERVER_Error* ModelState::ValidateModelConfig() {
     RETURN_IF_ERROR(inputs.IndexAsObject(input_idx, &input));
 
     // Record the input and output name in the model state.
-    const char* input_name;
+    const char *input_name;
     size_t input_name_len;
     RETURN_IF_ERROR(input.MemberAsString("name", &input_name, &input_name_len));
     std::string input_name_ = std::string(input_name);
@@ -178,7 +178,7 @@ TRITONSERVER_Error* ModelState::ValidateModelConfig() {
     RETURN_IF_ERROR(outputs.IndexAsObject(output_idx, &output));
 
     // Record the input and output name in the model state.
-    const char* output_name;
+    const char *output_name;
     size_t output_name_len;
     RETURN_IF_ERROR(
         output.MemberAsString("name", &output_name, &output_name_len));
@@ -197,20 +197,20 @@ TRITONSERVER_Error* ModelState::ValidateModelConfig() {
 
   common::TritonJson::Value model_type_obj;
   RETURN_IF_ERROR(parameters.MemberAsObject("model_type", &model_type_obj));
-  const char* model_type_value;
+  const char *model_type_value;
   size_t model_type_length;
   RETURN_IF_ERROR(model_type_obj.MemberAsString(
       "string_value", &model_type_value, &model_type_length));
   model_type_ = std::string(model_type_value);
 
-  // Record the file_name of model paramters
-  const char* model_file_name;
+  // Record the file_name of model parameters
+  const char *model_file_name;
   size_t file_name_len;
   RETURN_IF_ERROR(ModelConfig().MemberAsString(
       "default_model_filename", &model_file_name, &file_name_len));
   file_name_ = std::string(model_file_name);
 
-  return nullptr;  // success
+  return nullptr; // success
 }
 
 /////////////
@@ -224,14 +224,14 @@ TRITONSERVER_Error* ModelState::ValidateModelConfig() {
 // provides many common functions.
 //
 class ModelInstanceState : public BackendModelInstance {
- public:
-  static TRITONSERVER_Error* Create(
-      ModelState* model_state,
-      TRITONBACKEND_ModelInstance* triton_model_instance,
-      ModelInstanceState** state) {
+public:
+  static TRITONSERVER_Error *
+  Create(ModelState *model_state,
+         TRITONBACKEND_ModelInstance *triton_model_instance,
+         ModelInstanceState **state) {
     try {
       *state = new ModelInstanceState(model_state, triton_model_instance);
-    } catch (const BackendModelInstanceException& ex) {
+    } catch (const BackendModelInstanceException &ex) {
       RETURN_ERROR_IF_TRUE(
           ex.err_ == nullptr, TRITONSERVER_ERROR_INTERNAL,
           std::string("unexpected nullptr in BackendModelInstanceException"));
@@ -240,12 +240,12 @@ class ModelInstanceState : public BackendModelInstance {
 
     LOG_MESSAGE(TRITONSERVER_LOG_INFO, "ModelInstanceState Created success");
 
-    return nullptr;  // success
+    return nullptr; // success
   }
   virtual ~ModelInstanceState() = default;
 
   // Get the state of the model that corresponds to this instance.
-  ModelState* StateForModel() const { return model_state_; }
+  ModelState *StateForModel() const { return model_state_; }
   std::shared_ptr<::lightseq::cuda::LSModel> LightseqModel() {
     return lightseq_model_ptr_;
   }
@@ -255,28 +255,28 @@ class ModelInstanceState : public BackendModelInstance {
   int get_output_index(std::string output_name) {
     return output_name_map_.find(output_name)->second;
   }
-  void* get_d_input(std::string input_name) {
+  void *get_d_input(std::string input_name) {
     return d_inputs_map.find(input_name)->second;
   }
-  void* get_d_output(std::string output_name) {
+  void *get_d_output(std::string output_name) {
     return d_outputs_map.find(output_name)->second;
   }
 
- private:
-  ModelInstanceState(ModelState* model_state,
-                     TRITONBACKEND_ModelInstance* triton_model_instance);
-  ModelState* model_state_;
+private:
+  ModelInstanceState(ModelState *model_state,
+                     TRITONBACKEND_ModelInstance *triton_model_instance);
+  ModelState *model_state_;
   std::shared_ptr<::lightseq::cuda::LSModel> lightseq_model_ptr_;
 
   std::unordered_map<std::string, int> input_name_map_;
   std::unordered_map<std::string, int> output_name_map_;
 
-  std::map<std::string, void*> d_inputs_map;
-  std::map<std::string, void*> d_outputs_map;
+  std::map<std::string, void *> d_inputs_map;
+  std::map<std::string, void *> d_outputs_map;
 };
 
 ModelInstanceState::ModelInstanceState(
-    ModelState* model_state, TRITONBACKEND_ModelInstance* triton_model_instance)
+    ModelState *model_state, TRITONBACKEND_ModelInstance *triton_model_instance)
     : BackendModelInstance(model_state, triton_model_instance),
       model_state_(model_state) {
   std::string file_name =
@@ -314,7 +314,7 @@ ModelInstanceState::ModelInstanceState(
       input_byte_size *= shape_iter;
     }
 
-    void* d_input = nullptr;
+    void *d_input = nullptr;
     LOG_IF_ERROR(TRITONBACKEND_MemoryManagerAllocate(
                      model_state->TritonMemoryManager(), &d_input,
                      TRITONSERVER_MEMORY_GPU, DeviceId(), input_byte_size),
@@ -333,7 +333,7 @@ ModelInstanceState::ModelInstanceState(
     for (auto shape_iter : lightseq_model_ptr_->get_output_max_shape(idx)) {
       output_byte_size *= shape_iter;
     }
-    void* d_output = nullptr;
+    void *d_output = nullptr;
     LOG_IF_ERROR(TRITONBACKEND_MemoryManagerAllocate(
                      model_state->TritonMemoryManager(), &d_output,
                      TRITONSERVER_MEMORY_GPU, 0, output_byte_size),
@@ -343,6 +343,6 @@ ModelInstanceState::ModelInstanceState(
   }
 }
 
-}  // namespace lightseq
-}  // namespace backend
-}  // namespace triton
+} // namespace lightseq
+} // namespace backend
+} // namespace triton

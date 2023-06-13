@@ -1,10 +1,10 @@
 
 
-#include "model_base.h"
 #include "../model/moe_decoder.h"
 #include "../model/moe_encoder.h"
 #include "../proto/moe_weight.h"
 #include "../tools/util.h"
+#include "model_base.h"
 
 #ifdef FP16_MODE
 const lightseq::cuda::OperationType moe_optytpe =
@@ -17,7 +17,7 @@ const lightseq::cuda::OperationType moe_optytpe =
 namespace lightseq {
 namespace cuda {
 class Moe : public LSModel {
- private:
+private:
   typedef OperationTypeTraits<moe_optytpe> optraits;
   std::shared_ptr<MoeEncoder<moe_optytpe>> encoder_;
   std::shared_ptr<MoeDecoder<moe_optytpe>> decoder_;
@@ -58,7 +58,7 @@ class Moe : public LSModel {
   const int get_max_step() { return tw_._max_step; }
   const int get_beam_size() { return tw_._beam_size; }
 
- public:
+public:
   Moe(const std::string weight_path, const int max_batch_size);
   ~Moe();
   void Infer() override;
@@ -73,5 +73,5 @@ class Moe : public LSModel {
 };
 
 LSMODEL_REGISTER(Moe);
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

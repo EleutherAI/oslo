@@ -12,8 +12,8 @@
 #include <string>
 #include <vector>
 
-#include "quant_bert.pb.h"
 #include "../tools/util.h"
+#include "quant_bert.pb.h"
 
 namespace lightseq {
 namespace cuda {
@@ -21,9 +21,8 @@ namespace cuda {
 /*
 Load the model weights which stored in custom proto file into GPU memory.
 */
-template <OperationType OpType_>
-class QuantBertWeight {
- private:
+template <OperationType OpType_> class QuantBertWeight {
+private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   _DataType float2required(float value);
@@ -35,8 +34,8 @@ class QuantBertWeight {
   void hdf5_parse_emb_wei(hid_t hdf5_file);
   void hdf5_parse_enc_wei(hid_t hdf5_file);
   // store the weights pointer
-  std::vector<const _DataType *> _p_d_src_emb_wei;  // size: 4
-  std::vector<const _DataType *> _p_d_enc_wei;      // size: 12 * enc_layer_num
+  std::vector<const _DataType *> _p_d_src_emb_wei; // size: 4
+  std::vector<const _DataType *> _p_d_enc_wei;     // size: 12 * enc_layer_num
 
   // store the weights on cpu memory
   std::vector<_DataType> _d_src_emb_wei;
@@ -44,9 +43,9 @@ class QuantBertWeight {
 
   // store the clip_max of weights and activations
   float _src_emb_clip_max;
-  std::vector<float> _enc_clip_max;  // size: 11 * enc_layer_num
+  std::vector<float> _enc_clip_max; // size: 11 * enc_layer_num
 
- public:
+public:
   std::string initializing(std::string proto_path);
 
   const std::vector<const _DataType *> &get_src_emb_wei() const {
@@ -71,12 +70,12 @@ class QuantBertWeight {
   int _inner_size;
   int _max_step;
   int _src_vocab_size;
-  int _n_enc_layer;  // number of encoder layer
+  int _n_enc_layer; // number of encoder layer
   int _dim_per_head;
-  int _weight_per_enc_layer;  // 12
+  int _weight_per_enc_layer; // 12
 
   int _head_num;
-  int _padding_id;  // for src
+  int _padding_id; // for src
   bool _is_post_ln;
   bool _use_gelu;
   int _multilg_type;
@@ -98,5 +97,5 @@ class QuantBertWeight {
   }
 };
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

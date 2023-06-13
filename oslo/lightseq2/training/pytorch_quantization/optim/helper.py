@@ -64,7 +64,7 @@ def group_parameters(
 
     Args:
         model: A module
-        patterns_list: A list of list of strings. WARNING: patters must be EXCLUSIVE, the function doesn't
+        patterns_list: A list of list of strings. WARNING: patterns must be EXCLUSIVE, the function doesn't
             perform exclusive check.
         lrs: A list of float with same length as keys_list or None.
         momentums: A list of float with same length as keys_list or None.

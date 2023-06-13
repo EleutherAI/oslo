@@ -8,14 +8,10 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
     size_t hidden_size, size_t num_heads, float attn_prob_dropout_ratio,
     float hidden_output_dropout_ratio, bool is_pre_ln,
     bool is_continuous_cache)
-    : Layer("DecSelfAttentionLayer"),  // necessary
-      _layer_id(layer_id),
-      _max_batch_tokens(max_batch_tokens),
-      _max_seq_len(max_seq_len),
-      _hidden_size(hidden_size),
-      _heads(num_heads),
-      _is_pre_ln(is_pre_ln),
-      _is_continuous_cache(is_continuous_cache),
+    : Layer("DecSelfAttentionLayer"), // necessary
+      _layer_id(layer_id), _max_batch_tokens(max_batch_tokens),
+      _max_seq_len(max_seq_len), _hidden_size(hidden_size), _heads(num_heads),
+      _is_pre_ln(is_pre_ln), _is_continuous_cache(is_continuous_cache),
       // operators
       _attn_ln(
           new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false)),
@@ -55,57 +51,56 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
   _attn_nw = new Variable("_attn_nw", g_dtype<T1>(), g_dtype<T2>());
   _attn_nb = new Variable("_attn_nb", g_dtype<T1>(), g_dtype<T2>());
 
-  this->_context_ptr->exit_layer();  // necessary
+  this->_context_ptr->exit_layer(); // necessary
 }
 
 template <typename T1, typename T2>
-std::tuple<Variable*, Variable*, Variable*>
-DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
-                                          Variable* cache_v) {
+std::tuple<Variable *, Variable *, Variable *> DecSelfAttentionLayer<T1, T2>::
+operator()(Variable *inp, Variable *cache_k, Variable *cache_v) {
   set_inputs({inp, cache_k, cache_v});
 
-  Variable* qkv_out = nullptr;
+  Variable *qkv_out = nullptr;
   if (_is_pre_ln) {
-    Variable* attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
+    Variable *attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
     qkv_out = (*_qkv_linear)(attn_ln_out, _attn_qkvw);
   } else {
     qkv_out = (*_qkv_linear)(inp, _attn_qkvw);
   }
 
-  Variable* transform_20314_out =
+  Variable *transform_20314_out =
       (*_bias_add_transform_20314)(qkv_out, _attn_qkvb);
   q_out = new Variable("q_out", transform_20314_out);
   k_out = new Variable("k_out", transform_20314_out);
   v_out = new Variable("v_out", transform_20314_out);
 
-  Variable* cache_k_out = (*_concat_cache_k)(k_out, cache_k);
-  Variable* cache_v_out = (*_concat_cache_v)(v_out, cache_v);
+  Variable *cache_k_out = (*_concat_cache_k)(k_out, cache_k);
+  Variable *cache_v_out = (*_concat_cache_v)(v_out, cache_v);
 
-  Variable* attn_score = (*_attn_scores)(cache_k_out, q_out);
+  Variable *attn_score = (*_attn_scores)(cache_k_out, q_out);
 
-  Variable* soft_out = (*_softmax)(attn_score);
+  Variable *soft_out = (*_softmax)(attn_score);
 
-  Variable* attn_context;
+  Variable *attn_context;
   // if mode is Training, then execute dropout, otherwise omit the processing.
   if (_context_ptr->is_training()) {
-    Variable* prob_dropout = (*_attn_prob_dropout)(soft_out);
+    Variable *prob_dropout = (*_attn_prob_dropout)(soft_out);
     attn_context = (*_attn_context)(cache_v_out, prob_dropout);
   } else {
     attn_context = (*_attn_context)(cache_v_out, soft_out);
   }
 
-  Variable* transform_0213_out = (*_transform_0213)(attn_context);
+  Variable *transform_0213_out = (*_transform_0213)(attn_context);
 
-  Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
+  Variable *attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
 
-  Variable* attn_dropout_residual =
+  Variable *attn_dropout_residual =
       (*_attn_dropout)(attn_linear, _attn_ob, inp);
   if (_is_pre_ln) {
     set_outputs({attn_dropout_residual, cache_k_out, cache_v_out});
     return std::make_tuple(attn_dropout_residual, cache_k_out, cache_v_out);
   }
 
-  Variable* attn_ln_out =
+  Variable *attn_ln_out =
       (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
   set_outputs({attn_ln_out, cache_k_out, cache_v_out});
   return std::make_tuple(attn_ln_out, cache_k_out, cache_v_out);
@@ -118,7 +113,7 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(size_t batch_size,
   _trg_seq_len = trg_seq_len;
   _batch_heads = batch_size * _heads;
   _trg_batch_tokens =
-      batch_size * trg_seq_len;  // if inference, means batch_size * beam_size.
+      batch_size * trg_seq_len; // if inference, means batch_size * beam_size.
   _batch_dim = _trg_batch_tokens * _hidden_size;
   _step = (_context_ptr->is_inference() ? steps : -1);
 
@@ -187,35 +182,35 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(size_t batch_size,
 
 template <typename T1, typename T2>
 size_t DecSelfAttentionLayer<T1, T2>::load_para_and_grad(
-    const T1* para_ptr, T2* grad_ptr) {  // for training
+    const T1 *para_ptr, T2 *grad_ptr) { // for training
   size_t offset = 0;
-  _attn_qkvw->set_value((char*)(para_ptr + offset));
-  _attn_qkvw->set_grad((char*)(grad_ptr + offset));
+  _attn_qkvw->set_value((char *)(para_ptr + offset));
+  _attn_qkvw->set_grad((char *)(grad_ptr + offset));
   _attn_qkvw->set_shape({_hidden_size, 3 * _hidden_size});
   offset += _hidden_size * _hidden_size * 3;
 
-  _attn_qkvb->set_value((char*)(para_ptr + offset));
-  _attn_qkvb->set_grad((char*)(grad_ptr + offset));
+  _attn_qkvb->set_value((char *)(para_ptr + offset));
+  _attn_qkvb->set_grad((char *)(grad_ptr + offset));
   _attn_qkvb->set_shape({3 * _hidden_size});
   offset += _hidden_size * 3;
 
-  _attn_ow->set_value((char*)(para_ptr + offset));
-  _attn_ow->set_grad((char*)(grad_ptr + offset));
+  _attn_ow->set_value((char *)(para_ptr + offset));
+  _attn_ow->set_grad((char *)(grad_ptr + offset));
   _attn_ow->set_shape({_hidden_size, _hidden_size});
   offset += _hidden_size * _hidden_size;
 
-  _attn_ob->set_value((char*)(para_ptr + offset));
-  _attn_ob->set_grad((char*)(grad_ptr + offset));
+  _attn_ob->set_value((char *)(para_ptr + offset));
+  _attn_ob->set_grad((char *)(grad_ptr + offset));
   _attn_ob->set_shape({_hidden_size});
   offset += _hidden_size;
 
-  _attn_nw->set_value((char*)(para_ptr + offset));
-  _attn_nw->set_grad((char*)(grad_ptr + offset));
+  _attn_nw->set_value((char *)(para_ptr + offset));
+  _attn_nw->set_grad((char *)(grad_ptr + offset));
   _attn_nw->set_shape({_hidden_size});
   offset += _hidden_size;
 
-  _attn_nb->set_value((char*)(para_ptr + offset));
-  _attn_nb->set_grad((char*)(grad_ptr + offset));
+  _attn_nb->set_value((char *)(para_ptr + offset));
+  _attn_nb->set_grad((char *)(grad_ptr + offset));
   _attn_nb->set_shape({_hidden_size});
   offset += _hidden_size;
 
@@ -224,24 +219,24 @@ size_t DecSelfAttentionLayer<T1, T2>::load_para_and_grad(
 
 template <typename T1, typename T2>
 int DecSelfAttentionLayer<T1, T2>::load_params(
-    const std::vector<const T1*>& para_vec, int offset) {  // for inference
+    const std::vector<const T1 *> &para_vec, int offset) { // for inference
   int size = 0;
-  _attn_nw->set_value((char*)para_vec[offset + size]), size++;
+  _attn_nw->set_value((char *)para_vec[offset + size]), size++;
   _attn_nw->set_shape({_hidden_size});
-  _attn_nb->set_value((char*)para_vec[offset + size]), size++;
+  _attn_nb->set_value((char *)para_vec[offset + size]), size++;
   _attn_nb->set_shape({_hidden_size});
 
-  _attn_qkvw->set_value((char*)para_vec[offset + size]), size++;
+  _attn_qkvw->set_value((char *)para_vec[offset + size]), size++;
   _attn_qkvw->set_shape({_hidden_size, 3 * _hidden_size});
-  _attn_qkvb->set_value((char*)para_vec[offset + size]), size++;
+  _attn_qkvb->set_value((char *)para_vec[offset + size]), size++;
   _attn_qkvb->set_shape({3 * _hidden_size});
 
-  _attn_ow->set_value((char*)para_vec[offset + size]), size++;
+  _attn_ow->set_value((char *)para_vec[offset + size]), size++;
   _attn_ow->set_shape({_hidden_size, _hidden_size});
-  _attn_ob->set_value((char*)para_vec[offset + size]), size++;
+  _attn_ob->set_value((char *)para_vec[offset + size]), size++;
   _attn_ob->set_shape({_hidden_size});
 
   return size;
 }
 
-}  // namespace lightseq
+} // namespace lightseq

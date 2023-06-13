@@ -16,7 +16,7 @@
 #
 
 """Quantized instance normalization module
-   Base code is from nn.InstanceNorm, details of the module can be found from the offical repo.
+   Base code is from nn.InstanceNorm, details of the module can be found from the official repo.
 """
 
 from torch.nn.modules.batchnorm import _NormBase

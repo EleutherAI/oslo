@@ -1,7 +1,7 @@
 #pragma once
 #include "declaration.h"
-#include "node.h"
 #include "kernels.h"
+#include "node.h"
 #include "tuple"
 
 namespace lightseq {
@@ -34,11 +34,10 @@ if qkv_num == 3:
   value[:,:,step:step+q_len,:] = func(v)
 
 */
-template <typename T1, typename T2>
-class SplitHeadOp : public Operator {
- private:
+template <typename T1, typename T2> class SplitHeadOp : public Operator {
+private:
   // const after init
-  int _max_query_tokens;  // batch_size * q_len
+  int _max_query_tokens; // batch_size * q_len
   int _nhead;
   int _hidden_size;
   int _head_dim;
@@ -50,15 +49,12 @@ class SplitHeadOp : public Operator {
   int _q_len;
   int _step;
 
- public:
+public:
   SplitHeadOp(int max_query_tokens, int num_heads, int hidden_size,
               int qkv_num = 3, int cache_sz = 0)
-      : Operator("SplitHeadOp"),
-        _max_query_tokens(max_query_tokens),
-        _nhead(num_heads),
-        _hidden_size(hidden_size),
-        _head_dim(hidden_size / num_heads),
-        _cache_sz(cache_sz),
+      : Operator("SplitHeadOp"), _max_query_tokens(max_query_tokens),
+        _nhead(num_heads), _hidden_size(hidden_size),
+        _head_dim(hidden_size / num_heads), _cache_sz(cache_sz),
         _qkv_num(qkv_num) {
     if (qkv_num != 1 && qkv_num != 3) {
       throw std::runtime_error("qkv_num should be 1 or 3.");
@@ -68,11 +64,11 @@ class SplitHeadOp : public Operator {
   virtual ~SplitHeadOp() {}
 
   // without cache
-  std::vector<Variable*> operator()(Variable* inp, Variable* bias);
+  std::vector<Variable *> operator()(Variable *inp, Variable *bias);
 
   // with cache, return query
-  Variable* operator()(Variable* inp, Variable* bias, Variable* key,
-                       Variable* value);
+  Variable *operator()(Variable *inp, Variable *bias, Variable *key,
+                       Variable *value);
 
   // without cache
   void before_forward(int batch_size, int q_len) {
@@ -107,4 +103,4 @@ class SplitHeadOp : public Operator {
   void backward() override;
 };
 
-}  // namespace lightseq
+} // namespace lightseq

@@ -10,16 +10,10 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
     int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
     float activation_dropout_ratio, float hidden_output_dropout_ratio,
     bool pre_or_postLayerNorm, std::string activation_fn)
-    : _layer_id(layer_id),
-      _max_batch_tokens(max_batch_tokens),
-      _max_seq_len(max_seq_len),
-      _hidden_size(hidden_size),
-      _heads(num_heads),
-      _intermediate_size(intermediate_size),
-      _training(true),
-      _predict(false),
-      _is_pre_ln(pre_or_postLayerNorm),
-      _activation_fn(activation_fn),
+    : _layer_id(layer_id), _max_batch_tokens(max_batch_tokens),
+      _max_seq_len(max_seq_len), _hidden_size(hidden_size), _heads(num_heads),
+      _intermediate_size(intermediate_size), _training(true), _predict(false),
+      _is_pre_ln(pre_or_postLayerNorm), _activation_fn(activation_fn),
       // >>> decoder self attn layer
       _attn_ln(typename Normalize_Layer<T>::Config(hidden_size, false),
                _max_batch_tokens),
@@ -31,9 +25,9 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
       _softmax(typename Softmax<T>::Config(num_heads)),
       _attn_prob_dropout(
           typename Dropout<T>::Config(attn_prob_dropout_ratio),
-          std::max(
-              _max_batch_tokens * std::max(_heads * _max_seq_len, _hidden_size),
-              _hidden_size * _hidden_size * 3)),
+          std::max(_max_batch_tokens *
+                       std::max(_heads * _max_seq_len, _hidden_size),
+                   _hidden_size * _hidden_size * 3)),
       _attn_context(typename StridedBatchGemm<T>::Config(
           T(1.0), T(0.0), CUBLAS_OP_N, CUBLAS_OP_N)),
       _attn_out_linear(
@@ -53,9 +47,9 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
       _encdec_softmax(typename Softmax<T>::Config(num_heads)),
       _encdec_attn_prob_dropout(
           typename Dropout<T>::Config(attn_prob_dropout_ratio),
-          std::max(
-              _max_batch_tokens * std::max(_heads * _max_seq_len, _hidden_size),
-              _hidden_size * _hidden_size)),
+          std::max(_max_batch_tokens *
+                       std::max(_heads * _max_seq_len, _hidden_size),
+                   _hidden_size * _hidden_size)),
       _encdec_attn_context(typename StridedBatchGemm<T>::Config(
           T(1.0), T(0.0), CUBLAS_OP_N, CUBLAS_OP_N)),
       _encdec_attn_out_linear(
@@ -71,18 +65,16 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
           typename Dropout<T>::Config(activation_dropout_ratio),
           std::max(_max_batch_tokens, _hidden_size) * _intermediate_size),
       _ff2(typename FeedForward<T>::Config(hidden_size, _intermediate_size)),
-      _ffn_dropout(
-          typename Dropout<T>::Config(hidden_output_dropout_ratio),
-          std::max(_max_batch_tokens, _intermediate_size) * _hidden_size),
-      _enable_quant(false),
-      _algo_map() {
+      _ffn_dropout(typename Dropout<T>::Config(hidden_output_dropout_ratio),
+                   std::max(_max_batch_tokens, _intermediate_size) *
+                       _hidden_size),
+      _enable_quant(false), _algo_map() {
   assert(_hidden_size % _heads == 0);
   allocate_buffer();
   _shared_nlayer += 1;
 }
 
-template <typename T>
-TransformerDecoderLayer<T>::~TransformerDecoderLayer() {
+template <typename T> TransformerDecoderLayer<T>::~TransformerDecoderLayer() {
   free_memory();
 }
 
@@ -526,7 +518,7 @@ void TransformerDecoderLayer<T>::Forward(const T *dec_input_ptr,
     encdec_kv_fw(enc_output_ptr);
   }
 
-  T *buffer = _shared_buffer_ptr;  // 3 * _batch_dim
+  T *buffer = _shared_buffer_ptr; // 3 * _batch_dim
 
   // _batch_dim
   T *encdec_attn_inp_ptr =
@@ -561,12 +553,12 @@ void TransformerDecoderLayer<T>::self_attn_layer_bw(const T *input_ptr,
   T *grad_residual_ptr = buffer;
   buffer += _batch_dim;
 
-  T *grad_input_buf_ptr = buffer;  // batch_dim
-  T *grad_qkv_5d_ptr = buffer;     // batch_dim * 3
+  T *grad_input_buf_ptr = buffer; // batch_dim
+  T *grad_qkv_5d_ptr = buffer;    // batch_dim * 3
   buffer += 3 * _batch_dim;
 
-  T *grad_qkv_4d_ptr = buffer;   // batch_dim * 3
-  T *grad_softmax_ptr = buffer;  // batch_size * head_num * seq_len * seq_len
+  T *grad_qkv_4d_ptr = buffer;  // batch_dim * 3
+  T *grad_softmax_ptr = buffer; // batch_size * head_num * seq_len * seq_len
   // buffer += max(3 * _batch_dim,
   //   batch_size * head_num * seq_len * seq_len);
 
@@ -678,14 +670,14 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_bw(const T *output_ptr,
   // batch_dim = batch_size * seq_len * hidden_size
   // buffer size: batch_dim * 2 + max(batch_dim,
   //     batch_size * head_num * seq_len * seq_len)
-  T *grad_residual_ptr = buffer;  // batch_dim
+  T *grad_residual_ptr = buffer; // batch_dim
   buffer += _batch_dim;
 
-  T *grad_input_buf_ptr = buffer;  // batch_dim
-  T *grad_q_5d_ptr = buffer;       // batch_dim
+  T *grad_input_buf_ptr = buffer; // batch_dim
+  T *grad_q_5d_ptr = buffer;      // batch_dim
   buffer += _batch_dim;
 
-  T *grad_q_4d_ptr = buffer;  // batch_dim
+  T *grad_q_4d_ptr = buffer; // batch_dim
   // batch_size * head_num * trg_seq_len * src_seq_len
   T *grad_softmax_ptr = buffer;
 
@@ -906,8 +898,7 @@ void TransformerDecoderLayer<T>::Backward(
   }
 }
 
-template <typename T>
-void TransformerDecoderLayer<T>::zero_mask_grad() {
+template <typename T> void TransformerDecoderLayer<T>::zero_mask_grad() {
   cudaMemsetAsync(_grad_attn_qkv_cmax_ptr, 0, 24 * sizeof(T), _stream);
   _attn_prob_dropout.zero_mask(_stream);
   _attn_dropout.zero_mask(_stream);
@@ -917,8 +908,7 @@ void TransformerDecoderLayer<T>::zero_mask_grad() {
   _ffn_dropout.zero_mask(_stream);
 }
 
-template <typename T>
-size_t TransformerDecoderLayer<T>::_shared_nlayer = 0;
+template <typename T> size_t TransformerDecoderLayer<T>::_shared_nlayer = 0;
 template <typename T>
 T *TransformerDecoderLayer<T>::_shared_buffer_ptr = nullptr;
 template <typename T>
@@ -932,5 +922,5 @@ int8_t *TransformerDecoderLayer<T>::_shared_quant_mem_ptr = nullptr;
 
 template class TransformerDecoderLayer<float>;
 template class TransformerDecoderLayer<__half>;
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

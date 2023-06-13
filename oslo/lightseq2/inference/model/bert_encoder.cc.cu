@@ -1,6 +1,6 @@
-#include "bert_encoder.h"
 #include "../kernels/embKernels.h"
 #include "../kernels/transformerKernels.h"
+#include "bert_encoder.h"
 
 /**
 @file
@@ -17,18 +17,11 @@ BertEncoder<OpType_>::BertEncoder(int max_batch_size, const int *p_d_token_id,
                                   const BertWeight<OpType_> &tw,
                                   cudaStream_t stream, cublasHandle_t hd,
                                   const int *p_d_lang_id)
-    : _max_batch_size(max_batch_size),
-      _p_d_token_id(p_d_token_id),
-      _p_d_padding_mask(p_d_padding_mask),
-      _p_d_output(p_d_output),
-      _p_d_lang_id(p_d_lang_id),
-      _tw(tw),
-      _stream(stream),
-      _hd(hd),
-      _p_d_src_emb_wei(tw.get_src_emb_wei()),
-      _p_d_enc_wei(tw.get_enc_wei()),
-      _fone((_DataType)1.f),
-      _fzero((_DataType)0.f),
+    : _max_batch_size(max_batch_size), _p_d_token_id(p_d_token_id),
+      _p_d_padding_mask(p_d_padding_mask), _p_d_output(p_d_output),
+      _p_d_lang_id(p_d_lang_id), _tw(tw), _stream(stream), _hd(hd),
+      _p_d_src_emb_wei(tw.get_src_emb_wei()), _p_d_enc_wei(tw.get_enc_wei()),
+      _fone((_DataType)1.f), _fzero((_DataType)0.f),
       _atten_scaler((_DataType)sqrt(1.f / tw._dim_per_head)),
       _max_batch_dim(max_batch_size * tw._max_step * tw._hidden_size),
       _max_thread_per_block(1024) {}
@@ -67,8 +60,7 @@ void BertEncoder<OpType_>::init_buffer(void *pbuf) {
 /**
 Some requirements needed by custom cuda kernel function
 */
-template <OperationType OpType_>
-std::string BertEncoder<OpType_>::check() {
+template <OperationType OpType_> std::string BertEncoder<OpType_>::check() {
   // if (_max_thread_per_block < _tw._hidden_size) {
   //   return "violate hidden_size <= max_thread_per_block";
   // }
@@ -121,14 +113,14 @@ void BertEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
                             _tw._hidden_size, _stream, _p_d_src_emb_wei[4],
                             _p_d_lang_id, _tw._multilg_type);
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // token_id
       std::cout << "emb out: token-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
                 "emb out", 10);
     }
-  }  // not normal
+  } // not normal
 #endif
   for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
     _weight_offset = _layer_id * _tw._weight_per_enc_layer;
@@ -141,14 +133,14 @@ void BertEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
       _p_d_src_emb_wei[2], _p_d_src_emb_wei[3], _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // token_id
       std::cout << "encoder output: token-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
                 "encoder_output", _tw._dim_per_head);
     }
-  }  // not normal
+  } // not normal
 #endif
   return;
 }
@@ -156,8 +148,7 @@ void BertEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
 /**
 Encoder self attention
 */
-template <OperationType OpType_>
-void BertEncoder<OpType_>::self_attention() {
+template <OperationType OpType_> void BertEncoder<OpType_>::self_attention() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_q,
@@ -249,8 +240,7 @@ void BertEncoder<OpType_>::self_attention() {
   return;
 }
 
-template <OperationType OpType_>
-void BertEncoder<OpType_>::ffn_add_norm() {
+template <OperationType OpType_> void BertEncoder<OpType_>::ffn_add_norm() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_ffn_buf1,
@@ -303,5 +293,5 @@ void BertEncoder<OpType_>::ffn_add_norm() {
 template class BertEncoder<OperationType::FP16>;
 template class BertEncoder<OperationType::FP32>;
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

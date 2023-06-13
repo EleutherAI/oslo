@@ -7,17 +7,14 @@ namespace cuda {
 template <typename T>
 QuantLinearLayer<T>::QuantLinearLayer(int layer_id, int in_features,
                                       int out_features, int max_batch_tokens)
-    : _layer_id(layer_id),
-      _in_features(in_features),
-      _out_features(out_features),
-      _max_batch_tokens(max_batch_tokens),
+    : _layer_id(layer_id), _in_features(in_features),
+      _out_features(out_features), _max_batch_tokens(max_batch_tokens),
       _enable_quant(false),
       _linear(typename FeedForward<T>::Config(out_features, in_features)) {
   allocate_mem_buffer();
 }
 
-template <typename T>
-QuantLinearLayer<T>::~QuantLinearLayer() {
+template <typename T> QuantLinearLayer<T>::~QuantLinearLayer() {
   free_mem_buffer();
 }
 
@@ -88,5 +85,5 @@ void QuantLinearLayer<T>::SetQuantMode(bool enable_quant) {
 
 template class QuantLinearLayer<float>;
 template class QuantLinearLayer<__half>;
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

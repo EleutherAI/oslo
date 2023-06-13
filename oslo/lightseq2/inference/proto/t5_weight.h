@@ -22,9 +22,8 @@ namespace cuda {
 /*
 Load the model weights which stored in custom proto file into GPU memory.
 */
-template <OperationType OpType_>
-class T5Weight {
- private:
+template <OperationType OpType_> class T5Weight {
+private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   _DataType float2required(float value);
@@ -43,10 +42,10 @@ class T5Weight {
   void hdf5_parse_dec_wei(hid_t hdf5_file);
 
   // store the weights pointer
-  std::vector<const _DataType *> _p_d_src_emb_wei;  // size: 4
-  std::vector<const _DataType *> _p_d_trg_emb_wei;  // size: 4
-  std::vector<const _DataType *> _p_d_enc_wei;      // size: 12 * enc_layer_num
-  std::vector<const _DataType *> _p_d_dec_wei;      // size: 18 * dec_layer_num
+  std::vector<const _DataType *> _p_d_src_emb_wei; // size: 4
+  std::vector<const _DataType *> _p_d_trg_emb_wei; // size: 4
+  std::vector<const _DataType *> _p_d_enc_wei;     // size: 12 * enc_layer_num
+  std::vector<const _DataType *> _p_d_dec_wei;     // size: 18 * dec_layer_num
 
   // store the weights on gpu memo
   thrust::device_vector<_DataType> _d_src_emb_wei;
@@ -56,7 +55,7 @@ class T5Weight {
   thrust::device_vector<_DataType> _d_src_lang_emb;
   thrust::device_vector<_DataType> _d_trg_lang_emb;
 
- public:
+public:
   std::string initializing(std::string proto_path, bool only_decoder = false);
 
   const std::vector<const _DataType *> &get_src_emb_wei() const {
@@ -94,19 +93,19 @@ class T5Weight {
   int _max_step;
   int _src_vocab_size;
   int _trg_vocab_size;
-  int _n_enc_layer;  // number of encoder layer
-  int _n_dec_layer;  // number of decoder layer
+  int _n_enc_layer; // number of encoder layer
+  int _n_dec_layer; // number of decoder layer
   int _dim_per_head;
-  int _weight_per_enc_layer;  // 12
-  int _weight_per_dec_layer;  // 18
+  int _weight_per_enc_layer; // 12
+  int _weight_per_dec_layer; // 18
 
   int _head_num;
-  int _relative_attention_num_buckets;  // 32
+  int _relative_attention_num_buckets; // 32
   int _beam_size;
   int _extra_decode_length;
   float _length_penalty;
-  int _padding_id;  // for src
-  int _start_id;    // for trg
+  int _padding_id; // for src
+  int _start_id;   // for trg
   int _end_id;
   float _diverse_lambda;
   std::string _sampling_method;
@@ -150,5 +149,5 @@ class T5Weight {
   }
 };
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

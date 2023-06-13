@@ -3,9 +3,9 @@
 namespace lightseq {
 
 template <typename T>
-std::tuple<Variable*, Variable*> LaunchEncEmbOp<T>::operator()(
-    Variable* inp_tokens, Variable* token_emb, Variable* pos_emb,
-    Variable* lang_emb, Variable* lang_id) {
+std::tuple<Variable *, Variable *> LaunchEncEmbOp<T>::
+operator()(Variable *inp_tokens, Variable *token_emb, Variable *pos_emb,
+           Variable *lang_emb, Variable *lang_id) {
   size_t max_size = _max_batch_tokens * _hidden_dim;
 
   _result = new Variable("LaunchEncEmbOp_out", _max_batch_tokens * _hidden_dim,
@@ -16,16 +16,15 @@ std::tuple<Variable*, Variable*> LaunchEncEmbOp<T>::operator()(
   return std::make_tuple(_result, _pad_mask);
 }
 
-template <typename T>
-void LaunchEncEmbOp<T>::forward() {
-  int* inp_tokens = (int*)parent(0)->value();
-  const T* token_emb = (const T*)parent(1)->value();
-  const T* pos_emb = (const T*)parent(2)->value();
-  T* lang_emb = (T*)parent(3)->value();
-  int* lang_id = (int*)parent(4)->value();
+template <typename T> void LaunchEncEmbOp<T>::forward() {
+  int *inp_tokens = (int *)parent(0)->value();
+  const T *token_emb = (const T *)parent(1)->value();
+  const T *pos_emb = (const T *)parent(2)->value();
+  T *lang_emb = (T *)parent(3)->value();
+  int *lang_id = (int *)parent(4)->value();
 
-  T* output_ptr = (T*)child(0)->value();
-  T* pad_mask = (T*)child(1)->value();
+  T *output_ptr = (T *)child(0)->value();
+  T *pad_mask = (T *)child(1)->value();
 
   if (!_context_ptr->is_built()) {
     return;
@@ -43,4 +42,4 @@ template class LaunchEncEmbOp<float>;
 #ifdef LIGHTSEQ_cuda
 template class LaunchEncEmbOp<__half>;
 #endif
-}  // namespace lightseq
+} // namespace lightseq

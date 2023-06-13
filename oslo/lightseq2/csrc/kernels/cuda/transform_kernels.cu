@@ -9,26 +9,22 @@ using namespace cub;
 namespace lightseq {
 namespace cuda {
 
-template <typename T>
-bool check_divide_float4(int sz) {
-  return !(sz & 3);  // sz % 4 == 0
+template <typename T> bool check_divide_float4(int sz) {
+  return !(sz & 3); // sz % 4 == 0
 }
 
-template <>
-bool check_divide_float4<__half>(int sz) {
-  return !(sz & 7);  // sz % 8 == 0
+template <> bool check_divide_float4<__half>(int sz) {
+  return !(sz & 7); // sz % 8 == 0
 }
 
-template <typename T>
-void divide_float4(int *sz) {
+template <typename T> void divide_float4(int *sz) {
   if ((*sz) % 4 != 0) {
     throw std::runtime_error("size need to be a multiple of 4 when use float4");
   }
   (*sz) >>= 2;
 }
 
-template <>
-void divide_float4<__half>(int *sz) {
+template <> void divide_float4<__half>(int *sz) {
   if ((*sz) % 8 != 0) {
     throw std::runtime_error("size need to be a multiple of 8 when use float4");
   }
@@ -124,10 +120,9 @@ __global__ void bias_add_transform_20314(T *output, const T *input,
                                          const T *bias, int dim_3, int dim_4);
 
 template <>
-__global__ void bias_add_transform_20314<float>(float *output,
-                                                const float *input,
-                                                const float *bias, int dim_3,
-                                                int dim_4) {
+__global__ void
+bias_add_transform_20314<float>(float *output, const float *input,
+                                const float *bias, int dim_3, int dim_4) {
   int id0 = blockIdx.x;
   int id1 = blockIdx.y;
   int id2 = blockIdx.z;
@@ -163,10 +158,9 @@ __global__ void bias_add_transform_20314<float>(float *output,
 }
 
 template <>
-__global__ void bias_add_transform_20314<__half>(__half *output,
-                                                 const __half *input,
-                                                 const __half *bias, int dim_3,
-                                                 int dim_4) {
+__global__ void
+bias_add_transform_20314<__half>(__half *output, const __half *input,
+                                 const __half *bias, int dim_3, int dim_4) {
   int id0 = blockIdx.x;
   int id1 = blockIdx.y;
   int id2 = blockIdx.z;
@@ -251,12 +245,11 @@ bias: [dim_2, dim_3, dim_4]
 output: [dim_2, dim_0, dim_3, dim_1, dim_4]
 */
 template <typename T>
-__global__ void quant_bias_add_transform_20314(T *output, uint8_t *clip_mask,
-                                               const int8_t *input,
-                                               const T *bias, const T *clip_max,
-                                               int dim_3, int dim_4,
-                                               const T *out_clip_max,
-                                               bool in_col32);
+__global__ void
+quant_bias_add_transform_20314(T *output, uint8_t *clip_mask,
+                               const int8_t *input, const T *bias,
+                               const T *clip_max, int dim_3, int dim_4,
+                               const T *out_clip_max, bool in_col32);
 
 template <>
 __global__ void quant_bias_add_transform_20314<float>(
@@ -285,7 +278,8 @@ __global__ void quant_bias_add_transform_20314<float>(
 
   float clip_max_val = clip_max[0];
   float out_clip_max_val;
-  if (out_clip_max) out_clip_max_val = out_clip_max[0];
+  if (out_clip_max)
+    out_clip_max_val = out_clip_max[0];
   // fix me
   uint8_t clip_mask_val;
 
@@ -354,7 +348,8 @@ __global__ void quant_bias_add_transform_20314<__half>(
 
   float clip_max_val = __half2float(clip_max[0]);
   float out_clip_max_val;
-  if (out_clip_max) out_clip_max_val = __half2float(out_clip_max[0]);
+  if (out_clip_max)
+    out_clip_max_val = __half2float(out_clip_max[0]);
   uint8_t clip_mask_val;
 
   for (std::size_t i = threadIdx.x; i < dim_34; i += blockDim.x) {
@@ -565,11 +560,10 @@ nhead: number of attention heads
 trans_count: 1 or 3, the count of matrice need to be transformed
 */
 template <typename T>
-__global__ void quant_transform4d_0213(int8_t *output, uint8_t *clip_mask,
-                                       const T *input, const T *clip_max,
-                                       int batch_size, int seq_len,
-                                       int trans_count, int nhead, int head_dim,
-                                       int num_all) {
+__global__ void
+quant_transform4d_0213(int8_t *output, uint8_t *clip_mask, const T *input,
+                       const T *clip_max, int batch_size, int seq_len,
+                       int trans_count, int nhead, int head_dim, int num_all) {
   int offset = blockIdx.x * blockDim.x + threadIdx.x;
   if (offset >= num_all) {
     return;
@@ -599,10 +593,11 @@ __global__ void quant_transform4d_0213(int8_t *output, uint8_t *clip_mask,
 }
 
 template <>
-__global__ void quant_transform4d_0213<__half>(
-    int8_t *output, uint8_t *clip_mask, const __half *input,
-    const __half *clip_max, int batch_size, int seq_len, int trans_count,
-    int nhead, int head_dim, int num_all) {
+__global__ void
+quant_transform4d_0213<__half>(int8_t *output, uint8_t *clip_mask,
+                               const __half *input, const __half *clip_max,
+                               int batch_size, int seq_len, int trans_count,
+                               int nhead, int head_dim, int num_all) {
   int offset = blockIdx.x * blockDim.x + threadIdx.x;
   if (offset >= num_all) {
     return;
@@ -727,7 +722,8 @@ __global__ void transform_0213_dcmax(T *output, T *grad_cmax, const T *input,
 
   __shared__ float block_cmax_grad;
 
-  if (threadIdx.x == 0) block_cmax_grad = 0;
+  if (threadIdx.x == 0)
+    block_cmax_grad = 0;
   __syncthreads();
 
   if (thread_cmax_grad != 0) {
@@ -787,7 +783,8 @@ __global__ void transform_0213_dcmax<__half>(__half *output, __half *grad_cmax,
 
   __shared__ float block_cmax_grad;
 
-  if (threadIdx.x == 0) block_cmax_grad = 0;
+  if (threadIdx.x == 0)
+    block_cmax_grad = 0;
   __syncthreads();
 
   if (thread_cmax_grad != 0) {
@@ -837,16 +834,14 @@ void launch_transform_0213_dcmax<__half>(__half *output, __half *grad_cmax,
       output, grad_cmax, input, clip_mask, hidden_dim, head_dim);
 }
 
-template <typename T>
-__device__ void add_float4(float4 *a, float4 *b) {
+template <typename T> __device__ void add_float4(float4 *a, float4 *b) {
   a[0].x += b[0].x;
   a[0].y += b[0].y;
   a[0].z += b[0].z;
   a[0].w += b[0].w;
 }
 
-template <>
-__device__ void add_float4<__half>(float4 *a, float4 *b) {
+template <> __device__ void add_float4<__half>(float4 *a, float4 *b) {
   __half2 *a_h2 = reinterpret_cast<__half2 *>(a);
   __half2 *b_h2 = reinterpret_cast<__half2 *>(b);
   ;
@@ -888,11 +883,10 @@ if qkv_num == 3:
   value[:,:,step:step+q_len,:] = func(v)
 */
 template <typename T>
-__global__ void ker_split_head_float4(const T *inp, const T *bias, T *query,
-                                      T *key, T *value, int batch_size,
-                                      int hidden_dim, int head_dim, int q_len,
-                                      int kv_len, int step, int qkv_num,
-                                      int num_all) {
+__global__ void
+ker_split_head_float4(const T *inp, const T *bias, T *query, T *key, T *value,
+                      int batch_size, int hidden_dim, int head_dim, int q_len,
+                      int kv_len, int step, int qkv_num, int num_all) {
   int offset = blockIdx.x * blockDim.x + threadIdx.x;
   if (offset >= num_all) {
     return;
@@ -990,5 +984,5 @@ template void launch_split_head<__half>(const __half *inp, const __half *bias,
                                         int hidden_dim, int head_dim, int q_len,
                                         int kv_len, int step, int qkv_num,
                                         cudaStream_t stream);
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

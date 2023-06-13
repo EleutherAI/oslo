@@ -3,7 +3,7 @@
 namespace lightseq {
 
 template <typename T1, typename T2>
-Variable* BiasAddTrans20314<T1, T2>::operator()(Variable* inp, Variable* bias) {
+Variable *BiasAddTrans20314<T1, T2>::operator()(Variable *inp, Variable *bias) {
   // size_t trans_size = _max_batch_tokens * _hidden_size;
   _res = new Variable("BiasAddTrans20314_res",
                       _trans_count * _max_batch_tokens * _hidden_size,
@@ -13,12 +13,11 @@ Variable* BiasAddTrans20314<T1, T2>::operator()(Variable* inp, Variable* bias) {
   return _res;
 }
 
-template <typename T1, typename T2>
-void BiasAddTrans20314<T1, T2>::forward() {
-  T1* inp_ptr = (T1*)parent(0)->value();
-  T1* bias_ptr = (T1*)parent(1)->value();
+template <typename T1, typename T2> void BiasAddTrans20314<T1, T2>::forward() {
+  T1 *inp_ptr = (T1 *)parent(0)->value();
+  T1 *bias_ptr = (T1 *)parent(1)->value();
 
-  T1* res_ptr = (T1*)child(0)->value();
+  T1 *res_ptr = (T1 *)child(0)->value();
 
   if (!_context_ptr->is_built()) {
     return;
@@ -32,11 +31,10 @@ void BiasAddTrans20314<T1, T2>::forward() {
 #endif
 }
 
-template <typename T1, typename T2>
-void BiasAddTrans20314<T1, T2>::backward() {
-  T2* inp_grad = (T2*)parent(0)->grad();
-  T2* res_grad = (T2*)child(0)->grad();
-  T2* qkv_bias_grad = (T2*)parent(1)->grad();
+template <typename T1, typename T2> void BiasAddTrans20314<T1, T2>::backward() {
+  T2 *inp_grad = (T2 *)parent(0)->grad();
+  T2 *res_grad = (T2 *)child(0)->grad();
+  T2 *qkv_bias_grad = (T2 *)parent(1)->grad();
 
   if (!_context_ptr->is_built()) {
     return;
@@ -57,4 +55,4 @@ template class BiasAddTrans20314<float, float>;
 #ifdef LIGHTSEQ_cuda
 template class BiasAddTrans20314<__half, __half>;
 #endif
-}  // namespace lightseq
+} // namespace lightseq

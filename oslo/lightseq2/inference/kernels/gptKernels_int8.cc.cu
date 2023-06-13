@@ -19,11 +19,10 @@ __forceinline__ __device__ int8_t float2int8(float x, float quant_scale) {
 }
 
 template <typename T>
-__global__ void ker_gpt_embedding_int8(const int8_t* token_emb,
-                                       const T* pos_emb, const int* token_id,
-                                       T* output, int* real_seq_len,
-                                       int padding_id, int pos_offset,
-                                       float dequant_scale) {
+__global__ void
+ker_gpt_embedding_int8(const int8_t *token_emb, const T *pos_emb,
+                       const int *token_id, T *output, int *real_seq_len,
+                       int padding_id, int pos_offset, float dequant_scale) {
   int target_pos = blockIdx.x * gridDim.y + blockIdx.y;
   int tid = token_id[target_pos];
   if (tid == padding_id) {
@@ -41,13 +40,14 @@ __global__ void ker_gpt_embedding_int8(const int8_t* token_emb,
 
 /* fp16 version */
 template <>
-__global__ void ker_gpt_embedding_int8<__half>(
-    const int8_t* token_emb, const __half* pos_emb, const int* token_id,
-    __half* output, int* real_seq_len, int padding_id, int pos_offset,
-    float dequant_scale) {
+__global__ void
+ker_gpt_embedding_int8<__half>(const int8_t *token_emb, const __half *pos_emb,
+                               const int *token_id, __half *output,
+                               int *real_seq_len, int padding_id,
+                               int pos_offset, float dequant_scale) {
   int target_pos = blockIdx.x * gridDim.y + blockIdx.y;
   int tid = token_id[target_pos];
-  half2* output_h = (half2*)output;
+  half2 *output_h = (half2 *)output;
 
   if (tid == padding_id) {
     // for padding id
@@ -59,9 +59,9 @@ __global__ void ker_gpt_embedding_int8<__half>(
   }
 
   float2 te;
-  char2 cte = ((const char2*)token_emb)[tid * blockDim.x + threadIdx.x];
+  char2 cte = ((const char2 *)token_emb)[tid * blockDim.x + threadIdx.x];
   float2 pe = __half22float2(
-      ((const half2*)
+      ((const half2 *)
            pos_emb)[(blockIdx.y + pos_offset) * blockDim.x + threadIdx.x]);
   te.x = float(cte.x) * dequant_scale + pe.x;
   te.y = float(cte.y) * dequant_scale + pe.y;
@@ -71,9 +71,9 @@ __global__ void ker_gpt_embedding_int8<__half>(
 template <typename T>
 void ker_gpt_embedding_i8I_launcher(int batch_size, int batch_seq_len,
                                     int hidden_size, cudaStream_t stream,
-                                    const int8_t* token_emb, const T* pos_emb,
-                                    const int* token_id, T* output,
-                                    int* real_seq_len, int padding_id,
+                                    const int8_t *token_emb, const T *pos_emb,
+                                    const int *token_id, T *output,
+                                    int *real_seq_len, int padding_id,
                                     int pos_offset, float dequant_scale) {
   ker_gpt_embedding_int8<T>
       <<<dim3(batch_size, batch_seq_len), hidden_size, 0, stream>>>(
@@ -84,8 +84,8 @@ void ker_gpt_embedding_i8I_launcher(int batch_size, int batch_seq_len,
 template <>
 void ker_gpt_embedding_i8I_launcher<__half>(
     int batch_size, int batch_seq_len, int hidden_size, cudaStream_t stream,
-    const int8_t* token_emb, const __half* pos_emb, const int* token_id,
-    __half* output, int* real_seq_len, int padding_id, int pos_offset,
+    const int8_t *token_emb, const __half *pos_emb, const int *token_id,
+    __half *output, int *real_seq_len, int padding_id, int pos_offset,
     float dequant_scale) {
   ker_gpt_embedding_int8<__half>
       <<<dim3(batch_size, batch_seq_len), hidden_size / 2, 0, stream>>>(
@@ -95,20 +95,20 @@ void ker_gpt_embedding_i8I_launcher<__half>(
 
 template void ker_gpt_embedding_i8I_launcher<float>(
     int batch_size, int batch_seq_len, int hidden_size, cudaStream_t stream,
-    const int8_t* token_emb, const float* pos_emb, const int* token_id,
-    float* output, int* real_seq_len, int padding_id, int pos_offset,
+    const int8_t *token_emb, const float *pos_emb, const int *token_id,
+    float *output, int *real_seq_len, int padding_id, int pos_offset,
     float dequant_scale);
 
 template void ker_gpt_embedding_i8I_launcher<__half>(
     int batch_size, int batch_seq_len, int hidden_size, cudaStream_t stream,
-    const int8_t* token_emb, const __half* pos_emb, const int* token_id,
-    __half* output, int* real_seq_len, int padding_id, int pos_offset,
+    const int8_t *token_emb, const __half *pos_emb, const int *token_id,
+    __half *output, int *real_seq_len, int padding_id, int pos_offset,
     float dequant_scale);
 
-__global__ void ker_ppl_i8I(const int8_t* logits, const int* input_ids,
-                            const int* real_seq_len, float* ppl, int vocab_size,
+__global__ void ker_ppl_i8I(const int8_t *logits, const int *input_ids,
+                            const int *real_seq_len, float *ppl, int vocab_size,
                             float dequant_scale, bool in_col32) {
-  int seq_len = real_seq_len[blockIdx.x];  // remove "eos"
+  int seq_len = real_seq_len[blockIdx.x]; // remove "eos"
   if (blockIdx.y >= seq_len - 1) {
     // will not contribute to ppl
     return;
@@ -181,8 +181,8 @@ __global__ void ker_ppl_i8I(const int8_t* logits, const int* input_ids,
 
 void ker_ppl_i8I_launcher(int batch_size, int batch_seq_len,
                           int max_thread_per_block, cudaStream_t stream,
-                          const int8_t* logits, const int* input_ids,
-                          const int* real_seq_len, float* ppl, int vocab_size,
+                          const int8_t *logits, const int *input_ids,
+                          const int *real_seq_len, float *ppl, int vocab_size,
                           float dequant_scale, bool in_col32) {
   ker_ppl_i8I<<<dim3(batch_size, batch_seq_len), max_thread_per_block, 0,
                 stream>>>(logits, input_ids, real_seq_len, ppl, vocab_size,
@@ -191,16 +191,16 @@ void ker_ppl_i8I_launcher(int batch_size, int batch_seq_len,
 
 template <typename T>
 __global__ void ker_correlation_softmax_gpt_i32I(
-    int32_t* correlation, T* output, const int* real_seq_len,
+    int32_t *correlation, T *output, const int *real_seq_len,
     const int batch_seq_len, float attn_scale, float dequant_scale) {
   int query_token_pos = blockIdx.y % batch_seq_len;
   if (query_token_pos >= real_seq_len[blockIdx.x]) {
     return;
   }
 
-  int mask = 0;  // can see the token when mask=0
+  int mask = 0; // can see the token when mask=0
   if (threadIdx.x > query_token_pos || threadIdx.x >= batch_seq_len) {
-    mask = 1;  // Can only see the token on the left side of it
+    mask = 1; // Can only see the token on the left side of it
   }
 
   int idx = (blockIdx.x * gridDim.y + blockIdx.y) * batch_seq_len + threadIdx.x;
@@ -210,22 +210,25 @@ __global__ void ker_correlation_softmax_gpt_i32I(
                   : CUDA_FLOAT_INF_NEG;
   float max_val = blockReduceMax<float>(mask ? CUDA_FLOAT_INF_NEG : val);
   __shared__ float smax;
-  if (threadIdx.x == 0) smax = max_val;
+  if (threadIdx.x == 0)
+    smax = max_val;
   __syncthreads();
 
   val = mask ? 0.f : expf(val - smax);
   float rsum = blockReduceSum<float>(val);
   __shared__ float ssum;
-  if (threadIdx.x == 0) ssum = rsum;
+  if (threadIdx.x == 0)
+    ssum = rsum;
   __syncthreads();
 
-  if (threadIdx.x < batch_seq_len) output[idx] = (T)(val / ssum);
+  if (threadIdx.x < batch_seq_len)
+    output[idx] = (T)(val / ssum);
 }
 
 template <typename T>
 void ker_correlation_softmax_gpt_i32I_launcher(
     int batch_size, int batch_seq_len, int head_num, cudaStream_t stream,
-    int32_t* correlation, T* output, const int* real_seq_len, float attn_scale,
+    int32_t *correlation, T *output, const int *real_seq_len, float attn_scale,
     float dequant_scale) {
   int block_dim = batch_seq_len;
   if (batch_seq_len < 1024) {
@@ -241,20 +244,20 @@ void ker_correlation_softmax_gpt_i32I_launcher(
 
 template void ker_correlation_softmax_gpt_i32I_launcher<float>(
     int batch_size, int batch_seq_len, int head_num, cudaStream_t stream,
-    int32_t* correlation, float* output, const int* real_seq_len,
+    int32_t *correlation, float *output, const int *real_seq_len,
     float attn_scale, float dequant_scale);
 
 template void ker_correlation_softmax_gpt_i32I_launcher<__half>(
     int batch_size, int batch_seq_len, int head_num, cudaStream_t stream,
-    int32_t* correlation, __half* output, const int* real_seq_len,
+    int32_t *correlation, __half *output, const int *real_seq_len,
     float attn_scale, float dequant_scale);
 
 template <int k>
-__global__ void ker_topk_sample_i8I(const int8_t* logits, int* old_input_ids,
-                                    int* new_input_ids, const int* real_seq_len,
+__global__ void ker_topk_sample_i8I(const int8_t *logits, int *old_input_ids,
+                                    int *new_input_ids, const int *real_seq_len,
                                     const int vocab_size,
                                     const int batch_seq_len, int logits_seq_len,
-                                    int* unfinished, curandState* curandstate,
+                                    int *unfinished, curandState *curandstate,
                                     int eos_id, float dequant_scale,
                                     bool in_col32) {
   int last_token_idx_in_batch = blockIdx.x * batch_seq_len + batch_seq_len - 1;
@@ -326,7 +329,8 @@ __global__ void ker_topk_sample_i8I(const int8_t* logits, int* old_input_ids,
       }
       float logit = (float)logits[logits_idx] * dequant_scale;
       float logit_exp = expf(fmaxf(logit - s_max_logit, logit_thresh_min));
-      if (logit >= s_topk_logit) test_num++;
+      if (logit >= s_topk_logit)
+        test_num++;
       if (logit >= s_topk_logit && logit_exp > topk_exp) {
         topk_exp = logit_exp;
         topk_tid = idx - left_logit_idx + threadIdx.x;
@@ -335,7 +339,8 @@ __global__ void ker_topk_sample_i8I(const int8_t* logits, int* old_input_ids,
 
     test_num = blockReduceSum(test_num);
 
-    if (topk_tid == vocab_size) topk_exp = 0;
+    if (topk_tid == vocab_size)
+      topk_exp = 0;
     topk_exp_sum = blockReduceSum(topk_exp);
     if (threadIdx.x == 0) {
       s_topk_exp_sum = topk_exp_sum;
@@ -363,7 +368,8 @@ __global__ void ker_topk_sample_i8I(const int8_t* logits, int* old_input_ids,
     int threadID = threadIdx.x;
     __shared__ int s_threadID;
     __shared__ float s_max_prob;
-    if (random_x > prefix_sum_prob) threadID = blockDim.x;
+    if (random_x > prefix_sum_prob)
+      threadID = blockDim.x;
     threadID = blockReduceMin(threadID);
     float max_prob = blockReduceMax(topk_prob);
     if (threadIdx.x == 0) {
@@ -402,7 +408,8 @@ __global__ void ker_topk_sample_i8I(const int8_t* logits, int* old_input_ids,
 
   /* if new sampled tid is not EOS, set unfinish TRUE */
   if (threadIdx.x == 0) {
-    if (s_tid != eos_id) unfinished[0] = 1;
+    if (s_tid != eos_id)
+      unfinished[0] = 1;
   }
 
   /* step3 copy old_input_ids to new_input_ids and add new sampled ids */
@@ -421,11 +428,11 @@ __global__ void ker_topk_sample_i8I(const int8_t* logits, int* old_input_ids,
 
 void ker_topk_sample_i8I_launcher(int batch_size, int batch_seq_len,
                                   int logits_seq_len, int max_thread_per_block,
-                                  cudaStream_t stream, const int8_t* logits,
-                                  int* old_input_ids, int* new_input_ids,
-                                  const int* real_seq_len, const int vocab_size,
-                                  const int k, int* unfinished,
-                                  curandState* curandstate, int eos_id,
+                                  cudaStream_t stream, const int8_t *logits,
+                                  int *old_input_ids, int *new_input_ids,
+                                  const int *real_seq_len, const int vocab_size,
+                                  const int k, int *unfinished,
+                                  curandState *curandstate, int eos_id,
                                   float dequant_scale, bool in_col32) {
   if (k == 1)
     ker_topk_sample_i8I<1><<<batch_size, max_thread_per_block, 0, stream>>>(
@@ -462,12 +469,12 @@ void ker_topk_sample_i8I_launcher(int batch_size, int batch_seq_len,
   }
 }
 
-__global__ void ker_topp_sample_i8I(const int8_t* logits, int* old_input_ids,
-                                    int* new_input_ids, const int* real_seq_len,
+__global__ void ker_topp_sample_i8I(const int8_t *logits, int *old_input_ids,
+                                    int *new_input_ids, const int *real_seq_len,
                                     const int vocab_size,
                                     const int batch_seq_len, int logits_seq_len,
-                                    int* unfinished, float p,
-                                    curandState* curandstate, int eos_id,
+                                    int *unfinished, float p,
+                                    curandState *curandstate, int eos_id,
                                     float dequant_scale, bool in_col32) {
   int token_idx_in_batch = blockIdx.x * batch_seq_len + batch_seq_len - 1;
 
@@ -568,7 +575,8 @@ __global__ void ker_topp_sample_i8I(const int8_t* logits, int* old_input_ids,
     }
     float logit = (float)logits[logits_idx] * dequant_scale;
     float logit_exp = expf(fmaxf(logit - s_max_logit, logit_thresh_min));
-    if (logit >= s_logit_threshold) test_num++;
+    if (logit >= s_logit_threshold)
+      test_num++;
     if (logit >= s_logit_threshold && logit_exp > topk_exp) {
       topk_exp = logit_exp;
       topk_tid = idx - left_logit_idx + threadIdx.x;
@@ -577,7 +585,8 @@ __global__ void ker_topp_sample_i8I(const int8_t* logits, int* old_input_ids,
 
   test_num = blockReduceSum(test_num);
 
-  if (topk_tid == vocab_size) topk_exp = 0;
+  if (topk_tid == vocab_size)
+    topk_exp = 0;
   topk_exp_sum = blockReduceSum(topk_exp);
   if (threadIdx.x == 0) {
     s_topk_exp_sum = topk_exp_sum;
@@ -604,7 +613,8 @@ __global__ void ker_topp_sample_i8I(const int8_t* logits, int* old_input_ids,
   int threadID = threadIdx.x;
   __shared__ int s_threadID;
   __shared__ float s_max_prob;
-  if (random_x > prefix_sum_prob) threadID = blockDim.x;
+  if (random_x > prefix_sum_prob)
+    threadID = blockDim.x;
   threadID = blockReduceMin(threadID);
   float max_prob = blockReduceMax(topk_prob);
   if (threadIdx.x == 0) {
@@ -624,7 +634,8 @@ __global__ void ker_topp_sample_i8I(const int8_t* logits, int* old_input_ids,
 
   /* if new sampled tid is not EOS, set unfinish TRUE */
   if (threadIdx.x == 0) {
-    if (s_tid != eos_id) unfinished[0] = 1;
+    if (s_tid != eos_id)
+      unfinished[0] = 1;
   }
 
   /* step3 copy old_input_ids to new_input_ids and add new sampled ids */
@@ -643,11 +654,11 @@ __global__ void ker_topp_sample_i8I(const int8_t* logits, int* old_input_ids,
 
 void ker_topp_sample_i8I_launcher(int batch_size, int batch_seq_len,
                                   int logits_seq_len, int max_thread_per_block,
-                                  cudaStream_t stream, const int8_t* logits,
-                                  int* old_input_ids, int* new_input_ids,
-                                  const int* real_seq_len, const int vocab_size,
-                                  const float p, int* unfinished,
-                                  curandState* curandstate, int eos_id,
+                                  cudaStream_t stream, const int8_t *logits,
+                                  int *old_input_ids, int *new_input_ids,
+                                  const int *real_seq_len, const int vocab_size,
+                                  const float p, int *unfinished,
+                                  curandState *curandstate, int eos_id,
                                   float dequant_scale, bool in_col32) {
   ker_topp_sample_i8I<<<batch_size, max_thread_per_block, 0, stream>>>(
       logits, old_input_ids, new_input_ids, real_seq_len, vocab_size,
@@ -657,8 +668,8 @@ void ker_topp_sample_i8I_launcher(int batch_size, int batch_seq_len,
 
 template <typename T>
 __global__ void ker_arrange_qkv_with_cache_i8I_i8O(
-    const int8_t* ori_qkv, const T* qkv_bias, int8_t* new_q, int8_t* new_k,
-    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, int batch_seq_len,
+    const int8_t *ori_qkv, const T *qkv_bias, int8_t *new_q, int8_t *new_k,
+    int8_t *k_cache, int8_t *new_v, int8_t *v_cache, int batch_seq_len,
     int dim_per_head, int head_num, float dequant_scale, float quant_scale,
     bool in_col32) {
   int hidden_size = head_num * dim_per_head;
@@ -675,9 +686,12 @@ __global__ void ker_arrange_qkv_with_cache_i8I_i8O(
     int old_target_id =
         targetid_4dim(batch_id, head_id, token_id, dim_id, head_num,
                       batch_seq_len - 1, dim_per_head);
-    if (blockIdx.y == 0) return;
-    if (blockIdx.y == 1) new_val = k_cache[old_target_id];
-    if (blockIdx.y == 2) new_val = v_cache[old_target_id];
+    if (blockIdx.y == 0)
+      return;
+    if (blockIdx.y == 1)
+      new_val = k_cache[old_target_id];
+    if (blockIdx.y == 2)
+      new_val = v_cache[old_target_id];
   } else {
     int qkv_index;
     if (in_col32) {
@@ -698,8 +712,10 @@ __global__ void ker_arrange_qkv_with_cache_i8I_i8O(
     }
   }
 
-  if (blockIdx.y == 0) new_q[target_id] = new_val;
-  if (blockIdx.y == 1) new_k[target_id] = new_val;
+  if (blockIdx.y == 0)
+    new_q[target_id] = new_val;
+  if (blockIdx.y == 1)
+    new_k[target_id] = new_val;
   if (blockIdx.y == 2) {
     new_v[target_id] = new_val;
   }
@@ -707,8 +723,8 @@ __global__ void ker_arrange_qkv_with_cache_i8I_i8O(
 
 template <>
 __global__ void ker_arrange_qkv_with_cache_i8I_i8O<__half>(
-    const int8_t* ori_qkv, const __half* qkv_bias, int8_t* new_q, int8_t* new_k,
-    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, int batch_seq_len,
+    const int8_t *ori_qkv, const __half *qkv_bias, int8_t *new_q, int8_t *new_k,
+    int8_t *k_cache, int8_t *new_v, int8_t *v_cache, int batch_seq_len,
     int dim_per_head, int head_num, float dequant_scale, float quant_scale,
     bool in_col32) {
   int hidden_size = head_num * dim_per_head;
@@ -720,22 +736,25 @@ __global__ void ker_arrange_qkv_with_cache_i8I_i8O<__half>(
   int target_id = targetid_4dim(batch_id, head_id, token_id, dim_id, head_num,
                                 batch_seq_len, dim_per_head);
   int2 new_val;
-  int8_t* p_new_val = (int8_t*)(&new_val);
-  const int2* p_ori_qkv = (const int2*)ori_qkv;
-  const float4* p_bias = (const float4*)qkv_bias;
-  const int2* p_k_cache = (const int2*)k_cache;
-  const int2* p_v_cache = (const int2*)v_cache;
-  int2* p_new_q = (int2*)new_q;
-  int2* p_new_k = (int2*)new_k;
-  int2* p_new_v = (int2*)new_v;
+  int8_t *p_new_val = (int8_t *)(&new_val);
+  const int2 *p_ori_qkv = (const int2 *)ori_qkv;
+  const float4 *p_bias = (const float4 *)qkv_bias;
+  const int2 *p_k_cache = (const int2 *)k_cache;
+  const int2 *p_v_cache = (const int2 *)v_cache;
+  int2 *p_new_q = (int2 *)new_q;
+  int2 *p_new_k = (int2 *)new_k;
+  int2 *p_new_v = (int2 *)new_v;
 
   if (token_id < batch_seq_len - 1) {
     int old_target_id =
         targetid_4dim(batch_id, head_id, token_id, dim_id, head_num,
                       batch_seq_len - 1, dim_per_head);
-    if (blockIdx.y == 0) return;
-    if (blockIdx.y == 1) new_val = p_k_cache[old_target_id];
-    if (blockIdx.y == 2) new_val = p_v_cache[old_target_id];
+    if (blockIdx.y == 0)
+      return;
+    if (blockIdx.y == 1)
+      new_val = p_k_cache[old_target_id];
+    if (blockIdx.y == 2)
+      new_val = p_v_cache[old_target_id];
   } else {
     int qkv_index;
     if (in_col32) {
@@ -750,8 +769,8 @@ __global__ void ker_arrange_qkv_with_cache_i8I_i8O<__half>(
     }
     int2 ori_qkv8 = p_ori_qkv[qkv_index];
     float4 bias8 = __ldg(&p_bias[blockIdx.y * blockDim.x + threadIdx.x]);
-    int8_t* p_ori_qkv8 = (int8_t*)(&ori_qkv8);
-    __half* p_bias8 = (__half*)(&bias8);
+    int8_t *p_ori_qkv8 = (int8_t *)(&ori_qkv8);
+    __half *p_bias8 = (__half *)(&bias8);
 #pragma unroll
     for (int i = 0; i < 8; ++i) {
       p_new_val[i] =
@@ -764,16 +783,19 @@ __global__ void ker_arrange_qkv_with_cache_i8I_i8O<__half>(
     }
   }
 
-  if (blockIdx.y == 0) p_new_q[target_id] = new_val;
-  if (blockIdx.y == 1) p_new_k[target_id] = new_val;
-  if (blockIdx.y == 2) p_new_v[target_id] = new_val;
+  if (blockIdx.y == 0)
+    p_new_q[target_id] = new_val;
+  if (blockIdx.y == 1)
+    p_new_k[target_id] = new_val;
+  if (blockIdx.y == 2)
+    p_new_v[target_id] = new_val;
 }
 
 template <typename T>
 void ker_arrange_qkv_with_cache_i8I_i8O_launcher(
     int batch_token_num, int hidden_size, cudaStream_t stream,
-    const int8_t* ori_qkv, const T* qkv_bias, int8_t* new_q, int8_t* new_k,
-    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, int batch_seq_len,
+    const int8_t *ori_qkv, const T *qkv_bias, int8_t *new_q, int8_t *new_k,
+    int8_t *k_cache, int8_t *new_v, int8_t *v_cache, int batch_seq_len,
     int dim_per_head, int head_num, float dequant_scale, float quant_scale,
     bool in_col32) {
   ker_arrange_qkv_with_cache_i8I_i8O<T>
@@ -786,8 +808,8 @@ void ker_arrange_qkv_with_cache_i8I_i8O_launcher(
 template <>
 void ker_arrange_qkv_with_cache_i8I_i8O_launcher<__half>(
     int batch_token_num, int hidden_size, cudaStream_t stream,
-    const int8_t* ori_qkv, const __half* qkv_bias, int8_t* new_q, int8_t* new_k,
-    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, int batch_seq_len,
+    const int8_t *ori_qkv, const __half *qkv_bias, int8_t *new_q, int8_t *new_k,
+    int8_t *k_cache, int8_t *new_v, int8_t *v_cache, int batch_seq_len,
     int dim_per_head, int head_num, float dequant_scale, float quant_scale,
     bool in_col32) {
   ker_arrange_qkv_with_cache_i8I_i8O<__half>
@@ -799,29 +821,29 @@ void ker_arrange_qkv_with_cache_i8I_i8O_launcher<__half>(
 
 template void ker_arrange_qkv_with_cache_i8I_i8O_launcher<float>(
     int batch_token_num, int hidden_size, cudaStream_t stream,
-    const int8_t* ori_qkv, const float* qkv_bias, int8_t* new_q, int8_t* new_k,
-    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, int batch_seq_len,
+    const int8_t *ori_qkv, const float *qkv_bias, int8_t *new_q, int8_t *new_k,
+    int8_t *k_cache, int8_t *new_v, int8_t *v_cache, int batch_seq_len,
     int dim_per_head, int head_num, float dequant_scale, float quant_scale,
     bool in_col32);
 
 template void ker_arrange_qkv_with_cache_i8I_i8O_launcher<__half>(
     int batch_token_num, int hidden_size, cudaStream_t stream,
-    const int8_t* ori_qkv, const __half* qkv_bias, int8_t* new_q, int8_t* new_k,
-    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, int batch_seq_len,
+    const int8_t *ori_qkv, const __half *qkv_bias, int8_t *new_q, int8_t *new_k,
+    int8_t *k_cache, int8_t *new_v, int8_t *v_cache, int batch_seq_len,
     int dim_per_head, int head_num, float dequant_scale, float quant_scale,
     bool in_col32);
 
 template <typename T>
 __global__ void ker_attention_mask_weights_i32I(
-    int32_t* correlation, T* output, const int* real_seq_len, int dst_seq_len,
+    int32_t *correlation, T *output, const int *real_seq_len, int dst_seq_len,
     int src_seq_len, float attn_scale, float dequant_scale) {
   int query_token_pos = blockIdx.y % dst_seq_len + src_seq_len - dst_seq_len;
   if (query_token_pos >= real_seq_len[blockIdx.x]) {
     return;
   }
-  int mask = 0;  // can see the token when mask=0
+  int mask = 0; // can see the token when mask=0
   if (threadIdx.x > query_token_pos) {
-    mask = 1;  // Can only see the token on the left side of it
+    mask = 1; // Can only see the token on the left side of it
   }
 
   int idx = (blockIdx.x * gridDim.y + blockIdx.y) * blockDim.x + threadIdx.x;
@@ -829,13 +851,15 @@ __global__ void ker_attention_mask_weights_i32I(
       (float)correlation[idx] * attn_scale * dequant_scale * dequant_scale;
   float max_val = blockReduceMax<float>(mask ? CUDA_FLOAT_INF_NEG : val);
   __shared__ float smax;
-  if (threadIdx.x == 0) smax = max_val;
+  if (threadIdx.x == 0)
+    smax = max_val;
   __syncthreads();
 
   val = mask ? 0.f : expf(fmaxf(logit_thresh_min, val - smax));
   float rsum = blockReduceSum<float>(val);
   __shared__ float ssum;
-  if (threadIdx.x == 0) ssum = rsum;
+  if (threadIdx.x == 0)
+    ssum = rsum;
   __syncthreads();
 
   output[idx] = (T)(val / (ssum + epsilon));
@@ -844,8 +868,8 @@ __global__ void ker_attention_mask_weights_i32I(
 template <typename T>
 void ker_attention_mask_weights_i32I_launcher(
     int batch_size, int dst_seq_len, int src_seq_len, int head_num,
-    cudaStream_t stream, int32_t* correlation, T* output,
-    const int* real_seq_len, float attn_scale, float dequant_scale) {
+    cudaStream_t stream, int32_t *correlation, T *output,
+    const int *real_seq_len, float attn_scale, float dequant_scale) {
   ker_attention_mask_weights_i32I<T>
       <<<dim3(batch_size, head_num * dst_seq_len), src_seq_len, 0, stream>>>(
           correlation, output, real_seq_len, dst_seq_len, src_seq_len,
@@ -854,13 +878,13 @@ void ker_attention_mask_weights_i32I_launcher(
 
 template void ker_attention_mask_weights_i32I_launcher<float>(
     int batch_size, int dst_seq_len, int src_seq_len, int head_num,
-    cudaStream_t stream, int32_t* correlation, float* output,
-    const int* real_seq_len, float attn_scale, float dequant_scale);
+    cudaStream_t stream, int32_t *correlation, float *output,
+    const int *real_seq_len, float attn_scale, float dequant_scale);
 
 template void ker_attention_mask_weights_i32I_launcher<__half>(
     int batch_size, int dst_seq_len, int src_seq_len, int head_num,
-    cudaStream_t stream, int32_t* correlation, __half* output,
-    const int* real_seq_len, float attn_scale, float dequant_scale);
+    cudaStream_t stream, int32_t *correlation, __half *output,
+    const int *real_seq_len, float attn_scale, float dequant_scale);
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

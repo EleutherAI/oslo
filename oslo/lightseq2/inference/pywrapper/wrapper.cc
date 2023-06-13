@@ -1,21 +1,21 @@
-#include <cuda_runtime.h>
 #include <cuda_fp16.h>
+#include <cuda_runtime.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
 #include "model_base.h"
-#include "util.h"
 #include "transformer_decoder.cc.cu"
+#include "util.h"
 
 namespace py = pybind11;
 
 class PyTransformer {
- private:
+private:
   lightseq::cuda::LSModel *model_;
   int *d_input_;
   std::vector<void *> d_outputs_;
 
- public:
+public:
   PyTransformer(std::string weight_path, int max_batch_size) {
     model_ = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
         "Transformer", weight_path, max_batch_size);
@@ -45,8 +45,8 @@ class PyTransformer {
     }
   }
 
-  std::tuple<py::array_t<int>, py::array_t<float>> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+  std::tuple<py::array_t<int>, py::array_t<float>>
+  infer(py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
     int batch_size = input_seq_out.shape(0);
@@ -83,12 +83,12 @@ class PyTransformer {
 };
 
 class PyQuantTransformer {
- private:
+private:
   lightseq::cuda::LSModel *model_;
   int *d_input_;
   std::vector<void *> d_outputs_;
 
- public:
+public:
   PyQuantTransformer(std::string weight_path, int max_batch_size) {
     model_ = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
         "QuantTransformer", weight_path, max_batch_size);
@@ -118,8 +118,8 @@ class PyQuantTransformer {
     }
   }
 
-  std::tuple<py::array_t<int>, py::array_t<float>> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+  std::tuple<py::array_t<int>, py::array_t<float>>
+  infer(py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
     int batch_size = input_seq_out.shape(0);
@@ -156,12 +156,12 @@ class PyQuantTransformer {
 };
 
 class PyBert {
- private:
+private:
   lightseq::cuda::LSModel *model_;
   int *d_input_;
   std::vector<void *> d_outputs_;
 
- public:
+public:
   PyBert(std::string weight_path, int max_batch_size) {
     model_ = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
         "Bert", weight_path, max_batch_size);
@@ -191,8 +191,8 @@ class PyBert {
     }
   }
 
-  py::array_t<float> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+  py::array_t<float>
+  infer(py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
     int batch_size = input_seq_out.shape(0);
@@ -238,12 +238,12 @@ class PyBert {
 };
 
 class PyQuantBert {
- private:
+private:
   lightseq::cuda::LSModel *model_;
   int *d_input_;
   std::vector<void *> d_outputs_;
 
- public:
+public:
   PyQuantBert(std::string weight_path, int max_batch_size) {
     model_ = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
         "QuantBert", weight_path, max_batch_size);
@@ -273,8 +273,8 @@ class PyQuantBert {
     }
   }
 
-  py::array_t<float> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+  py::array_t<float>
+  infer(py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
     int batch_size = input_seq_out.shape(0);
@@ -320,12 +320,12 @@ class PyQuantBert {
 };
 
 class PyGpt {
- private:
+private:
   lightseq::cuda::LSModel *model_;
   int *d_input_;
   std::vector<void *> d_outputs_;
 
- public:
+public:
   PyGpt(std::string weight_path, int max_batch_size) {
     model_ = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
         "Gpt", weight_path, max_batch_size);
@@ -388,8 +388,8 @@ class PyGpt {
     return output;
   }
 
-  py::array_t<float> ppl(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+  py::array_t<float>
+  ppl(py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
     int batch_size = input_seq_out.shape(0);
@@ -425,12 +425,12 @@ class PyGpt {
 };
 
 class PyQuantGpt {
- private:
+private:
   lightseq::cuda::LSModel *model_;
   int *d_input_;
   std::vector<void *> d_outputs_;
 
- public:
+public:
   PyQuantGpt(std::string weight_path, int max_batch_size) {
     model_ = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
         "QuantGpt", weight_path, max_batch_size);
@@ -493,8 +493,8 @@ class PyQuantGpt {
     return output;
   }
 
-  py::array_t<float> ppl(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+  py::array_t<float>
+  ppl(py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
     int batch_size = input_seq_out.shape(0);
@@ -530,12 +530,12 @@ class PyQuantGpt {
 };
 
 class PyMoe {
- private:
+private:
   lightseq::cuda::LSModel *model_;
   int *d_input_;
   std::vector<void *> d_outputs_;
 
- public:
+public:
   PyMoe(std::string weight_path, int max_batch_size) {
     model_ = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
         "Moe", weight_path, max_batch_size);
@@ -565,8 +565,8 @@ class PyMoe {
     }
   }
 
-  std::tuple<py::array_t<int>, py::array_t<float>> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+  std::tuple<py::array_t<int>, py::array_t<float>>
+  infer(py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
     int batch_size = input_seq_out.shape(0);
@@ -603,12 +603,12 @@ class PyMoe {
 };
 
 class PyT5 {
- private:
+private:
   lightseq::cuda::LSModel *model_;
   int *d_input_;
   std::vector<void *> d_outputs_;
 
- public:
+public:
   PyT5(std::string weight_path, int max_batch_size) {
     model_ = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
         "T5", weight_path, max_batch_size);
@@ -638,8 +638,8 @@ class PyT5 {
     }
   }
 
-  std::tuple<py::array_t<int>, py::array_t<float>> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+  std::tuple<py::array_t<int>, py::array_t<float>>
+  infer(py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
     int batch_size = input_seq_out.shape(0);
@@ -676,12 +676,12 @@ class PyT5 {
 };
 
 class PyMT5 {
- private:
+private:
   lightseq::cuda::LSModel *model_;
   int *d_input_;
   std::vector<void *> d_outputs_;
 
- public:
+public:
   PyMT5(std::string weight_path, int max_batch_size) {
     model_ = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
         "MT5", weight_path, max_batch_size);
@@ -711,8 +711,8 @@ class PyMT5 {
     }
   }
 
-  std::tuple<py::array_t<int>, py::array_t<float>> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+  std::tuple<py::array_t<int>, py::array_t<float>>
+  infer(py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
     int batch_size = input_seq_out.shape(0);
@@ -749,12 +749,12 @@ class PyMT5 {
 };
 
 class PyVit {
- private:
+private:
   lightseq::cuda::LSModel *model_;
   float *d_input_;
   std::vector<void *> d_outputs_;
 
- public:
+public:
   PyVit(std::string weight_path, int max_batch_size) {
     model_ = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
         "Vit", weight_path, max_batch_size);
@@ -833,12 +833,12 @@ class PyVit {
 };
 
 class PyQuantVit {
- private:
+private:
   lightseq::cuda::LSModel *model_;
   float *d_input_;
   std::vector<void *> d_outputs_;
 
- public:
+public:
   PyQuantVit(std::string weight_path, int max_batch_size) {
     model_ = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
         "QuantVit", weight_path, max_batch_size);

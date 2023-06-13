@@ -1,17 +1,16 @@
 #pragma once
 
-#include "transformer.pb.h"
 #include "proto_headers.h"
 #include "proto_util.h"
+#include "transformer.pb.h"
 
 namespace lightseq {
 
 /*
 Load the model weights which stored in custom proto file into GPU memory.
 */
-template <typename T>
-class TransformerWeight {
- private:
+template <typename T> class TransformerWeight {
+private:
   T float2required(float value);
 
   // parsing function for protobuffer
@@ -29,10 +28,10 @@ class TransformerWeight {
   void hdf5_parse_dec_wei(hid_t hdf5_file);
 
   // store the weights pointer
-  std::vector<const T *> _p_d_src_emb_wei;  // size: 4
-  std::vector<const T *> _p_d_trg_emb_wei;  // size: 4
-  std::vector<const T *> _p_d_enc_wei;      // size: 12 * enc_layer_num
-  std::vector<const T *> _p_d_dec_wei;      // size: 18 * dec_layer_num
+  std::vector<const T *> _p_d_src_emb_wei; // size: 4
+  std::vector<const T *> _p_d_trg_emb_wei; // size: 4
+  std::vector<const T *> _p_d_enc_wei;     // size: 12 * enc_layer_num
+  std::vector<const T *> _p_d_dec_wei;     // size: 18 * dec_layer_num
 
 #ifdef LIGHTSEQ_cuda
   // store the weights on gpu memo
@@ -44,7 +43,7 @@ class TransformerWeight {
   thrust::device_vector<T> _d_trg_lang_emb;
 #endif
 
- public:
+public:
   std::string initializing(std::string proto_path, bool only_decoder = false);
 
   const std::vector<const T *> &get_src_emb_wei() const {
@@ -82,18 +81,18 @@ class TransformerWeight {
   int _max_step;
   int _src_vocab_size;
   int _trg_vocab_size;
-  int _n_enc_layer;  // number of encoder layer
-  int _n_dec_layer;  // number of decoder layer
+  int _n_enc_layer; // number of encoder layer
+  int _n_dec_layer; // number of decoder layer
   int _dim_per_head;
-  int _weight_per_enc_layer;  // 12
-  int _weight_per_dec_layer;  // 18
+  int _weight_per_enc_layer; // 12
+  int _weight_per_dec_layer; // 18
 
   int _head_num;
   int _beam_size;
   int _extra_decode_length;
   float _length_penalty;
-  int _padding_id;  // for src
-  int _start_id;    // for trg
+  int _padding_id; // for src
+  int _start_id;   // for trg
   int _end_id;
   float _diverse_lambda;
   std::string _sampling_method;
@@ -135,4 +134,4 @@ class TransformerWeight {
   }
 };
 
-}  // namespace lightseq
+} // namespace lightseq

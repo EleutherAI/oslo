@@ -5,8 +5,8 @@
 #include "iostream"
 #include "map"
 
-#include "declaration.h"
 #include "context.h"
+#include "declaration.h"
 #include "node.h"
 
 namespace lightseq {
@@ -22,17 +22,17 @@ namespace lightseq {
       data calculation update for all nodes of the layer.
 */
 class Layer {
- protected:
+protected:
   ContextPtr _context_ptr;
   std::string _name = "";
 
-  std::vector<Variable*> _inp_var_vec = {};
-  std::vector<Variable*> _out_var_vec = {};
+  std::vector<Variable *> _inp_var_vec = {};
+  std::vector<Variable *> _out_var_vec = {};
 
- public:
+public:
   Layer(std::string name);
   virtual ~Layer();
-  const std::string& name() const { return _name; }
+  const std::string &name() const { return _name; }
 
   virtual void forward() final;
   virtual void backward() final;
@@ -40,11 +40,11 @@ class Layer {
   virtual void forward_process() {}
   virtual void backward_process() {}
 
-  void set_inputs(std::vector<Variable*> inps);
-  void set_outputs(std::vector<Variable*> outs);
+  void set_inputs(std::vector<Variable *> inps);
+  void set_outputs(std::vector<Variable *> outs);
 
-  Variable* input(int idx);
-  Variable* output(int idx);
+  Variable *input(int idx);
+  Variable *output(int idx);
 
   // Clear the forward propagation mark, you need to ensure that the mark is
   // cleared before each execution of forward.
@@ -59,11 +59,11 @@ class Layer {
   void tag_fw_flag();
   void tag_bw_flag();
 
-  std::vector<Operator*> _op_vec;
+  std::vector<Operator *> _op_vec;
 
   bool macro_inputs_check = false;
   bool macro_outputs_check = false;
   std::shared_ptr<Context> get_context() { return _context_ptr; }
 };
 
-}  // namespace lightseq
+} // namespace lightseq

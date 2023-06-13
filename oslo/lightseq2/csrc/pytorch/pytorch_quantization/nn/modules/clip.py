@@ -51,7 +51,7 @@ class Clip(nn.Module):
         if learn_max:
             if not isinstance(clip_value_max, float) and clip_value_max.size != 1:
                 raise ValueError(
-                    "clip_value_min/clip_value_max must be scalar for initilizing"
+                    "clip_value_min/clip_value_max must be scalar for initializing"
                     " learnable range."
                 )
             self.clip_value_max = Parameter(
@@ -63,7 +63,7 @@ class Clip(nn.Module):
         # if learn_min :
         #     if not isinstance(clip_value_min, float) and clip_value_min.size != 1:
         #         raise ValueError(
-        #             "clip_value_min/clip_value_max must be scalar for initilizing"
+        #             "clip_value_min/clip_value_max must be scalar for initializing"
         #             " learnable range."
         #         )
         #     self.clip_value_min = Parameter(

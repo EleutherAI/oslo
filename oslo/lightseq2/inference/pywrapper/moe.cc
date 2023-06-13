@@ -7,9 +7,7 @@ namespace cuda {
 
 Moe::Moe(const std::string weight_path, const int max_batch_size)
     : LSModel({"source_ids"}, {"target_ids", "target_scores"}),
-      stream_(nullptr),
-      hd_(nullptr),
-      decoder_(nullptr),
+      stream_(nullptr), hd_(nullptr), decoder_(nullptr),
       _max_batch_size(max_batch_size) {
   /* ---step1. init environment--- */
   CHECK_GPU_ERROR(cudaStreamCreate(&stream_));
@@ -37,8 +35,8 @@ Moe::Moe(const std::string weight_path, const int max_batch_size)
 
   CHECK_GPU_ERROR(
       cudaMalloc(&d_input_, _max_batch_size * tw_._max_step * sizeof(int32_t)));
-  CHECK_GPU_ERROR(cudaMalloc(
-      &d_padding_mask_, _max_batch_size * tw_._max_step * sizeof(int32_t)));
+  CHECK_GPU_ERROR(cudaMalloc(&d_padding_mask_, _max_batch_size * tw_._max_step *
+                                                   sizeof(int32_t)));
 
   CHECK_GPU_ERROR(cudaMalloc(
       &d_encoder_output_, _max_batch_size * tw_._max_step * tw_._hidden_size *
@@ -69,7 +67,7 @@ Moe::Moe(const std::string weight_path, const int max_batch_size)
   std::cout << "Allocated " << buf_bytesize / (1024 * 1024)
             << "MB GPU buffer for moe" << std::endl;
 
-  // encoder and decoder use the same buffer to save gpu memory useage
+  // encoder and decoder use the same buffer to save gpu memory usage
   CHECK_GPU_ERROR(cudaMalloc(&d_buf_, buf_bytesize));
   encoder_->init_buffer(d_buf_);
   decoder_->init_buffer(d_buf_);
@@ -129,7 +127,7 @@ void Moe::Infer() {
     /**
       1. calculate gate according to lang_id
       2. copy [hard_gates,gate_sizes,reorder_indexs] to device
-      shape: [hard_gates,sizes of each gate,reorder indexs]
+      shape: [hard_gates,sizes of each gate,reorder indexes]
       used for hard gate ffn calculation and reorder final ffn logits
     */
     init_hard_gates();
@@ -150,100 +148,100 @@ void Moe::Infer() {
 
 void Moe::set_input_ptr(int index, void *input_ptr) {
   switch (index) {
-    case 0:
-      encoder_->_p_d_token_id = static_cast<int *>(input_ptr);
-      break;
+  case 0:
+    encoder_->_p_d_token_id = static_cast<int *>(input_ptr);
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
 void Moe::set_output_ptr(int index, void *output_ptr) {
   switch (index) {
-    case 0:
-      decoder_->_p_d_result = static_cast<int *>(output_ptr);
-      break;
+  case 0:
+    decoder_->_p_d_result = static_cast<int *>(output_ptr);
+    break;
 
-    case 1:
-      decoder_->_p_d_alive_seq_score = static_cast<float *>(output_ptr);
-      break;
+  case 1:
+    decoder_->_p_d_alive_seq_score = static_cast<float *>(output_ptr);
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 const void *Moe::get_output_ptr(int index) {
   switch (index) {
-    case 0:
-      return static_cast<void *>(decoder_->_p_d_result);
-      break;
+  case 0:
+    return static_cast<void *>(decoder_->_p_d_result);
+    break;
 
-    case 1:
-      return static_cast<void *>(decoder_->_p_d_alive_seq_score);
-      break;
+  case 1:
+    return static_cast<void *>(decoder_->_p_d_alive_seq_score);
+    break;
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 std::vector<int> Moe::get_input_max_shape(int index) {
   switch (index) {
-    case 0:
-      return {_max_batch_size, tw_._max_step};
-      break;
+  case 0:
+    return {_max_batch_size, tw_._max_step};
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
 std::vector<int> Moe::get_output_max_shape(int index) {
   switch (index) {
-    case 0:
-      return {_max_batch_size, tw_._beam_size, tw_._max_step};
-      break;
+  case 0:
+    return {_max_batch_size, tw_._beam_size, tw_._max_step};
+    break;
 
-    case 1:
-      return {_max_batch_size, tw_._beam_size};
-      break;
+  case 1:
+    return {_max_batch_size, tw_._beam_size};
+    break;
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 DataType Moe::get_input_dtype(int index) {
   switch (index) {
-    case 0:
-      return DataType::kInt32;
-      break;
+  case 0:
+    return DataType::kInt32;
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
 DataType Moe::get_output_dtype(int index) {
   switch (index) {
-    case 0:
-      return DataType::kInt32;
-      break;
+  case 0:
+    return DataType::kInt32;
+    break;
 
-    case 1:
-      return DataType::kFloat32;
-      break;
+  case 1:
+    return DataType::kFloat32;
+    break;
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
@@ -295,5 +293,5 @@ void Moe::init_hard_gates() {
                                   cudaMemcpyHostToDevice, stream_));
 }
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

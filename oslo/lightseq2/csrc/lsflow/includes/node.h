@@ -7,12 +7,12 @@
 #include <cstdlib>
 #include <iostream>
 
-#include "declaration.h"
-#include "tensor.h"
 #include "context.h"
-#include "manager.h"
+#include "declaration.h"
 #include "lsflow_util.h"
+#include "manager.h"
 #include "shape.h"
+#include "tensor.h"
 
 namespace lightseq {
 
@@ -26,8 +26,8 @@ namespace lightseq {
   - Implementation file: node.cpp
 */
 class Node {
- protected:
-  Context* _context_ptr;
+protected:
+  Context *_context_ptr;
   std::string _name;
   NodeType _node_type;
 
@@ -35,12 +35,12 @@ class Node {
   bool _bw_flag = false;
   bool _bw_first_flag = false;
 
-  std::vector<Node*> _parents{};
-  std::vector<Node*> _children{};
+  std::vector<Node *> _parents{};
+  std::vector<Node *> _children{};
   int _fw_node_idx, _bw_node_idx;
   bool _in_regress_scope = false;
 
- public:
+public:
   Node(std::string name, NodeType nt_);
   std::string name() { return _name; }
   virtual ~Node();
@@ -49,17 +49,17 @@ class Node {
   NodeType node_type() { return _node_type; }
 
   // Set the parent node of the current node.
-  void set_parents(std::vector<Node*> parents);
+  void set_parents(std::vector<Node *> parents);
 
   // Add a child node to the current node.
-  void add_child(Node* child) { _children.push_back(child); }
+  void add_child(Node *child) { _children.push_back(child); }
 
   // Pure virtual functions need to be implemented in subclasses.
   virtual void forward() = 0;
   virtual void backward() = 0;
 
-  const std::vector<Node*>& parents() { return _parents; }
-  const std::vector<Node*>& children() { return _children; }
+  const std::vector<Node *> &parents() { return _parents; }
+  const std::vector<Node *> &children() { return _children; }
 
   void recursive_forward();
   void recursive_backward();
@@ -69,7 +69,7 @@ class Node {
   void clear_bw_flag() { _bw_flag = false, _bw_first_flag = true; }
   void tag_bw_flag() { _bw_flag = true; }
 
-  bool is_cover();  // true means assign, false means accumulate
+  bool is_cover(); // true means assign, false means accumulate
 };
 
 /*
@@ -83,10 +83,10 @@ class Node {
   - implementation file: variable.cpp
 */
 class Variable : public Node {
- private:
+private:
   VariableType _variable_type;
-  Variable* _parent_variable = nullptr;
-  std::unordered_set<Variable*> _children_variable;
+  Variable *_parent_variable = nullptr;
+  std::unordered_set<Variable *> _children_variable;
 
   cuda::DataType _fw_dtype;
   cuda::DataType _bw_dtype;
@@ -96,11 +96,11 @@ class Variable : public Node {
   size_t _mx_shape_size;
   Shape _shape;
 
- protected:
+protected:
   TensorPtr _value = nullptr;
   TensorPtr _grad = nullptr;
 
- public:
+public:
   // Applicable to variables using fixed memory, usually as input or output
   // nodes of the entire network.
   Variable(std::string name, cuda::DataType fw_dtype,
@@ -125,10 +125,9 @@ class Variable : public Node {
         RegressVariable - Only applicable to tensors that need to be passed
     across steps in autoregressive models.
   */
-  Variable(
-      std::string name, size_t mx_shape_size, cuda::DataType fw_dtype,
-      cuda::DataType bw_dtype = cuda::DataType::kNotSupported,
-      VariableType vt = VariableType::SharedVariable);  // for Shared memory
+  Variable(std::string name, size_t mx_shape_size, cuda::DataType fw_dtype,
+           cuda::DataType bw_dtype = cuda::DataType::kNotSupported,
+           VariableType vt = VariableType::SharedVariable); // for Shared memory
 
   /*
     Applicable when a variable object is a fragment of another variable object.
@@ -137,15 +136,15 @@ class Variable : public Node {
     obtain q, k, and v respectively, so the fragments in qkv need to be
     intercepted.
   */
-  Variable(std::string name, Variable* parent_variable);
+  Variable(std::string name, Variable *parent_variable);
 
   virtual ~Variable() {}
 
   virtual void forward() {}
   virtual void backward() {}
 
-  const cuda::DataType& fw_dtype() const { return _fw_dtype; }
-  const cuda::DataType& bw_dtype() const { return _bw_dtype; }
+  const cuda::DataType &fw_dtype() const { return _fw_dtype; }
+  const cuda::DataType &bw_dtype() const { return _bw_dtype; }
 
   // This method is to switch the current VariableType to FixedMemory.
   // This method will not execute the memory development logic internally,
@@ -155,16 +154,16 @@ class Variable : public Node {
 
   // Exchange the tensor information of two variable objects,
   // which is used when backup exchange is required such as beam search
-  static void swap_tensor(Variable* var_a, Variable* var_b);
+  static void swap_tensor(Variable *var_a, Variable *var_b);
 
   // Set the value pointer and shape information for the variable node,
   // usually used for IO type variable nodes.
-  void set_value(char* value_ptr);
-  void set_value(const char* value_ptr);
+  void set_value(char *value_ptr);
+  void set_value(const char *value_ptr);
 
   // Set the grad pointer and shape information for the variable node,
   // usually used for IO type variable nodes.
-  void set_grad(char* grad_ptr);
+  void set_grad(char *grad_ptr);
 
   // Just only set shape for variable object.
   void set_shape(Shape shape);
@@ -180,16 +179,14 @@ class Variable : public Node {
     is_open_interval is true, it doesn't update the lifecycle of the tensor.
     Please refer to tensor() method in Tensor class for internal logic.
   */
-  char* value(bool is_open_interval = false);
-  char* grad(bool is_open_interval = false);
+  char *value(bool is_open_interval = false);
+  char *grad(bool is_open_interval = false);
 
-  template <typename T>
-  T* value(bool is_open_interval = false) {
-    return (T*)value(is_open_interval);
+  template <typename T> T *value(bool is_open_interval = false) {
+    return (T *)value(is_open_interval);
   }
-  template <typename T>
-  T* grad(bool is_open_interval = false) {
-    return (T*)grad(is_open_interval);
+  template <typename T> T *grad(bool is_open_interval = false) {
+    return (T *)grad(is_open_interval);
   }
 
   // For tensors that need to be passed across steps in the autoregressive
@@ -202,15 +199,15 @@ class Variable : public Node {
   // node.
   bool is_ancestor() { return _children_variable.size(); }
 
-  Variable* ancestor() { return _parent_variable; }
-  const std::unordered_set<Variable*>& descendants() const {
+  Variable *ancestor() { return _parent_variable; }
+  const std::unordered_set<Variable *> &descendants() const {
     return _children_variable;
   }
 
   // Set the offset value and shape parameter for OffsetVariable.
   void set_offset(int offset, Shape shape);
 
-  void add_descendants(Variable* var);
+  void add_descendants(Variable *var);
 
   // Identifies that the variable is a tensor that needs to be
   // passed across multiple steps in autoregressive.
@@ -224,20 +221,20 @@ class Variable : public Node {
 };
 
 class Operator : public Node {
- protected:
- public:
+protected:
+public:
   Operator(std::string name);
   virtual ~Operator() {}
   void check_override_grad();
 
-  void set_children(std::vector<Node*> children);
+  void set_children(std::vector<Node *> children);
 
-  Variable* child(int index) {
-    return static_cast<Variable*>(_children[index]);
+  Variable *child(int index) {
+    return static_cast<Variable *>(_children[index]);
   }
 
-  Variable* parent(int index) {
-    return static_cast<Variable*>(_parents[index]);
+  Variable *parent(int index) {
+    return static_cast<Variable *>(_parents[index]);
   }
 };
-}  // namespace lightseq
+} // namespace lightseq

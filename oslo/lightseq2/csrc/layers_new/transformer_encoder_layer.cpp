@@ -19,17 +19,17 @@ TransformerEncoderLayer<T1, T2>::TransformerEncoderLayer(
       intermediate_size, activation_dropout_ratio, hidden_output_dropout_ratio,
       is_pre_ln, activation_fn));
 
-  this->_context_ptr->exit_layer();  // necessary
+  this->_context_ptr->exit_layer(); // necessary
 }
 
 template <typename T1, typename T2>
-Variable* TransformerEncoderLayer<T1, T2>::operator()(Variable* inp,
-                                                      Variable* inp_mask) {
+Variable *TransformerEncoderLayer<T1, T2>::operator()(Variable *inp,
+                                                      Variable *inp_mask) {
   set_inputs({inp, inp_mask});
 
-  Variable* attn_out = (*_attn_layer)(inp, inp_mask);
+  Variable *attn_out = (*_attn_layer)(inp, inp_mask);
 
-  Variable* ffn_out = (*_ffn_layer)(attn_out);
+  Variable *ffn_out = (*_ffn_layer)(attn_out);
 
   set_outputs({ffn_out});
   return ffn_out;
@@ -37,7 +37,7 @@ Variable* TransformerEncoderLayer<T1, T2>::operator()(Variable* inp,
 
 template <typename T1, typename T2>
 size_t TransformerEncoderLayer<T1, T2>::load_para_and_grad(
-    const T1* para_ptr, T2* grad_ptr) {  // for training
+    const T1 *para_ptr, T2 *grad_ptr) { // for training
   size_t offset = 0;
 
   offset +=
@@ -51,7 +51,7 @@ size_t TransformerEncoderLayer<T1, T2>::load_para_and_grad(
 
 template <typename T1, typename T2>
 int TransformerEncoderLayer<T1, T2>::load_params(
-    const std::vector<const T1*>& para_vec, int offset) {  // for inference
+    const std::vector<const T1 *> &para_vec, int offset) { // for inference
   int size = 0;
 
   size += _attn_layer->load_params(para_vec, offset + size);
@@ -61,4 +61,4 @@ int TransformerEncoderLayer<T1, T2>::load_params(
   return size;
 }
 
-}  // namespace lightseq
+} // namespace lightseq

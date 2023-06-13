@@ -1,10 +1,10 @@
 
 
-#include "model_base.h"
 #include "../model/decoder.h"
 #include "../model/encoder.h"
 #include "../proto/transformer_weight.h"
 #include "../tools/util.h"
+#include "model_base.h"
 
 #ifdef FP16_MODE
 const lightseq::cuda::OperationType transformer_optytpe =
@@ -17,7 +17,7 @@ const lightseq::cuda::OperationType transformer_optytpe =
 namespace lightseq {
 namespace cuda {
 class Transformer : public LSModel {
- private:
+private:
   typedef OperationTypeTraits<transformer_optytpe> optraits;
   std::shared_ptr<Encoder<transformer_optytpe>> encoder_;
   std::shared_ptr<Decoder<transformer_optytpe>> decoder_;
@@ -41,7 +41,7 @@ class Transformer : public LSModel {
   int get_max_step() { return tw_._max_step; }
   int get_beam_size() { return tw_._beam_size; }
 
- public:
+public:
   Transformer(const std::string weight_path, const int max_batch_size);
   ~Transformer();
 
@@ -57,5 +57,5 @@ class Transformer : public LSModel {
 };
 
 LSMODEL_REGISTER(Transformer);
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

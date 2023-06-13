@@ -7,14 +7,12 @@ namespace cuda {
 template <typename T>
 CrossEntropyLayer<T>::CrossEntropyLayer(float epsilon, int padding_idx,
                                         int max_batch_tokens)
-    : _epsilon(epsilon),
-      _padding_idx(padding_idx),
+    : _epsilon(epsilon), _padding_idx(padding_idx),
       _max_batch_tokens(max_batch_tokens) {
   allocate_mem_buffer();
 }
 
-template <typename T>
-CrossEntropyLayer<T>::~CrossEntropyLayer() {
+template <typename T> CrossEntropyLayer<T>::~CrossEntropyLayer() {
   free_mem_buffer();
 }
 
@@ -49,5 +47,5 @@ void CrossEntropyLayer<T>::set_cur_batch_shape(int batch_size, int seq_len,
 
 template class CrossEntropyLayer<float>;
 template class CrossEntropyLayer<__half>;
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

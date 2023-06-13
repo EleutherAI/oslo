@@ -1,8 +1,8 @@
 #include "transformer_encoder_layer.h"
 
 #include "context.h"
-#include "kernels.h"
 #include "cuda_util.h"
+#include "kernels.h"
 namespace lightseq {
 namespace cuda {
 template <typename T>
@@ -12,15 +12,10 @@ TransformerEncoderLayer<T>::TransformerEncoderLayer(
     float activation_dropout_ratio, float hidden_output_dropout_ratio,
     bool pre_or_postLayerNorm, std::string activation_fn,
     bool mask_future_tokens)
-    : _layer_id(layer_id),
-      _max_batch_tokens(max_batch_tokens),
-      _max_seq_len(max_seq_len),
-      _hidden_size(hidden_size),
-      _heads(num_heads),
-      _intermediate_size(intermediate_size),
-      _training(true),
-      _is_pre_ln(pre_or_postLayerNorm),
-      _activation_fn(activation_fn),
+    : _layer_id(layer_id), _max_batch_tokens(max_batch_tokens),
+      _max_seq_len(max_seq_len), _hidden_size(hidden_size), _heads(num_heads),
+      _intermediate_size(intermediate_size), _training(true),
+      _is_pre_ln(pre_or_postLayerNorm), _activation_fn(activation_fn),
       _qkv_linear(
           typename FeedForward<T>::Config(3 * hidden_size, hidden_size)),
       _attn_out_linear(
@@ -34,31 +29,29 @@ TransformerEncoderLayer<T>::TransformerEncoderLayer(
       _softmax(typename Softmax<T>::Config(num_heads, mask_future_tokens)),
       _attn_prob_dropout(
           typename Dropout<T>::Config(attn_prob_dropout_ratio),
-          std::max(
-              _max_batch_tokens * std::max(_heads * _max_seq_len, _hidden_size),
-              _hidden_size * _hidden_size * 3)),
+          std::max(_max_batch_tokens *
+                       std::max(_heads * _max_seq_len, _hidden_size),
+                   _hidden_size * _hidden_size * 3)),
       _attn_dropout(typename Dropout<T>::Config(hidden_output_dropout_ratio),
                     std::max(_max_batch_tokens, _hidden_size) * _hidden_size),
       _ffn_activation_dropout(
           typename Dropout<T>::Config(activation_dropout_ratio),
           std::max(_max_batch_tokens, _hidden_size) * _intermediate_size),
-      _ffn_dropout(
-          typename Dropout<T>::Config(hidden_output_dropout_ratio),
-          std::max(_max_batch_tokens, _intermediate_size) * _hidden_size),
+      _ffn_dropout(typename Dropout<T>::Config(hidden_output_dropout_ratio),
+                   std::max(_max_batch_tokens, _intermediate_size) *
+                       _hidden_size),
       _attn_scores(typename StridedBatchGemm<T>::Config(
           (T(1.0) / T(sqrt(_hidden_size / _heads))), T(0.0), CUBLAS_OP_T,
           CUBLAS_OP_N)),
       _attn_context(typename StridedBatchGemm<T>::Config(
           T(1.0), T(0.0), CUBLAS_OP_N, CUBLAS_OP_N)),
-      _enable_quant(false),
-      _mask_future_tokens(mask_future_tokens),
+      _enable_quant(false), _mask_future_tokens(mask_future_tokens),
       _algo_map() {
   assert(_hidden_size % _heads == 0);
   allocate_mem_buffer();
 }
 
-template <typename T>
-TransformerEncoderLayer<T>::~TransformerEncoderLayer() {
+template <typename T> TransformerEncoderLayer<T>::~TransformerEncoderLayer() {
   free_mem_buffer();
 }
 
@@ -279,7 +272,7 @@ void TransformerEncoderLayer<T>::Forward(const T *input_ptr,
   _stream = Context::Instance().get_stream();
   _cublasHandle = Context::Instance().get_cublashandle();
   _cublasLtHandle = Context::Instance().get_cublaslthandle();
-  T *attn_buffer = _shared_mem_ptr;  // 3 * _batch_dim
+  T *attn_buffer = _shared_mem_ptr; // 3 * _batch_dim
   // _batch_dim
   T *ffn_inp_ptr =
       _is_pre_ln ? _shared_mem_ptr + std::max(3 * _batch_dim,
@@ -307,12 +300,12 @@ void TransformerEncoderLayer<T>::attn_layer_bw(const T *input_ptr,
   T *grad_residual_ptr = buffer;
   buffer += _batch_dim;
 
-  T *grad_input_buf_ptr = buffer;  // batch_dim
-  T *grad_qkv_5d_ptr = buffer;     // batch_dim * 3
+  T *grad_input_buf_ptr = buffer; // batch_dim
+  T *grad_qkv_5d_ptr = buffer;    // batch_dim * 3
   buffer += 3 * _batch_dim;
 
-  T *grad_qkv_4d_ptr = buffer;   // batch_dim * 3
-  T *grad_softmax_ptr = buffer;  // batch_size * head_num * seq_len * seq_len
+  T *grad_qkv_4d_ptr = buffer;  // batch_dim * 3
+  T *grad_softmax_ptr = buffer; // batch_size * head_num * seq_len * seq_len
   // buffer += max(3 * _batch_dim,
   //   batch_size * head_num * seq_len * seq_len);
 
@@ -534,8 +527,7 @@ void TransformerEncoderLayer<T>::SetQuantMode(bool enable_quant) {
   }
 }
 
-template <typename T>
-void TransformerEncoderLayer<T>::zero_mask_grad() {
+template <typename T> void TransformerEncoderLayer<T>::zero_mask_grad() {
   cudaMemsetAsync(_grad_attn_qkv_cmax_ptr, 0, 12 * sizeof(T), 0);
   _attn_prob_dropout.zero_mask(0);
   _attn_dropout.zero_mask(0);
@@ -543,13 +535,12 @@ void TransformerEncoderLayer<T>::zero_mask_grad() {
   _ffn_dropout.zero_mask(0);
 }
 
-template <typename T>
-T *TransformerEncoderLayer<T>::_shared_mem_ptr = nullptr;
+template <typename T> T *TransformerEncoderLayer<T>::_shared_mem_ptr = nullptr;
 
 template <typename T>
 int8_t *TransformerEncoderLayer<T>::_shared_quant_mem_ptr = nullptr;
 
 template class TransformerEncoderLayer<float>;
 template class TransformerEncoderLayer<__half>;
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

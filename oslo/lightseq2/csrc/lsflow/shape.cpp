@@ -36,4 +36,4 @@ void Shape::print_shape() {
   }
 }
 
-}  // namespace lightseq
+} // namespace lightseq

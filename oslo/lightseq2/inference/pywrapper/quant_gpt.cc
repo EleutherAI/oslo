@@ -4,11 +4,8 @@ namespace lightseq {
 namespace cuda {
 
 QuantGpt::QuantGpt(const std::string weight_path, const int max_batch_size)
-    : LSModel({"token_ids"}, {"result"}),
-      stream_(nullptr),
-      hd_(nullptr),
-      encoder_(nullptr),
-      _max_batch_size(max_batch_size) {
+    : LSModel({"token_ids"}, {"result"}), stream_(nullptr), hd_(nullptr),
+      encoder_(nullptr), _max_batch_size(max_batch_size) {
   /* ---step1. init environment--- */
   CHECK_GPU_ERROR(cudaSetDevice(0));
   CHECK_GPU_ERROR(cudaStreamCreate(&stream_));
@@ -58,8 +55,8 @@ QuantGpt::~QuantGpt() {
   CHECK_GPU_ERROR(cublasDestroy(hd_));
 }
 
-const int* QuantGpt::get_result_ptr() { return d_sample_id; }
-const float* QuantGpt::get_score_ptr() { return d_ppl; }
+const int *QuantGpt::get_result_ptr() { return d_sample_id; }
+const float *QuantGpt::get_score_ptr() { return d_ppl; }
 
 void QuantGpt::Infer() {
   int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
@@ -77,126 +74,126 @@ void QuantGpt::Infer() {
   }
 }
 
-void QuantGpt::set_input_ptr(int index, void* input_ptr) {
+void QuantGpt::set_input_ptr(int index, void *input_ptr) {
   switch (index) {
-    case 0:
-      encoder_->_p_d_token_id = static_cast<int*>(input_ptr);
-      break;
+  case 0:
+    encoder_->_p_d_token_id = static_cast<int *>(input_ptr);
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
-void QuantGpt::set_output_ptr(int index, void* output_ptr) {
+void QuantGpt::set_output_ptr(int index, void *output_ptr) {
   switch (index) {
-    case 0:
-      if (tw_._sampling_method == "ppl") {
-        encoder_->_p_d_ppl = static_cast<float*>(output_ptr);
-        break;
-      } else if (tw_._sampling_method == "topk" ||
-                 tw_._sampling_method == "topp") {
-        encoder_->_p_d_sample_id = static_cast<int*>(output_ptr);
-        break;
-
-      } else {
-        throw std::runtime_error("Unsupported sampling_method");
-        break;
-      }
-
-    default:
-      throw std::runtime_error("invalid output index");
+  case 0:
+    if (tw_._sampling_method == "ppl") {
+      encoder_->_p_d_ppl = static_cast<float *>(output_ptr);
       break;
+    } else if (tw_._sampling_method == "topk" ||
+               tw_._sampling_method == "topp") {
+      encoder_->_p_d_sample_id = static_cast<int *>(output_ptr);
+      break;
+
+    } else {
+      throw std::runtime_error("Unsupported sampling_method");
+      break;
+    }
+
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
-const void* QuantGpt::get_output_ptr(int index) {
+const void *QuantGpt::get_output_ptr(int index) {
   switch (index) {
-    case 0:
-      if (tw_._sampling_method == "ppl") {
-        return static_cast<void*>(encoder_->_p_d_ppl);
-        break;
-      } else if (tw_._sampling_method == "topk" ||
-                 tw_._sampling_method == "topp") {
-        return static_cast<void*>(encoder_->_p_d_sample_id);
-        break;
-      } else {
-        throw std::runtime_error("Unsupported sampling_method");
-        break;
-      }
-
-    default:
-      throw std::runtime_error("invalid output index");
+  case 0:
+    if (tw_._sampling_method == "ppl") {
+      return static_cast<void *>(encoder_->_p_d_ppl);
       break;
+    } else if (tw_._sampling_method == "topk" ||
+               tw_._sampling_method == "topp") {
+      return static_cast<void *>(encoder_->_p_d_sample_id);
+      break;
+    } else {
+      throw std::runtime_error("Unsupported sampling_method");
+      break;
+    }
+
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 std::vector<int> QuantGpt::get_input_max_shape(int index) {
   switch (index) {
-    case 0:
-      return {_max_batch_size, tw_._max_step};
+  case 0:
+    return {_max_batch_size, tw_._max_step};
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
 std::vector<int> QuantGpt::get_output_max_shape(int index) {
   switch (index) {
-    case 0:
+  case 0:
 
-      if (tw_._sampling_method == "ppl") {
-        return {_max_batch_size};
-        break;
-      } else if (tw_._sampling_method == "topk" ||
-                 tw_._sampling_method == "topp") {
-        return {_max_batch_size, tw_._max_step};
-        break;
-      } else {
-        throw std::runtime_error("Unsupported sampling_method");
-        break;
-      }
-
-    default:
-      throw std::runtime_error("invalid output index");
+    if (tw_._sampling_method == "ppl") {
+      return {_max_batch_size};
       break;
+    } else if (tw_._sampling_method == "topk" ||
+               tw_._sampling_method == "topp") {
+      return {_max_batch_size, tw_._max_step};
+      break;
+    } else {
+      throw std::runtime_error("Unsupported sampling_method");
+      break;
+    }
+
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 DataType QuantGpt::get_input_dtype(int index) {
   switch (index) {
-    case 0:
-      return DataType::kInt32;
-      break;
+  case 0:
+    return DataType::kInt32;
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
 DataType QuantGpt::get_output_dtype(int index) {
   switch (index) {
-    case 0:
-      if (tw_._sampling_method == "ppl") {
-        return DataType::kFloat32;
-        break;
-      } else if (tw_._sampling_method == "topk" ||
-                 tw_._sampling_method == "topp") {
-        return DataType::kInt32;
-        break;
-      } else {
-        throw std::runtime_error("Unsupported sampling_method");
-        break;
-      }
-
-    default:
-      throw std::runtime_error("invalid output index");
+  case 0:
+    if (tw_._sampling_method == "ppl") {
+      return DataType::kFloat32;
       break;
+    } else if (tw_._sampling_method == "topk" ||
+               tw_._sampling_method == "topp") {
+      return DataType::kInt32;
+      break;
+    } else {
+      throw std::runtime_error("Unsupported sampling_method");
+      break;
+    }
+
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

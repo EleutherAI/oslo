@@ -19,25 +19,16 @@ GptEncoder<OpType_>::GptEncoder(int max_batch_size, const int *p_d_token_id,
                                 const GptWeight<OpType_> &tw,
                                 cudaStream_t stream, cudaStream_t cache_stream,
                                 cublasHandle_t hd)
-    : _max_batch_size(max_batch_size),
-      _p_d_token_id(p_d_token_id),
-      _p_d_ppl(p_d_ppl),
-      _p_d_sample_id(p_d_sample_id),
-      _tw(tw),
-      _stream(stream),
-      _cache_stream(cache_stream),
-      _hd(hd),
-      _p_d_src_emb_wei(tw.get_src_emb_wei()),
-      _p_d_enc_wei(tw.get_enc_wei()),
-      _fone((_DataType)1.f),
-      _fzero((_DataType)0.f),
+    : _max_batch_size(max_batch_size), _p_d_token_id(p_d_token_id),
+      _p_d_ppl(p_d_ppl), _p_d_sample_id(p_d_sample_id), _tw(tw),
+      _stream(stream), _cache_stream(cache_stream), _hd(hd),
+      _p_d_src_emb_wei(tw.get_src_emb_wei()), _p_d_enc_wei(tw.get_enc_wei()),
+      _fone((_DataType)1.f), _fzero((_DataType)0.f),
       _atten_scaler((_DataType)sqrt(1.f / tw._dim_per_head)),
       _max_batch_dim(max_batch_size * tw._max_step * tw._hidden_size),
-      _max_thread_per_block(1024),
-      _h_real_seq_len(max_batch_size, 0),
+      _max_thread_per_block(1024), _h_real_seq_len(max_batch_size, 0),
       _h_ppl(max_batch_size, 0.f),
-      _h_sample_id(max_batch_size * tw._max_step, 0),
-      _h_unfinished(1),
+      _h_sample_id(max_batch_size * tw._max_step, 0), _h_unfinished(1),
       _is_benchmark(false) {}
 
 /**
@@ -106,8 +97,7 @@ void GptEncoder<OpType_>::init_buffer(void *pbuf) {
 /**
 Some requirements needed by custom cuda kernel function
 */
-template <OperationType OpType_>
-std::string GptEncoder<OpType_>::check() {
+template <OperationType OpType_> std::string GptEncoder<OpType_>::check() {
   // if (_max_thread_per_block < _tw._hidden_size) {
   //   return "violate hidden_size <= max_thread_per_block";
   // }
@@ -290,7 +280,8 @@ int GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
 #else
 
     bool unfinish = sample_one_token_with_cache();
-    if (!unfinish && !_is_benchmark) break;
+    if (!unfinish && !_is_benchmark)
+      break;
 #endif
   }
 
@@ -302,8 +293,7 @@ int GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
   return _batch_seq_len;
 }
 
-template <OperationType OpType_>
-int GptEncoder<OpType_>::sample_one_token() {
+template <OperationType OpType_> int GptEncoder<OpType_>::sample_one_token() {
   /* ---step 1. project hidden states to vocab logits--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_T, CUBLAS_OP_N, _tw._src_vocab_size, _batch_token_num,
@@ -704,8 +694,7 @@ void GptEncoder<OpType_>::self_attention_with_cache() {
   return;
 }
 
-template <OperationType OpType_>
-void GptEncoder<OpType_>::ffn_add_norm() {
+template <OperationType OpType_> void GptEncoder<OpType_>::ffn_add_norm() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_query, _p_d_ffn_buf1,
@@ -765,8 +754,7 @@ void GptEncoder<OpType_>::ffn_add_norm_with_cache() {
 /**
 Compute ppl from encoder output
 */
-template <OperationType OpType_>
-void GptEncoder<OpType_>::compute_ppl() {
+template <OperationType OpType_> void GptEncoder<OpType_>::compute_ppl() {
   /* ---step 1. project hidden states to vocab logits--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_T, CUBLAS_OP_N, _tw._src_vocab_size, _batch_token_num,
@@ -788,5 +776,5 @@ void GptEncoder<OpType_>::compute_ppl() {
 template class GptEncoder<OperationType::FP16>;
 template class GptEncoder<OperationType::FP32>;
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

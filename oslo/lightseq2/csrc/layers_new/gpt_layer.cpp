@@ -20,25 +20,25 @@ GptLayer<T1, T2>::GptLayer(int layer_id, int max_batch_tokens, int max_seq_len,
       intermediate_size, activation_dropout_ratio, hidden_output_dropout_ratio,
       true, activation_fn));
 
-  this->_context_ptr->exit_layer();  // necessary
+  this->_context_ptr->exit_layer(); // necessary
 }
 
 template <typename T1, typename T2>
-Variable* GptLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
-                                       Variable* cache_v, Variable* pad_mask) {
+Variable *GptLayer<T1, T2>::operator()(Variable *inp, Variable *cache_k,
+                                       Variable *cache_v, Variable *pad_mask) {
   set_inputs({inp, cache_k, cache_v});
 
-  Variable* attn_out = (*_attn_layer)(inp, cache_k, cache_v, pad_mask);
+  Variable *attn_out = (*_attn_layer)(inp, cache_k, cache_v, pad_mask);
 
-  Variable* ffn_out = (*_ffn_layer)(attn_out);
+  Variable *ffn_out = (*_ffn_layer)(attn_out);
 
   set_outputs({ffn_out});
   return ffn_out;
 }
 
 template <typename T1, typename T2>
-size_t GptLayer<T1, T2>::load_para_and_grad(const T1* para_ptr,
-                                            T2* grad_ptr) {  // for training
+size_t GptLayer<T1, T2>::load_para_and_grad(const T1 *para_ptr,
+                                            T2 *grad_ptr) { // for training
   size_t offset = 0;
 
   offset +=
@@ -51,8 +51,8 @@ size_t GptLayer<T1, T2>::load_para_and_grad(const T1* para_ptr,
 }
 
 template <typename T1, typename T2>
-int GptLayer<T1, T2>::load_params(const std::vector<const T1*>& para_vec,
-                                  int offset) {  // for inference
+int GptLayer<T1, T2>::load_params(const std::vector<const T1 *> &para_vec,
+                                  int offset) { // for inference
   int size = 0;
 
   size += _attn_layer->load_params(para_vec, offset + size);
@@ -62,4 +62,4 @@ int GptLayer<T1, T2>::load_params(const std::vector<const T1*>& para_vec,
   return size;
 }
 
-}  // namespace lightseq
+} // namespace lightseq

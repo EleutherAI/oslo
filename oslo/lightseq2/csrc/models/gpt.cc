@@ -26,7 +26,7 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
   /* --- step.3 initial input Variable node --- */
   _inp_tokens = new Variable("inp_tokens", g_dtype<int>());
 
-  /* --- step.4 inital operator & layer --- */
+  /* --- step.4 initial operator & layer --- */
   int max_batch_tokens = tw_._max_step * _max_batch_size;
 
   // initial LaunchEncEmb layer
@@ -55,7 +55,7 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
       max_batch_size * tw_._beam_size, tw_._hidden_size));
   _lyr_norm_layer->load_params(tw_.get_src_emb_wei(), 2);
 
-  // intial Project hidden states to vocab logits
+  // initial Project hidden states to vocab logits
   _linear_layer.reset(new LinearLayer<OpType_, OpType_>(
       max_batch_size * tw_._beam_size, tw_._hidden_size, tw_._src_vocab_size,
       MATRIX_OP::Transpose, MATRIX_OP::NonTranspose, 1.f));
@@ -167,14 +167,14 @@ void Gpt::Infer() {
       OpType_ *linear_inp_ptr = _lyr_norm_layer->input(0)->value<OpType_>();
       for (int batch_idx = 0; batch_idx < batch_size; batch_idx++) {
         for (int i = 0; i < tw_._beam_size; i++) {
-          cudaMemcpyAsync(
-              linear_inp_ptr +
-                  (batch_idx * tw_._beam_size + i) * tw_._hidden_size,
-              linear_inp_ptr + (batch_idx * tw_._beam_size * prompt_len +
-                                i * prompt_len + prompt_len - 1) *
-                                   tw_._hidden_size,
-              tw_._hidden_size * sizeof(OpType_), cudaMemcpyDefault,
-              _context_ptr->get_stream());
+          cudaMemcpyAsync(linear_inp_ptr + (batch_idx * tw_._beam_size + i) *
+                                               tw_._hidden_size,
+                          linear_inp_ptr +
+                              (batch_idx * tw_._beam_size * prompt_len +
+                               i * prompt_len + prompt_len - 1) *
+                                  tw_._hidden_size,
+                          tw_._hidden_size * sizeof(OpType_), cudaMemcpyDefault,
+                          _context_ptr->get_stream());
         }
       }
     }
@@ -200,12 +200,12 @@ void Gpt::Infer() {
       int *tmp_out_ptr = (_generate_method == GenerateMethod::BeamSearch)
                              ? _out_tokens->value<int>()
                              : _inp_tokens->value<int>();
-      cudaMemcpyAsync(
-          _gpt_out_ptr +
-              (batch_idx * tw_._beam_size + beam_idx) * (steps + prompt_len),
-          tmp_out_ptr + (batch_idx * tw_._beam_size + beam_idx) * tw_._max_step,
-          (steps + prompt_len) * sizeof(int), cudaMemcpyDefault,
-          _context_ptr->get_stream());
+      cudaMemcpyAsync(_gpt_out_ptr + (batch_idx * tw_._beam_size + beam_idx) *
+                                         (steps + prompt_len),
+                      tmp_out_ptr + (batch_idx * tw_._beam_size + beam_idx) *
+                                        tw_._max_step,
+                      (steps + prompt_len) * sizeof(int), cudaMemcpyDefault,
+                      _context_ptr->get_stream());
     }
   }
   cudaMemcpyAsync(_gpt_scores_ptr, _out_scores->value<float>(),
@@ -224,97 +224,97 @@ void Gpt::Infer() {
 
 void Gpt::set_input_ptr(int index, void *input_ptr) {
   switch (index) {
-    case 0:
-      _input_ptr = (int *)input_ptr;
-      break;
+  case 0:
+    _input_ptr = (int *)input_ptr;
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
 void Gpt::set_output_ptr(int index, void *output_ptr) {
   switch (index) {
-    case 0:
-      _gpt_out_ptr = (int *)output_ptr;
-      break;
+  case 0:
+    _gpt_out_ptr = (int *)output_ptr;
+    break;
 
-    case 1:
-      _gpt_scores_ptr = (float *)output_ptr;
-      break;
+  case 1:
+    _gpt_scores_ptr = (float *)output_ptr;
+    break;
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 const void *Gpt::get_output_ptr(int index) {
   switch (index) {
-    case 0:
-      return static_cast<void *>(_gpt_out_ptr);
+  case 0:
+    return static_cast<void *>(_gpt_out_ptr);
 
-    case 1:
-      return static_cast<void *>(_gpt_scores_ptr);
+  case 1:
+    return static_cast<void *>(_gpt_scores_ptr);
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 std::vector<int> Gpt::get_input_max_shape(int index) {
   switch (index) {
-    case 0:
-      return {_max_batch_size, tw_._max_step};
+  case 0:
+    return {_max_batch_size, tw_._max_step};
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 std::vector<int> Gpt::get_output_max_shape(int index) {
   switch (index) {
-    case 0:
-      return {_max_batch_size, tw_._beam_size, tw_._max_step};
+  case 0:
+    return {_max_batch_size, tw_._beam_size, tw_._max_step};
 
-    case 1:
-      return {_max_batch_size, tw_._beam_size};
-      break;
+  case 1:
+    return {_max_batch_size, tw_._beam_size};
+    break;
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 DataType Gpt::get_input_dtype(int index) {
   switch (index) {
-    case 0:
-      return DataType::kInt32;
-      break;
+  case 0:
+    return DataType::kInt32;
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
 DataType Gpt::get_output_dtype(int index) {
   switch (index) {
-    case 0:
-      return DataType::kInt32;
-      break;
+  case 0:
+    return DataType::kInt32;
+    break;
 
-    case 1:
-      return DataType::kFloat32;
-      break;
+  case 1:
+    return DataType::kFloat32;
+    break;
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

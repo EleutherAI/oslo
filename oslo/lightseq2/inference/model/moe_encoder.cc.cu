@@ -1,7 +1,7 @@
-#include "moe_encoder.h"
-#include "../kernels/transformerKernels.h"
 #include "../kernels/embKernels.h"
 #include "../kernels/moeKernels.h"
+#include "../kernels/transformerKernels.h"
+#include "moe_encoder.h"
 
 /**
 @file
@@ -18,23 +18,15 @@ MoeEncoder<OpType_>::MoeEncoder(int max_batch_size, int *p_d_token_id,
                                 const MoeWeight<OpType_> &tw,
                                 cudaStream_t stream, cublasHandle_t hd,
                                 const int *p_d_lang_id)
-    : _max_batch_size(max_batch_size),
-      _p_d_token_id(p_d_token_id),
-      _p_d_padding_mask(p_d_padding_mask),
-      _p_d_output(p_d_output),
-      _p_d_lang_id(p_d_lang_id),
-      _tw(tw),
-      _stream(stream),
-      _hd(hd),
-      _p_d_src_emb_wei(tw.get_src_emb_wei()),
-      _p_d_enc_wei(tw.get_enc_wei()),
-      _fone((_DataType)1.f),
-      _fzero((_DataType)0.f),
+    : _max_batch_size(max_batch_size), _p_d_token_id(p_d_token_id),
+      _p_d_padding_mask(p_d_padding_mask), _p_d_output(p_d_output),
+      _p_d_lang_id(p_d_lang_id), _tw(tw), _stream(stream), _hd(hd),
+      _p_d_src_emb_wei(tw.get_src_emb_wei()), _p_d_enc_wei(tw.get_enc_wei()),
+      _fone((_DataType)1.f), _fzero((_DataType)0.f),
       _atten_scaler((_DataType)sqrt(1.f / tw._dim_per_head)),
       _max_batch_dim(max_batch_size * tw._max_step * tw._hidden_size),
       _max_token_num(max_batch_size * tw._max_step),
-      _max_thread_per_block(1024),
-      _gate_weight_offset(0),
+      _max_thread_per_block(1024), _gate_weight_offset(0),
       _p_d_enc_gate_wei(tw.get_enc_gate_wei()) {}
 
 /**
@@ -80,7 +72,7 @@ void MoeEncoder<OpType_>::init_buffer(void *pbuf) {
       _p_d_expert_id_routed + _tw._moe_topk_encoder * _max_token_num);
   _p_d_moe_inner_buf =
       _p_d_moe_input_buf + _tw._expert_num_encoder * _max_batch_dim;
-  // encoder and decoder use the same buffer to save gpu memory useage
+  // encoder and decoder use the same buffer to save gpu memory usage
 
   return;
 }
@@ -88,8 +80,7 @@ void MoeEncoder<OpType_>::init_buffer(void *pbuf) {
 /**
 Some requirements needed by custom cuda kernel function
 */
-template <OperationType OpType_>
-std::string MoeEncoder<OpType_>::check() {
+template <OperationType OpType_> std::string MoeEncoder<OpType_>::check() {
   // if (_max_thread_per_block < _tw._hidden_size) {
   //   return "violate hidden_size <= max_thread_per_block";
   // }
@@ -150,14 +141,14 @@ void MoeEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
                             _tw._hidden_size, _stream, _p_d_src_emb_wei[4],
                             _p_d_lang_id, _tw._multilg_type);
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // token_id
       std::cout << "emb out: token-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
                 "emb out", 10);
     }
-  }  // not normal
+  } // not normal
   print_vec(_p_d_src_emb_wei[0], "token embedding weight", 10);
   print_vec(_p_d_src_emb_wei[1], "position embedding weight", 10);
 #endif
@@ -172,14 +163,14 @@ void MoeEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
       _p_d_src_emb_wei[2], _p_d_src_emb_wei[3], _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // token_id
       std::cout << "encoder output: token-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
                 "encoder_output", _tw._dim_per_head);
     }
-  }  // not normal
+  } // not normal
 #endif
   return;
 }
@@ -187,8 +178,7 @@ void MoeEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
 /**
 Encoder self attention
 */
-template <OperationType OpType_>
-void MoeEncoder<OpType_>::self_attention() {
+template <OperationType OpType_> void MoeEncoder<OpType_>::self_attention() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_q,
@@ -247,8 +237,7 @@ void MoeEncoder<OpType_>::self_attention() {
   return;
 }
 
-template <OperationType OpType_>
-void MoeEncoder<OpType_>::ffn_add_norm() {
+template <OperationType OpType_> void MoeEncoder<OpType_>::ffn_add_norm() {
   if (_tw._is_moe_layer_encoder[_layer_id]) {
     if (_tw._gate_type == 1) {
       // hard gate
@@ -264,8 +253,7 @@ void MoeEncoder<OpType_>::ffn_add_norm() {
   return;
 }
 
-template <OperationType OpType_>
-void MoeEncoder<OpType_>::ffn() {
+template <OperationType OpType_> void MoeEncoder<OpType_>::ffn() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_ffn_buf1,
@@ -309,8 +297,7 @@ void MoeEncoder<OpType_>::set_hard_gates_ptr(int *hard_gates,
   _p_d_hard_gates = p_d_hard_gates;
 }
 
-template <OperationType OpType_>
-void MoeEncoder<OpType_>::moe_fw_hard_gate() {
+template <OperationType OpType_> void MoeEncoder<OpType_>::moe_fw_hard_gate() {
   if (_batch_size == 1) {
     // if size ==1, perform ffn() for all batch data according to gate
     int expert_id = _h_hard_gates[0];
@@ -372,7 +359,7 @@ void MoeEncoder<OpType_>::moe_fw_hard_gate() {
         _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_ffn_buf1,
         _p_d_enc_wei[_weight_offset + 6], _p_d_enc_wei[_weight_offset + 7],
         _max_thread_per_block, _tw._is_post_ln);
-    // used for reorder ouptut of each gate
+    // used for reorder output of each gate
     int cursor_p = 0;
     _DataType *_p_d_moe_input_buf_tmp;
     int *_p_d_cur_gate_indexs = _p_d_hard_gates + 2 * _max_batch_size;
@@ -445,8 +432,7 @@ void MoeEncoder<OpType_>::moe_fw_hard_gate() {
   }
 }
 
-template <OperationType OpType_>
-void MoeEncoder<OpType_>::moe_fw() {
+template <OperationType OpType_> void MoeEncoder<OpType_>::moe_fw() {
   ker_norm_layer_prepost_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_ffn_buf1,
       _p_d_enc_wei[_weight_offset + 6], _p_d_enc_wei[_weight_offset + 7],
@@ -509,5 +495,5 @@ void MoeEncoder<OpType_>::moe_fw() {
 template class MoeEncoder<OperationType::FP16>;
 template class MoeEncoder<OperationType::FP32>;
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

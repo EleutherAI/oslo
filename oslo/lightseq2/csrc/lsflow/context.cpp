@@ -3,13 +3,13 @@
 namespace lightseq {
 
 Context::Context(StatusType status_type, int device_id)
-    : _mm_ptr(new MemoryManager()),
-      _device_id(device_id),
+    : _mm_ptr(new MemoryManager()), _device_id(device_id),
       _status_type(status_type) {
   _allocator_ptr = _mm_ptr->allocator();
   printf("Initial Context, status_type: %s\n", status_type_str().c_str());
 #ifdef LIGHTSEQ_cuda
-  if (device_id >= 0) CHECK_GPU_ERROR(cudaSetDevice(device_id));
+  if (device_id >= 0)
+    CHECK_GPU_ERROR(cudaSetDevice(device_id));
   CHECK_GPU_ERROR(cudaStreamCreate(&_stream));
   CHECK_GPU_ERROR(cublasCreate(&_cublasHandle));
   CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
@@ -17,7 +17,7 @@ Context::Context(StatusType status_type, int device_id)
 }
 
 Context::~Context() {
-  for (auto& iter : _all_node_vec) {
+  for (auto &iter : _all_node_vec) {
     delete iter;
   }
 }
@@ -31,9 +31,7 @@ void Context::set_stream(cudaStream_t stream) {
 
 void Context::convert_into_train() { _status_type = StatusType::Training; }
 
-void Context::convert_into_inference() {
-  _status_type = StatusType::Inference;
-}
+void Context::convert_into_inference() { _status_type = StatusType::Inference; }
 
 void Context::convert_into_eval() {
   if (_status_type != StatusType::Inference)
@@ -52,7 +50,7 @@ int Context::create_global_context(StatusType status_type, int device_id) {
 void Context::set_global_context(int context_id) {
   auto iter = global_contexts_map.find(context_id);
   if (iter == global_contexts_map.end()) {
-    printf("Error occured! context_id %d does not exist!\n", context_id);
+    printf("Error occurred! context_id %d does not exist!\n", context_id);
     exit(-1);
   }
   _global_context_ptr = iter->second;
@@ -63,18 +61,19 @@ std::shared_ptr<Context> Context::global_instance() {
 }
 
 void Context::update_node_idx() {
-  if (_built) return;
+  if (_built)
+    return;
   _node_idx++;
 }
 
-void Context::add_op(Operator* op) {
+void Context::add_op(Operator *op) {
   if (is_built()) {
     printf("Context has constructed! should not add new operator!\n");
     exit(-1);
   }
 
   if (_layer_context.size()) {
-    for (Layer* lyr : _layer_context) {
+    for (Layer *lyr : _layer_context) {
       lyr->_op_vec.push_back(op);
     }
     return;
@@ -88,9 +87,9 @@ void Context::add_op(Operator* op) {
 #endif
 }
 
-void Context::add_node(Node* node) { _all_node_vec.push_back(node); }
+void Context::add_node(Node *node) { _all_node_vec.push_back(node); }
 
-void Context::enter_layer(Layer* cur_layer, bool is_initial) {
+void Context::enter_layer(Layer *cur_layer, bool is_initial) {
   if (is_built()) {
     printf("Context has constructed! should not modify network\n");
     exit(-1);
@@ -110,19 +109,17 @@ void Context::build() {
   }
   _building = true;
 
-  printf(
-      "========== start Lightseq Context build, StatusType: %s, OpType_: %d "
-      "==========\n\n",
-      status_type_str().c_str(), g_dtype<OpType_>());
+  printf("========== start Lightseq Context build, StatusType: %s, OpType_: %d "
+         "==========\n\n",
+         status_type_str().c_str(), g_dtype<OpType_>());
 
   if (!check_validate()) {
     printf("Check validate error!\n");
     exit(-1);
   }
 
-  printf(
-      "Please pay attention to whether the build order of the layer is "
-      "consistent with the actual execution order.\n");
+  printf("Please pay attention to whether the build order of the layer is "
+         "consistent with the actual execution order.\n");
 
   try {
     temporary_buffer_ = _allocator_ptr->malloc_mem(mx_tensor_size);
@@ -149,7 +146,7 @@ void Context::build() {
   }
 #endif
 
-  for (Layer* rl : _root_layers) {
+  for (Layer *rl : _root_layers) {
     printf("########## Context build layer %s forward ##########\n",
            rl->name().c_str());
     rl->forward();
@@ -158,7 +155,7 @@ void Context::build() {
   if (is_training()) {
     printf("is training!\n");
     for (int idx = _root_layers.size() - 1; idx >= 0; idx--) {
-      Layer* rl = _root_layers[idx];
+      Layer *rl = _root_layers[idx];
 
       printf("\n########## Context build layer %s backward ##########\n",
              rl->name().c_str());
@@ -171,7 +168,7 @@ void Context::build() {
 
   for (auto iter : _all_node_vec) {
     if (iter->node_type() == NodeType::Variable) {
-      static_cast<Variable*>(iter)->update_regress_idx();
+      static_cast<Variable *>(iter)->update_regress_idx();
     }
   }
 
@@ -197,14 +194,14 @@ void Context::build() {
 
 bool Context::check_validate() {
   bool check_flag = true;
-  for (Layer* lyr : _all_layers) {
+  for (Layer *lyr : _all_layers) {
     if (lyr->name().size() == 0) {
       printf("error! some LAYERS didn't initialize!\n");
       check_flag = false;
     }
   }
 
-  for (Operator* op : _model_ops) {
+  for (Operator *op : _model_ops) {
     if (op->name().size() == 0) {
       printf("error! some OPERATORS didn't initialize!\n");
       check_flag = false;
@@ -216,11 +213,11 @@ bool Context::check_validate() {
 
 void Context::draw_all_context() {}
 
-Layer* Context::last_layer() {
+Layer *Context::last_layer() {
   return _layer_context.size() ? _layer_context.back() : nullptr;
 }
 
-Node* Context::last_node() {
+Node *Context::last_node() {
   return _all_node_vec.size() ? _all_node_vec[_all_node_vec.size() - 1]
                               : nullptr;
 }
@@ -229,10 +226,9 @@ void Context::regist_pybind_layer(std::string layer_name, int layer_id,
                                   std::shared_ptr<void> layer_ptr) {
   std::string full_name = layer_name + std::to_string(layer_id);
   if (pybind_layers.find(full_name) != pybind_layers.end()) {
-    printf(
-        "The layer applied for registration has been occupied!\n"
-        "Layer name is %s!\n",
-        full_name.c_str());
+    printf("The layer applied for registration has been occupied!\n"
+           "Layer name is %s!\n",
+           full_name.c_str());
     throw std::runtime_error(
         "The layer applied for registration has been occupied!\n");
   }
@@ -262,7 +258,7 @@ void Context::update_regr_end(int node_idx) {
                          : std::max(node_idx, _regress_end_idx);
 }
 
-void Context::register_object(std::string object_name, void* object) {
+void Context::register_object(std::string object_name, void *object) {
   if (_resources_pool.find(object_name) != _resources_pool.end()) {
     printf("Error! register same name(%s) twice!\n", object_name.c_str());
     exit(-1);
@@ -270,7 +266,7 @@ void Context::register_object(std::string object_name, void* object) {
   _resources_pool.emplace(object_name, object);
 }
 
-void* Context::get_object(std::string object_name) {
+void *Context::get_object(std::string object_name) {
   auto iter = _resources_pool.find(object_name);
   if (iter == _resources_pool.end()) {
     printf("Error! can't get %s\n", object_name.c_str());
@@ -291,10 +287,9 @@ std::shared_ptr<void> Context::get_pybind_layer(std::string layer_name,
   std::string full_name = layer_name + std::to_string(layer_id);
   auto iter = pybind_layers.find(full_name);
   if (iter == pybind_layers.end()) {
-    printf(
-        "The requested layer was not found!\n"
-        "Layer name is %s!\n",
-        full_name.c_str());
+    printf("The requested layer was not found!\n"
+           "Layer name is %s!\n",
+           full_name.c_str());
     throw std::runtime_error("The requested layer was not found!");
   }
   return iter->second;
@@ -307,4 +302,4 @@ std::unordered_map<int, std::shared_ptr<Context>> Context::global_contexts_map =
     {};
 int Context::global_context_id = 0;
 
-}  // namespace lightseq
+} // namespace lightseq

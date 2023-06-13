@@ -17,7 +17,7 @@ __global__ void ls_cross_entropy_fw_kernel(
   const int left_idx = block_start + threadIdx.x;
   const int right_idx = (blockIdx.x + 1) * vocab_size;
   float max_input[1] = {REDUCE_FLOAT_INF_NEG};
-  float sum_logits[2] = {0.f, 0.f};  // logit and logit exp
+  float sum_logits[2] = {0.f, 0.f}; // logit and logit exp
   int target_tid = targets[blockIdx.x];
 
   if (target_tid == padding_idx) {
@@ -190,5 +190,5 @@ template void launch_cross_entropy_bw<__half>(
     const int *targets_ptr, __half *grad_inputs_ptr, const int padding_idx,
     const float epsilon, const int batch_size, const int seq_len,
     const int vocab_size, cudaStream_t stream);
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

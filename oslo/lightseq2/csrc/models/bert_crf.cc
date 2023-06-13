@@ -21,7 +21,7 @@ BertCrf::BertCrf(const std::string weight_path, const int max_batch_size)
   /* --- step.3 initial input Variable node --- */
   inp_tokens = new Variable("inp_tokens", g_dtype<OpType_>());
 
-  /* --- step.4 inital operator & layer --- */
+  /* --- step.4 initial operator & layer --- */
   int max_batch_tokens = tw_._max_step * _max_batch_size;
 
   // initial LaunchEncEmb layer
@@ -112,81 +112,81 @@ void BertCrf::Infer() {
 
 void BertCrf::set_input_ptr(int index, void *input_ptr) {
   switch (index) {
-    case 0:
-      inp_tokens->set_value((char *)input_ptr);
-      break;
+  case 0:
+    inp_tokens->set_value((char *)input_ptr);
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
 void BertCrf::set_output_ptr(int index, void *output_ptr) {
   switch (index) {
-    case 0:
-      bert_out->set_value((char *)output_ptr);
-      break;
+  case 0:
+    bert_out->set_value((char *)output_ptr);
+    break;
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 const void *BertCrf::get_output_ptr(int index) {
   switch (index) {
-    case 0:
-      return static_cast<void *>(bert_out->value());
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  case 0:
+    return static_cast<void *>(bert_out->value());
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 std::vector<int> BertCrf::get_input_max_shape(int index) {
   switch (index) {
-    case 0:
-      return {_max_batch_size, tw_._max_step};
+  case 0:
+    return {_max_batch_size, tw_._max_step};
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 std::vector<int> BertCrf::get_output_max_shape(int index) {
   switch (index) {
-    case 0:
-      return {_max_batch_size, tw_._max_step};
+  case 0:
+    return {_max_batch_size, tw_._max_step};
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 DataType BertCrf::get_input_dtype(int index) {
   switch (index) {
-    case 0:
-      return DataType::kInt32;
-      break;
+  case 0:
+    return DataType::kInt32;
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
 DataType BertCrf::get_output_dtype(int index) {
   switch (index) {
-    case 0:
-      return DataType::kInt32;
-      break;
+  case 0:
+    return DataType::kInt32;
+    break;
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

@@ -1,6 +1,6 @@
+#include "common.h"
 #include "moeKernels.h"
 #include "transformerKernels.h"
-#include "common.h"
 
 /**
 @file
@@ -26,8 +26,8 @@ scale: [hidden_size]
 bias: [hidden_size]
 */
 template <typename T>
-__global__ void ker_norm_layer_prepost(T* input, T* output, const T* scale,
-                                       const T* bias, const int hidden_size,
+__global__ void ker_norm_layer_prepost(T *input, T *output, const T *scale,
+                                       const T *bias, const int hidden_size,
                                        bool is_post_ln) {
   uint block_start = blockIdx.x * hidden_size;
   uint start = block_start + threadIdx.x;
@@ -40,7 +40,8 @@ __global__ void ker_norm_layer_prepost(T* input, T* output, const T* scale,
   // step 0. compute mean
   __shared__ float s_mean;
   float reduce_res = blockReduceSum<float>(val);
-  if (threadIdx.x == 0) s_mean = reduce_res / float(hidden_size);
+  if (threadIdx.x == 0)
+    s_mean = reduce_res / float(hidden_size);
   __syncthreads();
 
   // step 1. compute variance
@@ -67,18 +68,17 @@ __global__ void ker_norm_layer_prepost(T* input, T* output, const T* scale,
 }
 
 template <>
-__global__ void ker_norm_layer_prepost<__half>(__half* input, __half* output,
-                                               const __half* scale,
-                                               const __half* bias,
-                                               const int half_hidden_size,
-                                               bool is_post_ln) {
+__global__ void
+ker_norm_layer_prepost<__half>(__half *input, __half *output,
+                               const __half *scale, const __half *bias,
+                               const int half_hidden_size, bool is_post_ln) {
   uint block_start = blockIdx.x * half_hidden_size;
   uint start = block_start + threadIdx.x;
   uint end = blockIdx.x * half_hidden_size + half_hidden_size;
-  half2* pinput = (half2*)input;
-  half2* poutput = (half2*)output;
-  const half2* pscale = (const half2*)scale;
-  const half2* pbias = (const half2*)bias;
+  half2 *pinput = (half2 *)input;
+  half2 *poutput = (half2 *)output;
+  const half2 *pscale = (const half2 *)scale;
+  const half2 *pbias = (const half2 *)bias;
   float mean_dim = float(half_hidden_size) * 2.f;
 
   float val = 0.0;
@@ -89,7 +89,8 @@ __global__ void ker_norm_layer_prepost<__half>(__half* input, __half* output,
   }
   __shared__ float s_mean;
   float reduce_res = blockReduceSum<float>(val);
-  if (threadIdx.x == 0) s_mean = reduce_res / mean_dim;
+  if (threadIdx.x == 0)
+    s_mean = reduce_res / mean_dim;
   __syncthreads();
 
   // step 1. compute variance
@@ -102,7 +103,8 @@ __global__ void ker_norm_layer_prepost<__half>(__half* input, __half* output,
   }
   __shared__ float s_var;
   reduce_res = blockReduceSum(val);
-  if (threadIdx.x == 0) s_var = rsqrtf(reduce_res / mean_dim + epsilon);
+  if (threadIdx.x == 0)
+    s_var = rsqrtf(reduce_res / mean_dim + epsilon);
   __syncthreads();
 
   // step 2. layer norm
@@ -121,8 +123,8 @@ __global__ void ker_norm_layer_prepost<__half>(__half* input, __half* output,
 
 template <typename T>
 void ker_norm_layer_prepost_launcher(int token_num, int hidden_size,
-                                     cudaStream_t stream, T* input, T* output,
-                                     const T* scale, const T* bias,
+                                     cudaStream_t stream, T *input, T *output,
+                                     const T *scale, const T *bias,
                                      const int max_thread_per_block,
                                      bool is_post_ln) {
   ker_norm_layer_prepost<T><<<token_num, max_thread_per_block, 0, stream>>>(
@@ -131,8 +133,8 @@ void ker_norm_layer_prepost_launcher(int token_num, int hidden_size,
 
 template <>
 void ker_norm_layer_prepost_launcher<__half>(
-    int token_num, int hidden_size, cudaStream_t stream, __half* input,
-    __half* output, const __half* scale, const __half* bias,
+    int token_num, int hidden_size, cudaStream_t stream, __half *input,
+    __half *output, const __half *scale, const __half *bias,
     const int max_thread_per_block, bool is_post_ln) {
   ker_norm_layer_prepost<__half>
       <<<token_num, max_thread_per_block, 0, stream>>>(
@@ -140,13 +142,13 @@ void ker_norm_layer_prepost_launcher<__half>(
 }
 
 template void ker_norm_layer_prepost_launcher<float>(
-    int token_num, int hidden_size, cudaStream_t stream, float* input,
-    float* output, const float* scale, const float* bias,
+    int token_num, int hidden_size, cudaStream_t stream, float *input,
+    float *output, const float *scale, const float *bias,
     const int max_thread_per_block, bool is_post_ln);
 
 template void ker_norm_layer_prepost_launcher<__half>(
-    int token_num, int hidden_size, cudaStream_t stream, __half* input,
-    __half* output, const __half* scale, const __half* bias,
+    int token_num, int hidden_size, cudaStream_t stream, __half *input,
+    __half *output, const __half *scale, const __half *bias,
     const int max_thread_per_block, bool is_post_ln);
 
 /**
@@ -166,8 +168,8 @@ expert_routed: [max_token_num * topk]
   ids of two routed experts.
 */
 template <typename T>
-__global__ void ker_softmax_topk_router(const T* gate_out, float* score_routed,
-                                        int* expert_routed, int batch_token_num,
+__global__ void ker_softmax_topk_router(const T *gate_out, float *score_routed,
+                                        int *expert_routed, int batch_token_num,
                                         int expert_num, int max_token_num,
                                         int topk) {
   int token_id = blockIdx.x, expert_id = threadIdx.x;
@@ -177,13 +179,15 @@ __global__ void ker_softmax_topk_router(const T* gate_out, float* score_routed,
                   : CUDA_FLOAT_INF_NEG;
   float max_val = blockReduceMax(val);
   __shared__ float smax;
-  if (threadIdx.x == 0) smax = max_val;
+  if (threadIdx.x == 0)
+    smax = max_val;
   __syncthreads();
 
   float score = expert_id < expert_num ? expf(val - smax) : 0.f;
   float rsum = blockReduceSum(score);
   __shared__ float ssum;
-  if (threadIdx.x == 0) ssum = rsum;
+  if (threadIdx.x == 0)
+    ssum = rsum;
   __syncthreads();
   score /= ssum;
 
@@ -210,7 +214,8 @@ __global__ void ker_softmax_topk_router(const T* gate_out, float* score_routed,
   }
 
   max_val = blockReduceMax(val);
-  if (threadIdx.x == 0) smax = max_val;
+  if (threadIdx.x == 0)
+    smax = max_val;
   __syncthreads();
   __shared__ int second_expert;
   if (val == smax) {
@@ -228,8 +233,8 @@ __global__ void ker_softmax_topk_router(const T* gate_out, float* score_routed,
 template <typename T>
 void ker_softmax_topk_router_launcher(int batch_token_num, int expert_num,
                                       int max_token_num, int topk,
-                                      cudaStream_t stream, const T* gate_out,
-                                      float* score_routed, int* expert_routed) {
+                                      cudaStream_t stream, const T *gate_out,
+                                      float *score_routed, int *expert_routed) {
   int block_dim = (expert_num + 31) >> 5 << 5;
   ker_softmax_topk_router<T><<<batch_token_num, block_dim, 0, stream>>>(
       gate_out, score_routed, expert_routed, batch_token_num, expert_num,
@@ -238,12 +243,12 @@ void ker_softmax_topk_router_launcher(int batch_token_num, int expert_num,
 
 template void ker_softmax_topk_router_launcher<float>(
     int batch_token_num, int expert_num, int max_token_num, int topk,
-    cudaStream_t stream, const float* gate_out, float* score_routed,
-    int* expert_routed);
+    cudaStream_t stream, const float *gate_out, float *score_routed,
+    int *expert_routed);
 template void ker_softmax_topk_router_launcher<__half>(
     int batch_token_num, int expert_num, int max_token_num, int topk,
-    cudaStream_t stream, const __half* gate_out, float* score_routed,
-    int* expert_routed);
+    cudaStream_t stream, const __half *gate_out, float *score_routed,
+    int *expert_routed);
 
 /**
 @brief: ker_reorder_tokens
@@ -260,8 +265,8 @@ score: [expert_num, max_token_num]
 output: [expert_num, max_token_num, hidden_size]
 */
 template <typename T>
-__global__ void ker_reorder_tokens(const T* input, const float* score,
-                                   T* output, int max_token_num,
+__global__ void ker_reorder_tokens(const T *input, const float *score,
+                                   T *output, int max_token_num,
                                    int hidden_size) {
   int expert_id = blockIdx.x, token_id = blockIdx.y;
   int score_pos = expert_id * max_token_num + token_id;
@@ -277,8 +282,8 @@ template <typename T>
 void ker_reorder_tokens_launcher(int batch_token_num, int expert_num,
                                  int max_token_num, int hidden_size,
                                  int max_thread_per_block, cudaStream_t stream,
-                                 const T* input, const float* score,
-                                 T* output) {
+                                 const T *input, const float *score,
+                                 T *output) {
   ker_reorder_tokens<T>
       <<<dim3(expert_num, batch_token_num), max_thread_per_block, 0, stream>>>(
           input, score, output, max_token_num, hidden_size);
@@ -286,13 +291,13 @@ void ker_reorder_tokens_launcher(int batch_token_num, int expert_num,
 
 template void ker_reorder_tokens_launcher<float>(
     int batch_token_num, int expert_num, int max_token_num, int hidden_size,
-    int max_thread_per_block, cudaStream_t stream, const float* input,
-    const float* score, float* output);
+    int max_thread_per_block, cudaStream_t stream, const float *input,
+    const float *score, float *output);
 
 template void ker_reorder_tokens_launcher<__half>(
     int batch_token_num, int expert_num, int max_token_num, int hidden_size,
-    int max_thread_per_block, cudaStream_t stream, const __half* input,
-    const float* score, __half* output);
+    int max_thread_per_block, cudaStream_t stream, const __half *input,
+    const float *score, __half *output);
 
 /**
 @brief: ker_strided_bias_gelu
@@ -309,7 +314,7 @@ bias: [expert_num, feature_dim]
 feature_dim: the dim of input feature
 */
 template <typename T>
-__global__ void ker_strided_bias_gelu(T* input, const T* bias, int feature_dim,
+__global__ void ker_strided_bias_gelu(T *input, const T *bias, int feature_dim,
                                       int max_token_num) {
   int offset = (blockIdx.x * max_token_num + blockIdx.y) * feature_dim;
   for (int idx = threadIdx.x; idx < feature_dim; idx += blockDim.x) {
@@ -321,12 +326,12 @@ __global__ void ker_strided_bias_gelu(T* input, const T* bias, int feature_dim,
 
 /* fp16 version */
 template <>
-__global__ void ker_strided_bias_gelu<__half>(__half* input, const __half* bias,
+__global__ void ker_strided_bias_gelu<__half>(__half *input, const __half *bias,
                                               int feature_dim,
                                               int max_token_num) {
   int offset = (blockIdx.x * max_token_num + blockIdx.y) * feature_dim;
-  half2* pinput = (half2*)input;
-  const half2* pbias = (const half2*)bias;
+  half2 *pinput = (half2 *)input;
+  const half2 *pbias = (const half2 *)bias;
   for (int idx = threadIdx.x; idx < feature_dim; idx += blockDim.x) {
     int cur_offset = offset + idx;
     pinput[cur_offset] = gelu<half2>(__hadd2(
@@ -338,7 +343,7 @@ template <typename T>
 void ker_strided_bias_gelu_launcher(int batch_token_num, int expert_num,
                                     int max_token_num, int feature_dim,
                                     int block_dim, cudaStream_t stream,
-                                    T* input, const T* bias) {
+                                    T *input, const T *bias) {
   ker_strided_bias_gelu<T>
       <<<dim3(expert_num, batch_token_num), block_dim, 0, stream>>>(
           input, bias, feature_dim, max_token_num);
@@ -348,7 +353,7 @@ template <>
 void ker_strided_bias_gelu_launcher<__half>(int batch_token_num, int expert_num,
                                             int max_token_num, int feature_dim,
                                             int block_dim, cudaStream_t stream,
-                                            __half* input, const __half* bias) {
+                                            __half *input, const __half *bias) {
   ker_strided_bias_gelu<__half>
       <<<dim3(expert_num, batch_token_num), block_dim, 0, stream>>>(
           input, bias, feature_dim / 2, max_token_num);
@@ -356,11 +361,11 @@ void ker_strided_bias_gelu_launcher<__half>(int batch_token_num, int expert_num,
 
 template void ker_strided_bias_gelu_launcher<float>(
     int batch_token_num, int expert_num, int max_token_num, int feature_dim,
-    int block_dim, cudaStream_t stream, float* input, const float* bias);
+    int block_dim, cudaStream_t stream, float *input, const float *bias);
 
 template void ker_strided_bias_gelu_launcher<__half>(
     int batch_token_num, int expert_num, int max_token_num, int feature_dim,
-    int block_dim, cudaStream_t stream, __half* input, const __half* bias);
+    int block_dim, cudaStream_t stream, __half *input, const __half *bias);
 
 /**
 @brief: ker_strided_bias_relu
@@ -377,7 +382,7 @@ bias: [expert_num, feature_dim]
 feature_dim: the dim of input feature
 */
 template <typename T>
-__global__ void ker_strided_bias_relu(T* input, const T* bias, int feature_dim,
+__global__ void ker_strided_bias_relu(T *input, const T *bias, int feature_dim,
                                       int max_token_num) {
   int offset = (blockIdx.x * max_token_num + blockIdx.y) * feature_dim;
   for (int idx = threadIdx.x; idx < feature_dim; idx += blockDim.x) {
@@ -389,12 +394,12 @@ __global__ void ker_strided_bias_relu(T* input, const T* bias, int feature_dim,
 }
 
 template <>
-__global__ void ker_strided_bias_relu<__half>(__half* input, const __half* bias,
+__global__ void ker_strided_bias_relu<__half>(__half *input, const __half *bias,
                                               int feature_dim,
                                               int max_token_num) {
   int offset = (blockIdx.x * max_token_num + blockIdx.y) * feature_dim;
-  half2* pinput = (half2*)input;
-  const half2* pbias = (const half2*)bias;
+  half2 *pinput = (half2 *)input;
+  const half2 *pbias = (const half2 *)bias;
   for (int idx = threadIdx.x; idx < feature_dim; idx += blockDim.x) {
     int cur_offset = offset + idx;
     float2 f2_inp = __half22float2(pinput[cur_offset]);
@@ -410,7 +415,7 @@ template <typename T>
 void ker_strided_bias_relu_launcher(int batch_token_num, int expert_num,
                                     int max_token_num, int feature_dim,
                                     int block_dim, cudaStream_t stream,
-                                    T* input, const T* bias) {
+                                    T *input, const T *bias) {
   ker_strided_bias_relu<T>
       <<<dim3(expert_num, batch_token_num), block_dim, 0, stream>>>(
           input, bias, feature_dim, max_token_num);
@@ -420,7 +425,7 @@ template <>
 void ker_strided_bias_relu_launcher<__half>(int batch_token_num, int expert_num,
                                             int max_token_num, int feature_dim,
                                             int block_dim, cudaStream_t stream,
-                                            __half* input, const __half* bias) {
+                                            __half *input, const __half *bias) {
   ker_strided_bias_relu<__half>
       <<<dim3(expert_num, batch_token_num), block_dim, 0, stream>>>(
           input, bias, feature_dim / 2, max_token_num);
@@ -428,11 +433,11 @@ void ker_strided_bias_relu_launcher<__half>(int batch_token_num, int expert_num,
 
 template void ker_strided_bias_relu_launcher<float>(
     int batch_token_num, int expert_num, int max_token_num, int feature_dim,
-    int block_dim, cudaStream_t stream, float* input, const float* bias);
+    int block_dim, cudaStream_t stream, float *input, const float *bias);
 
 template void ker_strided_bias_relu_launcher<__half>(
     int batch_token_num, int expert_num, int max_token_num, int feature_dim,
-    int block_dim, cudaStream_t stream, __half* input, const __half* bias);
+    int block_dim, cudaStream_t stream, __half *input, const __half *bias);
 
 /**
 @brief: ker_bias_redirect_tokens
@@ -451,11 +456,10 @@ expert_routed: [max_token_num * topk]
 output: [batch_token_num, feature_dim]
 */
 template <typename T>
-__global__ void ker_bias_redirect_residual(const T* input, const T* bias,
-                                           const float* score,
-                                           const int* expert_routed, T* output,
-                                           int feature_dim, int max_token_num,
-                                           int topk) {
+__global__ void
+ker_bias_redirect_residual(const T *input, const T *bias, const float *score,
+                           const int *expert_routed, T *output, int feature_dim,
+                           int max_token_num, int topk) {
   int expert_id = -1, token_id = blockIdx.x;
   float input_val, score_val, bias_val, output_val;
   for (int idx = threadIdx.x; idx < feature_dim; idx += blockDim.x) {
@@ -473,13 +477,14 @@ __global__ void ker_bias_redirect_residual(const T* input, const T* bias,
 }
 
 template <>
-__global__ void ker_bias_redirect_residual<__half>(
-    const __half* input, const __half* bias, const float* score,
-    const int* expert_routed, __half* output, int feature_dim,
-    int max_token_num, int topk) {
+__global__ void
+ker_bias_redirect_residual<__half>(const __half *input, const __half *bias,
+                                   const float *score, const int *expert_routed,
+                                   __half *output, int feature_dim,
+                                   int max_token_num, int topk) {
   int expert_id = -1, token_id = blockIdx.x;
-  const half2 *pinput = (const half2*)input, *pbias = (const half2*)bias;
-  half2* poutput = (half2*)output;
+  const half2 *pinput = (const half2 *)input, *pbias = (const half2 *)bias;
+  half2 *poutput = (half2 *)output;
   float2 f2_input_val, f2_bias_val, f2_output_val;
   float score_val;
   for (int idx = threadIdx.x; idx < feature_dim; idx += blockDim.x) {
@@ -505,9 +510,9 @@ template <typename T>
 void ker_bias_redirect_residual_launcher(int hidden_size, int max_token_num,
                                          int topk, int batch_token_num,
                                          int block_dim, cudaStream_t stream,
-                                         const T* input, const T* bias,
-                                         const float* score,
-                                         const int* expert_routed, T* output) {
+                                         const T *input, const T *bias,
+                                         const float *score,
+                                         const int *expert_routed, T *output) {
   ker_bias_redirect_residual<T><<<batch_token_num, block_dim, 0, stream>>>(
       input, bias, score, expert_routed, output, hidden_size, max_token_num,
       topk);
@@ -516,8 +521,8 @@ void ker_bias_redirect_residual_launcher(int hidden_size, int max_token_num,
 template <>
 void ker_bias_redirect_residual_launcher<__half>(
     int hidden_size, int max_token_num, int topk, int batch_token_num,
-    int block_dim, cudaStream_t stream, const __half* input, const __half* bias,
-    const float* score, const int* expert_routed, __half* output) {
+    int block_dim, cudaStream_t stream, const __half *input, const __half *bias,
+    const float *score, const int *expert_routed, __half *output) {
   ker_bias_redirect_residual<__half><<<batch_token_num, block_dim, 0, stream>>>(
       input, bias, score, expert_routed, output, hidden_size / 2, max_token_num,
       topk);
@@ -525,13 +530,13 @@ void ker_bias_redirect_residual_launcher<__half>(
 
 template void ker_bias_redirect_residual_launcher<float>(
     int hidden_size, int max_token_num, int topk, int batch_token_num,
-    int block_dim, cudaStream_t stream, const float* input, const float* bias,
-    const float* score, const int* expert_routed, float* output);
+    int block_dim, cudaStream_t stream, const float *input, const float *bias,
+    const float *score, const int *expert_routed, float *output);
 
 template void ker_bias_redirect_residual_launcher<__half>(
     int hidden_size, int max_token_num, int topk, int batch_token_num,
-    int block_dim, cudaStream_t stream, const __half* input, const __half* bias,
-    const float* score, const int* expert_routed, __half* output);
+    int block_dim, cudaStream_t stream, const __half *input, const __half *bias,
+    const float *score, const int *expert_routed, __half *output);
 
 /**
 @brief: ker_hard_gate_reorder_pre
@@ -547,9 +552,9 @@ output: [seq_len * gate_size, feature_dim]
 p_d_gate_indexs: [gate_size]
 */
 template <typename T>
-__global__ void ker_hard_gate_reorder_pre(const T* input, T* output,
+__global__ void ker_hard_gate_reorder_pre(const T *input, T *output,
                                           int seq_len, int hidden_size,
-                                          int* p_d_gate_indexs) {
+                                          int *p_d_gate_indexs) {
   int batch_index = blockIdx.x, seq_id = blockIdx.y;
   int src_index = p_d_gate_indexs[batch_index];
   int pos = batch_index * seq_len + seq_id;
@@ -561,9 +566,9 @@ __global__ void ker_hard_gate_reorder_pre(const T* input, T* output,
 }
 
 template <typename T>
-void ker_hard_gate_reorder_pre_launcher(const T* input, cudaStream_t stream,
-                                        int gate_size, int* p_d_gate_indexs,
-                                        T* output, int max_token_num,
+void ker_hard_gate_reorder_pre_launcher(const T *input, cudaStream_t stream,
+                                        int gate_size, int *p_d_gate_indexs,
+                                        T *output, int max_token_num,
                                         int seq_len, int max_thread_per_block,
                                         int hidden_size, int batch_token_num) {
   ker_hard_gate_reorder_pre<T>
@@ -572,12 +577,12 @@ void ker_hard_gate_reorder_pre_launcher(const T* input, cudaStream_t stream,
 }
 
 template void ker_hard_gate_reorder_pre_launcher<float>(
-    const float* input, cudaStream_t stream, int gate_size,
-    int* p_d_gate_indexs, float* output, int max_token_num, int seq_len,
+    const float *input, cudaStream_t stream, int gate_size,
+    int *p_d_gate_indexs, float *output, int max_token_num, int seq_len,
     int max_thread_per_block, int hidden_size, int batch_token_num);
 template void ker_hard_gate_reorder_pre_launcher<__half>(
-    const __half* input, cudaStream_t stream, int gate_size,
-    int* p_d_gate_indexs, __half* output, int max_token_num, int seq_len,
+    const __half *input, cudaStream_t stream, int gate_size,
+    int *p_d_gate_indexs, __half *output, int max_token_num, int seq_len,
     int max_thread_per_block, int hidden_size, int batch_token_num);
 
 /**
@@ -596,11 +601,10 @@ p_d_gate_reorder_indexs: [batch_size]
 bias: [expoert_num * feature_dim]
 */
 template <typename T>
-__global__ void ker_hard_gate_reorder_post(const T* input, T* output,
-                                           int* p_d_gate_reorder_indexs,
-                                           int hidden_size, int seq_len,
-                                           const T* bias,
-                                           int* _p_d_hard_gates) {
+__global__ void
+ker_hard_gate_reorder_post(const T *input, T *output,
+                           int *p_d_gate_reorder_indexs, int hidden_size,
+                           int seq_len, const T *bias, int *_p_d_hard_gates) {
   int batch_idx = blockIdx.x;
   int seq_id = blockIdx.y;
 
@@ -620,9 +624,9 @@ __global__ void ker_hard_gate_reorder_post(const T* input, T* output,
 
 template <typename T>
 void ker_hard_gate_reorder_post_launcher(
-    cudaStream_t stream, const T* input, T* output, int seq_len,
-    int max_thread_per_block, int hidden_size, int* p_d_gate_reorder_indexs,
-    int batch_size, const T* bias, int* _p_d_hard_gates) {
+    cudaStream_t stream, const T *input, T *output, int seq_len,
+    int max_thread_per_block, int hidden_size, int *p_d_gate_reorder_indexs,
+    int batch_size, const T *bias, int *_p_d_hard_gates) {
   ker_hard_gate_reorder_post<T>
       <<<dim3(batch_size, seq_len), max_thread_per_block, 0, stream>>>(
           input, output, p_d_gate_reorder_indexs, hidden_size, seq_len, bias,
@@ -630,13 +634,13 @@ void ker_hard_gate_reorder_post_launcher(
 }
 
 template void ker_hard_gate_reorder_post_launcher<float>(
-    cudaStream_t stream, const float* input, float* output, int seq_len,
-    int max_thread_per_block, int hidden_size, int* p_d_gate_reorder_indexs,
-    int batch_size, const float* bias, int* _p_d_hard_gates);
+    cudaStream_t stream, const float *input, float *output, int seq_len,
+    int max_thread_per_block, int hidden_size, int *p_d_gate_reorder_indexs,
+    int batch_size, const float *bias, int *_p_d_hard_gates);
 template void ker_hard_gate_reorder_post_launcher<__half>(
-    cudaStream_t stream, const __half* input, __half* output, int seq_len,
-    int max_thread_per_block, int hidden_size, int* p_d_gate_reorder_indexs,
-    int batch_size, const __half* bias, int* _p_d_hard_gates);
+    cudaStream_t stream, const __half *input, __half *output, int seq_len,
+    int max_thread_per_block, int hidden_size, int *p_d_gate_reorder_indexs,
+    int batch_size, const __half *bias, int *_p_d_hard_gates);
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

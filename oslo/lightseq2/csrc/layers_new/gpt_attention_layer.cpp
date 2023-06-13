@@ -15,13 +15,9 @@ GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
                                              float attn_prob_dropout_ratio,
                                              float hidden_output_dropout_ratio,
                                              bool is_pre_ln)
-    : Layer("GptAttentionLayer"),
-      _max_batch_tokens(max_batch_tokens),
-      _max_seq_len(max_seq_len),
-      _hidden_size(hidden_size),
-      _nhead(num_heads),
-      _head_dim(hidden_size / num_heads),
-      _is_pre_ln(is_pre_ln) {
+    : Layer("GptAttentionLayer"), _max_batch_tokens(max_batch_tokens),
+      _max_seq_len(max_seq_len), _hidden_size(hidden_size), _nhead(num_heads),
+      _head_dim(hidden_size / num_heads), _is_pre_ln(is_pre_ln) {
   // operators
   _attn_ln = new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false);
   _qkv_linear =
@@ -47,36 +43,35 @@ GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
 
   int cache_size = max_batch_tokens * hidden_size;
 
-  this->_context_ptr->exit_layer();  // necessary
+  this->_context_ptr->exit_layer(); // necessary
 }
 
 template <typename T1, typename T2>
-Variable* GptAttentionLayer<T1, T2>::operator()(Variable* inp,
-                                                Variable* cache_k,
-                                                Variable* cache_v,
-                                                Variable* pad_mask) {
+Variable *GptAttentionLayer<T1, T2>::
+operator()(Variable *inp, Variable *cache_k, Variable *cache_v,
+           Variable *pad_mask) {
   set_inputs({inp});
 
-  Variable* qkv_out = nullptr;
+  Variable *qkv_out = nullptr;
 
   if (_is_pre_ln) {
-    Variable* ln_res = (*_attn_ln)(inp, _attn_nw, _attn_nb);
+    Variable *ln_res = (*_attn_ln)(inp, _attn_nw, _attn_nb);
     qkv_out = (*_qkv_linear)(ln_res, _attn_qkvw);
   } else {
     qkv_out = (*_qkv_linear)(inp, _attn_qkvw);
   }
 
-  Variable* q_out = (*_split_head)(qkv_out, _attn_qkvb, cache_k, cache_v);
+  Variable *q_out = (*_split_head)(qkv_out, _attn_qkvb, cache_k, cache_v);
 
   // result of Scaled Dot Product Attention
-  Variable* sdpa_res = (*_sdpa)(q_out, cache_k, cache_v, pad_mask);
+  Variable *sdpa_res = (*_sdpa)(q_out, cache_k, cache_v, pad_mask);
 
   // [sz0, sz1, sz2, sz3] -> [sz0, sz2, sz1, sz3]
-  Variable* transform_0213_out = (*_transform_0213)(sdpa_res);
+  Variable *transform_0213_out = (*_transform_0213)(sdpa_res);
 
-  Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
+  Variable *attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
 
-  Variable* attn_dropout_residual = (*_attn_res)(attn_linear, _attn_ob, inp);
+  Variable *attn_dropout_residual = (*_attn_res)(attn_linear, _attn_ob, inp);
   set_outputs({attn_dropout_residual});
   return attn_dropout_residual;
 }
@@ -127,31 +122,32 @@ template <typename T1, typename T2>
 void GptAttentionLayer<T1, T2>::before_backward() {}
 
 template <typename T1, typename T2>
-size_t GptAttentionLayer<T1, T2>::load_para_and_grad(
-    const T1* para_ptr, T2* grad_ptr) {  // for training
+size_t
+GptAttentionLayer<T1, T2>::load_para_and_grad(const T1 *para_ptr,
+                                              T2 *grad_ptr) { // for training
   size_t offset = 0;
-  _attn_qkvw->set_value((char*)(para_ptr + offset));
-  _attn_qkvw->set_grad((char*)(grad_ptr + offset));
+  _attn_qkvw->set_value((char *)(para_ptr + offset));
+  _attn_qkvw->set_grad((char *)(grad_ptr + offset));
   offset += _hidden_size * _hidden_size * 3;
 
-  _attn_qkvb->set_value((char*)(para_ptr + offset));
-  _attn_qkvb->set_grad((char*)(grad_ptr + offset));
+  _attn_qkvb->set_value((char *)(para_ptr + offset));
+  _attn_qkvb->set_grad((char *)(grad_ptr + offset));
   offset += _hidden_size * 3;
 
-  _attn_ow->set_value((char*)(para_ptr + offset));
-  _attn_ow->set_grad((char*)(grad_ptr + offset));
+  _attn_ow->set_value((char *)(para_ptr + offset));
+  _attn_ow->set_grad((char *)(grad_ptr + offset));
   offset += _hidden_size * _hidden_size;
 
-  _attn_ob->set_value((char*)(para_ptr + offset));
-  _attn_ob->set_grad((char*)(grad_ptr + offset));
+  _attn_ob->set_value((char *)(para_ptr + offset));
+  _attn_ob->set_grad((char *)(grad_ptr + offset));
   offset += _hidden_size;
 
-  _attn_nw->set_value((char*)(para_ptr + offset));
-  _attn_nw->set_grad((char*)(grad_ptr + offset));
+  _attn_nw->set_value((char *)(para_ptr + offset));
+  _attn_nw->set_grad((char *)(grad_ptr + offset));
   offset += _hidden_size;
 
-  _attn_nb->set_value((char*)(para_ptr + offset));
-  _attn_nb->set_grad((char*)(grad_ptr + offset));
+  _attn_nb->set_value((char *)(para_ptr + offset));
+  _attn_nb->set_grad((char *)(grad_ptr + offset));
   offset += _hidden_size;
 
   return offset;
@@ -159,24 +155,24 @@ size_t GptAttentionLayer<T1, T2>::load_para_and_grad(
 
 template <typename T1, typename T2>
 int GptAttentionLayer<T1, T2>::load_params(
-    const std::vector<const T1*>& para_vec, int offset) {  // for inference
+    const std::vector<const T1 *> &para_vec, int offset) { // for inference
   int size = 0;
-  _attn_nw->set_value((char*)para_vec[offset + size]), size++;
+  _attn_nw->set_value((char *)para_vec[offset + size]), size++;
   _attn_nw->set_shape({_hidden_size});
-  _attn_nb->set_value((char*)para_vec[offset + size]), size++;
+  _attn_nb->set_value((char *)para_vec[offset + size]), size++;
   _attn_nb->set_shape({_hidden_size});
 
-  _attn_qkvw->set_value((char*)para_vec[offset + size]), size++;
+  _attn_qkvw->set_value((char *)para_vec[offset + size]), size++;
   _attn_qkvw->set_shape({_hidden_size, 3 * _hidden_size});
-  _attn_qkvb->set_value((char*)para_vec[offset + size]), size++;
+  _attn_qkvb->set_value((char *)para_vec[offset + size]), size++;
   _attn_qkvb->set_shape({_hidden_size * 3});
 
-  _attn_ow->set_value((char*)para_vec[offset + size]), size++;
+  _attn_ow->set_value((char *)para_vec[offset + size]), size++;
   _attn_ow->set_shape({_hidden_size, _hidden_size});
-  _attn_ob->set_value((char*)para_vec[offset + size]), size++;
+  _attn_ob->set_value((char *)para_vec[offset + size]), size++;
   _attn_ob->set_shape({_hidden_size});
 
   return size;
 }
 
-}  // namespace lightseq
+} // namespace lightseq

@@ -17,5 +17,5 @@ void t5_launch_dec_emb(const T *token_emb, int *tokens, const T *lang_emb,
                        int beam_size, int hidden_dim, int vocab_size, int step,
                        int max_step, int multilg_type, cudaStream_t stream);
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

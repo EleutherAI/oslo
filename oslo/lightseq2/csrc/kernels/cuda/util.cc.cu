@@ -29,7 +29,7 @@ struct prg_norm {
   }
 };
 
-void generate_distribution(thrust::device_vector<float>& input_output,
+void generate_distribution(thrust::device_vector<float> &input_output,
                            std::string mode, float a, float b) {
   thrust::counting_iterator<unsigned int> index_sequence_begin(0);
   if (mode == "uniform")
@@ -42,9 +42,9 @@ void generate_distribution(thrust::device_vector<float>& input_output,
                       input_output.begin(), prg_norm(a, b));
 }
 
-void read_batch_tokenids_from_file(std::string file_name, int& batch_size,
-                                   int& batch_seq_len,
-                                   std::vector<int>& input_ids) {
+void read_batch_tokenids_from_file(std::string file_name, int &batch_size,
+                                   int &batch_seq_len,
+                                   std::vector<int> &input_ids) {
   std::ifstream fin(file_name);
   fin >> batch_size >> batch_seq_len;
   input_ids = std::vector<int>(batch_size * batch_seq_len, 0);
@@ -60,11 +60,11 @@ float dequantize(unsigned char i, float scale, float clip_max) {
   return (float(i) - scale) * clip_max / scale;
 }
 
-void dequantize_array(std::vector<unsigned char>& i8, std::vector<float>& f,
+void dequantize_array(std::vector<unsigned char> &i8, std::vector<float> &f,
                       float clip_max, float quant_range, int start, int num) {
   for (int i = start; i < start + num; ++i) {
     f[i] = dequantize(i8[i], quant_range, clip_max);
   }
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

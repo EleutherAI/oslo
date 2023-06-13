@@ -9,17 +9,11 @@ TransformerEmbeddingLayer<T>::TransformerEmbeddingLayer(
     int layer_id, const T *pos_embeddings_ptr, int max_batch_tokens,
     int embedding_dim, int vocab_size, int max_seq_len, float dropout_ratio,
     int padding_idx, bool trainable_pos)
-    : _layer_id(layer_id),
-      _pos_embeddings_ptr(pos_embeddings_ptr),
-      _max_batch_tokens(max_batch_tokens),
-      _embedding_dim(embedding_dim),
-      _vocab_size(vocab_size),
-      _max_seq_len(max_seq_len),
-      _padding_idx(padding_idx),
-      _dropout_ratio(dropout_ratio),
-      _trainable_pos(trainable_pos),
-      _training(true),
-      _enable_quant(false) {
+    : _layer_id(layer_id), _pos_embeddings_ptr(pos_embeddings_ptr),
+      _max_batch_tokens(max_batch_tokens), _embedding_dim(embedding_dim),
+      _vocab_size(vocab_size), _max_seq_len(max_seq_len),
+      _padding_idx(padding_idx), _dropout_ratio(dropout_ratio),
+      _trainable_pos(trainable_pos), _training(true), _enable_quant(false) {
   allocate_mem_buffer();
 }
 
@@ -69,5 +63,5 @@ void TransformerEmbeddingLayer<T>::SetQuantMode(bool enable_quant) {
 
 template class TransformerEmbeddingLayer<float>;
 template class TransformerEmbeddingLayer<__half>;
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

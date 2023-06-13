@@ -3,7 +3,7 @@
 namespace lightseq {
 
 template <typename T1, typename T2>
-Variable* Transform0213OP<T1, T2>::operator()(Variable* inp) {
+Variable *Transform0213OP<T1, T2>::operator()(Variable *inp) {
   _result = new Variable("Transform0213_res", _max_numel, g_dtype<T1>(),
                          g_dtype<T2>());
   set_parents({inp});
@@ -11,10 +11,9 @@ Variable* Transform0213OP<T1, T2>::operator()(Variable* inp) {
   return _result;
 }
 
-template <typename T1, typename T2>
-void Transform0213OP<T1, T2>::forward() {
-  T1* inp_ptr = (T1*)parent(0)->value();
-  T1* res_ptr = (T1*)child(0)->value();
+template <typename T1, typename T2> void Transform0213OP<T1, T2>::forward() {
+  T1 *inp_ptr = (T1 *)parent(0)->value();
+  T1 *res_ptr = (T1 *)child(0)->value();
 
   if (!_context_ptr->is_built()) {
     return;
@@ -26,10 +25,9 @@ void Transform0213OP<T1, T2>::forward() {
 #endif
 }
 
-template <typename T1, typename T2>
-void Transform0213OP<T1, T2>::backward() {
-  T2* inp_grad = (T1*)parent(0)->grad();
-  T2* out_grad = (T1*)child(0)->grad();
+template <typename T1, typename T2> void Transform0213OP<T1, T2>::backward() {
+  T2 *inp_grad = (T1 *)parent(0)->grad();
+  T2 *out_grad = (T1 *)child(0)->grad();
 
   if (!_context_ptr->is_built()) {
     return;
@@ -46,4 +44,4 @@ template class Transform0213OP<float, float>;
 #ifdef LIGHTSEQ_cuda
 template class Transform0213OP<__half, __half>;
 #endif
-}  // namespace lightseq
+} // namespace lightseq

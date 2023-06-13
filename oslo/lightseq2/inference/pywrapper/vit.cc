@@ -50,7 +50,7 @@ Vit::Vit(const std::string weight_path, const int max_batch_size)
   long buf_bytesize = encoder_->compute_buffer_bytesize();
   std::cout << "Vit buf_bytesize: " << buf_bytesize << std::endl;
 
-  // encoder and decoder use the same buffer to save gpu memory useage
+  // encoder and decoder use the same buffer to save gpu memory usage
   CHECK_GPU_ERROR(cudaMalloc(&d_buf_, (size_t)buf_bytesize));
   encoder_->init_buffer(d_buf_);
   CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
@@ -74,88 +74,88 @@ void Vit::Infer() {
 
 void Vit::set_input_ptr(int index, void *input_ptr) {
   switch (index) {
-    case 0:
-      encoder_->_p_d_pixel_input = static_cast<float *>(input_ptr);
-      break;
+  case 0:
+    encoder_->_p_d_pixel_input = static_cast<float *>(input_ptr);
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
 void Vit::set_output_ptr(int index, void *output_ptr) {
   switch (index) {
-    case 0:
-      encoder_->_p_d_output = static_cast<optraits::DataType *>(output_ptr);
-      break;
+  case 0:
+    encoder_->_p_d_output = static_cast<optraits::DataType *>(output_ptr);
+    break;
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 const void *Vit::get_output_ptr(int index) {
   switch (index) {
-    case 0:
-      return static_cast<void *>(encoder_->_p_d_output);
+  case 0:
+    return static_cast<void *>(encoder_->_p_d_output);
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 std::vector<int> Vit::get_input_max_shape(int index) {
   switch (index) {
-    case 0:
-      return {_max_batch_size, tw_._channel_input, tw_._image_size,
-              tw_._image_size};
+  case 0:
+    return {_max_batch_size, tw_._channel_input, tw_._image_size,
+            tw_._image_size};
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 std::vector<int> Vit::get_output_max_shape(int index) {
   switch (index) {
-    case 0:
-      return {_max_batch_size, tw_._max_step, tw_._hidden_size};
+  case 0:
+    return {_max_batch_size, tw_._max_step, tw_._hidden_size};
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 DataType Vit::get_input_dtype(int index) {
   switch (index) {
-    case 0:
-      return DataType::kFloat32;
-      break;
+  case 0:
+    return DataType::kFloat32;
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
 DataType Vit::get_output_dtype(int index) {
   switch (index) {
-    case 0:
-      if (vit_optype == OperationType::FP32) {
-        return DataType::kFloat32;
-      } else {
-        return DataType::kFloat16;
-      }
-      break;
+  case 0:
+    if (vit_optype == OperationType::FP32) {
+      return DataType::kFloat32;
+    } else {
+      return DataType::kFloat16;
+    }
+    break;
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

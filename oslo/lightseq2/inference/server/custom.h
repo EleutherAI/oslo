@@ -59,12 +59,12 @@ typedef enum custom_serverparamkind_enum {
 typedef struct custom_initdata_struct {
   /// The name of this instance of the custom backend. Instance names
   /// are unique.
-  const char* instance_name;
+  const char *instance_name;
 
   /// Serialized representation of the model configuration. This
   /// serialization is owned by the caller and must be copied if a
   /// persistent copy of required by the custom backend.
-  const char* serialized_model_config;
+  const char *serialized_model_config;
 
   /// The size of 'serialized_model_config', in bytes.
   size_t serialized_model_config_size;
@@ -81,7 +81,7 @@ typedef struct custom_initdata_struct {
   /// by CustomServerParameter. This strings are owned by the caller
   /// and must be copied if a persistent copy of required by the
   /// custom backend.
-  const char** server_parameters;
+  const char **server_parameters;
 } CustomInitializeData;
 
 /// A payload represents the input tensors and the required output
@@ -95,15 +95,15 @@ typedef struct custom_payload_struct {
 
   /// For each of the 'input_cnt' inputs, the name of the input as a
   /// null-terminated string.
-  const char** input_names;
+  const char **input_names;
 
   /// For each of the 'input_cnt' inputs, the number of dimensions in
   /// the input's shape, not including the batch dimension.
-  const size_t* input_shape_dim_cnts;
+  const size_t *input_shape_dim_cnts;
 
   /// For each of the 'input_cnt' inputs, the shape of the input, not
   /// including the batch dimension.
-  const int64_t** input_shape_dims;
+  const int64_t **input_shape_dims;
 
   /// The number of outputs that must be computed for this
   /// payload. Can be 0 to indicate that no outputs are required from
@@ -114,15 +114,15 @@ typedef struct custom_payload_struct {
   /// a null-terminated string.  Each name must be one of the names
   /// from the model configuration, but all outputs do not need to be
   /// computed.
-  const char** required_output_names;
+  const char **required_output_names;
 
   /// The context to use with CustomGetNextInput callback function to
   /// get the input tensor values for this payload.
-  void* input_context;
+  void *input_context;
 
   /// The context to use with CustomGetOutput callback function to get
   /// the buffer for output tensor values for this payload.
-  void* output_context;
+  void *output_context;
 
   /// The error code indicating success or failure from execution. A
   /// value of 0 (zero) indicates success, all other values indicate
@@ -149,9 +149,9 @@ typedef struct custom_payload_struct {
 /// gives the maximum size expected for 'content'. Returns the actual
 /// size, in bytes, of 'content'.
 /// \return false if error, true if success.
-typedef bool (*CustomGetNextInputFn_t)(void* input_context, const char* name,
-                                       const void** content,
-                                       uint64_t* content_byte_size);
+typedef bool (*CustomGetNextInputFn_t)(void *input_context, const char *name,
+                                       const void **content,
+                                       uint64_t *content_byte_size);
 
 /// Type for the CustomGetOutput callback function.
 ///
@@ -171,21 +171,21 @@ typedef bool (*CustomGetNextInputFn_t)(void* input_context, const char* name,
 /// should continue to the next output. If non-nullptr, the size of
 /// the buffer will be large enough to hold 'content_byte_size' bytes.
 /// \return false if error, true if success.
-typedef bool (*CustomGetOutputFn_t)(void* output_context, const char* name,
-                                    size_t shape_dim_cnt, int64_t* shape_dims,
-                                    uint64_t content_byte_size, void** content);
+typedef bool (*CustomGetOutputFn_t)(void *output_context, const char *name,
+                                    size_t shape_dim_cnt, int64_t *shape_dims,
+                                    uint64_t content_byte_size, void **content);
 
 /// Type for the CustomInitialize function.
-typedef int (*CustomInitializeFn_t)(const CustomInitializeData*, void**);
+typedef int (*CustomInitializeFn_t)(const CustomInitializeData *, void **);
 
 /// Type for the CustomFinalize function.
-typedef int (*CustomFinalizeFn_t)(void*);
+typedef int (*CustomFinalizeFn_t)(void *);
 
 /// Type for the CustomErrorString function.
-typedef char* (*CustomErrorStringFn_t)(void*, int);
+typedef char *(*CustomErrorStringFn_t)(void *, int);
 
 /// Type for the CustomExecute function.
-typedef int (*CustomExecuteFn_t)(void*, uint32_t, CustomPayload*,
+typedef int (*CustomExecuteFn_t)(void *, uint32_t, CustomPayload *,
                                  CustomGetNextInputFn_t, CustomGetOutputFn_t);
 
 /// Initialize the custom backend for a given model configuration and
@@ -198,7 +198,7 @@ typedef int (*CustomExecuteFn_t)(void*, uint32_t, CustomPayload*,
 /// \return An error code. Zero indicates success, all other values
 /// indicate failure. Use CustomErrorString to get the error string
 /// for an error code.
-int CustomInitialize(const CustomInitializeData* data, void** custom_context);
+int CustomInitialize(const CustomInitializeData *data, void **custom_context);
 
 /// Finalize a custom context. All state associated with the context
 /// should be freed.
@@ -208,7 +208,7 @@ int CustomInitialize(const CustomInitializeData* data, void** custom_context);
 /// \return An error code. Zero indicates success, all other values
 /// indicate failure. Use CustomErrorString to get the error string
 /// for an error code.
-int CustomFinalize(void* custom_context);
+int CustomFinalize(void *custom_context);
 
 /// Get the string for an error code.
 ///
@@ -217,7 +217,7 @@ int CustomFinalize(void* custom_context);
 /// \param errcode The error code.
 /// \return The error code string, or nullptr if the error code has no
 /// string representation.
-const char* CustomErrorString(void* custom_context, int errcode);
+const char *CustomErrorString(void *custom_context, int errcode);
 
 /// Execute the custom model.
 ///
@@ -232,8 +232,8 @@ const char* CustomErrorString(void* custom_context, int errcode);
 /// \return An error code. Zero indicates success, all other values
 /// indicate failure. Use CustomErrorString to get the error string
 /// for an error code.
-int CustomExecute(void* custom_context, uint32_t payload_cnt,
-                  CustomPayload* payloads, CustomGetNextInputFn_t input_fn,
+int CustomExecute(void *custom_context, uint32_t payload_cnt,
+                  CustomPayload *payloads, CustomGetNextInputFn_t input_fn,
                   CustomGetOutputFn_t output_fn);
 
 #ifdef __cplusplus

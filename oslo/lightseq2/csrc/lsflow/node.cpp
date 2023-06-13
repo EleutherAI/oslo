@@ -3,8 +3,7 @@
 namespace lightseq {
 
 Node::Node(std::string name, NodeType nt_)
-    : _context_ptr(Context::global_instance().get()),
-      _bw_first_flag(true),
+    : _context_ptr(Context::global_instance().get()), _bw_first_flag(true),
       _node_type(nt_) {
   std::string prefix_name = _context_ptr->last_layer()
                                 ? (_context_ptr->last_layer()->name() + ":")
@@ -25,9 +24,9 @@ Node::~Node() {
   _children.clear();
 }
 
-void Node::set_parents(std::vector<Node*> parents) {
+void Node::set_parents(std::vector<Node *> parents) {
   int idx = 0;
-  for (Node* iter : parents) {
+  for (Node *iter : parents) {
     _parents.push_back(iter);
     if (iter == nullptr)
       printf("Node %s 's parent #%d is nullptr\n", _name.c_str(), idx);
@@ -43,13 +42,14 @@ void Node::set_parents(std::vector<Node*> parents) {
 }
 
 void Node::recursive_forward() {
-  if (_fw_flag) return;
-  for (Node* iter : _parents) {
+  if (_fw_flag)
+    return;
+  for (Node *iter : _parents) {
     iter->recursive_forward();
   }
 
   if (node_type() == NodeType::Variable) {
-    Variable* this_var = static_cast<Variable*>(this);
+    Variable *this_var = static_cast<Variable *>(this);
     if (this_var->variable_type() == VariableType::OffsetVariable) {
       this_var->_parent_variable->recursive_forward();
     }
@@ -71,7 +71,7 @@ void Node::recursive_forward() {
   if (node_type() == NodeType::Operator && _context_ptr->is_built()) {
     printf("##### %s forward ##### fw node idx: %d\n", name().c_str(),
            _fw_node_idx);
-    Operator* this_op = static_cast<Operator*>(this);
+    Operator *this_op = static_cast<Operator *>(this);
     printf("_parents.size(): %zu\n", _parents.size());
     for (int idx = 0; idx < _parents.size(); idx++) {
       if (_parents[idx] == nullptr) {
@@ -96,7 +96,7 @@ void Node::recursive_forward() {
   }
   _context_ptr->synchronize();
   print_time_duration(start, "time cost");
-  Operator* this_op = static_cast<Operator*>(this);
+  Operator *this_op = static_cast<Operator *>(this);
   printf("_children.size(): %zu\n", _children.size());
   for (int idx = 0; idx < _children.size(); idx++) {
     if (_children[idx] == nullptr)
@@ -109,14 +109,15 @@ void Node::recursive_forward() {
 }
 
 void Node::recursive_backward() {
-  if (_bw_flag) return;
-  for (Node* iter : _children) {
+  if (_bw_flag)
+    return;
+  for (Node *iter : _children) {
     iter->recursive_backward();
   }
 
   if (node_type() == NodeType::Variable) {
-    Variable* this_var = static_cast<Variable*>(this);
-    for (Variable* iter : this_var->descendants()) {
+    Variable *this_var = static_cast<Variable *>(this);
+    for (Variable *iter : this_var->descendants()) {
       iter->recursive_backward();
     }
   }
@@ -137,7 +138,7 @@ void Node::recursive_backward() {
   if (node_type() == NodeType::Operator && _context_ptr->is_built()) {
     printf("##### %s backward ##### bw node idx: %d\n", name().c_str(),
            _bw_node_idx);
-    Operator* this_op = static_cast<Operator*>(this);
+    Operator *this_op = static_cast<Operator *>(this);
     printf("_children.size(): %zu\n", _children.size());
     for (int idx = 0; idx < _children.size(); idx++) {
       if (_children[idx] == nullptr)
@@ -160,7 +161,7 @@ void Node::recursive_backward() {
   }
   _context_ptr->synchronize();
   print_time_duration(start, "time cost");
-  Operator* this_op = static_cast<Operator*>(this);
+  Operator *this_op = static_cast<Operator *>(this);
   printf("_parents.size(): %zu\n", _parents.size());
   for (int idx = 0; idx < _parents.size(); idx++) {
     if (_parents[idx] == nullptr)
@@ -172,7 +173,7 @@ void Node::recursive_backward() {
 #endif
 }
 
-bool Node::is_cover() {  // true means assign, false means accumulate
+bool Node::is_cover() { // true means assign, false means accumulate
   if (this->_bw_first_flag) {
     this->_bw_first_flag = false;
     return true;
@@ -180,4 +181,4 @@ bool Node::is_cover() {  // true means assign, false means accumulate
   return false;
 }
 
-}  // namespace lightseq
+} // namespace lightseq

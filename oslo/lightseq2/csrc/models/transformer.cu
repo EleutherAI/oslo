@@ -26,7 +26,7 @@ Transformer::Transformer(const std::string weight_path,
   /* --- step.3 initial input Variable node --- */
   int max_batch_tokens = tw_._max_step * _max_batch_size;
 
-  /* --- step.4 inital operator & layer --- */
+  /* --- step.4 initial operator & layer --- */
 
   // initial LaunchEncEmb layer
   launch_enc_emb_layer.reset(new LaunchEncEmbLayer<OpType_>(
@@ -84,7 +84,7 @@ Transformer::Transformer(const std::string weight_path,
     dec_layer_vec.push_back(dec_layer_);
   }
 
-  // intial Project hidden states to vocab logits
+  // initial Project hidden states to vocab logits
   linear_layer.reset(new LinearLayer<OpType_, OpType_>(
       max_batch_size * tw_._beam_size, tw_._hidden_size, tw_._trg_vocab_size,
       MATRIX_OP::NonTranspose, MATRIX_OP::NonTranspose,
@@ -289,100 +289,100 @@ void Transformer::Infer() {
 
 void Transformer::set_input_ptr(int index, void *input_ptr) {
   switch (index) {
-    case 0:
-      inp_tokens->set_value(static_cast<char *>(input_ptr));
-      break;
+  case 0:
+    inp_tokens->set_value(static_cast<char *>(input_ptr));
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
 void Transformer::set_output_ptr(int index, void *output_ptr) {
   switch (index) {
-    case 0:
-      transformer_out->set_value(static_cast<char *>(output_ptr));
-      break;
+  case 0:
+    transformer_out->set_value(static_cast<char *>(output_ptr));
+    break;
 
-    case 1:
-      seq_score->set_value(static_cast<char *>(output_ptr));
-      break;
+  case 1:
+    seq_score->set_value(static_cast<char *>(output_ptr));
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
 const void *Transformer::get_output_ptr(int index) {
   switch (index) {
-    case 0:
-      return static_cast<void *>(transformer_out->value());
+  case 0:
+    return static_cast<void *>(transformer_out->value());
 
-    case 1:
-      return static_cast<void *>(seq_score->value());
+  case 1:
+    return static_cast<void *>(seq_score->value());
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 std::vector<int> Transformer::get_input_max_shape(int index) {
   switch (index) {
-    case 0:
-      return {_max_batch_size, tw_._max_step};
-      break;
+  case 0:
+    return {_max_batch_size, tw_._max_step};
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
 std::vector<int> Transformer::get_output_max_shape(int index) {
   switch (index) {
-    case 0:
-      return {_max_batch_size, tw_._beam_size, tw_._max_step};
-      break;
+  case 0:
+    return {_max_batch_size, tw_._beam_size, tw_._max_step};
+    break;
 
-    case 1:
-      return {_max_batch_size, tw_._beam_size};
-      break;
+  case 1:
+    return {_max_batch_size, tw_._beam_size};
+    break;
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
 
 DataType Transformer::get_input_dtype(int index) {
   switch (index) {
-    case 0:
-      return DataType::kInt32;
-      break;
+  case 0:
+    return DataType::kInt32;
+    break;
 
-    default:
-      throw std::runtime_error("invalid input index");
-      break;
+  default:
+    throw std::runtime_error("invalid input index");
+    break;
   }
 }
 
 DataType Transformer::get_output_dtype(int index) {
   switch (index) {
-    case 0:
-      return DataType::kInt32;
-      break;
+  case 0:
+    return DataType::kInt32;
+    break;
 
-    case 1:
-      return DataType::kFloat32;
-      break;
+  case 1:
+    return DataType::kFloat32;
+    break;
 
-    default:
-      throw std::runtime_error("invalid output index");
-      break;
+  default:
+    throw std::runtime_error("invalid output index");
+    break;
   }
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

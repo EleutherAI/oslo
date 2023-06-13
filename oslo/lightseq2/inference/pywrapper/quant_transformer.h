@@ -1,10 +1,10 @@
 
 
-#include "model_base.h"
 #include "../model/quant_decoder.h"
 #include "../model/quant_encoder.h"
 #include "../proto/quant_transformer_weight.h"
 #include "../tools/util.h"
+#include "model_base.h"
 
 #ifdef FP16_MODE
 const lightseq::cuda::OperationType qtransformer_optytpe =
@@ -17,7 +17,7 @@ const lightseq::cuda::OperationType qtransformer_optytpe =
 namespace lightseq {
 namespace cuda {
 class QuantTransformer : public LSModel {
- private:
+private:
   typedef OperationTypeTraits<qtransformer_optytpe> optraits;
   std::shared_ptr<QuantEncoder<qtransformer_optytpe>> encoder_;
   std::shared_ptr<QuantDecoder<qtransformer_optytpe>> decoder_;
@@ -40,7 +40,7 @@ class QuantTransformer : public LSModel {
   int get_max_step() { return tw_._max_step; }
   int get_beam_size() { return tw_._beam_size; }
 
- public:
+public:
   QuantTransformer(const std::string weight_path, const int max_batch_size);
   ~QuantTransformer();
 
@@ -56,5 +56,5 @@ class QuantTransformer : public LSModel {
 };
 
 LSMODEL_REGISTER(QuantTransformer);
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

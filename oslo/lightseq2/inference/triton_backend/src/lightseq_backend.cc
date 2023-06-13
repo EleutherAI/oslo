@@ -21,8 +21,8 @@ extern "C" {
 // use the backend. The backend should also verify version
 // compatibility with Triton in this function.
 //
-TRITONSERVER_Error* TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
-  const char* cname;
+TRITONSERVER_Error *TRITONBACKEND_Initialize(TRITONBACKEND_Backend *backend) {
+  const char *cname;
   RETURN_IF_ERROR(TRITONBACKEND_BackendName(backend, &cname));
   std::string name(cname);
 
@@ -59,11 +59,11 @@ TRITONSERVER_Error* TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
   // backend, such as tritonserver command-line arguments. This
   // backend doesn't use any such configuration but for this example
   // print whatever is available.
-  TRITONSERVER_Message* backend_config_message;
+  TRITONSERVER_Message *backend_config_message;
   RETURN_IF_ERROR(
       TRITONBACKEND_BackendConfig(backend, &backend_config_message));
 
-  const char* buffer;
+  const char *buffer;
   size_t byte_size;
   RETURN_IF_ERROR(TRITONSERVER_MessageSerializeToJson(backend_config_message,
                                                       &buffer, &byte_size));
@@ -72,23 +72,23 @@ TRITONSERVER_Error* TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
 
   // This backend does not require any "global" state but as an
   // example create a string to demonstrate.
-  std::string* state = new std::string("backend state");
+  std::string *state = new std::string("backend state");
   RETURN_IF_ERROR(
-      TRITONBACKEND_BackendSetState(backend, reinterpret_cast<void*>(state)));
+      TRITONBACKEND_BackendSetState(backend, reinterpret_cast<void *>(state)));
 
   LOG_MESSAGE(TRITONSERVER_LOG_INFO, "TRITONBACKEND_Initialize success");
 
-  return nullptr;  // success
+  return nullptr; // success
 }
 
 // Triton calls TRITONBACKEND_Finalize when a backend is no longer
 // needed.
 //
-TRITONSERVER_Error* TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend) {
+TRITONSERVER_Error *TRITONBACKEND_Finalize(TRITONBACKEND_Backend *backend) {
   // Delete the "global" state associated with the backend.
-  void* vstate;
+  void *vstate;
   RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vstate));
-  std::string* state = reinterpret_cast<std::string*>(vstate);
+  std::string *state = reinterpret_cast<std::string *>(vstate);
 
   LOG_MESSAGE(TRITONSERVER_LOG_INFO,
               (std::string("TRITONBACKEND_Finalize: state is '") + *state + "'")
@@ -98,10 +98,10 @@ TRITONSERVER_Error* TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend) {
 
   LOG_MESSAGE(TRITONSERVER_LOG_INFO, "TRITONBACKEND_Finalize success");
 
-  return nullptr;  // success
+  return nullptr; // success
 }
 
-}  // extern "C"
+} // extern "C"
 
 extern "C" {
 
@@ -111,7 +111,7 @@ extern "C" {
 // configuration is suitable for the backend. Any errors reported by
 // this function will prevent the model from loading.
 //
-TRITONSERVER_Error* TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model) {
+TRITONSERVER_Error *TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model *model) {
   // Create a ModelState object and associate it with the
   // TRITONBACKEND_Model. If anything goes wrong with initialization
   // of the model state then an error is returned and Triton will fail
@@ -119,14 +119,14 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model) {
 
   LOG_MESSAGE(TRITONSERVER_LOG_INFO, "doing TRITONBACKEND_ModelInitialize");
 
-  ModelState* model_state;
+  ModelState *model_state;
   RETURN_IF_ERROR(ModelState::Create(model, &model_state));
-  RETURN_IF_ERROR(
-      TRITONBACKEND_ModelSetState(model, reinterpret_cast<void*>(model_state)));
+  RETURN_IF_ERROR(TRITONBACKEND_ModelSetState(
+      model, reinterpret_cast<void *>(model_state)));
 
   LOG_MESSAGE(TRITONSERVER_LOG_INFO, "TRITONBACKEND_ModelInitialize success");
 
-  return nullptr;  // success
+  return nullptr; // success
 }
 
 // Triton calls TRITONBACKEND_ModelFinalize when a model is no longer
@@ -134,18 +134,18 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model) {
 // model. This function will not be called until all model instances
 // of the model have been finalized.
 //
-TRITONSERVER_Error* TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model* model) {
-  void* vstate;
+TRITONSERVER_Error *TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model *model) {
+  void *vstate;
   RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, &vstate));
-  ModelState* model_state = reinterpret_cast<ModelState*>(vstate);
+  ModelState *model_state = reinterpret_cast<ModelState *>(vstate);
   delete model_state;
 
   LOG_MESSAGE(TRITONSERVER_LOG_INFO, "TRITONBACKEND_ModelFinalize success");
 
-  return nullptr;  // success
+  return nullptr; // success
 }
 
-}  // extern "C"
+} // extern "C"
 
 extern "C" {
 
@@ -153,56 +153,56 @@ extern "C" {
 // instance is created to allow the backend to initialize any state
 // associated with the instance.
 //
-TRITONSERVER_Error* TRITONBACKEND_ModelInstanceInitialize(
-    TRITONBACKEND_ModelInstance* instance) {
+TRITONSERVER_Error *
+TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance *instance) {
   LOG_MESSAGE(TRITONSERVER_LOG_INFO,
               "doing TRITONBACKEND_ModelInstanceInitialize");
   // Get the model state associated with this instance's model.
-  TRITONBACKEND_Model* model;
+  TRITONBACKEND_Model *model;
   RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceModel(instance, &model));
   LOG_MESSAGE(TRITONSERVER_LOG_INFO,
               "TRITONBACKEND_ModelInstanceModel initial success");
 
-  void* vmodelstate;
+  void *vmodelstate;
   RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, &vmodelstate));
-  ModelState* model_state = reinterpret_cast<ModelState*>(vmodelstate);
+  ModelState *model_state = reinterpret_cast<ModelState *>(vmodelstate);
   LOG_MESSAGE(TRITONSERVER_LOG_INFO,
               "TRITONBACKEND_ModelState initial success");
 
   // Create a ModelInstanceState object and associate it with the
   // TRITONBACKEND_ModelInstance.
-  ModelInstanceState* instance_state;
+  ModelInstanceState *instance_state;
   RETURN_IF_ERROR(
       ModelInstanceState::Create(model_state, instance, &instance_state));
   LOG_MESSAGE(TRITONSERVER_LOG_INFO, "ModelInstanceState Create success");
   RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceSetState(
-      instance, reinterpret_cast<void*>(instance_state)));
+      instance, reinterpret_cast<void *>(instance_state)));
 
   LOG_MESSAGE(TRITONSERVER_LOG_INFO,
               "TRITONBACKEND_ModelInstanceInitialize success");
 
-  return nullptr;  // success
+  return nullptr; // success
 }
 
 // Triton calls TRITONBACKEND_ModelInstanceFinalize when a model
 // instance is no longer needed. The backend should cleanup any state
 // associated with the model instance.
 //
-TRITONSERVER_Error* TRITONBACKEND_ModelInstanceFinalize(
-    TRITONBACKEND_ModelInstance* instance) {
-  void* vstate;
+TRITONSERVER_Error *
+TRITONBACKEND_ModelInstanceFinalize(TRITONBACKEND_ModelInstance *instance) {
+  void *vstate;
   RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceState(instance, &vstate));
-  ModelInstanceState* instance_state =
-      reinterpret_cast<ModelInstanceState*>(vstate);
+  ModelInstanceState *instance_state =
+      reinterpret_cast<ModelInstanceState *>(vstate);
   delete instance_state;
 
   LOG_MESSAGE(TRITONSERVER_LOG_INFO,
               "TRITONBACKEND_ModelInstanceFinalize success");
 
-  return nullptr;  // success
+  return nullptr; // success
 }
 
-}  // extern "C"
+} // extern "C"
 
 /////////////
 
@@ -213,9 +213,10 @@ extern "C" {
 // response may be the output tensors required for that request or may
 // be an error that is returned in the response.
 //
-TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
-    TRITONBACKEND_ModelInstance* instance, TRITONBACKEND_Request** requests,
-    const uint32_t request_count) {
+TRITONSERVER_Error *
+TRITONBACKEND_ModelInstanceExecute(TRITONBACKEND_ModelInstance *instance,
+                                   TRITONBACKEND_Request **requests,
+                                   const uint32_t request_count) {
   // Collect various timestamps during the execution of this batch or
   // requests. These values are reported below before returning from
   // the function.
@@ -230,10 +231,10 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
   // 'instance' objects). Best practice for a high-performance
   // implementation is to avoid introducing mutex/lock and instead use
   // only function-local and model-instance-specific state.
-  ModelInstanceState* instance_state;
+  ModelInstanceState *instance_state;
   RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceState(
-      instance, reinterpret_cast<void**>(&instance_state)));
-  ModelState* model_state = instance_state->StateForModel();
+      instance, reinterpret_cast<void **>(&instance_state)));
+  ModelState *model_state = instance_state->StateForModel();
 
   int device_id;
   TRITONBACKEND_ModelInstanceDeviceId(instance, &device_id);
@@ -257,11 +258,11 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
   // useful macros for error handling that can be found in
   // backend_common.h.
 
-  std::vector<TRITONBACKEND_Response*> responses;
+  std::vector<TRITONBACKEND_Response *> responses;
   responses.reserve(request_count);
   for (uint32_t r = 0; r < request_count; ++r) {
-    TRITONBACKEND_Request* request = requests[r];
-    TRITONBACKEND_Response* response;
+    TRITONBACKEND_Request *request = requests[r];
+    TRITONBACKEND_Response *response;
     RETURN_IF_ERROR(TRITONBACKEND_ResponseNew(&response, request));
     responses.push_back(response);
   }
@@ -276,18 +277,18 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
   SET_TIMESTAMP(compute_start_ns);
 
   for (uint32_t idx = 0; idx < request_count; idx++) {
-    TRITONBACKEND_Request* request = requests[idx];
+    TRITONBACKEND_Request *request = requests[idx];
     uint32_t input_count;
     TRITONBACKEND_RequestInputCount(request, &input_count);
 
     for (uint32_t input_idx = 0; input_idx < input_count; input_idx++) {
-      TRITONBACKEND_Input* input = nullptr;
+      TRITONBACKEND_Input *input = nullptr;
       LOG_IF_ERROR(TRITONBACKEND_RequestInputByIndex(
                        request, input_idx /* index */, &input),
                    "failed getting request input");
 
-      const int64_t* shape = nullptr;
-      const char* input_name = nullptr;
+      const int64_t *shape = nullptr;
+      const char *input_name = nullptr;
       TRITONSERVER_DataType datatype;
       uint32_t dims_count;
       uint64_t byte_size;
@@ -300,10 +301,10 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
       }
 
       // malloc GPU memory by triton api;
-      void* d_input = instance_state->get_d_input(input_name);
-      void* moved_d_input = d_input;
+      void *d_input = instance_state->get_d_input(input_name);
+      void *moved_d_input = d_input;
       for (uint32_t buffer_idx = 0; buffer_idx < buffer_count; buffer_idx++) {
-        const void* partial_buffer = nullptr;
+        const void *partial_buffer = nullptr;
         uint64_t buffer_byte_size;
         TRITONSERVER_MemoryType memory_type;
         int64_t memory_type_id;
@@ -314,8 +315,8 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
 
         cudaMemcpy(moved_d_input, partial_buffer, buffer_byte_size,
                    cudaMemcpyHostToDevice);
-        moved_d_input = (void*)(reinterpret_cast<uint64_t>(moved_d_input) +
-                                buffer_byte_size);
+        moved_d_input = (void *)(reinterpret_cast<uint64_t>(moved_d_input) +
+                                 buffer_byte_size);
       }
 
       // match triton client input with lightseq input by input_name.
@@ -334,11 +335,11 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
     lightseq_model_ptr->Infer();
 
     // create response buffer
-    TRITONBACKEND_Response* response = responses[idx];
+    TRITONBACKEND_Response *response = responses[idx];
     for (int output_idx = 0; output_idx < lightseq_model_ptr->get_output_size();
          output_idx++) {
-      TRITONBACKEND_Output* output = nullptr;
-      void* single_output_buffer = nullptr;
+      TRITONBACKEND_Output *output = nullptr;
+      void *single_output_buffer = nullptr;
       const std::vector<int> lightseq_shape =
           lightseq_model_ptr->get_output_shape(output_idx);
       std::string output_name = lightseq_model_ptr->get_output_name(output_idx);
@@ -375,7 +376,7 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
           continue;
         }
 
-        const void* d_output = static_cast<const void*>(
+        const void *d_output = static_cast<const void *>(
             lightseq_model_ptr->get_output_ptr(output_idx));
 
         cudaMemcpy(single_output_buffer, d_output, buffer_byte_size,
@@ -394,7 +395,7 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
 
   // Send all the responses that haven't already been sent because of
   // an earlier error.
-  for (auto& response : responses) {
+  for (auto &response : responses) {
     if (response != nullptr) {
       LOG_IF_ERROR(TRITONBACKEND_ResponseSend(
                        response, TRITONSERVER_RESPONSE_COMPLETE_FINAL, nullptr),
@@ -415,17 +416,17 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
     total_batch_size = request_count;
   } else {
     for (uint32_t r = 0; r < request_count; ++r) {
-      auto& request = requests[r];
-      TRITONBACKEND_Input* input = nullptr;
+      auto &request = requests[r];
+      TRITONBACKEND_Input *input = nullptr;
       LOG_IF_ERROR(
           TRITONBACKEND_RequestInputByIndex(request, 0 /* index */, &input),
           "failed getting request input");
       if (input != nullptr) {
-        const int64_t* shape = nullptr;
-        LOG_IF_ERROR(
-            TRITONBACKEND_InputProperties(input, nullptr, nullptr, &shape,
-                                          nullptr, nullptr, nullptr),
-            "failed getting input properties");
+        const int64_t *shape = nullptr;
+        LOG_IF_ERROR(TRITONBACKEND_InputProperties(input, nullptr, nullptr,
+                                                   &shape, nullptr, nullptr,
+                                                   nullptr),
+                     "failed getting input properties");
         if (shape != nullptr) {
           total_batch_size += shape[0];
         }
@@ -437,11 +438,11 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
   (void)exec_end_ns;
   (void)compute_start_ns;
   (void)compute_end_ns;
-#endif  // TRITON_ENABLE_STATS
+#endif // TRITON_ENABLE_STATS
 
   // Report statistics for each request, and then release the request.
   for (uint32_t r = 0; r < request_count; ++r) {
-    auto& request = requests[r];
+    auto &request = requests[r];
 
 #ifdef TRITON_ENABLE_STATS
     LOG_IF_ERROR(TRITONBACKEND_ModelInstanceReportStatistics(
@@ -449,7 +450,7 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
                      (responses[r] != nullptr) /* success */, exec_start_ns,
                      compute_start_ns, compute_end_ns, exec_end_ns),
                  "failed reporting request statistics");
-#endif  // TRITON_ENABLE_STATS
+#endif // TRITON_ENABLE_STATS
 
     LOG_IF_ERROR(
         TRITONBACKEND_RequestRelease(request, TRITONSERVER_REQUEST_RELEASE_ALL),
@@ -458,18 +459,18 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
 
 #ifdef TRITON_ENABLE_STATS
   // Report batch statistics.
-  LOG_IF_ERROR(
-      TRITONBACKEND_ModelInstanceReportBatchStatistics(
-          instance_state->TritonModelInstance(), total_batch_size,
-          exec_start_ns, compute_start_ns, compute_end_ns, exec_end_ns),
-      "failed reporting batch request statistics");
-#endif  // TRITON_ENABLE_STATS
+  LOG_IF_ERROR(TRITONBACKEND_ModelInstanceReportBatchStatistics(
+                   instance_state->TritonModelInstance(), total_batch_size,
+                   exec_start_ns, compute_start_ns, compute_end_ns,
+                   exec_end_ns),
+               "failed reporting batch request statistics");
+#endif // TRITON_ENABLE_STATS
 
-  return nullptr;  // success
+  return nullptr; // success
 }
 
-}  // extern "C"
+} // extern "C"
 
-}  // namespace lightseq
-}  // namespace backend
-}  // namespace triton
+} // namespace lightseq
+} // namespace backend
+} // namespace triton

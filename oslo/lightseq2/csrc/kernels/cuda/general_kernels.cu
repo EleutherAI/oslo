@@ -55,11 +55,13 @@ __global__ void column_sum_reduce(const T *__restrict__ inp,
   __syncthreads();
 
   // Calculate the sum of a row in tile
-  for (int i = 1; i < WARP_SIZE; i <<= 1) sum += g.shfl_down(sum, i);
+  for (int i = 1; i < WARP_SIZE; i <<= 1)
+    sum += g.shfl_down(sum, i);
 
   if (threadIdx.x == 0) {
     int pos = flat_2dim(blockIdx.x, threadIdx.y, WARP_SIZE);
-    if (pos < cols) out[pos] = sum;
+    if (pos < cols)
+      out[pos] = sum;
   }
 }
 
@@ -274,5 +276,5 @@ void launch_filling_concat3_dim1<__half>(__half *output, const __half *inp,
   kernel_filling_concat3_dim1<<<nblock, MAX_THREADS, 0, stream>>>(
       output, inp, sz0, mx_sz1, sz2, sz1_0, sz1_1);
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

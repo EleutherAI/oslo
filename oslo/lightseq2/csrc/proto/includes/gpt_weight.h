@@ -8,9 +8,8 @@ namespace lightseq {
 /*
 Load the model weights which stored in custom proto file into GPU memory.
 */
-template <typename T>
-class GptWeight {
- private:
+template <typename T> class GptWeight {
+private:
   T float2required(float value);
 
   void proto_get_model_config(const Gpt &gpt);
@@ -23,14 +22,14 @@ class GptWeight {
   void hdf5_parse_enc_wei(hid_t hdf5_file);
 
   // store the weights pointer
-  std::vector<const T *> _p_d_src_emb_wei;  // size: 4
-  std::vector<const T *> _p_d_enc_wei;      // size: 12 * enc_layer_num
+  std::vector<const T *> _p_d_src_emb_wei; // size: 4
+  std::vector<const T *> _p_d_enc_wei;     // size: 12 * enc_layer_num
 
   // store the weights on gpu memory
   thrust::device_vector<T> _d_src_emb_wei;
   thrust::device_vector<T> _d_enc_wei;
 
- public:
+public:
   std::string initializing(std::string weight_path);
 
   const std::vector<const T *> &get_src_emb_wei() const {
@@ -52,12 +51,12 @@ class GptWeight {
   int _max_step;
   int _extra_decode_length;
   int _src_vocab_size;
-  int _n_enc_layer;  // number of encoder layer
+  int _n_enc_layer; // number of encoder layer
   int _dim_per_head;
-  int _weight_per_enc_layer;  // 12
+  int _weight_per_enc_layer; // 12
 
   int _head_num;
-  int _padding_id;  // for src
+  int _padding_id; // for src
   std::string _sampling_method = "topk";
   int _topk = 1;
   float _topp = 0.75;
@@ -93,4 +92,4 @@ class GptWeight {
   }
 };
 
-}  // namespace lightseq
+} // namespace lightseq

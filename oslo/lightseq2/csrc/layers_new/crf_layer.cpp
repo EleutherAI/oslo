@@ -4,10 +4,8 @@ namespace lightseq {
 
 template <typename T>
 CRFLayer<T>::CRFLayer(int num_tags, int max_batch_tokens, int max_batch_size)
-    : Layer("CRFLayer"),
-      _num_tags(num_tags),
-      _max_batch_tokens(max_batch_tokens),
-      _max_batch_size(max_batch_size) {
+    : Layer("CRFLayer"), _num_tags(num_tags),
+      _max_batch_tokens(max_batch_tokens), _max_batch_size(max_batch_size) {
   // operators node
   _crf_op = new CRFOP<T>(max_batch_tokens, max_batch_size, num_tags);
   // parameters node
@@ -16,13 +14,13 @@ CRFLayer<T>::CRFLayer(int num_tags, int max_batch_tokens, int max_batch_size)
   _end_transition = new Variable("end_transition", g_dtype<T>());
   _transition = new Variable("transition", g_dtype<T>());
 
-  this->_context_ptr->exit_layer();  // necessary
+  this->_context_ptr->exit_layer(); // necessary
 }
 
 template <typename T>
-Variable* CRFLayer<T>::operator()(Variable* emission, Variable* mask) {
+Variable *CRFLayer<T>::operator()(Variable *emission, Variable *mask) {
   set_inputs({emission, mask});
-  Variable* crf_out = (*_crf_op)(_start_transition, _end_transition,
+  Variable *crf_out = (*_crf_op)(_start_transition, _end_transition,
                                  _transition, emission, mask, _linear_b);
   set_outputs({crf_out});
   return crf_out;
@@ -37,15 +35,15 @@ void CRFLayer<T>::before_forward(int batch_size, int seq_len,
 }
 
 template <typename T>
-int CRFLayer<T>::load_params(const std::vector<const T*>& para_vec,
-                             int offset) {  // for inference
+int CRFLayer<T>::load_params(const std::vector<const T *> &para_vec,
+                             int offset) { // for inference
   int size = 0;
-  _linear_b->set_value((char*)para_vec[offset + size]), size++;
-  _start_transition->set_value((char*)para_vec[offset + size]), size++;
-  _end_transition->set_value((char*)para_vec[offset + size]), size++;
-  _transition->set_value((char*)para_vec[offset + size]), size++;
+  _linear_b->set_value((char *)para_vec[offset + size]), size++;
+  _start_transition->set_value((char *)para_vec[offset + size]), size++;
+  _end_transition->set_value((char *)para_vec[offset + size]), size++;
+  _transition->set_value((char *)para_vec[offset + size]), size++;
 
   return size;
 }
 
-}  // namespace lightseq
+} // namespace lightseq

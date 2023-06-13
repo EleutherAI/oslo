@@ -469,7 +469,7 @@ def export_pb2hdf5(transformer, f):
                 print(
                     f"find type str, explicitly convert string to ascii encoded array."
                 )
-                # explict convert to array of char (int8) to avoid issues on string reading in C
+                # explicit convert to array of char (int8) to avoid issues on string reading in C
                 _data = np.array([ord(c) for c in _data]).astype(np.int8)
             f.create_dataset(hdf5_key, data=_data)
 

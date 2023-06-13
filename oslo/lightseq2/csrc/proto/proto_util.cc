@@ -2,7 +2,7 @@
 
 namespace lightseq {
 
-bool endswith(std::string const& full, std::string const& end) {
+bool endswith(std::string const &full, std::string const &end) {
   if (full.length() >= end.length()) {
     return (0 == full.compare(full.length() - end.length(), end.length(), end));
   }
@@ -52,7 +52,7 @@ int get_hdf5_dataset_size(hid_t hdf5_file, std::string dataset_name) {
 }
 
 int read_hdf5_dataset_data(hid_t hdf5_file, std::string dataset_name,
-                           hid_t output_type, void* output_buf,
+                           hid_t output_type, void *output_buf,
                            std::function<bool(int)> size_predicate,
                            std::string extra_msg) {
   // check if dataset exists or not
@@ -112,7 +112,7 @@ std::vector<float> read_hdf5_dataset_data_float(
     throw std::runtime_error("Failed to read HDF5 dataset: " + dataset_name);
   }
   H5Dclose(ds);
-  return output_vec;  // return with copy elision
+  return output_vec; // return with copy elision
 }
 
 std::vector<int> read_hdf5_dataset_data_int(
@@ -144,17 +144,17 @@ std::vector<int> read_hdf5_dataset_data_int(
     throw std::runtime_error("Failed to read HDF5 dataset: " + dataset_name);
   }
   H5Dclose(ds);
-  return output_vec;  // return with copy elision
+  return output_vec; // return with copy elision
 }
 
 int read_hdf5_dataset_scalar(hid_t hdf5_file, std::string dataset_name,
-                             hid_t output_type, void* output_buf) {
-  return read_hdf5_dataset_data(
-      hdf5_file, dataset_name, output_type, output_buf,
-      [](int size) { return size != 1; }, "Expect scalar with shape of 1.");
+                             hid_t output_type, void *output_buf) {
+  return read_hdf5_dataset_data(hdf5_file, dataset_name, output_type,
+                                output_buf, [](int size) { return size != 1; },
+                                "Expect scalar with shape of 1.");
 }
 
-void transform_param_shape(float* origin, float* buffer, int row_size,
+void transform_param_shape(float *origin, float *buffer, int row_size,
                            int col_size) {
   int idx = 0;
   for (int i = 0; i < row_size; i++) {
@@ -167,4 +167,4 @@ void transform_param_shape(float* origin, float* buffer, int row_size,
     *(origin + i) = *(buffer + i);
   }
 }
-}  // namespace lightseq
+} // namespace lightseq

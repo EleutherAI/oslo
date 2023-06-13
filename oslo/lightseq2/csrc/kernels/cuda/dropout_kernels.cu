@@ -122,8 +122,8 @@ __device__ __half2 activation_bwd_kernel<ActivationType::kRelu, __half2>(
 /**
  * @brief init curand states in global memory
  *
- * @thread grid_dim * block*dim to suuport any size of states
- * @param state persistant curand states
+ * @thread grid_dim * block*dim to support any size of states
+ * @param state persistent curand states
  * @param seed seed to init states
  * @return void
  */
@@ -167,7 +167,8 @@ __global__ void ls_dropout_kernel(const int total_count, const float ratio,
   const float scale = 1.f / (1.f - ratio);
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 4 >= total_count) return;
+  if (i * 4 >= total_count)
+    return;
 
   curandStatePhilox4_32_10_t state;
   curand_init(seed, i, i % 4, &state);
@@ -203,7 +204,8 @@ __global__ void ls_dropout_kernel(const int total_count, const float ratio,
 
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 8 >= total_count) return;
+  if (i * 8 >= total_count)
+    return;
 
   curandStatePhilox4_32_10_t state;
   curand_init(seed, i, i % 4, &state);
@@ -261,7 +263,8 @@ __global__ void ls_dropout_bwd_kernel(const int total_count, const float ratio,
   const float scale = 1.f / (1.f - ratio);
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 4 >= total_count) return;
+  if (i * 4 >= total_count)
+    return;
 
   uint8_t m[4];
 
@@ -288,7 +291,8 @@ __global__ void ls_dropout_bwd_kernel(const int total_count, const float ratio,
 
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 8 >= total_count) return;
+  if (i * 8 >= total_count)
+    return;
 
   float4 *out4 = reinterpret_cast<float4 *>(out);
   const float4 *vals_float4 = reinterpret_cast<const float4 *>(in);
@@ -378,7 +382,8 @@ __global__ void ls_dropout_res_bias_kernel(
   const float scale = 1.f / (1.f - ratio);
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 4 >= total_count) return;
+  if (i * 4 >= total_count)
+    return;
 
   curandStatePhilox4_32_10_t state;
   curand_init(seed, i, i % 4, &state);
@@ -421,7 +426,8 @@ __global__ void ls_dropout_res_bias_kernel(
 
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 8 >= total_count) return;
+  if (i * 8 >= total_count)
+    return;
 
   curandStatePhilox4_32_10_t state;
   curand_init(seed, i, i % 4, &state);
@@ -561,9 +567,11 @@ __global__ void ls_dropout_bias_bwd_kernel(
   }
   __syncthreads();
 
-  for (int i = 1; i < 32; i <<= 1) sum += g.shfl_down(sum, i);
+  for (int i = 1; i < 32; i <<= 1)
+    sum += g.shfl_down(sum, i);
 
-  if (y == 0) tile[0][x] = sum;
+  if (y == 0)
+    tile[0][x] = sum;
   __syncthreads();
 
   if (threadIdx.x < 8) {
@@ -615,9 +623,11 @@ __global__ void ls_dropout_bias_bwd_kernel(
   }
   __syncthreads();
 
-  for (int i = 1; i < WARP_SIZE; i <<= 1) sum += g.shfl_down(sum, i);
+  for (int i = 1; i < WARP_SIZE; i <<= 1)
+    sum += g.shfl_down(sum, i);
 
-  if (y == 0) tile[0][x] = sum;
+  if (y == 0)
+    tile[0][x] = sum;
   __syncthreads();
 
   if (threadIdx.x < 8) {
@@ -681,7 +691,8 @@ __global__ void ls_dropout_act_bias_kernel(
   const float scale = 1.f / (1.f - ratio);
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 4 >= total_count) return;
+  if (i * 4 >= total_count)
+    return;
 
   curandStatePhilox4_32_10_t state;
   curand_init(seed, i, i % 4, &state);
@@ -726,7 +737,8 @@ __global__ void ls_dropout_act_bias_kernel(
 
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 8 >= total_count) return;
+  if (i * 8 >= total_count)
+    return;
 
   curandStatePhilox4_32_10_t state;
   curand_init(seed, i, i % 4, &state);
@@ -862,7 +874,8 @@ __global__ void ls_quant_dropout_act_bias_kernel(
   const float scale = 1.f / (1.f - ratio);
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 4 >= total_count) return;
+  if (i * 4 >= total_count)
+    return;
 
   curandStatePhilox4_32_10_t state;
   curand_init(seed, i, i % 4, &state);
@@ -923,7 +936,8 @@ __global__ void ls_quant_dropout_act_bias_kernel(
 
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 8 >= total_count) return;
+  if (i * 8 >= total_count)
+    return;
 
   curandStatePhilox4_32_10_t state;
   curand_init(seed, i, i % 4, &state);
@@ -1084,7 +1098,8 @@ __global__ void ls_fakequant_dropout_act_bias_kernel(
   const float scale = 1.f / (1.f - ratio);
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 4 >= total_count) return;
+  if (i * 4 >= total_count)
+    return;
 
   curandStatePhilox4_32_10_t state;
   curand_init(seed, i, i % 4, &state);
@@ -1157,7 +1172,8 @@ __global__ void ls_fakequant_dropout_act_bias_kernel(
 
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 8 >= total_count) return;
+  if (i * 8 >= total_count)
+    return;
 
   curandStatePhilox4_32_10_t state;
   curand_init(seed, i, i % 4, &state);
@@ -1354,9 +1370,11 @@ __global__ void ls_dropout_act_bias_bwd_kernel(
   float sum = tile[threadIdx.y][threadIdx.x];
   __syncthreads();
 
-  for (int i = 1; i < WARP_SIZE; i <<= 1) sum += g.shfl_down(sum, i);
+  for (int i = 1; i < WARP_SIZE; i <<= 1)
+    sum += g.shfl_down(sum, i);
 
-  if (threadIdx.x == 0) tile[0][threadIdx.y] = sum;
+  if (threadIdx.x == 0)
+    tile[0][threadIdx.y] = sum;
   __syncthreads();
 
   if (threadIdx.y == 0) {
@@ -1572,9 +1590,11 @@ __global__ void ls_quant_dropout_act_bias_bwd_kernel(
     //   atomicAdd(&cmax_out_grad[0], block_cmax_out_grad);
     // }
   }
-  for (int i = 1; i < WARP_SIZE; i <<= 1) sum += g.shfl_down(sum, i);
+  for (int i = 1; i < WARP_SIZE; i <<= 1)
+    sum += g.shfl_down(sum, i);
 
-  if (threadIdx.x == 0) tile[0][threadIdx.y] = sum;
+  if (threadIdx.x == 0)
+    tile[0][threadIdx.y] = sum;
   __syncthreads();
 
   if (threadIdx.y == 0) {
@@ -1726,9 +1746,11 @@ __global__ void ls_quant_dropout_act_bias_bwd_kernel(
 
   __syncthreads();
 
-  for (int i = 1; i < WARP_SIZE; i <<= 1) sum += g.shfl_down(sum, i);
+  for (int i = 1; i < WARP_SIZE; i <<= 1)
+    sum += g.shfl_down(sum, i);
 
-  if (threadIdx.x == 0) tile[0][threadIdx.y] = sum;
+  if (threadIdx.x == 0)
+    tile[0][threadIdx.y] = sum;
   __syncthreads();
 
   if (threadIdx.y == 0) {
@@ -1805,15 +1827,17 @@ launch_ls_quant_dropout_act_bias_bwd<ActivationType::kGelu, __half>(
  * @param hidden_size hidden size
  * @return void
  */
-__global__ void ls_quant_dropout_res_bias_kernel(
-    const int total_count, const float ratio, float *out, uint8_t *mask,
-    const int8_t *qin, const float *cmax, const float *bias,
-    const float *residual, const int seed, const int hidden_size,
-    bool in_col32) {
+__global__ void
+ls_quant_dropout_res_bias_kernel(const int total_count, const float ratio,
+                                 float *out, uint8_t *mask, const int8_t *qin,
+                                 const float *cmax, const float *bias,
+                                 const float *residual, const int seed,
+                                 const int hidden_size, bool in_col32) {
   const float scale = 1.f / (1.f - ratio);
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 4 >= total_count) return;
+  if (i * 4 >= total_count)
+    return;
 
   curandStatePhilox4_32_10_t state;
   curand_init(seed, i, i % 4, &state);
@@ -1860,16 +1884,18 @@ __global__ void ls_quant_dropout_res_bias_kernel(
   out4[i] = output4;
 }
 
-__global__ void ls_quant_dropout_res_bias_kernel(
-    const int total_count, const float ratio, __half *out, uint8_t *mask,
-    const int8_t *qin, const __half *cmax, const __half *bias,
-    const __half *residual, const int seed, const int hidden_size,
-    bool in_col32) {
+__global__ void
+ls_quant_dropout_res_bias_kernel(const int total_count, const float ratio,
+                                 __half *out, uint8_t *mask, const int8_t *qin,
+                                 const __half *cmax, const __half *bias,
+                                 const __half *residual, const int seed,
+                                 const int hidden_size, bool in_col32) {
   const __half scale = 1.f / (1.f - ratio);
 
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (i * 8 >= total_count) return;
+  if (i * 8 >= total_count)
+    return;
 
   curandStatePhilox4_32_10_t state;
   curand_init(seed, i, i % 4, &state);
@@ -1965,5 +1991,5 @@ void launch_ls_quant_dropout_res_bias<__half>(
           .count(),
       dim, in_col32);
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

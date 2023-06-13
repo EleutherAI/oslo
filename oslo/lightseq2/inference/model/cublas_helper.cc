@@ -1,9 +1,9 @@
 #include "cublas_helper.h"
 
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <cuda_fp16.h>
 #include <cublasLt.h>
+#include <cuda.h>
+#include <cuda_fp16.h>
+#include <cuda_runtime.h>
 
 #include "transformerKernels_int8.h"
 #include "util.h"
@@ -28,9 +28,9 @@ namespace cuda {
  * @param stream
  * @param use_ORDER_COL32_2R_4R4 B layout switch
  */
-void cublasLtMM_withAlgo(int* res, int batchCount, int m, int n, int k,
+void cublasLtMM_withAlgo(int *res, int batchCount, int m, int n, int k,
                          int64_t stridea, int64_t strideb, int64_t stridec,
-                         const int8_t* ATransform, const int8_t* kernel,
+                         const int8_t *ATransform, const int8_t *kernel,
                          cublasLtHandle_t cublasLt_handle, cudaStream_t stream,
                          bool use_ORDER_COL32_2R_4R4) {
   cublasOperation_t opTranspose = CUBLAS_OP_T;
@@ -131,10 +131,10 @@ void cublasLtMM_withAlgo(int* res, int batchCount, int m, int n, int k,
  * @param stream
  * @param use_ORDER_COL32_2R_4R4
  */
-void cublasLtMM_withAlgo_i8IO(int8_t* res, int batchCount, int m, int n, int k,
+void cublasLtMM_withAlgo_i8IO(int8_t *res, int batchCount, int m, int n, int k,
                               int64_t stridea, int64_t strideb, int64_t stridec,
-                              const float alpha, const int8_t* ATransform,
-                              const int8_t* kernel,
+                              const float alpha, const int8_t *ATransform,
+                              const int8_t *kernel,
                               cublasLtHandle_t cublasLt_handle,
                               cudaStream_t stream,
                               bool use_ORDER_COL32_2R_4R4) {
@@ -244,8 +244,8 @@ void cublasLtMM_withAlgo_i8IO(int8_t* res, int batchCount, int m, int n, int k,
  * @param stream
  */
 template <typename OutType, typename ScaleType>
-void cublaslt_gemm(const int8_t* input_a, const int8_t* input_b,
-                   OutType* output_c, int batch_count, int m, int n, int k,
+void cublaslt_gemm(const int8_t *input_a, const int8_t *input_b,
+                   OutType *output_c, int batch_count, int m, int n, int k,
                    int64_t stridea, int64_t strideb, int64_t stridec,
                    const ScaleType alpha, cublasLtHandle_t cublasLt_handle,
                    cudaStream_t stream) {
@@ -328,13 +328,13 @@ void cublaslt_gemm(const int8_t* input_a, const int8_t* input_b,
 }
 
 template void cublaslt_gemm<int32_t, int32_t>(
-    const int8_t* input_a, const int8_t* input_b, int32_t* output_c,
+    const int8_t *input_a, const int8_t *input_b, int32_t *output_c,
     int batch_count, int m, int n, int k, int64_t stridea, int64_t strideb,
     int64_t stridec, const int32_t alpha, cublasLtHandle_t cublasLt_handle,
     cudaStream_t stream);
 
 template void cublaslt_gemm<int8_t, float>(
-    const int8_t* input_a, const int8_t* input_b, int8_t* output_c,
+    const int8_t *input_a, const int8_t *input_b, int8_t *output_c,
     int batch_count, int m, int n, int k, int64_t stridea, int64_t strideb,
     int64_t stridec, const float alpha, cublasLtHandle_t cublasLt_handle,
     cudaStream_t stream);
@@ -359,11 +359,11 @@ template void cublaslt_gemm<int8_t, float>(
  * @param stream
  */
 template <typename OutType, typename ScaleType>
-void cublaslt_gemm(const int8_t* input_a, const int8_t* input_b,
-                   OutType* output_c, int batch_count, int m, int n, int k,
+void cublaslt_gemm(const int8_t *input_a, const int8_t *input_b,
+                   OutType *output_c, int batch_count, int m, int n, int k,
                    int64_t stridea, int64_t strideb, int64_t stridec,
                    const ScaleType alpha, cublasLtHandle_t cublasLt_handle,
-                   cudaStream_t stream, cublasAlgoMap& algo_map) {
+                   cudaStream_t stream, cublasAlgoMap &algo_map) {
   cublasOperation_t transpose = CUBLAS_OP_T;
 #if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
   cublasComputeType_t compute_type = CUBLAS_COMPUTE_32I;
@@ -477,16 +477,16 @@ void cublaslt_gemm(const int8_t* input_a, const int8_t* input_b,
 }
 
 template void cublaslt_gemm<int32_t, int32_t>(
-    const int8_t* input_a, const int8_t* input_b, int32_t* output_c,
+    const int8_t *input_a, const int8_t *input_b, int32_t *output_c,
     int batch_count, int m, int n, int k, int64_t stridea, int64_t strideb,
     int64_t stridec, const int32_t alpha, cublasLtHandle_t cublasLt_handle,
-    cudaStream_t stream, cublasAlgoMap& algo_map);
+    cudaStream_t stream, cublasAlgoMap &algo_map);
 
 template void cublaslt_gemm<int8_t, float>(
-    const int8_t* input_a, const int8_t* input_b, int8_t* output_c,
+    const int8_t *input_a, const int8_t *input_b, int8_t *output_c,
     int batch_count, int m, int n, int k, int64_t stridea, int64_t strideb,
     int64_t stridec, const float alpha, cublasLtHandle_t cublasLt_handle,
-    cudaStream_t stream, cublasAlgoMap& algo_map);
+    cudaStream_t stream, cublasAlgoMap &algo_map);
 
 /**
  * @brief transform kernel layout for int8 gemm
@@ -499,7 +499,7 @@ template void cublaslt_gemm<int8_t, float>(
  * @param lt_handle
  * @param stream
  */
-void transform_weight_layout(const int8_t* input, int8_t* output, int row,
+void transform_weight_layout(const int8_t *input, int8_t *output, int row,
                              int col, Layout layout, cublasLtHandle_t lt_handle,
                              cudaStream_t stream) {
   float transform_alpha = 1.0f, transform_beta = 0.0f;
@@ -564,11 +564,11 @@ void transform_weight_layout(const int8_t* input, int8_t* output, int row,
  * @param layout_col32t layout to support different gemm
  */
 template <typename T>
-void quantize_weight(const T* origin_weight, int8_t* quantized_weight, int rows,
+void quantize_weight(const T *origin_weight, int8_t *quantized_weight, int rows,
                      int cols, float quant_scale, cudaStream_t stream,
                      cublasLtHandle_t handle, Layout layout) {
-  int8_t* temp1;
-  T* temp2;
+  int8_t *temp1;
+  T *temp2;
   CHECK_GPU_ERROR(cudaMalloc(&temp1, rows * cols * sizeof(int8_t)));
   CHECK_GPU_ERROR(cudaMalloc(&temp2, rows * cols * sizeof(T)));
   CHECK_GPU_ERROR(cudaMemcpyAsync(temp2, origin_weight, rows * cols * sizeof(T),
@@ -592,14 +592,14 @@ void quantize_weight(const T* origin_weight, int8_t* quantized_weight, int rows,
   CHECK_GPU_ERROR(cudaFree(temp2));
 }
 
-template void quantize_weight<float>(const float* origin_weight,
-                                     int8_t* quantized_weight, int rows,
+template void quantize_weight<float>(const float *origin_weight,
+                                     int8_t *quantized_weight, int rows,
                                      int cols, float quant_scale,
                                      cudaStream_t stream,
                                      cublasLtHandle_t handle, Layout layout);
 
-template void quantize_weight<half>(const half* origin_weight,
-                                    int8_t* quantized_weight, int rows,
+template void quantize_weight<half>(const half *origin_weight,
+                                    int8_t *quantized_weight, int rows,
                                     int cols, float quant_scale,
                                     cudaStream_t stream,
                                     cublasLtHandle_t handle, Layout layout);
@@ -612,5 +612,5 @@ int getSMVersion() {
   return props.major * 10 + props.minor;
 }
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

@@ -12,9 +12,8 @@ using namespace std;
 namespace lightseq {
 namespace cuda {
 
-template <typename T>
-class Softmax {
- public:
+template <typename T> class Softmax {
+public:
   struct Config {
     size_t nhead;
     bool mask_future;
@@ -39,8 +38,8 @@ class Softmax {
                               stream);
   }
 
- private:
+private:
   Config config_;
 };
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

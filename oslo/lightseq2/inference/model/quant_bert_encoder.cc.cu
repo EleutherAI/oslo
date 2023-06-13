@@ -1,8 +1,8 @@
-#include "quant_bert_encoder.h"
 #include "../kernels/embKernels_int8.h"
 #include "../kernels/transformerKernels.h"
 #include "../kernels/transformerKernels_int8.h"
 #include "cublas_helper.h"
+#include "quant_bert_encoder.h"
 
 /**
 @file
@@ -18,26 +18,17 @@ QuantBertEncoder<OpType_>::QuantBertEncoder(
     int max_batch_size, const int *p_d_token_id, int *p_d_padding_mask,
     _DataType *p_d_output, const QuantBertWeight<OpType_> &tw,
     cudaStream_t stream, cublasHandle_t hd, const int *p_d_lang_id)
-    : _max_batch_size(max_batch_size),
-      _p_d_token_id(p_d_token_id),
-      _p_d_padding_mask(p_d_padding_mask),
-      _p_d_output(p_d_output),
-      _p_d_lang_id(p_d_lang_id),
-      _tw(tw),
-      _stream(stream),
-      _hd(hd),
-      _p_d_src_emb_wei(tw.get_src_emb_wei()),
-      _p_d_enc_wei(tw.get_enc_wei()),
-      _fone((_DataType)1.f),
-      _fzero((_DataType)0.f),
+    : _max_batch_size(max_batch_size), _p_d_token_id(p_d_token_id),
+      _p_d_padding_mask(p_d_padding_mask), _p_d_output(p_d_output),
+      _p_d_lang_id(p_d_lang_id), _tw(tw), _stream(stream), _hd(hd),
+      _p_d_src_emb_wei(tw.get_src_emb_wei()), _p_d_enc_wei(tw.get_enc_wei()),
+      _fone((_DataType)1.f), _fzero((_DataType)0.f),
       _src_emb_clip_max(tw.get_src_emb_clip_max()),
-      _enc_clip_max(tw.get_enc_clip_max()),
-      _ione((int32_t)1),
+      _enc_clip_max(tw.get_enc_clip_max()), _ione((int32_t)1),
       _izero((int32_t)0),
       _atten_scaler((_DataType)sqrt(1.f / tw._dim_per_head)),
       _max_batch_dim(max_batch_size * tw._max_step * tw._hidden_size),
-      _max_thread_per_block(1024),
-      _algo_map(),
+      _max_thread_per_block(1024), _algo_map(),
       _sm_gt_eq_80(getSMVersion() >= 80 ? true : false) {
   CHECK_GPU_ERROR(cublasLtCreate(&_cublas_lt_handle));
 }
@@ -48,8 +39,7 @@ Init the GPU memory pointer which point to
 These buffer are used during custom cuda kernel function,
   find the corresponding function to see how these buffer are used
 */
-template <OperationType OpType_>
-void QuantBertEncoder<OpType_>::init_buffer() {
+template <OperationType OpType_> void QuantBertEncoder<OpType_>::init_buffer() {
   std::cout << "encoder buffer init start" << std::endl;
 
   _DataType *qkv_buf;
@@ -236,14 +226,14 @@ void QuantBertEncoder<OpType_>::run_one_infer(int batch_size,
       _tw._hidden_size, _stream, _p_device_emb[4], _p_d_lang_id,
       _tw._multilg_type, _src_emb_clip_max / _quant_range, false);
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // token_id
       std::cout << "emb out: token-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
                 "emb out", 10);
     }
-  }  // not normal
+  } // not normal
 #endif
   for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
     _weight_offset = _layer_id * _tw._weight_per_enc_layer;
@@ -252,14 +242,14 @@ void QuantBertEncoder<OpType_>::run_one_infer(int batch_size,
   }
 
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // token_id
       std::cout << "encoder output: token-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
                 "encoder_output", _tw._dim_per_head);
     }
-  }  // not normal
+  } // not normal
 #endif
   return;
 }
@@ -281,8 +271,8 @@ void QuantBertEncoder<OpType_>::self_attention() {
   CHECK_GPU_ERROR(cudaGetLastError());
 
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // token_id
       std::cout << "qkv_attn input: token-" << j << std::endl;
       print_vec(_int8_ffn_in_buf + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
@@ -347,8 +337,8 @@ void QuantBertEncoder<OpType_>::self_attention() {
       _quant_range / _enc_clip_max[_layer_id * 11 + 5], !_sm_gt_eq_80);
 
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // token_id
       std::cout << "out_attn input: token-" << j << std::endl;
       print_vec(_int8_ffn_in_buf + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
@@ -377,8 +367,8 @@ void QuantBertEncoder<OpType_>::self_attention() {
   }
 
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // token_id
       std::cout << "attn_ln input: token-" << j << std::endl;
       print_vec(_int8_ffn_out_buf + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
@@ -401,8 +391,8 @@ void QuantBertEncoder<OpType_>::self_attention() {
 template <OperationType OpType_>
 void QuantBertEncoder<OpType_>::ffn_add_norm() {
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // token_id
       std::cout << "ffn1 input: token-" << j << std::endl;
       print_vec(_int8_ffn_in_buf + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
@@ -447,8 +437,8 @@ void QuantBertEncoder<OpType_>::ffn_add_norm() {
   }
 
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) { // token_id
       std::cout << "ffn2 input: token-" << j << std::endl;
       print_vec(_int8_ffn_in_buf + i * _batch_seq_len * _tw._inner_size +
                     j * _tw._inner_size,
@@ -505,8 +495,8 @@ void QuantBertEncoder<OpType_>::ffn_add_norm() {
         _scaled_ffn2_colsum[_layer_id]);
 
 #ifdef DEBUG_RESULT
-    for (int i = 0; i < _batch_size; i++) {       // batch_id
-      for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+    for (int i = 0; i < _batch_size; i++) {      // batch_id
+      for (int j = 0; j < _batch_seq_len; j++) { // token_id
         std::cout << "encoder layer out: token-" << j << std::endl;
         print_vec(_int8_ffn_in_buf + i * _batch_seq_len * _tw._hidden_size +
                       j * _tw._hidden_size,
@@ -522,5 +512,5 @@ void QuantBertEncoder<OpType_>::ffn_add_norm() {
 template class QuantBertEncoder<OperationType::FP16>;
 template class QuantBertEncoder<OperationType::FP32>;
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

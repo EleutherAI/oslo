@@ -1,5 +1,5 @@
-#include <cuda_runtime.h>
 #include <cuda_fp16.h>
+#include <cuda_runtime.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
@@ -16,12 +16,12 @@ namespace lightseq {
 namespace cuda {
 
 class PyTransformer {
- private:
+private:
   LSModel *model_;
   int *d_input_;
   std::vector<void *> d_outputs_;
 
- public:
+public:
   PyTransformer(std::string weight_path, int max_batch_size) {
     model_ = LSModelFactory::GetInstance().CreateModel(
         "Transformer", weight_path, max_batch_size);
@@ -49,8 +49,8 @@ class PyTransformer {
     }
   }
 
-  std::tuple<py::array_t<int>, py::array_t<float>> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+  std::tuple<py::array_t<int>, py::array_t<float>>
+  infer(py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
     int batch_size = input_seq_out.shape(0);
@@ -87,12 +87,12 @@ class PyTransformer {
 };
 
 class PyBert {
- private:
+private:
   LSModel *model_;
   int *d_input_;
   std::vector<void *> d_outputs_;
 
- public:
+public:
   PyBert(std::string weight_path, int max_batch_size) {
     model_ = LSModelFactory::GetInstance().CreateModel("Bert", weight_path,
                                                        max_batch_size);
@@ -120,8 +120,8 @@ class PyBert {
     }
   }
 
-  py::array_t<float> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+  py::array_t<float>
+  infer(py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
     int batch_size = input_seq_out.shape(0);
@@ -167,12 +167,12 @@ class PyBert {
 };
 
 class PyBertCrf {
- private:
+private:
   LSModel *model_;
   int *d_input_;
   std::vector<void *> d_outputs_;
 
- public:
+public:
   PyBertCrf(std::string weight_path, int max_batch_size) {
     model_ = LSModelFactory::GetInstance().CreateModel("BertCrf", weight_path,
                                                        max_batch_size);
@@ -200,8 +200,8 @@ class PyBertCrf {
     }
   }
 
-  py::array_t<int> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+  py::array_t<int>
+  infer(py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
     int batch_size = input_seq_out.shape(0);
@@ -230,12 +230,12 @@ class PyBertCrf {
 };
 
 class PyGpt {
- private:
+private:
   LSModel *model_;
   int *d_input_;
   std::vector<void *> d_outputs_;
 
- public:
+public:
   PyGpt(std::string weight_path, int max_batch_size) {
     model_ = LSModelFactory::GetInstance().CreateModel("Gpt", weight_path,
                                                        max_batch_size);
@@ -263,8 +263,8 @@ class PyGpt {
     }
   }
 
-  std::tuple<py::array_t<int>, py::array_t<float>> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+  std::tuple<py::array_t<int>, py::array_t<float>>
+  infer(py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
     int batch_size = input_seq_out.shape(0);
@@ -306,8 +306,8 @@ class PyGpt {
     return std::make_tuple(output, scores);
   }
 };
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq
 
 PYBIND11_MODULE(inference, m) {
   m.attr("__name__") = "oslo.lightseq2.inference";

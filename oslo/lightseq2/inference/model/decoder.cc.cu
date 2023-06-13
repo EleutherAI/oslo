@@ -1,7 +1,7 @@
 #include "decoder.h"
 
-#include "../kernels/transformerKernels.h"
 #include "../kernels/embKernels.h"
+#include "../kernels/transformerKernels.h"
 
 /**
 @file
@@ -13,39 +13,30 @@ namespace lightseq {
 namespace cuda {
 
 template <OperationType OpType_>
-Decoder<OpType_>::Decoder(int max_batch_size, const int* p_d_padding_mask,
-                          const _DataType* p_d_encoder_output, int* p_d_result,
-                          TransformerWeight<OpType_>& tw, cudaStream_t stream,
+Decoder<OpType_>::Decoder(int max_batch_size, const int *p_d_padding_mask,
+                          const _DataType *p_d_encoder_output, int *p_d_result,
+                          TransformerWeight<OpType_> &tw, cudaStream_t stream,
                           cublasHandle_t hd, bool output_topk,
-                          const int* p_d_lang_id)
-    : _max_batch_size(max_batch_size),
-      _max_thread_per_block(1024),
+                          const int *p_d_lang_id)
+    : _max_batch_size(max_batch_size), _max_thread_per_block(1024),
       _h_can_num_batch(0),
       _cub_sort_buffer_bytes(max_batch_size * tw._beam_size *
                              tw._trg_vocab_size * sizeof(_DataType)),
       _p_d_padding_mask(p_d_padding_mask),
-      _p_d_encoder_output(p_d_encoder_output),
-      _p_d_result(p_d_result),
-      _p_d_trg_emb_wei(tw.get_trg_emb_wei()),
-      _p_d_dec_wei(tw.get_dec_wei()),
-      _tw(tw),
-      _stream(stream),
-      _hd(hd),
-      _output_topk(output_topk),
-      _p_d_lang_id(p_d_lang_id),  // source token id
+      _p_d_encoder_output(p_d_encoder_output), _p_d_result(p_d_result),
+      _p_d_trg_emb_wei(tw.get_trg_emb_wei()), _p_d_dec_wei(tw.get_dec_wei()),
+      _tw(tw), _stream(stream), _hd(hd), _output_topk(output_topk),
+      _p_d_lang_id(p_d_lang_id), // source token id
       _layer_size_encdec_k(max_batch_size * tw._max_step * tw._hidden_size),
       _layer_size_self_k(max_batch_size * tw._max_step * tw._hidden_size *
                          tw._beam_size),
-      _type_one(1.f),
-      _type_zero(0.f),
-      _fzero(0.f),
+      _type_one(1.f), _type_zero(0.f), _fzero(0.f),
       _atten_scaler(sqrt(1.f / tw._dim_per_head)),
       _logit_scaler(_tw._no_scale_embedding ? 1.f
                                             : sqrt(1.f / tw._hidden_size)),
       _h_alive_seq_probs(max_batch_size * tw._beam_size,
                          min_log_probability / 2),
-      _h_length_norm(tw._max_step, 1.f),
-      _h_unfinished(1),
+      _h_length_norm(tw._max_step, 1.f), _h_unfinished(1),
       _is_benchmark(false) {
   for (int i = 0; i < _h_alive_seq_probs.size(); i += tw._beam_size) {
     _h_alive_seq_probs[i] = 0.f;
@@ -94,17 +85,17 @@ These buffer are used during custom cuda kernel function,
   find the corresponding function to see how these buffer are used
 */
 template <OperationType OpType_>
-void Decoder<OpType_>::init_buffer(void* pbuf) {
+void Decoder<OpType_>::init_buffer(void *pbuf) {
   std::cout << "decoder buffer init start" << std::endl;
-  _DataType* curp = reinterpret_cast<_DataType*>(pbuf);
+  _DataType *curp = reinterpret_cast<_DataType *>(pbuf);
 
   for (int i = 0; i < _tw._n_dec_layer; i++) {
-    // encoder ouput after project, the "key" of enc_dec attention
+    // encoder output after project, the "key" of enc_dec attention
     _p_d_encdec_k_bgeem.push_back(curp);
     curp += _layer_size_encdec_k;
   }
   for (int i = 0; i < _tw._n_dec_layer; i++) {
-    // encoder ouput after project, the "value" of enc_dec attention
+    // encoder output after project, the "value" of enc_dec attention
     _p_d_encdec_v_bgeem.push_back(curp);
     curp += _layer_size_encdec_k;
   }
@@ -144,34 +135,34 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
 
   // we can use the same buffer for decoder network computation
   // and beam search, since they're serial.
-  _DataType* reuse_p = curp;
+  _DataType *reuse_p = curp;
 
   // for decode network computation
-  _p_d_self_step_qkv = curp;  // [q, k, v], result of gemm
+  _p_d_self_step_qkv = curp; // [q, k, v], result of gemm
   curp += _max_batch_size * _tw._beam_size * _tw._hidden_size * 3;
-  _p_d_query_buf1 = curp;  // "query" buffer
+  _p_d_query_buf1 = curp; // "query" buffer
   curp += _max_batch_size * _tw._beam_size * _tw._hidden_size;
-  _p_d_query_buf2 = curp;  // "query" buffer
+  _p_d_query_buf2 = curp; // "query" buffer
   curp +=
       _max_batch_size * _tw._beam_size * max(_tw._hidden_size, _tw._inner_size);
-  _p_d_c = curp;  // correlation(attention score) buffer
+  _p_d_c = curp; // correlation(attention score) buffer
   curp += _max_batch_size * _tw._head_num * _tw._beam_size * _tw._max_step;
 
   // for beam search
   curp = reuse_p;
-  _p_d_logit_buf = curp;  // vocab ligit
+  _p_d_logit_buf = curp; // vocab ligit
   curp += _max_batch_size * _tw._beam_size * _tw._trg_vocab_size;
   // always be float
-  float* fcurp = (float*)curp;
+  float *fcurp = (float *)curp;
   // seq score ended with every target token for current step
   _p_d_can_score = fcurp;
   fcurp += _max_batch_size * _tw._beam_size * _tw._trg_vocab_size;
-  _p_d_alive_seq_probs = fcurp;  // alive seq probability
+  _p_d_alive_seq_probs = fcurp; // alive seq probability
   fcurp += _max_batch_size * _tw._beam_size;
-  _p_d_alive_seq_score = fcurp;  // alive seq score
+  _p_d_alive_seq_score = fcurp; // alive seq score
   fcurp += _max_batch_size * _tw._beam_size;
 
-  int* pint = reinterpret_cast<int*>(fcurp);
+  int *pint = reinterpret_cast<int *>(fcurp);
   // FIXME
   std::vector<int> start_id_vec(
       _max_batch_size * _tw._beam_size * _tw._max_step * 2, _tw._start_id);
@@ -197,8 +188,8 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
   _p_d_can_num = pint;
   pint += _max_batch_size * _tw._beam_size + 1;
 
-  CHECK_GPU_ERROR(cudaMalloc((void**)&_p_d_sample_unfinished, sizeof(int)));
-  CHECK_GPU_ERROR(cudaMalloc((void**)&_p_d_curandstate,
+  CHECK_GPU_ERROR(cudaMalloc((void **)&_p_d_sample_unfinished, sizeof(int)));
+  CHECK_GPU_ERROR(cudaMalloc((void **)&_p_d_curandstate,
                              _max_batch_size * sizeof(curandState)));
   ker_curand_setup<<<_max_batch_size, 1, 0, _stream>>>(_p_d_curandstate);
 
@@ -211,8 +202,7 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
 /**
 Some requirements needed by custom cuda kernel function
 */
-template <OperationType OpType_>
-std::string Decoder<OpType_>::check() {
+template <OperationType OpType_> std::string Decoder<OpType_>::check() {
   // if (_max_thread_per_block < _tw._hidden_size) {
   //   return "violate hidden_size <= max_thread_per_block";
   // }
@@ -292,7 +282,7 @@ void Decoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
     _batch_max_decode_length = _tw._max_step;
   }
 
-  project_encoder_output();  // project encoder output
+  project_encoder_output(); // project encoder output
   // init the first step's token id with target start_id
   CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_alive_seq_probs,
                                   _h_alive_seq_probs.data(),
@@ -305,7 +295,7 @@ void Decoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
     std::cout << "*** run step " << _cur_step << " ***" << std::endl;
 #endif
     bool early_stop = run_step();
-    if (!_is_benchmark && early_stop) {  // one step
+    if (!_is_benchmark && early_stop) { // one step
       break;
     }
   }
@@ -379,8 +369,7 @@ void Decoder<OpType_>::project_encoder_output() {
 /**
 Decode one step
 */
-template <OperationType OpType_>
-bool Decoder<OpType_>::run_step() {
+template <OperationType OpType_> bool Decoder<OpType_>::run_step() {
   embedding();
   decoder_stack();
   /* --- Project hidden states to vocab logits--- */
@@ -394,8 +383,8 @@ bool Decoder<OpType_>::run_step() {
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _tw._beam_size; j++) {  // beam_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _tw._beam_size; j++) { // beam_id
       std::cout << "decoder output: batch-" << i << ", beam-" << j << std::endl;
       print_vec(_p_d_cur_step_query + i * _tw._beam_size * _tw._hidden_size +
                     j * _tw._hidden_size,
@@ -418,13 +407,12 @@ bool Decoder<OpType_>::run_step() {
   } else {
     throw std::runtime_error("not supported sampling_method");
   }
-}  // namespace cuda
+} // namespace cuda
 
 /**
 Decode embedding
 */
-template <OperationType OpType_>
-void Decoder<OpType_>::embedding() {
+template <OperationType OpType_> void Decoder<OpType_>::embedding() {
   // _p_d_trg_emb_wei: {token_emb, position_emb, norm_scale, norm_bias,
   // enc_out_kernel_kv, enc_out_bias_kv, logit_bias}
   launch_dec_emb<_DataType>(_p_d_trg_emb_wei[0], _p_d_trg_emb_wei[1],
@@ -433,8 +421,8 @@ void Decoder<OpType_>::embedding() {
                             _tw._hidden_size, _tw._trg_vocab_size, _cur_step,
                             _tw._max_step, _tw._multilg_type, _stream);
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _tw._beam_size; j++) {  // beam_id
+  for (int i = 0; i < _batch_size; i++) {      // batch_id
+    for (int j = 0; j < _tw._beam_size; j++) { // beam_id
       std::cout << "decoder emb: batch-" << i << ", beam-" << j << std::endl;
       print_vec(_p_d_cur_step_query + i * _tw._beam_size * _tw._hidden_size +
                     j * _tw._hidden_size,
@@ -449,8 +437,7 @@ void Decoder<OpType_>::embedding() {
 Decoder feedforward, composed by self_atten,
   enc-dec-atten, ffn
 */
-template <OperationType OpType_>
-void Decoder<OpType_>::decoder_stack() {
+template <OperationType OpType_> void Decoder<OpType_>::decoder_stack() {
   // _p_d_dec_wei = {self_norm_scale, self_norm_bias,
   // self_qkv_kernel, self_qkv_bias, self_output_kernel, self_output_bias
   // encdec_norm_scale, encdec_norm_bias,
@@ -477,8 +464,7 @@ void Decoder<OpType_>::decoder_stack() {
 /**
 Decoder self attention
 */
-template <OperationType OpType_>
-void Decoder<OpType_>::self_attention() {
+template <OperationType OpType_> void Decoder<OpType_>::self_attention() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
@@ -588,8 +574,7 @@ void Decoder<OpType_>::self_attention() {
 /**
 Encode-Decoder attention
 */
-template <OperationType OpType_>
-void Decoder<OpType_>::encdec_attention() {
+template <OperationType OpType_> void Decoder<OpType_>::encdec_attention() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
@@ -661,8 +646,7 @@ void Decoder<OpType_>::encdec_attention() {
   return;
 }
 
-template <OperationType OpType_>
-void Decoder<OpType_>::ffn_add_norm() {
+template <OperationType OpType_> void Decoder<OpType_>::ffn_add_norm() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
@@ -713,8 +697,7 @@ void Decoder<OpType_>::ffn_add_norm() {
   return;
 }
 
-template <OperationType OpType_>
-bool Decoder<OpType_>::sample() {
+template <OperationType OpType_> bool Decoder<OpType_>::sample() {
   CHECK_GPU_ERROR(
       cudaMemsetAsync(_p_d_sample_unfinished, 0, sizeof(int), _stream));
   /* --- Sample new tokens from logits --- */
@@ -747,8 +730,7 @@ bool Decoder<OpType_>::sample() {
   return _h_unfinished == 1 ? false : true;
 }
 
-template <OperationType OpType_>
-bool Decoder<OpType_>::beam_search() {
+template <OperationType OpType_> bool Decoder<OpType_>::beam_search() {
   /*
     step 1. logits bias and softmax,
       select rough topk candidate for every batch item,
@@ -763,7 +745,7 @@ bool Decoder<OpType_>::beam_search() {
   if (_tw._diverse_lambda != 0) {
     if (_h_can_num_batch < _cub_sort_buffer_bytes / 160) {
       CHECK_GPU_ERROR(cub::DeviceRadixSort::SortPairsDescending(
-          (float*)_p_d_logit_buf, _cub_sort_buffer_bytes, _p_d_can_score,
+          (float *)_p_d_logit_buf, _cub_sort_buffer_bytes, _p_d_can_score,
           _p_d_can_score, _p_d_can_idx, _p_d_can_idx, _h_can_num_batch, 0,
           sizeof(float) * 8, _stream));
     } else {
@@ -798,7 +780,7 @@ bool Decoder<OpType_>::beam_search() {
       _p_d_alive_seq_buf, _p_d_alive_seq_probs, _p_d_alive_seq_score,
       _p_d_can_num, _tw._trg_vocab_size, _cur_step, _h_length_norm[_cur_step],
       _tw._diverse_lambda, _tw._end_id);
-  int* tmp = _p_d_alive_seq_buf;
+  int *tmp = _p_d_alive_seq_buf;
   _p_d_alive_seq_buf = _p_d_alive_seq;
   _p_d_alive_seq = tmp;
   CHECK_GPU_ERROR(cudaMemcpyAsync(&_h_can_num_batch, _p_d_can_num, sizeof(int),
@@ -834,7 +816,7 @@ bool Decoder<OpType_>::beam_search() {
         _p_d_self_v_bgeem2[0], _layer_size_self_k, _tw._beam_size,
         _tw._dim_per_head, _tw._head_num, _tw._trg_vocab_size, _cur_step,
         _tw._max_step, _tw._diverse_lambda != 0, _tw._end_id);
-    _DataType** ftmp = _p_d_self_k_bgeem2;
+    _DataType **ftmp = _p_d_self_k_bgeem2;
     _p_d_self_k_bgeem2 = _p_d_self_k_bgeem1;
     _p_d_self_k_bgeem1 = ftmp;
     ftmp = _p_d_self_v_bgeem2;
@@ -849,8 +831,7 @@ Logits bias and softmax.
 Select rough topk candidate for every batch item.
 Record the candidate's beam_id, vocab_id and probability
 */
-template <OperationType OpType_>
-void Decoder<OpType_>::update_new_seq_probs() {
+template <OperationType OpType_> void Decoder<OpType_>::update_new_seq_probs() {
   CHECK_GPU_ERROR(cudaMemsetAsync(_p_d_can_num, 0, sizeof(int), _stream));
 
   select_beam_rough_topk_launcher(
@@ -866,8 +847,7 @@ void Decoder<OpType_>::update_new_seq_probs() {
   return;
 }
 
-template <OperationType OpType_>
-bool Decoder<OpType_>::topk_greedy_search() {
+template <OperationType OpType_> bool Decoder<OpType_>::topk_greedy_search() {
   _tw._diverse_lambda = 0;
   if (_cur_step == 0) {
     return beam_search();
@@ -904,5 +884,5 @@ bool Decoder<OpType_>::topk_greedy_search() {
 template class Decoder<OperationType::FP16>;
 template class Decoder<OperationType::FP32>;
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

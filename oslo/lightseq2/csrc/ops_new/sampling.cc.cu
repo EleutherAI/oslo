@@ -6,27 +6,23 @@ template <typename T>
 SamplingOp<T>::SamplingOp(GenerateMethod gm, int max_batch_size, int max_step,
                           int max_thread_per_block, int trg_vocab_size,
                           int topk, float topp, int eos_id)
-    : Operator("SamplingOp"),
-      _generate_method(gm),
-      _max_batch_size(max_batch_size),
-      _max_step(max_step),
+    : Operator("SamplingOp"), _generate_method(gm),
+      _max_batch_size(max_batch_size), _max_step(max_step),
       _max_thread_per_block(max_thread_per_block),
-      _trg_vocab_size(trg_vocab_size),
-      _topk(topk),
-      _topp(topp),
+      _trg_vocab_size(trg_vocab_size), _topk(topk), _topp(topp),
       _eos_id(eos_id) {
 #ifdef LIGHTSEQ_cuda
-  CHECK_GPU_ERROR(cudaMalloc((void**)&_p_d_curandstate,
+  CHECK_GPU_ERROR(cudaMalloc((void **)&_p_d_curandstate,
                              _max_batch_size * sizeof(curandState)));
   cudaStream_t _stream = _context_ptr->get_stream();
   cuda::ker_curand_setup<<<_max_batch_size, 1, 0, _stream>>>(_p_d_curandstate);
-  CHECK_GPU_ERROR(cudaMalloc((void**)&_p_d_unfinished, sizeof(int)));
+  CHECK_GPU_ERROR(cudaMalloc((void **)&_p_d_unfinished, sizeof(int)));
 #endif
 }
 
 template <typename T>
-std::tuple<Variable*, Variable*> SamplingOp<T>::operator()(
-    Variable* logits, Variable* logit_bias, Variable* token_ids) {
+std::tuple<Variable *, Variable *> SamplingOp<T>::
+operator()(Variable *logits, Variable *logit_bias, Variable *token_ids) {
   set_parents({logits, logit_bias, token_ids});
 
   _out_token_ids = new Variable("out_token_ids", _max_batch_size * _max_step,
@@ -40,13 +36,12 @@ std::tuple<Variable*, Variable*> SamplingOp<T>::operator()(
   return std::make_tuple(_out_token_ids, _seq_score);
 }
 
-template <typename T>
-void SamplingOp<T>::forward() {
-  T* logits_ptr = parent(0)->value<T>();
-  T* logits_bias_ptr = parent(1)->value<T>();
-  int* inp_tokens_ptr = parent(2)->value<int>();
+template <typename T> void SamplingOp<T>::forward() {
+  T *logits_ptr = parent(0)->value<T>();
+  T *logits_bias_ptr = parent(1)->value<T>();
+  int *inp_tokens_ptr = parent(2)->value<int>();
 
-  int* out_tokens_ptr = _out_token_ids->value<int>();
+  int *out_tokens_ptr = _out_token_ids->value<int>();
 
   if (!_context_ptr->is_built()) {
     return;
@@ -80,4 +75,4 @@ template class SamplingOp<float>;
 template class SamplingOp<__half>;
 #endif
 
-}  // namespace lightseq
+} // namespace lightseq

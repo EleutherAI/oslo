@@ -1,6 +1,6 @@
 #include <ATen/cuda/CUDAContext.h>
-#include <torch/extension.h>
 #include <string>
+#include <torch/extension.h>
 
 #include "context.h"
 #include "cross_entropy_layer.h"
@@ -13,10 +13,10 @@ using namespace torch::indexing;
 
 // x is torch::Tensor
 #define CHECK_CUDA(x) AT_ASSERTM(x.is_cuda(), #x " must be a CUDA tensor")
-#define CHECK_CONTIGUOUS(x) \
+#define CHECK_CONTIGUOUS(x)                                                    \
   AT_ASSERTM(x.is_contiguous(), #x " must be contiguous")
-#define CHECK_INPUT(x) \
-  CHECK_CUDA(x);       \
+#define CHECK_INPUT(x)                                                         \
+  CHECK_CUDA(x);                                                               \
   CHECK_CONTIGUOUS(x)
 
 static std::unordered_map<int, std::shared_ptr<void>>
@@ -73,10 +73,11 @@ std::vector<torch::Tensor> transformer_encoder_layer_fw(
 }
 
 template <typename T>
-std::vector<torch::Tensor> transformer_encoder_layer_bw(
-    int layer_id, const torch::Tensor &grad_dec_output,
-    const torch::Tensor &output, const torch::Tensor &input,
-    const torch::Tensor &input_mask) {
+std::vector<torch::Tensor>
+transformer_encoder_layer_bw(int layer_id, const torch::Tensor &grad_dec_output,
+                             const torch::Tensor &output,
+                             const torch::Tensor &input,
+                             const torch::Tensor &input_mask) {
   auto g_output = grad_dec_output.contiguous();
   CHECK_INPUT(g_output);
   CHECK_INPUT(output);
@@ -133,11 +134,12 @@ int create_transformer_decoder_layer(int layer_id, int max_batch_tokens,
 }
 
 template <typename T>
-std::vector<torch::Tensor> transformer_decoder_layer_fw(
-    int layer_id, const torch::Tensor &dec_input,
-    const torch::Tensor &enc_output, const torch::Tensor &enc_mask,
-    bool training_mode, bool prelayernorm, bool quant_mode,
-    std::vector<torch::Tensor> &cache) {
+std::vector<torch::Tensor>
+transformer_decoder_layer_fw(int layer_id, const torch::Tensor &dec_input,
+                             const torch::Tensor &enc_output,
+                             const torch::Tensor &enc_mask, bool training_mode,
+                             bool prelayernorm, bool quant_mode,
+                             std::vector<torch::Tensor> &cache) {
   CHECK_INPUT(dec_input);
   CHECK_INPUT(enc_output);
   CHECK_INPUT(enc_mask);
@@ -159,18 +161,17 @@ std::vector<torch::Tensor> transformer_decoder_layer_fw(
   int step = -1;
   std::vector<T *> cache_ptr;
   if (cache.size() > 0) {
-    trg_seq_len = dec_input.size(0) / batch_size;  // beam_size
+    trg_seq_len = dec_input.size(0) / batch_size; // beam_size
     step = cache[0].size(2) - 1;
     cache_ptr = {nullptr, nullptr, nullptr, nullptr, nullptr};
-    cache_ptr[0] = (T *)cache[0].data_ptr();  // new dec-self-attn k
-    cache_ptr[1] = (T *)cache[1].data_ptr();  // new dec-self-attn v
+    cache_ptr[0] = (T *)cache[0].data_ptr(); // new dec-self-attn k
+    cache_ptr[1] = (T *)cache[1].data_ptr(); // new dec-self-attn v
     if (step > 0) {
-      cache_ptr[2] = (T *)cache[2].data_ptr();  // old dec-self-attn k
-      cache_ptr[3] = (T *)cache[3].data_ptr();  // old dec-self-attn v
+      cache_ptr[2] = (T *)cache[2].data_ptr(); // old dec-self-attn k
+      cache_ptr[3] = (T *)cache[3].data_ptr(); // old dec-self-attn v
     }
     if (layer_id == 0) {
-      cache_ptr[4] =
-          (T *)cache[cache.size() - 1].data_ptr();  // enc-dec-attn kv
+      cache_ptr[4] = (T *)cache[cache.size() - 1].data_ptr(); // enc-dec-attn kv
     }
   }
   layer->set_cur_batch_shape(batch_size, trg_seq_len, src_seq_len, step);
@@ -253,9 +254,9 @@ int create_transformer_embedding_layer(int layer_id,
 }
 
 template <typename T>
-std::vector<torch::Tensor> transformer_embedding_layer_fw(
-    int layer_id, const torch::Tensor &input, int step, bool training_mode,
-    bool quant_mode) {
+std::vector<torch::Tensor>
+transformer_embedding_layer_fw(int layer_id, const torch::Tensor &input,
+                               int step, bool training_mode, bool quant_mode) {
   CHECK_INPUT(input);
   const int *input_ptr = (const int *)input.data_ptr();
 
@@ -356,9 +357,9 @@ int create_cross_entropy_layer(const int layer_id, const float epsilon,
 }
 
 template <typename T>
-std::vector<torch::Tensor> cross_entropy_layer_fw(
-    const int layer_id, const torch::Tensor &inputs,
-    const torch::Tensor &targets) {
+std::vector<torch::Tensor>
+cross_entropy_layer_fw(const int layer_id, const torch::Tensor &inputs,
+                       const torch::Tensor &targets) {
   CHECK_INPUT(inputs);
   CHECK_INPUT(targets);
   AT_ASSERTM(targets.dtype() == torch::kInt32, "targets must be int32");
@@ -389,9 +390,10 @@ std::vector<torch::Tensor> cross_entropy_layer_fw(
 }
 
 template <typename T>
-std::vector<torch::Tensor> cross_entropy_layer_bw(
-    const int layer_id, const torch::Tensor &grad_outputs,
-    const torch::Tensor &inputs, const torch::Tensor &targets) {
+std::vector<torch::Tensor>
+cross_entropy_layer_bw(const int layer_id, const torch::Tensor &grad_outputs,
+                       const torch::Tensor &inputs,
+                       const torch::Tensor &targets) {
   CHECK_INPUT(grad_outputs);
   CHECK_INPUT(inputs);
   CHECK_INPUT(targets);
@@ -437,11 +439,10 @@ int create_quant_linear_layer(const int layer_id, const int in_features,
 }
 
 template <typename T>
-torch::Tensor quant_linear_layer_fw(const int layer_id,
-                                    const torch::Tensor &inputs,
-                                    const torch::Tensor &weight,
-                                    const torch::Tensor &clip_max,
-                                    bool quant_mode) {
+torch::Tensor
+quant_linear_layer_fw(const int layer_id, const torch::Tensor &inputs,
+                      const torch::Tensor &weight,
+                      const torch::Tensor &clip_max, bool quant_mode) {
   CHECK_INPUT(inputs);
   CHECK_INPUT(weight);
 
@@ -474,8 +475,8 @@ torch::Tensor quant_linear_layer_fw(const int layer_id,
 
   return outputs;
 }
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("transformer_encoder_layer_fw_fp32",

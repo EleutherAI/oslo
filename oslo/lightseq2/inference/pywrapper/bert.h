@@ -1,8 +1,8 @@
 
-#include "model_base.h"
 #include "../model/bert_encoder.h"
 #include "../proto/bert_weight.h"
 #include "../tools/util.h"
+#include "model_base.h"
 
 #ifdef FP16_MODE
 const lightseq::cuda::OperationType bert_optype =
@@ -15,7 +15,7 @@ const lightseq::cuda::OperationType bert_optype =
 namespace lightseq {
 namespace cuda {
 class Bert : public LSModel {
- private:
+private:
   typedef OperationTypeTraits<bert_optype> optraits;
   std::shared_ptr<BertEncoder<bert_optype>> encoder_;
 
@@ -28,7 +28,7 @@ class Bert : public LSModel {
   void *d_buf_;
   BertWeight<bert_optype> tw_;
 
- public:
+public:
   Bert(const std::string weight_path, const int max_batch_size);
 
   ~Bert();
@@ -46,5 +46,5 @@ class Bert : public LSModel {
 
 LSMODEL_REGISTER(Bert);
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

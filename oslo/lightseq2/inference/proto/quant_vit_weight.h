@@ -13,8 +13,8 @@
 #include <string>
 #include <vector>
 
-#include "quant_vit.pb.h"
 #include "../tools/util.h"
+#include "quant_vit.pb.h"
 
 namespace lightseq {
 namespace cuda {
@@ -22,9 +22,8 @@ namespace cuda {
 /*
 Load the model weights which stored in custom proto file into GPU memory.
 */
-template <OperationType OpType_>
-class QuantVitWeight {
- private:
+template <OperationType OpType_> class QuantVitWeight {
+private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   _DataType float2required(float value);
@@ -36,16 +35,16 @@ class QuantVitWeight {
   void hdf5_parse_emb_wei(hid_t hdf5_file);
   void hdf5_parse_enc_wei(hid_t hdf5_file);
   // store the weights pointer
-  std::vector<const _DataType *> _p_d_src_emb_wei;  // size: 6
-  std::vector<const _DataType *> _p_d_enc_wei;      // size: 12 * enc_layer_num
+  std::vector<const _DataType *> _p_d_src_emb_wei; // size: 6
+  std::vector<const _DataType *> _p_d_enc_wei;     // size: 12 * enc_layer_num
 
   // store the emb weights on gpu memory
   thrust::device_vector<_DataType> _d_src_emb_wei;
   // store the enc weights on cpu memory
   std::vector<_DataType> _d_enc_wei;
-  std::vector<float> _enc_clip_max;  // size: 11 * enc_layer_num
+  std::vector<float> _enc_clip_max; // size: 11 * enc_layer_num
 
- public:
+public:
   std::string initializing(std::string proto_path);
 
   const std::vector<const _DataType *> &get_src_emb_wei() const {
@@ -67,9 +66,9 @@ class QuantVitWeight {
   int _hidden_size;
   int _inner_size;
   int _max_step;
-  int _n_enc_layer;  // number of encoder layer
+  int _n_enc_layer; // number of encoder layer
   int _dim_per_head;
-  int _weight_per_enc_layer;  // 12
+  int _weight_per_enc_layer; // 12
   int _image_size;
   int _patch_size;
   int _channel_input;
@@ -96,5 +95,5 @@ class QuantVitWeight {
   }
 };
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

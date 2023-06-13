@@ -29,7 +29,8 @@ cublasAlgoMap::~cublasAlgoMap() {
 }
 
 bool cublasAlgoMap::fileExist(std::string path) {
-  if (fopen(path.c_str(), "r") == NULL) return false;
+  if (fopen(path.c_str(), "r") == NULL)
+    return false;
   return true;
 }
 
@@ -49,7 +50,7 @@ void cublasAlgoMap::getGemmConfig() {
   std::string command = "mkdir -p " + DEFAULT_DIR;
   system(command.c_str());
 
-  const char* config_url_cstr = std::getenv("GEMM_CONFIG_URL");
+  const char *config_url_cstr = std::getenv("GEMM_CONFIG_URL");
   std::string config_url = (config_url_cstr == nullptr ? "" : config_url_cstr);
   if (config_url.size() > 0) {
     command = "wget -nc " + config_url + " -P " + DEFAULT_DIR;
@@ -72,7 +73,7 @@ void cublasAlgoMap::getGemmConfig() {
 void cublasAlgoMap::loadGemmConfig() {
   getGemmConfig();
 
-  FILE* fd;
+  FILE *fd;
   fd = fopen((DEFAULT_DIR + _config_filename).c_str(), "r");
   if (fd == NULL || _config_filename.size() == 0) {
     std::cout << "[WARNING] " << DEFAULT_DIR + _config_filename
@@ -114,16 +115,18 @@ void cublasAlgoMap::loadGemmConfig() {
   }
   fclose(fd);
   if (_workspace_size > 0) {
-    _workspace_size = sizeof(char*) * _workspace_size;
-    CHECK_GPU_ERROR(cudaMalloc((void**)&_workspace, _workspace_size));
+    _workspace_size = sizeof(char *) * _workspace_size;
+    CHECK_GPU_ERROR(cudaMalloc((void **)&_workspace, _workspace_size));
   }
 }
 
 bool cublasAlgoMap::isExist(int m, int n, int k) {
   std::vector<int> mnk = {m, n, k};
-  if (_algo_map.find(mnk) != _algo_map.end()) return true;
+  if (_algo_map.find(mnk) != _algo_map.end())
+    return true;
 
-  if (m >= BORDER) m = ((m + STRIDE - 1) / STRIDE) * STRIDE;
+  if (m >= BORDER)
+    m = ((m + STRIDE - 1) / STRIDE) * STRIDE;
   mnk = {m, n, k};
   return _algo_map.find(mnk) != _algo_map.end();
 }
@@ -142,8 +145,9 @@ cublasLtMatmulAlgo_info cublasAlgoMap::defaultAlgo() {
   return default_algo;
 }
 
-cublasLtMatmulAlgo_info cublasAlgoMap::findBestAlgo(
-    std::map<std::string, cublasLtMatmulAlgo_info> mp, std::string data_order) {
+cublasLtMatmulAlgo_info
+cublasAlgoMap::findBestAlgo(std::map<std::string, cublasLtMatmulAlgo_info> mp,
+                            std::string data_order) {
   if (data_order.size() > 0) {
     if (mp.find(data_order) != mp.end()) {
       return mp[data_order];
@@ -168,7 +172,8 @@ cublasLtMatmulAlgo_info cublasAlgoMap::getAlgo(int m, int n, int k,
     return findBestAlgo(_algo_map[mnk], data_order);
   }
 
-  if (m >= BORDER) m = ((m + STRIDE - 1) / STRIDE) * STRIDE;
+  if (m >= BORDER)
+    m = ((m + STRIDE - 1) / STRIDE) * STRIDE;
   mnk = {m, n, k};
   if (_algo_map.find(mnk) != _algo_map.end()) {
     return findBestAlgo(_algo_map[mnk], data_order);
@@ -177,9 +182,9 @@ cublasLtMatmulAlgo_info cublasAlgoMap::getAlgo(int m, int n, int k,
   }
 }
 
-void* cublasAlgoMap::get_workspace() { return _workspace; }
+void *cublasAlgoMap::get_workspace() { return _workspace; }
 
 int cublasAlgoMap::get_workspace_size() { return _workspace_size; }
 
-}  // namespace cuda
-}  // namespace lightseq
+} // namespace cuda
+} // namespace lightseq

@@ -3,15 +3,15 @@
 */
 
 #pragma once
-#include <string>
-#include <memory>
-#include <map>
-#include <iostream>
-#include <vector>
 #include <algorithm>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
 
-#include "declaration.h"
 #include "allocator.h"
+#include "declaration.h"
 
 namespace lightseq {
 enum LSMemoryType { FixedMemory, SharedMemory, OffsetMemory };
@@ -24,7 +24,7 @@ enum LSMemoryType { FixedMemory, SharedMemory, OffsetMemory };
     allocation.
 */
 class TensorUsage {
- public:
+public:
   int first_idx, last_idx;
   int unique_id;
   size_t size;
@@ -49,20 +49,20 @@ class TensorUsage {
     several small buffers to avoid the above phenomenon.
 */
 class MemoryManager {
- private:
-  std::vector<char*> buffer_vec_;
+private:
+  std::vector<char *> buffer_vec_;
   std::vector<size_t> buffer_size_vec_;
   size_t _total_buffer_size;
-  char* buffer_ = nullptr;
+  char *buffer_ = nullptr;
   std::map<int, TensorUsage> tensor_usages_;
-  std::map<int, char*> tensor_ptr;
+  std::map<int, char *> tensor_ptr;
   AllocatorPtr _allocator_ptr;
 
- public:
+public:
   MemoryManager() : _allocator_ptr(new Allocator()) {}
   virtual ~MemoryManager() {}
 
-  char* get_memory(int unique_id) { return tensor_ptr.find(unique_id)->second; }
+  char *get_memory(int unique_id) { return tensor_ptr.find(unique_id)->second; }
 
   void update_tensor_life_idx(int unique_id, int node_idx, size_t size,
                               std::string name);
@@ -75,4 +75,4 @@ class MemoryManager {
 
   AllocatorPtr allocator() { return _allocator_ptr; }
 };
-}  // namespace lightseq
+} // namespace lightseq

@@ -193,7 +193,7 @@ class ScaledQuantDescriptor:
     def dict(self):
         """Serialize to dict
 
-        The build-in __dict__ method returns all the attributes, which includes those have default value and have
+        The built-in __dict__ method returns all the attributes, which includes those have default value and have
         protected prefix "_". This method only returns those have values other than the default one and don't have _ in
         key. Construct a instance by dict returned by this method should get exactly the same instance.
         """
