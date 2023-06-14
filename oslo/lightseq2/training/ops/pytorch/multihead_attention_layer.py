@@ -100,8 +100,9 @@ class LSMultiheadAttentionLayer(nn.Module):
         if isinstance(self.config, PretrainedConfig):
             self.config.max_seq_len = self.config.max_position_embeddings
             self.config.nhead = self.config.num_attention_heads
-            if hasattr(self.config, "max_batch_size_for_lightseq"):
-                self.config.max_batch_size_for_lightseq = 16
+            assert not hasattr(
+                self.config, "max_batch_size_for_lightseq"
+            ), "To use lightseq, you must have max_batch_size_for_lightseq. Please make the config the same as the actual batch size."
             self.config.max_batch_tokens = (
                 self.config.max_batch_size_for_lightseq
                 * self.config.max_position_embeddings
