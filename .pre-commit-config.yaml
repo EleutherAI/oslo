@@ -41,7 +41,7 @@ repos:
       hooks:
       - id: codespell
         args: [
-              '--ignore-words-list=reord,dout,nd,te,ser',  # Word used in error messages that need rewording
+              '--ignore-words-list=reord,dout,nd,te,ser,mata',  # Word used in error messages that need rewording
               --check-filenames,
               --check-hidden,
           ]

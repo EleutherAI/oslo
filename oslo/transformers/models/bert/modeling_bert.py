@@ -16,6 +16,9 @@ from oslo.torch.nn import (
     VocabParallelCrossEntropyLoss2p5D,
 )
 from oslo.transformers.modeling_utils import OsloModel
+from oslo.lightseq2.training.ops.pytorch.multihead_attention_layer import (
+    LSMultiheadAttentionLayer,
+)
 
 try:
     from transformers.modeling_outputs import (
@@ -165,6 +168,7 @@ class BertEmbeddings(nn.Module):
 class BertSelfAttention(nn.Module):
     def __init__(self, config, position_embedding_type=None):
         super().__init__()
+
         if config.hidden_size % config.num_attention_heads != 0 and not hasattr(
             config, "embedding_size"
         ):
@@ -343,36 +347,42 @@ class BertSelfOutput(nn.Module):
 
 
 class BertAttention(nn.Module):
-    def __init__(self, config, position_embedding_type=None):
+    def __init__(self, config, position_embedding_type=None, use_lightseq2=True):
         super().__init__()
-        self.self = BertSelfAttention(
-            config, position_embedding_type=position_embedding_type
-        )
-        self.output = BertSelfOutput(config)
-        self.pruned_heads = set()
+        self.use_lightseq2 = use_lightseq2
+
+        if use_lightseq2:
+            self.layer = LSMultiheadAttentionLayer(config)
+        else:
+            self.self = BertSelfAttention(
+                config, position_embedding_type=position_embedding_type
+            )
+            self.output = BertSelfOutput(config)
+            self.pruned_heads = set()
 
     def prune_heads(self, heads):
-        if len(heads) == 0:
-            return
-        heads, index = find_pruneable_heads_and_indices(
-            heads,
-            self.self.num_attention_heads,
-            self.self.attention_head_size,
-            self.pruned_heads,
-        )
+        if not self.use_lightseq2:
+            if len(heads) == 0:
+                return
+            heads, index = find_pruneable_heads_and_indices(
+                heads,
+                self.self.num_attention_heads,
+                self.self.attention_head_size,
+                self.pruned_heads,
+            )
 
-        # Prune linear layers
-        self.self.query = prune_linear_layer(self.self.query, index)
-        self.self.key = prune_linear_layer(self.self.key, index)
-        self.self.value = prune_linear_layer(self.self.value, index)
-        self.output.dense = prune_linear_layer(self.output.dense, index, dim=1)
+            # Prune linear layers
+            self.self.query = prune_linear_layer(self.self.query, index)
+            self.self.key = prune_linear_layer(self.self.key, index)
+            self.self.value = prune_linear_layer(self.self.value, index)
+            self.output.dense = prune_linear_layer(self.output.dense, index, dim=1)
 
-        # Update hyper params and store pruned heads
-        self.self.num_attention_heads = self.self.num_attention_heads - len(heads)
-        self.self.all_head_size = (
-            self.self.attention_head_size * self.self.num_attention_heads
-        )
-        self.pruned_heads = self.pruned_heads.union(heads)
+            # Update hyper params and store pruned heads
+            self.self.num_attention_heads = self.self.num_attention_heads - len(heads)
+            self.self.all_head_size = (
+                self.self.attention_head_size * self.self.num_attention_heads
+            )
+            self.pruned_heads = self.pruned_heads.union(heads)
 
     def forward(
         self,
@@ -384,20 +394,27 @@ class BertAttention(nn.Module):
         past_key_value: Optional[Tuple[Tuple[torch.FloatTensor]]] = None,
         output_attentions: Optional[bool] = False,
     ) -> Tuple[torch.Tensor]:
-        self_outputs = self.self(
-            hidden_states,
-            attention_mask,
-            head_mask,
-            encoder_hidden_states,
-            encoder_attention_mask,
-            past_key_value,
-            output_attentions,
-        )
-        attention_output = self.output(self_outputs[0], hidden_states)
-        outputs = (attention_output,) + self_outputs[
-            1:
-        ]  # add attentions if we output them
-        return outputs
+        if self.use_lightseq2:
+            # dimension체크 필요 -> lightseq2는 특정 dimension만 허용
+            outputs = self.layer(hidden_states, attention_mask)
+            # self.is_decoder에 대한 처리가 필요함
+            # context_layer, attention_probs
+            return outputs
+        else:
+            self_outputs = self.self(
+                hidden_states,
+                attention_mask,
+                head_mask,
+                encoder_hidden_states,
+                encoder_attention_mask,
+                past_key_value,
+                output_attentions,
+            )
+            attention_output = self.output(self_outputs[0], hidden_states)
+            outputs = (attention_output,) + self_outputs[
+                1:
+            ]  # add attentions if we output them
+            return outputs
 
 
 class BertIntermediate(nn.Module):
