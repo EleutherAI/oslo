@@ -20,6 +20,7 @@ from typing import Optional, List, Callable
 import torch
 import torch.distributed as dist
 from torch.optim import Optimizer
+from torch.nn.parameter import Parameter
 
 from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.distributed.parallel_context import ParallelContext
@@ -68,6 +69,8 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         self,
         optimizer: Optimizer,
         parallel_context: ParallelContext,
+        optimizer_params: dict = None,
+        model_params: Parameter = None,
         clip_grad_norm: float = 0.0,
         reduce_bucket_size: int = 1024 * 1024,  # communication
         communication_dtype: Optional[torch.dtype] = None,
@@ -83,7 +86,11 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         # TODO: add support for
         # 1. contiguous gradients
         # 2. support when some parameters requires_grad = False
-        super(ZeroRedundancyOptimizer, self).__init__(optim=optimizer)
+        super(ZeroRedundancyOptimizer, self).__init__(
+            optim=optimizer,
+            model_params=model_params,
+            optimizer_params=optimizer_params,
+        )
         self._dtype = self.optim.param_groups[0]["params"][0].dtype
 
         # stage 2

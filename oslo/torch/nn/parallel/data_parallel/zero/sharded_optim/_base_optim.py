@@ -16,16 +16,25 @@
 
 
 from torch.optim import Optimizer
+from torch.nn.parameter import Parameter
 
 
 class BaseOptimizerWrapper(Optimizer):
-    def __init__(self, optim: Optimizer):
+    def __init__(
+        self,
+        optim: Optimizer,
+        model_params: Parameter = None,
+        optimizer_params: dict = None,
+    ):
         """
         Wrap an optimizer with the base optimizer.
 
         Args:
             optim (Optimizer): The optimizer to be wrapped.
         """
+        if isinstance(optim, Optimizer) is not True and model_params is not None:
+            optim = optim(model_params, **optimizer_params)
+
         self.optim = optim
 
     @property
