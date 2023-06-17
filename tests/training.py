@@ -151,8 +151,6 @@ def main():
     # 6. Train model
     step = 0
     model_no_oslo.cuda()
-    model_no_oslo.train()
-    model_oslo.train()
 
     for ep in range(args.epoch):
         save_model_dir = f"tests/ckpt/checkpoint_{str(ep)}"
@@ -173,7 +171,7 @@ def main():
 
             if dist.get_rank() == 0:
                 print(
-                    f"[tp/no_tp loss]: {oslo_loss.item():.4f} / {no_oslo_loss.item():.4f}"
+                    f"[oslo loss/no_oslo loss]: {oslo_loss.item():.4f} / {no_oslo_loss.item():.4f}"
                 )
                 wandb.log(
                     {

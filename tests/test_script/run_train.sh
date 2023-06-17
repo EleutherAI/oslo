@@ -1,11 +1,22 @@
-# EXAMPLE BERT:`sh ./tests/test_script/run_train.sh aloxatel/bert-base-mnli sequence-classification 2 128 128 100 2 1 1 2 1 4 1D`
-# EXAMPLE GPT:`sh ./tests/test_script/run_train.sh gpt2 causal-lm 2 64 64 200 2 1 1 2 1 4 1D`
-# Check tensorboard: `tensorboard --logdir tests/ckpt/tensorboard`
+# EXAMPLE TP case BERT:`sh ./tests/test_script/run_train.sh ishan/bert-base-uncased-mnli sequence-classification 2 128 128 100 1 1 1 2 1 2 1D`
+
+# EXAMPLE TP + DP case BERT:`sh ./tests/test_script/run_train.sh ishan/bert-base-uncased-mnli sequence-classification 4 128 128 100 1 2 1 2 1 1 1D`
+
+
+# EXAMPLE GPT:`sh ./tests/test_script/run_train.sh gpt2 causal-lm 2 64 64 100 1 1 1 2 1 1 1D`
+
+# Check a checkpoint result on wandb
 
 # task specific model
 #  - BERT case
 #    - Sequence classification
-#      - aloxatel/bert-base-mnli
+#      - ishan/bert-base-uncased-mnli
+
+# task specific model
+#  - GPT case
+#    - causal-lm
+#      - gpt2
+
 
 MODEL=$1
 TASK=$2

@@ -38,17 +38,6 @@ class ModelTask:
                 ),
                 "preprocessing_map_func": self.causal_lm_task_map_func,
             },
-            "seq2seq-lm": {
-                "class": AutoModelForSeq2SeqLM.from_pretrained,
-                "load_dataset": lambda: load_dataset("wmt14", "de-en").data["train"][0],
-                "preprocessing": lambda args, dataset: [
-                    (str(data[1]), str(data[0])) for data in dataset[: args.train_step]
-                ],
-                "inputs": lambda args, tokenizer, sample: {
-                    "input_ids": tokenize(args, tokenizer, sample[0])["input_ids"],
-                    "labels": tokenize(args, tokenizer, sample[1])["input_ids"],
-                },
-            },
         }
 
     def get_model_task(self, task):
