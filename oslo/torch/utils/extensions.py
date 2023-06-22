@@ -6,6 +6,8 @@ from typing import Optional, Union, Callable
 import torch
 import torch.distributed as dist
 from torch import nn
+from torch.optim import Optimizer
+
 
 import oslo
 from oslo.torch.distributed import ParallelContext, ParallelMode
@@ -23,6 +25,7 @@ from oslo.torch.nn.parallel.utils import (
     parallelize,
     get_parameter_dtype,
 )
+from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim import ZeroRedundancyOptimizer
 
 
 def is_merge_meaningless(parallel_context):
@@ -41,6 +44,7 @@ def save_pretrained(
     state_dict: Optional[dict] = None,
     save_function: Callable = torch.save,
     merge_checkpoints: bool = False,
+    optimizer: Optional[Optimizer] = None,
     **kwargs,
 ):
     PARALLELIZED_WEIGHTS_NAME = "pytorch_model_tp_0_pp_0_ep_0.bin"
@@ -107,6 +111,39 @@ def save_pretrained(
             )
 
         del model_to_save
+        if optimizer is not None:
+            import copy
+            #TODO Handle optimizer shape
+            naive_optimizer = optimizer.optim 
+
+            if isinstance(optimizer,ZeroRedundancyOptimizer):
+                #TODO Handle param group
+                optimizer_keys = list(optimizer.state_dict()['state'][0].keys())
+                optimizer_keys.remove('step')
+                zero1_optimizer_param = {}
+                for k in optimizer_keys:
+                    zero1_optimizer_param[k] = optimizer.state_dict()['state'][0][k] # 0 == parameter group
+
+                from collections import defaultdict
+                output_optimizer = defaultdict(list)
+                for k in optimizer_keys:
+                    for i in range(self.parallel_context.get_world_size(ParallelMode.DATA)):
+                        output_optimizer[k].append(torch.zeros(optimizer.param_size[0][i],device=torch.device(torch.cuda.current_device())))
+
+                for k in optimizer_keys:
+                    dist.all_gather(tensor_list=output_optimizer[k], tensor=zero1_optimizer_param[k])
+
+                dist.barrier()
+
+                if dist.get_rank() == 0:
+                    for k,v in optimizer.param_group_map.items():
+                        group_id,param_index = k
+                        rank_to_go,s,size,shape = v
+
+                        for ok in optimizer_keys:
+                            params = torch.reshape(output_optimizer[ok][rank_to_go][s:s+size],shape)
+                            naive_optimizer.state_dict()['state'][param_index][ok]= params
+            save_function(naive_optimizer.state_dict())
 
     else:  # save weights of every rank without merge
         _save_pretrained_per_rank(

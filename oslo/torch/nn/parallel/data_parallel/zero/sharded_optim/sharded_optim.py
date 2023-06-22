@@ -20,6 +20,7 @@ from typing import Optional, List, Callable
 import torch
 import torch.distributed as dist
 from torch.optim import Optimizer
+import numpy as np
 
 from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.distributed.parallel_context import ParallelContext
@@ -85,7 +86,9 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         # 2. support when some parameters requires_grad = False
         super(ZeroRedundancyOptimizer, self).__init__(optim=optimizer)
         self._dtype = self.optim.param_groups[0]["params"][0].dtype
-
+        #optimizer deparallel
+        self.optim = Optimizer
+        self.param_group_map = {}
         # stage 2
         self._partition_grads = partition_grad
 
@@ -143,7 +146,9 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
 
             # assign parameters to ranks
             # the params in the list are sorted
-            params_per_rank = self._partition_param_list(group_params)
+
+            # deparallel info is saved
+            params_per_rank,param_map = self._partition_param_list(group_params,group_id)
 
             # store the mapping between param to rank
             # each param should belong to only one rank
@@ -234,7 +239,7 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
                     param.dtype == self._dtype
                 ), f"Parameters are expected to have the same dtype `{self._dtype}`, but got `{param.dtype}`"
 
-    def _partition_param_list(self, param_list: List) -> List:
+    def _partition_param_list(self, param_list: List, group_id: int) -> List:
         """Partitions a list of parameters into sublists for each rank in a greedy fashion.
 
         The parameters are sorted by number of elements in descending order and are assigned to the rank
@@ -249,17 +254,23 @@ class ZeroRedundancyOptimizer(BaseOptimizerWrapper):
         """
         params_per_rank = [[] for _ in range(self._world_size)]
         numel_per_rank = [0 for _ in range(self._world_size)]
+        param_map = {}
+        sorted_param_size = np.array([x.numel()*(-1) for x in param_list])
+        sorted_param_size_idx = np.argsort(sorted_param_size)
 
         # partititon the parameters in a greedy fashion
         sorted_params = sorted(param_list, key=lambda x: x.numel(), reverse=True)
-        for param in sorted_params:
+        for idx,param in enumerate(sorted_params):
             # allocate this parameter to the rank with
             # the smallest numel for load balancing purpose
+            param_index = sorted_param_size_idx[idx]
             rank_to_go = numel_per_rank.index(min(numel_per_rank))
             params_per_rank[rank_to_go].append(param)
+            param_map[(group_id,param_index)] = [rank_to_go,numel_per_rank[rank_to_go],param.numel(),param.shape]#key : (group_id,param_idx) :rank,start,size,param.shape
             numel_per_rank[rank_to_go] += param.numel()
+        self.param_size.append(numel_per_rank)
 
-        return params_per_rank
+        return params_per_rank, param_map
 
     ###########################
     # Backward Reduction Hook #
