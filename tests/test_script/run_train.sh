@@ -1,22 +1,35 @@
-# EXAMPLE TP case BERT:`sh ./tests/test_script/run_train.sh ishan/bert-base-uncased-mnli sequence-classification 2 128 128 100 1 1 1 2 1 2 1D`
+# EXAMPLE TP case BERT:`sh ./tests/test_script/run_train.sh ishan/bert-base-uncased-mnli sequence-classification 2 128 128 100 1 1 1 2 1 1 1D`
 
-# EXAMPLE TP + DP case BERT:`sh ./tests/test_script/run_train.sh ishan/bert-base-uncased-mnli sequence-classification 4 128 128 100 1 2 1 2 1 1 1D`
+# EXAMPLE DP case BERT:`sh ./tests/test_script/run_train.sh ishan/bert-base-uncased-mnli sequence-classification 2 128 128 100 1 2 1 1 1 1 1D`
 
 
-# EXAMPLE GPT:`sh ./tests/test_script/run_train.sh gpt2 causal-lm 2 64 64 100 1 1 1 2 1 1 1D`
+# EXAMPLE TP case GPT:`sh ./tests/test_script/run_train.sh gpt2 causal-lm 2 64 64 100 1 1 1 2 1 1 1D`
+
+# EXAMPLE TP case T5:`sh ./tests/test_script/run_train.sh t5-base seq2seq 2 64 128 100 1 1 1 2 1 1 1D`
+
 
 # Check a checkpoint result on wandb
 
-# task specific model
+# Task specific model
 #  - BERT case
 #    - Sequence classification
 #      - ishan/bert-base-uncased-mnli
 
-# task specific model
+# Task specific model
 #  - GPT case
 #    - causal-lm
 #      - gpt2
 
+# Task specific model
+#  - T5 case
+#    - seq2seq
+#      - t5-base
+
+#########################################
+# !!Feature still in development
+# 1. Pipeline parallelism
+# 2. Tensor parallelism + data pallelism
+#########################################
 
 MODEL=$1
 TASK=$2

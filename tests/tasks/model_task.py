@@ -31,12 +31,20 @@ class ModelTask:
             "causal-lm": {
                 "class": AutoModelForCausalLM.from_pretrained,
                 "load_dataset": load_dataset(
-                    "wikitext",
-                    "wikitext-2-raw-v1",
+                    "squad",
                     split="train",
                     cache_dir="tests/cache",
                 ),
                 "preprocessing_map_func": self.causal_lm_task_map_func,
+            },
+            "seq2seq": {
+                "class": AutoModelForSeq2SeqLM.from_pretrained,
+                "load_dataset": load_dataset(
+                    "squad",
+                    split="train",
+                    cache_dir="tests/cache",
+                ),
+                "preprocessing_map_func": self.seq2seq_task_map_func,
             },
         }
 
@@ -85,7 +93,7 @@ class ModelTask:
     def causal_lm_task_map_func(self, dataset, tokenizer, args):
         def preprocess(row_datas):
             input_text = tokenizer(
-                row_datas["text"],
+                row_datas["context"],
                 max_length=args.sequence_length,
                 return_tensors="pt",
                 padding="max_length",
@@ -99,5 +107,33 @@ class ModelTask:
         return dataset.map(
             preprocess,
             batched=True,
-            remove_columns=["text"],
+            remove_columns=["id", "title", "context", "question", "answers"],
+        ).with_format("torch")
+
+    def seq2seq_task_map_func(self, dataset, tokenizer, args):
+        def preprocess(row_datas):
+            input_text = tokenizer(
+                row_datas["context"],
+                max_length=args.sequence_length,
+                return_tensors="pt",
+                padding="max_length",
+                truncation=True,
+            )
+
+            label_text = tokenizer(
+                row_datas["question"],
+                max_length=args.sequence_length,
+                return_tensors="pt",
+                padding="max_length",
+                truncation=True,
+            )
+
+            return {**input_text, "labels": label_text["input_ids"]}
+
+        dataset = dataset.select(range(args.train_step))
+
+        return dataset.map(
+            preprocess,
+            batched=True,
+            remove_columns=["id", "title", "context", "question", "answers"],
         ).with_format("torch")

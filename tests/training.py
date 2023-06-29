@@ -6,6 +6,7 @@ import torch.distributed as dist
 import transformers
 import oslo
 import wandb
+import math
 
 from copy import deepcopy
 from datasets import load_dataset
@@ -77,7 +78,9 @@ def main():
 
     # 1. set tokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model)
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model, model_max_length=args.sequence_length
+    )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -159,8 +162,8 @@ def main():
             print(f"Start training epoch: {ep}")
 
         for _, sample in enumerate(tqdm(oslo_model_dataloader)):
-            optimizer_oslo.zero_grad()
-            optimizer_no_oslo.zero_grad()
+            model_oslo.zero_grad()
+            model_no_oslo.zero_grad()
             inputs = {k: v.cuda() for k, v in sample.items() if k != "guid"}
 
             # 7. Run no oslo model
@@ -168,15 +171,14 @@ def main():
 
             # 8. Run no oslo model
             no_oslo_loss = model_no_oslo(**inputs).loss
-
             if dist.get_rank() == 0:
                 print(
                     f"[oslo loss/no_oslo loss]: {oslo_loss.item():.4f} / {no_oslo_loss.item():.4f}"
                 )
                 wandb.log(
                     {
-                        "oslo_loss": f"{oslo_loss.item():.4f}",
-                        "no_oslo_loss": f"{no_oslo_loss.item():.4f}",
+                        "oslo_loss": oslo_loss.item(),
+                        "no_oslo_loss": no_oslo_loss.item(),
                         "time": step,
                     }
                 )
@@ -208,6 +210,8 @@ def main():
         model_oslo.save_pretrained(
             save_directory=save_model_dir, merge_checkpoints=False
         )
+
+    wandb.finish()
 
 
 if __name__ == "__main__":
