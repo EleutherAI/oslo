@@ -1,6 +1,6 @@
 import os
 import torch
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 from torch.utils.data import DataLoader
 from transformers import BertTokenizer, BertForSequenceClassification
 
@@ -19,13 +19,13 @@ os.environ["WANDB_DISABLED"] = "true"
 oslo_init_dict_form = {
     "data_parallelism": {
         "enable": True,
-        "parallel_size": 1,
-        "zero_stage": 1,
+        "parallel_size": 2,
+        "zero_stage": 2,
     },
     "tensor_parallelism": {
-        "enable": False,
-        "parallel_size": 1,
-        "parallel_mode": "2.5d",
+        "enable": True,
+        "parallel_size": 2,
+        "parallel_mode": "1d",
     },
     "pipeline_parallelism": {"enable": False, "parallel_size": 4},
 }
@@ -37,7 +37,12 @@ if processor._tokenizer.pad_token is None:
     processor._tokenizer.pad_token = processor._tokenizer.eos_token
 
 # 데이터셋 생성
-dataset = load_dataset("glue", "cola")
+if not os.path.exists("glue-cola"):
+    dataset = load_dataset("glue", "cola")
+    dataset.save_to_disk("glue-cola")
+else:
+    dataset = load_from_disk("glue-cola")
+
 dataset = dataset.rename_column("sentence", "text")
 dataset = dataset.rename_column("label", "labels")
 
@@ -45,6 +50,7 @@ dataset = dataset.rename_column("label", "labels")
 processed_dataset = dataset.map(
     processor, batched=True, remove_columns=dataset["train"].column_names
 )
+
 processed_dataset.cleanup_cache_files()
 train_dataset = processed_dataset["train"]
 valid_dataset = processed_dataset["validation"]
@@ -57,6 +63,7 @@ args = TrainingArguments(
     eval_steps=500,
     optim="adam",
     lr_scheduler_type="linear",
+    gradient_accumulation_steps=1,
     num_train_epochs=3,
     seed=0,
     load_best_model_at_end=True,

@@ -16,6 +16,7 @@ import torch.distributed as dist
 from torch import nn
 from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
+
 from transformers import (
     DataCollatorWithPadding,
     PreTrainedTokenizerBase,
@@ -42,7 +43,9 @@ from transformers.trainer_pt_utils import (
     nested_concat,
     nested_detach,
     reissue_pt_warnings,
+    LabelSmoother,
 )
+from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
 from transformers.trainer_utils import (
     speed_metrics,
     denumpify_detensorize,
@@ -50,18 +53,20 @@ from transformers.trainer_utils import (
     EvalLoopOutput,
     TrainOutput,
     EvalPrediction,
+    PredictionOutput,
     PREFIX_CHECKPOINT_DIR,
     get_last_checkpoint,
+    TrainerMemoryTracker,
 )
 
 import oslo
 from oslo.torch import ParallelMode
 
-# from oslo.torch.utils.extensions import save_pretrained as save_oslo_pretrained
-# from oslo.torch.utils.extensions import from_parallelized as from_oslo_parallelized
 from oslo.torch.nn.parallel import (
     PipelineParallel,
     TensorParallel,
+    DistributedDataParallel,
+    ZeroRedundancyOptimizer,
 )
 from oslo.torch.utils.checkpoint.activation_checkpointing import ActivationCheckpointing
 from oslo.transformers.data.data_collator import (
@@ -70,6 +75,7 @@ from oslo.transformers.data.data_collator import (
 )
 from oslo.transformers.trainer_utils import OptimizerNames, log_dist
 from oslo.transformers.training_args import TrainingArguments
+from oslo.transformers.profiler import FlopsProfiler
 
 TRAINER_STATE_NAME = "trainer_state.json"
 OPTIMIZER_NAME = "optimizer.pt"
@@ -114,6 +120,9 @@ class Trainer:
         self.args = args
         self.resume_from_checkpoint = resume_from_checkpoint
 
+        self._memory_tracker = TrainerMemoryTracker(self.args.skip_memory_metrics)
+        self._memory_tracker.start()
+
         default_collator = (
             default_data_collator
             if tokenizer is None
@@ -131,7 +140,13 @@ class Trainer:
         self.parallel_context = None
         self.model_wrappers = []
 
-        self.label_smoother = None  # TODO: label_smoother
+        # Label smoothing
+        if self.args.label_smoothing_factor != 0:
+            self.label_smoother = LabelSmoother(
+                epsilon=self.args.label_smoothing_factor
+            )
+        else:
+            self.label_smoother = None
 
         self.parallel_context, self.model_wrappers = (
             args.parallel_context,
@@ -196,10 +211,16 @@ class Trainer:
             self.args, self.state, self.control
         )
 
+        # very last
+        self._memory_tracker.stop_and_update_metrics()
+
     def train(self):
         resume_from_checkpoint = (
             None if not self.resume_from_checkpoint else self.resume_from_checkpoint
         )
+
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
 
         args = self.args
 
@@ -252,6 +273,12 @@ class Trainer:
                 **self.args.oslo_config["activation_checkpointing"],
             )
         self.model = self._wrap_model(self.model_wrappers)
+
+        log_dist(
+            f"DeepSpeed Flops Profiler Enabled: {self.args.use_flops_profiler is True}"
+        )
+        if self.args.use_flops_profiler is True:
+            self.flops_profiler = FlopsProfiler(self.model)
 
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
@@ -390,6 +417,12 @@ class Trainer:
             step = -1
             for step, inputs in enumerate(epoch_iterator):
 
+                flops_profiler_active = (
+                    self.args.use_flops_profiler is True
+                    and self.state.global_step == self.args.flops_profiler_profile_step
+                    and self.parallel_context.get_local_rank(ParallelMode.GLOBAL) == 0
+                )
+
                 # Skip past any already trained steps if resuming training
                 if steps_trained_in_current_epoch > 0:
                     steps_trained_in_current_epoch -= 1
@@ -405,18 +438,22 @@ class Trainer:
                     self.control = self.callback_handler.on_step_begin(
                         args, self.state, self.control
                     )
+                if flops_profiler_active:
+                    self.flops_profiler.start_profile(ignore_list=None)
 
-                # TODO _no_sync_in_gradient_accumulation
-                # if (
-                #     ((step + 1) % args.gradient_accumulation_steps != 0)
-                #     and args.local_rank != -1
-                #     and args._no_sync_in_gradient_accumulation
-                # ):
-                #     # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
-                #     with model.no_sync():
-                #         tr_loss_step = self.training_step(model, inputs)
-                # else:
-                tr_loss_step = self.training_step(self.model, inputs)
+                if (
+                    (step + 1) % args.gradient_accumulation_steps != 0
+                ) and self.parallel_context.get_local_rank(ParallelMode.GLOBAL) != -1:
+                    # TODO check whether DP support no_sync feature
+                    print(
+                        "no_sync",
+                        self.parallel_context.get_local_rank(ParallelMode.GLOBAL),
+                    )
+                    # Avoid unnecessary synchronization DDP since there will be no backward pass on this example.
+                    with self.model.no_sync():
+                        tr_loss_step = self.training_step(self.model, inputs)
+                else:
+                    tr_loss_step = self.training_step(self.model, inputs)
 
                 if torch.isnan(tr_loss_step) or torch.isinf(tr_loss_step):
                     # if loss is nan or inf simply add the average of previous logged losses
@@ -426,12 +463,28 @@ class Trainer:
                 else:
                     tr_loss += tr_loss_step
 
+                if flops_profiler_active:
+                    self.flops_profiler.stop_profile()
+
                 if (step + 1) % args.gradient_accumulation_steps == 0 or (
                     # last step in epoch but step is always smaller than gradient_accumulation_steps
                     steps_in_epoch <= args.gradient_accumulation_steps
                     and (step + 1) == steps_in_epoch
                 ):
                     # TODO Gradient Clipping
+                    if args.max_grad_norm is not None and args.max_grad_norm > 0:
+                        # TODO Reduce gradients first
+                        # self.scaler.unscale_(self.optimizer)
+                        # TODO check what kind of optimizer have clip_grad_norm?
+                        if hasattr(self.optimizer, "clip_grad_norm"):
+                            # Some optimizers (like the sharded optimizer) have a specific way to do gradient clipping
+                            self.optimizer.clip_grad_norm(args.max_grad_norm)
+                        else:
+                            nn.utils.clip_grad_norm_(
+                                self.model.parameters(),
+                                args.max_grad_norm,
+                            )
+
                     # Optimizer step
                     optimizer_was_run = True
                     if self.do_grad_scaling:
@@ -456,6 +509,15 @@ class Trainer:
                     self.control = self.callback_handler.on_substep_end(
                         args, self.state, self.control
                     )
+                if flops_profiler_active:
+                    self.flops_profiler.print_model_profile(
+                        profile_step=step,
+                        module_depth=self.args.flops_profiler_module_depth,
+                        top_modules=self.args.flops_profiler_top_modules,
+                        detailed=True,
+                        output_file=self.args.flops_profiler_output_path,
+                    )
+                    self.flops_profiler.end_profile()
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
             if step < 0:
@@ -495,6 +557,8 @@ class Trainer:
         metrics["train_loss"] = train_loss
         self.is_in_train = False
 
+        self._memory_tracker.stop_and_update_metrics(metrics)
+
         self.log(metrics)
 
         self.control = self.callback_handler.on_train_end(
@@ -524,9 +588,8 @@ class Trainer:
             `torch.Tensor`: The tensor with training loss on this batch.
         """
         model.train()
-        # log_dist(f"Before self._prepare_inputs: \n{inputs}", rank=-1)
         inputs = self._prepare_inputs(inputs)
-        # log_dist(f"After self._prepare_inputs: \n{inputs}", rank=-1)
+
         if (
             self.args.oslo_config is not None
             and self.args.oslo_config.pipeline_parallelism
@@ -552,9 +615,6 @@ class Trainer:
 
         if len(self.args.model_wrappers) > 0:
             self.model.from_parallelized(resume_from_checkpoint)
-            # from_oslo_parallelized(self.model, resume_from_checkpoint)
-            # self.model.from_oslo_parallelized(resume_from_checkpoint)
-            # self.model.from_parallelized(resume_from_checkpoint)
         else:
             if not os.path.isfile(os.path.join(resume_from_checkpoint, WEIGHTS_NAME)):
                 raise ValueError(
@@ -570,12 +630,12 @@ class Trainer:
         log_dist(
             f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
         )
-        best_model_path = self.state.best_model_checkpoint
+        best_model_path = os.path.join(self.state.best_model_checkpoint, WEIGHTS_NAME)
+        # best_model_path = self.state.best_model_checkpoint
         if os.path.exists(best_model_path):
             # We load the model state dict on the CPU to avoid an OOM error.
             if len(self.args.model_wrappers) > 0:
-                # from_oslo_parallelized(self.model, best_model_path)
-                self.model.from_parallelized(best_model_path)
+                self.model.from_parallelized(self.state.best_model_checkpoint)
             else:
                 state_dict = torch.load(best_model_path, map_location="cpu")
                 # If the model is on the GPU, it still works!
@@ -799,7 +859,7 @@ class Trainer:
         log_dist(f"Saving model checkpoint to {output_dir}")
 
         if len(self.args.model_wrappers) > 0:
-            self.model.save_pretrained(output_dir, state_dict=state_dict)
+            self.model.save_pretrained(save_directory=output_dir, state_dict=state_dict)
         else:
             if not isinstance(self.model, PreTrainedModel):
                 if isinstance(unwrap_model(self.model), PreTrainedModel):
@@ -854,6 +914,7 @@ class Trainer:
         The calling script will be responsible for providing a method to compute metrics, as they are task-dependent
         (pass it to the init `compute_metrics` argument).
         """
+        self._memory_tracker.start()
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         start_time = time.time()
         output = self.evaluation_loop(
@@ -884,8 +945,76 @@ class Trainer:
         self.control = self.callback_handler.on_evaluate(
             self.args, self.state, self.control, output.metrics
         )
-
+        self._memory_tracker.stop_and_update_metrics(output.metrics)
         return output.metrics
+
+    def predict(
+        self,
+        test_dataset: Dataset,
+        ignore_keys: Optional[List[str]] = None,
+        metric_key_prefix: str = "test",
+    ) -> PredictionOutput:
+        """
+        Run prediction and returns predictions and potential metrics.
+
+        Depending on the dataset and your use case, your test dataset may contain labels. In that case, this method
+        will also return metrics, like in `evaluate()`.
+
+        Args:
+            test_dataset (`Dataset`):
+                Dataset to run the predictions on. If it is an `datasets.Dataset`, columns not accepted by the
+                `model.forward()` method are automatically removed. Has to implement the method `__len__`
+            ignore_keys (`Lst[str]`, *optional*):
+                A list of keys in the output of your model (if it is a dictionary) that should be ignored when
+                gathering predictions.
+            metric_key_prefix (`str`, *optional*, defaults to `"test"`):
+                An optional prefix to be used as the metrics key prefix. For example the metrics "bleu" will be named
+                "test_bleu" if the prefix is "test" (default)
+
+        <Tip>
+
+        If your predictions or labels have different sequence length (for instance because you're doing dynamic padding
+        in a token classification task) the predictions will be padded (on the right) to allow for concatenation into
+        one array. The padding index is -100.
+
+        </Tip>
+
+        Returns: *NamedTuple* A namedtuple with the following keys:
+
+            - predictions (`np.ndarray`): The predictions on `test_dataset`.
+            - label_ids (`np.ndarray`, *optional*): The labels (if the dataset contained some).
+            - metrics (`Dict[str, float]`, *optional*): The potential dictionary of metrics (if the dataset contained
+              labels).
+        """
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
+
+        test_dataloader = self.get_test_dataloader(test_dataset)
+        start_time = time.time()
+
+        output = self.evaluation_loop(
+            test_dataloader,
+            description="Prediction",
+            ignore_keys=ignore_keys,
+            metric_key_prefix=metric_key_prefix,
+        )
+        total_batch_size = self.args.eval_batch_size * self.args.world_size
+        output.metrics.update(
+            speed_metrics(
+                metric_key_prefix,
+                start_time,
+                num_samples=output.num_samples,
+                num_steps=math.ceil(output.num_samples / total_batch_size),
+            )
+        )
+
+        self._memory_tracker.stop_and_update_metrics(output.metrics)
+
+        return PredictionOutput(
+            predictions=output.predictions,
+            label_ids=output.label_ids,
+            metrics=output.metrics,
+        )
 
     def evaluation_loop(
         self,
@@ -1246,7 +1375,6 @@ class Trainer:
         if len(self.model_wrappers) > 0:
             for wrapper in model_wrappers:
                 log_dist(f"Model wrapping with wrapper: {wrapper}")
-
                 if wrapper == TensorParallel:
                     log_dist(self.args.oslo_config)
                     model = wrapper(
@@ -1266,13 +1394,13 @@ class Trainer:
                 #         parallel_context=self.parallel_context,
                 #         **self.args.oslo_config.sequence_parallelism["params"],
                 #     )
-                # elif wrapper == DistributedDataParallel:
-                #     # model = model.to()
-                #     model = wrapper(
-                #         model,
-                #         parallel_context=self.parallel_context,
-                #         **self.args.oslo_config.data_parallelism["params"],
-                #     )
+                elif wrapper == DistributedDataParallel:
+                    # model = model.to()
+                    model = wrapper(
+                        model,
+                        parallel_context=self.parallel_context,
+                        **self.args.oslo_config.data_parallelism["params"],
+                    )
                 # elif wrapper == DataParallel:
                 #     self.create_optimizer()
                 #     model, self.optimizer = wrapper(
@@ -1365,6 +1493,19 @@ class Trainer:
         if self.optimizer is None:
             self.optimizer = optimizer_cls(
                 optimizer_grouped_parameters, **optimizer_kwargs
+            )
+        # if zero 1 or 2:
+        if (
+            self.args.oslo_config.data_parallelism is not None
+            and self.args.oslo_config.data_parallelism["zero_stage"] < 3
+        ):
+            self.optimizer = ZeroRedundancyOptimizer(
+                self.optimizer,
+                parallel_context=self.parallel_context,
+                overlap_communication=True,
+                partition_grad=True
+                if self.args.oslo_config.data_parallelism["zero_stage"] == 2
+                else False,
             )
         log_dist(f"Optimizer: {self.optimizer}")
         return self.optimizer
@@ -1474,8 +1615,16 @@ class Trainer:
         outputs = model(**inputs)
 
         if labels is not None:
-            loss = self.label_smoother(outputs, labels)
+            if model._get_name() in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES.values():
+                loss = self.label_smoother(outputs, labels, shift_labels=True)
+            else:
+                loss = self.label_smoother(outputs, labels)
         else:
+            if isinstance(outputs, dict) and "loss" not in outputs:
+                raise ValueError(
+                    "The model did not return a loss from the inputs, only the following keys: "
+                    f"{','.join(outputs.keys())}. For reference, the inputs it received are {','.join(inputs.keys())}."
+                )
             # We don't use .loss here since the model may return tuples instead of ModelOutput.
             loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
 
