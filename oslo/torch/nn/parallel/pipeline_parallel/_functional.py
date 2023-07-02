@@ -159,7 +159,7 @@ def start_job(job):
                 # ensure communication sync
                 COMM_INFO.LOCK.acquire()
 
-                # TODO; do we need to wait for colleagues ?
+                # wait for colleagues before starting the backward
                 parallel_context = COMM_INFO.PARALLEL_CONTEXT
                 if parallel_context.need_tensor_group_sync():
                     cur_rank = torch.distributed.get_rank()
@@ -215,6 +215,11 @@ def start_job(job):
                         new_act.append(act)
                         new_grad.append(grad)
 
+                # wait for gradient transferred?
+                # TODO; is this the right way to wait rpc sending gradients?
+                torch.cuda.synchronize()
+
+                # to wait for gradient being calculated
                 s = torch.cuda.Stream()
 
                 if len(new_act) > 0 and len(new_grad) > 0:
@@ -398,8 +403,7 @@ class _BackwardJobEnqueue(torch.autograd.Function):
         ctx.unique_key = unique_key
         ctx.num_nones = 2 + len(args)
 
-        # mark; use async since this requires loose sync
-        rpc.rpc_async(
+        rpc.rpc_sync(
             to=meta.dst,
             func=add_backward_required_key,
             args=(unique_key, ),

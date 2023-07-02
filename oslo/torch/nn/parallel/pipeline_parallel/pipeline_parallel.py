@@ -70,6 +70,8 @@ def PipelineParallel(
     return module
 
 
+# TODO; check whether the module has it's own parameter or not, and
+#  use that to decide whether to save the activation
 class _PipelineParallel(OsloParallelWrapper):
     """
     Pipeline parallel module

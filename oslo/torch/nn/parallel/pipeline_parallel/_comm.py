@@ -159,13 +159,18 @@ def send_data(
     torch.cuda.set_device(
         torch.distributed.get_rank()
     )
+    s = torch.cuda.Stream()
+    e = torch.cuda.Event()
+    with torch.cuda.stream(s):
+        _send(
+            data,
+            src_rank,
+            dst_rank,
+            recv_key=recv_key,
+        )
 
-    _send(
-        data,
-        src_rank,
-        dst_rank,
-        recv_key=recv_key,
-    )
+    e.record(s)
+    e.synchronize()
 
     del QUEUES.HANDSHAKE_QUEUES[recv_key]
     del q
@@ -182,7 +187,13 @@ def recv_data(
         torch.distributed.get_rank()
     )
 
-    data = _recv(recv_key)
+    s = torch.cuda.Stream()
+    e = torch.cuda.Event()
+    with torch.cuda.stream(s):
+        data = _recv(recv_key)
+
+    e.record(s)
+    e.synchronize()
 
     unique_key = data[KEY_NAME]
     value = data[VALUE_NAME]
