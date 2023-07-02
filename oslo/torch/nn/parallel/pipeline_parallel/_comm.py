@@ -58,9 +58,7 @@ def enqueue_backward_done_notice(key):
 
 
 def enqueue_result(ind, data):
-    NOTIFICATIONS.OUTPUT.put(
-        (ind, data)
-    )
+    NOTIFICATIONS.OUTPUT.put((ind, data))
 
 
 def enqueue_backward_job(meta, unique_key, *grad_outputs):
@@ -114,10 +112,10 @@ def enqueue_data(data, recv_key):
 
 
 def _send(
-        data,
-        src_rank,
-        dst_rank,
-        recv_key,
+    data,
+    src_rank,
+    dst_rank,
+    recv_key,
 ):
     rpc.rpc_sync(
         to=f"RPC_WORKER_{dst_rank}",
@@ -156,9 +154,7 @@ def send_data(
     r = q.get()
 
     # TODO; okay?
-    torch.cuda.set_device(
-        torch.distributed.get_rank()
-    )
+    torch.cuda.set_device(torch.distributed.get_rank())
     s = torch.cuda.Stream()
     e = torch.cuda.Event()
     with torch.cuda.stream(s):
@@ -177,15 +173,13 @@ def send_data(
 
 
 def recv_data(
-        src_rank,
-        dst_rank,
-        recv_key,
+    src_rank,
+    dst_rank,
+    recv_key,
 ):
     parallel_context = COMM_INFO.PARALLEL_CONTEXT
 
-    torch.cuda.set_device(
-        torch.distributed.get_rank()
-    )
+    torch.cuda.set_device(torch.distributed.get_rank())
 
     s = torch.cuda.Stream()
     e = torch.cuda.Event()

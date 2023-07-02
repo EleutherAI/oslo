@@ -37,7 +37,7 @@ class WorkerPoolWatcher(Thread):
                 worker_pool.append(new_worker)
 
             # sleep for enough time
-            time.sleep(30.)
+            time.sleep(30.0)
 
 
 class Worker(Thread):
@@ -69,7 +69,7 @@ job_selection.start()
 
 # workers run for forward and backward
 worker_pool = []
-for _ in range(16):     # TODO; 16 as an arg
+for _ in range(16):  # TODO; 16 as an arg
     worker = Worker()
     worker.setDaemon(True)
     worker.start()

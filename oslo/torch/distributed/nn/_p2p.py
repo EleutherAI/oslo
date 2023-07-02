@@ -14,6 +14,7 @@ from oslo.torch.distributed.parallel_mode import ParallelMode
 class TensorStub(object):
     id: int
 
+
 NoneType = type(None)
 
 TORCH_ID_TO_DTYPE = [
@@ -74,7 +75,10 @@ class _P2P(object):
             NoneType: {"send": self._send_none, "recv": self._recv_none},
             torch.Size: {"send": self._send_size, "recv": self._recv_size},
             torch.Tensor: {"send": self._send_tensor, "recv": self._recv_tensor},
-            TensorStub: {"send": self._send_tensor_stub, "recv": self._recv_tensor_stub},
+            TensorStub: {
+                "send": self._send_tensor_stub,
+                "recv": self._recv_tensor_stub,
+            },
         }
 
     @staticmethod
@@ -240,10 +244,14 @@ class _P2P(object):
         parallel_mode: ParallelMode = ParallelMode.PIPELINE,
         send_type: bool = False,
     ):
-        assert isinstance(data, TensorStub), f"wrong type: {data} must be {TensorStub} type."
+        assert isinstance(
+            data, TensorStub
+        ), f"wrong type: {data} must be {TensorStub} type."
 
         if send_type is True:
-            self._send_type(TensorStub, parallel_context=parallel_context, dst_rank=dst_rank)
+            self._send_type(
+                TensorStub, parallel_context=parallel_context, dst_rank=dst_rank
+            )
 
         group = parallel_context.get_group(parallel_mode)
         data = torch.tensor([data.id], dtype=torch.long, device=_device())

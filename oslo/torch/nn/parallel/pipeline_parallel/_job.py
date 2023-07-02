@@ -46,7 +46,10 @@ class AbstractJob:
             return _ORDERING[self.__class__] < _ORDERING[other.__class__]
 
     def __eq__(self, other):
-        return self.__class__ == other.__class__ and _ORDERING[self.__class__] == _ORDERING[other.__class__]
+        return (
+            self.__class__ == other.__class__
+            and _ORDERING[self.__class__] == _ORDERING[other.__class__]
+        )
 
 
 class Job(AbstractJob):

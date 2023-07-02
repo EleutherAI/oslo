@@ -18,13 +18,13 @@ class SyncNotification:
 
     # to make rpc available
     def initialize(
-            self,
-            forward_ready_notice,
-            forward_start_notice,
-            forward_finished_notice,
-            last_backward_notice,
-            batch_finished_notice,
-            out_queue,
+        self,
+        forward_ready_notice,
+        forward_start_notice,
+        forward_finished_notice,
+        last_backward_notice,
+        batch_finished_notice,
+        out_queue,
     ):
         # TODO; print warning?
         if self._initialized:

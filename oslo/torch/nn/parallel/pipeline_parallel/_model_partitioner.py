@@ -102,7 +102,7 @@ class ModelPartitioner(object):
         for node in post_order_traverse(self.root_node):
             for module in node.modules:
                 if len(self._get_parameters(module)) == 0:
-                # if self._get_parameters_in_module(module) == 0:
+                    # if self._get_parameters_in_module(module) == 0:
                     self._set_attribute_without_param(module, node)
                 else:
                     self._set_attribute(module, node)
@@ -123,7 +123,7 @@ class ModelPartitioner(object):
     def _get_parameters_in_module(module):
         num_params = 0
         for name, param in module.named_parameters():
-            if '.' not in name:
+            if "." not in name:
                 num_params += 1
         return num_params
 

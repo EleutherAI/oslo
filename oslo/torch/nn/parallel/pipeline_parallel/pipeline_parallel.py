@@ -183,10 +183,14 @@ class _PipelineParallel(OsloParallelWrapper):
                 r = self.forward_ready_notice.get()
                 ranks_ready.add(r)
 
-                if len(ranks_ready) == self.parallel_context.get_world_size(ParallelMode.GLOBAL):
+                if len(ranks_ready) == self.parallel_context.get_world_size(
+                    ParallelMode.GLOBAL
+                ):
                     break
 
-            for dst_rank in range(1, self.parallel_context.get_world_size(ParallelMode.GLOBAL)):
+            for dst_rank in range(
+                1, self.parallel_context.get_world_size(ParallelMode.GLOBAL)
+            ):
                 rpc.rpc_sync(
                     to=f"RPC_WORKER_{dst_rank}",
                     func=enqueue_forward_start_notice,
@@ -199,7 +203,7 @@ class _PipelineParallel(OsloParallelWrapper):
             rpc.rpc_sync(
                 to=f"RPC_WORKER_{dst_rank}",
                 func=enqueue_forward_ready_notice,
-                args=(src_rank, ),
+                args=(src_rank,),
             )
 
             # wait for a sign
@@ -232,7 +236,7 @@ class _PipelineParallel(OsloParallelWrapper):
             # enqueue jobs
             is_grad_enabled = torch.is_grad_enabled()
 
-            num_concurrent = 16     # TODO; make as an argument
+            num_concurrent = 16  # TODO; make as an argument
 
             for ind, kwargs_ in enumerate(new_kwargs[:num_concurrent]):
                 initialize_job(
@@ -259,10 +263,12 @@ class _PipelineParallel(OsloParallelWrapper):
 
                 torch.cuda.synchronize()
 
-                yield ind, result   # TODO;
+                yield ind, result  # TODO;
 
                 # pass result to PIPELINE groups
-                colleague = self.parallel_context.get_ranks_in_group(ParallelMode.PIPELINE)
+                colleague = self.parallel_context.get_ranks_in_group(
+                    ParallelMode.PIPELINE
+                )
                 for dst_rank in colleague:
                     if dst_rank == self.global_rank:
                         continue
@@ -270,7 +276,10 @@ class _PipelineParallel(OsloParallelWrapper):
                     rpc.rpc_sync(
                         to=f"RPC_WORKER_{dst_rank}",
                         func=enqueue_result,
-                        args=(ind, result, ),
+                        args=(
+                            ind,
+                            result,
+                        ),
                     )
 
                 if ri < self.num_micro_batches - num_concurrent:
@@ -305,7 +314,7 @@ class _PipelineParallel(OsloParallelWrapper):
             _ = self.last_backward_notice.get()
 
             ranks_done = set()
-            ranks_done.add(0)   # TODO; is 0 always a master of GLOBAL group?
+            ranks_done.add(0)  # TODO; is 0 always a master of GLOBAL group?
 
             while True:
                 while self.batch_finished_notice.empty():
@@ -314,13 +323,17 @@ class _PipelineParallel(OsloParallelWrapper):
                 r = self.batch_finished_notice.get()
                 ranks_done.add(r)
 
-                if len(ranks_done) == self.parallel_context.get_world_size(ParallelMode.GLOBAL):
+                if len(ranks_done) == self.parallel_context.get_world_size(
+                    ParallelMode.GLOBAL
+                ):
                     break
 
             # notice other ranks
             # TODO; how to find dst_rank?
             # TODO; do this like tree?
-            for dst_rank in range(1, self.parallel_context.get_world_size(ParallelMode.GLOBAL)):
+            for dst_rank in range(
+                1, self.parallel_context.get_world_size(ParallelMode.GLOBAL)
+            ):
                 rpc.rpc_sync(
                     to=f"RPC_WORKER_{dst_rank}",
                     func=enqueue_forward_finished_notice,
@@ -336,11 +349,11 @@ class _PipelineParallel(OsloParallelWrapper):
 
             # notice to master
             src_rank = self.global_rank
-            dst_rank = 0    # TODO; is 0 always a master of GLOBAL group?
+            dst_rank = 0  # TODO; is 0 always a master of GLOBAL group?
             rpc.rpc_sync(
                 to=f"RPC_WORKER_{dst_rank}",
                 func=enqueue_batch_finished_notice,
-                args=(src_rank, ),
+                args=(src_rank,),
             )
 
             # barrier
@@ -405,7 +418,9 @@ class _PipelineParallel(OsloParallelWrapper):
 
                 COMM_INFO.LOCK.acquire()
 
-                unique_key = make_unique_key(location, current_device.index, module_device.index)
+                unique_key = make_unique_key(
+                    location, current_device.index, module_device.index
+                )
 
                 if need_activation_save and is_training and is_grad_enabled:
                     # prepare backward
@@ -415,7 +430,7 @@ class _PipelineParallel(OsloParallelWrapper):
 
                 remote_request(
                     src=current_device.index,
-                    dst=module_device.index,    # global rank
+                    dst=module_device.index,  # global rank
                     unique_key=unique_key,
                     queue=queue_recv,
                     args_stub=args_stub,
@@ -445,7 +460,7 @@ class _PipelineParallel(OsloParallelWrapper):
                         is_training=is_training,
                         is_grad_enabled=is_grad_enabled,
                         is_fp16=False,  # TODO;
-                        func_name="",   # dummy
+                        func_name="",  # dummy
                         src=current_device.index,
                         dst=module_device.index,
                     )

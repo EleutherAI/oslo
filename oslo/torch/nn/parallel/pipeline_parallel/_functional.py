@@ -17,10 +17,16 @@ from oslo.torch.nn.parallel.pipeline_parallel._messages import (
 )
 from oslo.torch.nn.parallel.pipeline_parallel._sync import QUEUES, sleep
 from oslo.torch.nn.parallel.pipeline_parallel._job import (
-    Job, Backward, Input, HandshakeRequest, HandshakeResponse, Metadata
+    Job,
+    Backward,
+    Input,
+    HandshakeRequest,
+    HandshakeResponse,
+    Metadata,
 )
 from oslo.torch.nn.parallel.pipeline_parallel._comm import (
-    send_data, recv_data,
+    send_data,
+    recv_data,
     enqueue_handshake_resp,
     enqueue_backward_job,
     notify_last_backward_done,
@@ -28,7 +34,9 @@ from oslo.torch.nn.parallel.pipeline_parallel._comm import (
     enqueue_backward_done_notice,
     enqueue_backward_start_notice,
     enqueue_local_backward_start_notice,
-    KEY_NAME, VALUE_NAME, META_NAME,
+    KEY_NAME,
+    VALUE_NAME,
+    META_NAME,
     COMM_INFO,
 )
 
@@ -37,18 +45,18 @@ _BACKWARD_KEYS = list()
 
 
 def remote_request(
-        src,
-        dst,
-        unique_key,
-        queue,
-        args_stub,
-        kwargs_stub,
-        is_forward,
-        is_grad_enabled,
-        is_training,
-        is_fp16,
-        func_name,
-        tensors,
+    src,
+    dst,
+    unique_key,
+    queue,
+    args_stub,
+    kwargs_stub,
+    is_forward,
+    is_grad_enabled,
+    is_training,
+    is_fp16,
+    func_name,
+    tensors,
 ):
     # TODO; make the code below efficient
     data = dict()
@@ -84,9 +92,9 @@ def remote_request(
 
 
 def send_results(
-        src,
-        dst,
-        data,
+    src,
+    dst,
+    data,
 ):
     # send
     send_data(
@@ -106,8 +114,8 @@ def start_job(job):
         if meta.is_request:
             if meta.is_forward:
                 result_stub, tensors = launch_forward(
-                    meta.src,   # requested_from
-                    meta.dst,   # current rank
+                    meta.src,  # requested_from
+                    meta.dst,  # current rank
                     meta.func_name,
                     unique_key,
                     meta.is_training,
@@ -149,7 +157,7 @@ def start_job(job):
                     dst=dst,
                 )
 
-            else:   # backward
+            else:  # backward
                 activation = pop_activation(unique_key)
                 grad_outputs = tensors
 
@@ -164,7 +172,9 @@ def start_job(job):
                 if parallel_context.need_tensor_group_sync():
                     cur_rank = torch.distributed.get_rank()
                     # TODO; is min rank a master?
-                    master_rank = min(parallel_context.get_ranks_in_group(ParallelMode.TENSOR))
+                    master_rank = min(
+                        parallel_context.get_ranks_in_group(ParallelMode.TENSOR)
+                    )
                     sync_key = (unique_key[0], unique_key[1], master_rank)
 
                     if parallel_context.is_first_rank(ParallelMode.TENSOR):
@@ -185,7 +195,9 @@ def start_job(job):
                                 break
 
                         # send okay to go signal
-                        for dst_rank in parallel_context.get_ranks_in_group(ParallelMode.TENSOR):
+                        for dst_rank in parallel_context.get_ranks_in_group(
+                            ParallelMode.TENSOR
+                        ):
                             if dst_rank == cur_rank:
                                 continue
 
@@ -200,7 +212,10 @@ def start_job(job):
                         rpc.rpc_sync(
                             to=f"RPC_WORKER_{master_rank}",
                             func=enqueue_local_backward_start_notice,
-                            args=(sync_key, cur_rank, ),
+                            args=(
+                                sync_key,
+                                cur_rank,
+                            ),
                         )
 
                         # wait for okay to go signal
@@ -233,7 +248,9 @@ def start_job(job):
                 if parallel_context.need_tensor_group_sync():
                     cur_rank = torch.distributed.get_rank()
                     # TODO; is min rank a master?
-                    master_rank = min(parallel_context.get_ranks_in_group(ParallelMode.TENSOR))
+                    master_rank = min(
+                        parallel_context.get_ranks_in_group(ParallelMode.TENSOR)
+                    )
                     sync_key = (unique_key[0], unique_key[1], master_rank)
 
                     if parallel_context.is_first_rank(ParallelMode.TENSOR):
@@ -254,14 +271,16 @@ def start_job(job):
                                 break
 
                         # send okay to go signal
-                        for dst_rank in parallel_context.get_ranks_in_group(ParallelMode.TENSOR):
+                        for dst_rank in parallel_context.get_ranks_in_group(
+                            ParallelMode.TENSOR
+                        ):
                             if dst_rank == cur_rank:
                                 continue
 
                             rpc.rpc_sync(
                                 to=f"RPC_WORKER_{dst_rank}",
                                 func=enqueue_backward_done_notice,
-                                args=(sync_key, ),
+                                args=(sync_key,),
                             )
 
                         del QUEUES.TENSOR_GROUP_SYNC_QUEUES[sync_key]
@@ -272,7 +291,10 @@ def start_job(job):
                         rpc.rpc_sync(
                             to=f"RPC_WORKER_{master_rank}",
                             func=enqueue_local_backward_finished_notice,
-                            args=(sync_key, cur_rank, ),
+                            args=(
+                                sync_key,
+                                cur_rank,
+                            ),
                         )
 
                         # wait for okay to go signal
@@ -298,9 +320,7 @@ def start_job(job):
         else:
             queue = QUEUES.RESPONSE_QUEUES.pop(unique_key)
 
-            queue.put(
-                (stub, tensors)
-            )
+            queue.put((stub, tensors))
 
     elif isinstance(job, Input):
         # TODO; move or make as a function
@@ -314,11 +334,9 @@ def start_job(job):
         # function because torch.set_grad_enabled() is
         # thread local.
         with torch.set_grad_enabled(is_grad_enabled):
-            result = fn(**kwargs)   # *args is not used
+            result = fn(**kwargs)  # *args is not used
 
-        out_queue.put(
-            (unique_key, result)
-        )
+        out_queue.put((unique_key, result))
 
     elif isinstance(job, HandshakeRequest):
         # notify source rank
@@ -344,20 +362,18 @@ def start_job(job):
     elif isinstance(job, HandshakeResponse):
         # awake waiting thread
         q = QUEUES.HANDSHAKE_QUEUES[job.unique_key]
-        q.put(
-            f"okay - {job.unique_key}"
-        )
+        q.put(f"okay - {job.unique_key}")
 
 
 def launch_forward(
-        requested_from,
-        current_rank,
-        func_name,
-        unique_key,
-        is_training,
-        is_grad_enabled,
-        stub,
-        *tensors,
+    requested_from,
+    current_rank,
+    func_name,
+    unique_key,
+    is_training,
+    is_grad_enabled,
+    stub,
+    *tensors,
 ):
     requires_grad_any = any([t.requires_grad for t in tensors])
     if is_training and is_grad_enabled and requires_grad_any:
@@ -383,7 +399,7 @@ def launch_forward(
     result_stub, tensors = pack_tensor_stub(result, [])
 
     need_activation_save = (
-            any([t.requires_grad for t in tensors]) and is_training and is_grad_enabled
+        any([t.requires_grad for t in tensors]) and is_training and is_grad_enabled
     )
     if need_activation_save:
         save_activation(unique_key, tensors)
@@ -406,7 +422,7 @@ class _BackwardJobEnqueue(torch.autograd.Function):
         rpc.rpc_sync(
             to=meta.dst,
             func=add_backward_required_key,
-            args=(unique_key, ),
+            args=(unique_key,),
         )
 
         return args
