@@ -30,9 +30,7 @@ def prepare_to_receive(src, shape):
     print("Ready to recv!")
     dist.recv(tensor, src)
 
-    QUEUE.append(
-        tensor
-    )
+    QUEUE.append(tensor)
 
 
 def parse_args():

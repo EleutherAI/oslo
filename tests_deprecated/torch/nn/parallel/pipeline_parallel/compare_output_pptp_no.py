@@ -51,7 +51,9 @@ def main():
         # qkv reshape
         elif any([x in no_pp_name for x in [".c_attn"]]):
             for i in range(len(pp_tp_data)):
-                pp_tp_data[i] = einops.rearrange(pp_tp_data[i], "b t (n d) -> b t n d", n=3)
+                pp_tp_data[i] = einops.rearrange(
+                    pp_tp_data[i], "b t (n d) -> b t n d", n=3
+                )
             pp_tp_data = torch.stack(pp_tp_data, 0)
             pp_tp_data = einops.rearrange(pp_tp_data, "m b t n d -> b t (n m d)")
 

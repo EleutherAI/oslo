@@ -246,7 +246,10 @@ if save_dir is not None:
                 if isinstance(outp, types.GeneratorType):
                     return
                 torch.cuda.synchronize()
-                torch.save(outp, f"{save_dir}/output_{name}_pp_tp_{torch.distributed.get_rank()}.pkl")
+                torch.save(
+                    outp,
+                    f"{save_dir}/output_{name}_pp_tp_{torch.distributed.get_rank()}.pkl",
+                )
             else:
                 torch.cuda.synchronize()
                 torch.save(outp, f"{save_dir}/output_{name}_no_pp_tp.pkl")
@@ -284,7 +287,7 @@ def run():
                 max_length=128,
             ).to("cuda")
 
-            inputs['input_ids'][inputs['input_ids'] == tokenizer.pad_token] = -100
+            inputs["input_ids"][inputs["input_ids"] == tokenizer.pad_token] = -100
 
             if data_parallel_size > 1:
                 dp_rank = parallel_context.get_local_rank(ParallelMode.DATA)
@@ -366,7 +369,10 @@ def run():
             if save_dir is not None and step_count == target_step:
                 for name, param in wrapper_pp.named_parameters():
                     if param.grad is not None:
-                        torch.save(param.grad, f"{save_dir}/grad_{name}_pp_tp_{torch.distributed.get_rank()}.pkl")
+                        torch.save(
+                            param.grad,
+                            f"{save_dir}/grad_{name}_pp_tp_{torch.distributed.get_rank()}.pkl",
+                        )
 
                 for name, param in model_no_pp.named_parameters():
                     torch.save(param.grad, f"{save_dir}/grad_{name}_no_pp.pkl")

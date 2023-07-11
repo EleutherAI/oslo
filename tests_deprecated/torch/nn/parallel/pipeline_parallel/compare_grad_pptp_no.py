@@ -43,7 +43,9 @@ def main():
             else:
                 if any([x in no_pp_name for x in [".c_attn"]]):
                     for i in range(len(pp_tp_data)):
-                        pp_tp_data[i] = einops.rearrange(pp_tp_data[i], "(n d) -> n d", n=3)
+                        pp_tp_data[i] = einops.rearrange(
+                            pp_tp_data[i], "(n d) -> n d", n=3
+                        )
                     pp_tp_data = torch.stack(pp_tp_data, 0)
                     pp_tp_data = einops.rearrange(pp_tp_data, "m n d -> (n m d)")
                 else:
@@ -54,7 +56,9 @@ def main():
                 n = len(pp_tp_data)
                 for i in range(n):
                     pp_tp_data[i] = torch.transpose(pp_tp_data[i], 1, 0)
-                    pp_tp_data[i] = einops.rearrange(pp_tp_data[i], "o (n d) -> o n d", n=3)
+                    pp_tp_data[i] = einops.rearrange(
+                        pp_tp_data[i], "o (n d) -> o n d", n=3
+                    )
                 pp_tp_data = torch.stack(pp_tp_data, 0)
                 pp_tp_data = einops.rearrange(pp_tp_data, "m o n d -> o (n m d)")
 
@@ -79,7 +83,7 @@ def main():
                 pp_tp_data = torch.cat(pp_tp_data, 0)
 
         if any([x in no_pp_name for x in [".wpe", ".wte"]]):
-            pp_tp_data = pp_tp_data[:no_pp_data.size(0)]
+            pp_tp_data = pp_tp_data[: no_pp_data.size(0)]
 
         print(f"{pp_tp_data.shape=}, {no_pp_data.shape=}")
 
