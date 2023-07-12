@@ -23,7 +23,7 @@ CUDA_MEM_1 = {False: 0, True: 1024}
 CPU_MEM = {True: {True: 0, False: 0}, False: {True: 512, False: 0}}
 
 
-def exam_chunk_memory(keep_gathered, pin_memory):
+def exam_chunk_memory(parallel_context, keep_gathered, pin_memory):
 
     params = [torch.rand(8, 8) for _ in range(3)]
     config = {2: dict(chunk_size=128, keep_gathered=keep_gathered)}
@@ -33,7 +33,9 @@ def exam_chunk_memory(keep_gathered, pin_memory):
     assert chunk_manager.total_mem["cuda"] == 0
 
     for p in params:
-        chunk_manager.register_tensor(p, "param", 2, pin_memory=pin_memory)
+        chunk_manager.register_tensor(
+            p, "param", 2, parallel_context=parallel_context, pin_memory=pin_memory
+        )
     chunk_manager.close_all_groups()
     assert chunk_manager.total_mem["cpu"] == CPU_MEM[keep_gathered][pin_memory]
     assert chunk_manager.total_mem["cuda"] == CUDA_MEM_0[keep_gathered]
@@ -60,13 +62,13 @@ def exam_chunk_memory(keep_gathered, pin_memory):
 def run_dist(rank, world_size):
     os.environ["RANK"] = str(rank)
     os.environ["LOCAL_RANK"] = str(rank)
-    ParallelContext.from_torch(data_parallel_size=world_size)
+    parallel_context = ParallelContext.from_torch(data_parallel_size=world_size)
 
     keep_gathered = [True, False]
     pin_memory = [True, False]
 
     for args in itertools.product(keep_gathered, pin_memory):
-        exam_chunk_memory(*args)
+        exam_chunk_memory(parallel_context, *args)
 
 
 @skip_if_dist_unavailable
