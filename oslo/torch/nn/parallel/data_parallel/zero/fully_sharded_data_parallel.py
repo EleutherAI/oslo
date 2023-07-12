@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 import torch
 import torch.distributed as dist
 import torch.nn as nn
-from transformers.utils import logging
+from oslo.torch.utils.logging import DistributedLogger
 
 from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.distributed.parallel_mode import ParallelMode
@@ -108,7 +108,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
         self.name2param: Dict[str, nn.Parameter] = dict()
 
         self._cast_buffers()
-        self._logger = logging.get_logger(__name__)
+        self._logger = DistributedLogger.get_instance(__name__)
 
         if self.heterogeneous_manager._premade_memstats_:
             # build chunk in param runtime visited order.

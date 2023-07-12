@@ -9,7 +9,7 @@ import torch.distributed as dist
 from torch.nn import Parameter
 from torch.optim import Optimizer
 
-from transformers.utils import logging
+from oslo.torch.utils.logging import DistributedLogger
 
 from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim._base_optim import (
     BaseOptimizerWrapper,
@@ -117,7 +117,7 @@ class _HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
         self._found_overflow: torch.Tensor = torch.zeros(
             1, dtype=torch.int64, device=get_current_device()
         )
-        self._logger = logging.get_logger(__name__)
+        self._logger = DistributedLogger.get_instance(__name__)
 
         self.gpu_margin_mem_ratio: float = float(gpu_margin_mem_ratio)
         assert (
