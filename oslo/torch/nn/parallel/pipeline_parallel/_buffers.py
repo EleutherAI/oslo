@@ -6,7 +6,7 @@ from oslo.torch.nn.parallel.pipeline_parallel._sync import (
 # original forward dictionary
 _ORIGINAL_FORWARDS = dict()
 
-# module device locations
+# module device(local) locations
 _MODULE_DEVICE_LOCATIONS = dict()
 
 
@@ -34,3 +34,4 @@ def save_activation(key, activation):
 
 def pop_activation(key):
     return _ACTIVATIONS.pop(key, [])  # TODO; okay?
+    # return _ACTIVATIONS.pop(key)

@@ -169,7 +169,7 @@ set_seed(42)
 data_parallel_size = 1
 parallel_context = ParallelContext.from_torch(
     data_parallel_size=data_parallel_size,
-    pipeline_parallel_size=2,
+    pipeline_parallel_size=1,
     tensor_parallel_size=2,
 )
 
@@ -196,36 +196,19 @@ for n, m in model.named_modules():
     if isinstance(m, nn.Dropout):
         m.p = 0.0
 
-model_no_pp = deepcopy(model)
-model_no_pp.cuda()
+model_no_tp = deepcopy(model)
+model_no_tp.cuda()
 
-model = TensorParallel(model, parallel_context=parallel_context)
-wrapper_pp = PipelineParallel(
-    model,
-    parallel_context=parallel_context,
-    memory_computation_balance=1.0,
-    num_micro_batches=num_micro_batches,
-)
+wrapper = TensorParallel(model, parallel_context=parallel_context)
 
-wrapper_pp.train()
+wrapper.train()
 
-optimizer_pp = Adam(wrapper_pp.parameters(), lr=3e-4)
-optimizer_no_pp = Adam(model_no_pp.parameters(), lr=3e-4)
+optimizer_tp = Adam(wrapper.parameters(), lr=3e-4)
+optimizer_no_tp = Adam(model_no_tp.parameters(), lr=3e-4)
 
-parallelize(wrapper_pp, parallel_context)
+parallelize(wrapper, parallel_context)
 
-#
-# def print_location_backward_hook(m, i, o):
-#     print(f'{torch.distributed.get_rank()=}, {m.location=}')
-#     return i
-#
-#
-# for name, m in wrapper_pp.named_modules():
-#     m: nn.Module
-#     if hasattr(m, 'location'):
-#         m.register_full_backward_hook(print_location_backward_hook)
-#
-#
+
 if torch.distributed.get_rank() == 1:
     for k, v in _MODULE_DEVICE_LOCATIONS.items():
         print(f"{k}: {v}")
@@ -233,7 +216,7 @@ if torch.distributed.get_rank() == 1:
 
 target_step = 50
 # save_dir = None
-save_dir = "tmp3"
+save_dir = "tmp_tp"
 if save_dir is not None:
     os.makedirs(save_dir, exist_ok=True)
 
@@ -248,18 +231,18 @@ if save_dir is not None:
                 torch.cuda.synchronize()
                 torch.save(
                     outp,
-                    f"{save_dir}/output_{name}_pp_tp_{torch.distributed.get_rank()}.pkl",
+                    f"{save_dir}/output_{name}_tp_{torch.distributed.get_rank()}.pkl",
                 )
             else:
                 torch.cuda.synchronize()
-                torch.save(outp, f"{save_dir}/output_{name}_no_pp_tp.pkl")
+                torch.save(outp, f"{save_dir}/output_{name}_no_tp.pkl")
 
         return hook
 
-    for name, m in wrapper_pp.named_modules():
+    for name, m in wrapper.named_modules():
         m.register_forward_hook(save_output_hook(name, True))
 
-    for name, m in model_no_pp.named_modules():
+    for name, m in model_no_tp.named_modules():
         m.register_forward_hook(save_output_hook(name, False))
 
 
@@ -272,8 +255,8 @@ def run():
     datasets = [str(sample) for sample in datasets[:8192]]
     dataloader = DataLoader(datasets, batch_size=batch_size)
 
-    pp_losses = []
-    no_pp_losses = []
+    tp_losses = []
+    no_tp_losses = []
 
     step_count = 0
     with torch.enable_grad():
@@ -289,113 +272,52 @@ def run():
 
             inputs["input_ids"][inputs["input_ids"] == tokenizer.pad_token] = -100
 
-            if data_parallel_size > 1:
-                dp_rank = parallel_context.get_local_rank(ParallelMode.DATA)
-                new_inputs = dict()
-                for key, value in inputs.items():  # assumes HF
-                    new_inputs[key] = value.chunk(data_parallel_size)[dp_rank]
-                pp_inputs = new_inputs
-            else:
-                pp_inputs = inputs
+            optimizer_tp.zero_grad(set_to_none=True)
+            optimizer_no_tp.zero_grad(set_to_none=True)
 
-            optimizer_pp.zero_grad(set_to_none=True)
-            optimizer_no_pp.zero_grad(set_to_none=True)
+            out_tp = wrapper(**inputs, labels=inputs["input_ids"])
+            loss_tp = out_tp.loss
+            loss_tp.backward()
 
-            cum_loss_pp = torch.zeros(1).cuda()
-            partial_loss_pp = [None for _ in range(num_micro_batches)]
+            out_no_tp = model_no_tp(**inputs, labels=inputs["input_ids"])
+            loss_no_tp = out_no_tp.loss
+            loss_no_tp.backward()
 
-            for _, (ind, out_pp) in enumerate(
-                wrapper_pp(**pp_inputs, labels=pp_inputs["input_ids"])
-            ):
-
-                if out_pp is not None:
-                    loss_pp = out_pp.loss
-                    # loss is scaled in PP wrapper
-                    # loss_pp = loss_pp / num_micro_batches
-                    loss_pp.backward()
-
-                    _l = loss_pp.detach().item()
-                    cum_loss_pp += _l
-                    partial_loss_pp[ind] = _l
-
-                    # print(f"{cum_loss_pp=}")
-
-                else:
-                    pass
-
-            cum_loss_no_pp = torch.zeros(1).cuda()
-            partial_loss_no_pp = [None for _ in range(num_micro_batches)]
-
-            new_inputs = [dict() for _ in range(num_micro_batches)]
-            for key, value in inputs.items():
-                if key in BATCH_DIMENSIONS_PP:
-                    # splittable
-                    value = value.chunk(
-                        num_micro_batches,
-                        dim=BATCH_DIMENSIONS_PP[key],
-                    )
-                    for ind, v_chunk in enumerate(value):
-                        new_inputs[ind][key] = v_chunk
-                else:
-                    # not splittable
-                    for ind in range(num_micro_batches):
-                        new_inputs[ind][key] = value
-
-            for ind, inputs in enumerate(new_inputs):
-                out_no_pp = model_no_pp(**inputs, labels=inputs["input_ids"])
-                loss_no_pp = out_no_pp.loss / num_micro_batches
-                loss_no_pp.backward()
-
-                _l = loss_no_pp.detach().item()
-                cum_loss_no_pp += _l
-                partial_loss_no_pp[ind] = _l
-
-            if data_parallel_size > 1:
-                if dist.get_rank() == 4:  # TODO;
-                    dist.send(cum_loss_pp, 0)
-                elif dist.get_rank() == 0:
-                    cum_loss_pp_from_4 = torch.zeros(1).cuda()
-                    dist.recv(cum_loss_pp_from_4, 4)
-                    cum_loss_pp = (cum_loss_pp + cum_loss_pp_from_4) / 2.0
-                    print(f"{dist.get_rank()}, {cum_loss_pp}, {cum_loss_no_pp}")
-            else:
-                if dist.get_rank() == 0:
-                    print(f"{dist.get_rank()}, {cum_loss_pp}, {cum_loss_no_pp}")
+            if dist.get_rank() == 0:
+                print(f"{dist.get_rank()}, {loss_tp}, {loss_no_tp}")
 
             print(f"RANK {torch.distributed.get_rank()} | call step {step_count}")
 
             # TODO; split optimizer_pp? barrier?
 
             if save_dir is not None and step_count == target_step:
-                for name, param in wrapper_pp.named_parameters():
+                for name, param in wrapper.named_parameters():
                     if param.grad is not None:
                         torch.save(
                             param.grad,
-                            f"{save_dir}/grad_{name}_pp_tp_{torch.distributed.get_rank()}.pkl",
+                            f"{save_dir}/grad_{name}_tp_{torch.distributed.get_rank()}.pkl",
                         )
 
-                for name, param in model_no_pp.named_parameters():
-                    torch.save(param.grad, f"{save_dir}/grad_{name}_no_pp.pkl")
+                for name, param in model_no_tp.named_parameters():
+                    torch.save(param.grad, f"{save_dir}/grad_{name}_no_tp.pkl")
 
                 break
 
-            optimizer_pp.step()
-            optimizer_no_pp.step()
+            optimizer_tp.step()
+            optimizer_no_tp.step()
 
             step_count += 1
 
-            pp_losses.append(cum_loss_pp.item())
-            no_pp_losses.append(cum_loss_no_pp.item())
-
-    torch.distributed.rpc.shutdown()
+            tp_losses.append(loss_tp.item())
+            no_tp_losses.append(loss_no_tp.item())
 
     if dist.get_rank() == 0:
         plt.figure(figsize=(32, 8))
-        plt.plot(pp_losses, label="PP")
-        plt.plot(no_pp_losses, label="no PP")
+        plt.plot(tp_losses, label="TP")
+        plt.plot(no_tp_losses, label="no TP")
         plt.legend()
         plt.title(f"{model_name}")
-        plt.savefig(f"{model_name} pp_vs_no_pp.png")
+        plt.savefig(f"{model_name} tp_vs_no_tp.png")
 
 
 if __name__ == "__main__":

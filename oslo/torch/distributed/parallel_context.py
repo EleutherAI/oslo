@@ -481,13 +481,13 @@ class ParallelContext(object):
         self.seed = seed
         self.make_ranks_to_devices()
 
-        self.pipeline_worker_map = {
-            pp_rank: f"PP_WORKER_{pp_rank}"
-            for pp_rank in self.get_ranks_in_group(ParallelMode.PIPELINE)
+        # RPC requires global rank
+        self.rpc_worker_map = {
+            rank: f"RPC_WORKER_{rank}"
+            for rank in self.get_ranks_in_group(ParallelMode.GLOBAL)
         }
-        # TODO; is this naming okay?
-        self.pipeline_local_master_rank = None
-        self.init_pipeline_rpc_workers()
+        self.init_rpc_workers()
+
         ParallelContext._instances.append(weakref.ref(self))
 
     # sanity check
@@ -566,6 +566,12 @@ class ParallelContext(object):
         parallel_mode = self._convert_tensor_parallel_groups(parallel_mode)
         self._check_parallel_mode(parallel_mode)
         self._local_ranks[parallel_mode] = rank
+
+    def get_local_ranks(self):
+        ranks = {}
+        for k, v in self._local_ranks.items():
+            ranks[k] = v
+        return ranks
 
     # global ranks
     def get_global_rank(self) -> int:
@@ -778,7 +784,7 @@ class ParallelContext(object):
         self._ranks_in_group[parallel_mode] = ranks
 
     def get_pipeline_rpc_worker_name(self, rank):
-        return self.pipeline_worker_map[rank]
+        return self.rpc_worker_map[rank]
 
     # init distributed groups
     def init_global_dist(
@@ -891,32 +897,47 @@ class ParallelContext(object):
             else:
                 self._register_dist(**initializer_result)
 
-    def init_pipeline_rpc_workers(self):
+    def init_rpc_workers(self):
         if self.pipeline_parallel_size > 1:
             rank = self.get_global_rank()
             world_size = self.get_world_size(ParallelMode.GLOBAL)
 
             options = rpc.TensorPipeRpcBackendOptions()
-            for other in self.get_ranks_in_group(ParallelMode.PIPELINE):
+            for other in self.get_ranks_in_group(ParallelMode.GLOBAL):
                 if other == rank:
                     continue
-                options.set_device_map(f"PP_WORKER_{other}", {rank: other})
+                options.set_device_map(f"RPC_WORKER_{other}", {rank: other})
 
             rpc.init_rpc(
-                name=self.pipeline_worker_map[rank],
+                name=self.rpc_worker_map[rank],
                 rank=rank,
                 world_size=world_size,
                 rpc_backend_options=options,
             )
 
-            # Since rpc requires global rank, need to
-            # save the global rank of model partition
-            # tree. As partitioning algorithm uses
-            # 0-th entry of device candidates, min(ranks)
-            # will give the rank of root node's device.
-            self.pipeline_local_master_rank = min(
-                self.get_ranks_in_group(ParallelMode.PIPELINE)
-            )
+    def need_tensor_group_sync(self):
+        return self.tensor_parallel_size > 1
+
+    # TODO; SP and MoE?
+    def local_ranks_to_global_rank(self, *, dp_rank, pp_rank, tp_rank):
+        return (
+            self.tensor_parallel_size * self.pipeline_parallel_size * dp_rank
+            + self.tensor_parallel_size * pp_rank
+            + tp_rank
+        )
+
+    def pp_rank_to_global_rank_for_rpc(self, pp_rank):
+        # need to get global rank of dst device for rpc.
+        # assumes that all ranks except `parallel_mode`
+        # are same between src device and dst device
+        dp_rank = self.get_local_rank(ParallelMode.DATA)
+        tp_rank = self.get_local_rank(ParallelMode.TENSOR)
+        result = self.local_ranks_to_global_rank(
+            dp_rank=dp_rank,
+            pp_rank=pp_rank,
+            tp_rank=tp_rank,
+        )
+        return result
 
     def make_ranks_to_devices(self):
         rank_tensor = torch.zeros(len(self._local_ranks), dtype=torch.long).cuda()

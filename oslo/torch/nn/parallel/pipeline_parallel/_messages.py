@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 import torch
 
 from oslo.torch.nn.parallel.pipeline_parallel._utils import (
@@ -7,11 +5,7 @@ from oslo.torch.nn.parallel.pipeline_parallel._utils import (
     _is_private,
     _is_primitive,
 )
-
-
-@dataclass
-class TensorStub(object):
-    id: int
+from oslo.torch.distributed.nn._p2p import TensorStub
 
 
 def pack_tensor_stub(obj, args_list):
@@ -21,9 +15,9 @@ def pack_tensor_stub(obj, args_list):
     """
     if torch.is_tensor(obj):
         id_ = len(args_list)
-        tensor_sub = TensorStub(id_)
+        tensor_stub = TensorStub(id_)
         args_list.append(obj)
-        obj = tensor_sub
+        obj = tensor_stub
 
         return obj, args_list
 

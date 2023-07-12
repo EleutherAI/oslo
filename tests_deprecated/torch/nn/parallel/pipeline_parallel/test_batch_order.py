@@ -1,6 +1,4 @@
-import os.path
 import time
-import types
 from copy import deepcopy
 
 # for debugging
@@ -11,6 +9,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.distributed as dist
 import torch.nn as nn
+import torch.multiprocessing as mp
 from datasets import load_dataset
 from torch.distributed import rpc
 from torch.nn import CrossEntropyLoss
@@ -31,6 +30,10 @@ from transformers.modeling_outputs import (
 from oslo.torch.distributed import ParallelContext
 from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn.parallel import PipelineParallel
+from oslo.torch.nn.parallel.pipeline_parallel._sync import (
+    _JOBS,
+    _NUM_FORWARD_USED_COUNTER,
+)
 from oslo.torch.nn.parallel.pipeline_parallel._buffers import _MODULE_DEVICE_LOCATIONS
 from oslo.torch.nn.parallel.tensor_parallel.tensor_parallel import TensorParallel
 from oslo.torch.nn.parallel.utils import parallelize
@@ -163,33 +166,14 @@ class T5Debug(T5ForConditionalGeneration):
 
 
 matplotlib.use("Agg")
-torch.autograd.set_detect_anomaly(True)
 set_seed(42)
 
-data_parallel_size = 1
-parallel_context = ParallelContext.from_torch(
-    data_parallel_size=data_parallel_size,
-    pipeline_parallel_size=2,
-    tensor_parallel_size=2,
-)
-
 current_device = torch.cuda.current_device()
-num_micro_batches = 1
+num_micro_batches = 128
 
 model_name = "gpt2"
 config = GPT2Config.from_pretrained(model_name)
 model = GPT2LMHeadModel(config)
-
-# model_name = "t5-small"
-# config = T5Config.from_pretrained(model_name)
-# config.dropout_rate = 0.0
-# model = T5ForConditionalGeneration(config)
-# model = T5Debug(config)
-
-# model_name = "facebook/bart-base"
-# config = BartConfig.from_pretrained(model_name)
-# config.dropout_rate = 0.
-# model = BartForConditionalGeneration(config)
 
 
 for n, m in model.named_modules():
@@ -199,72 +183,15 @@ for n, m in model.named_modules():
 model_no_pp = deepcopy(model)
 model_no_pp.cuda()
 
-model = TensorParallel(model, parallel_context=parallel_context)
-wrapper_pp = PipelineParallel(
-    model,
-    parallel_context=parallel_context,
-    memory_computation_balance=1.0,
-    num_micro_batches=num_micro_batches,
-)
+model_no_pp_reversed = deepcopy(model_no_pp)
+model_no_pp_reversed.cuda()
 
-wrapper_pp.train()
-
-optimizer_pp = Adam(wrapper_pp.parameters(), lr=3e-4)
-optimizer_no_pp = Adam(model_no_pp.parameters(), lr=3e-4)
-
-parallelize(wrapper_pp, parallel_context)
-
-#
-# def print_location_backward_hook(m, i, o):
-#     print(f'{torch.distributed.get_rank()=}, {m.location=}')
-#     return i
-#
-#
-# for name, m in wrapper_pp.named_modules():
-#     m: nn.Module
-#     if hasattr(m, 'location'):
-#         m.register_full_backward_hook(print_location_backward_hook)
-#
-#
-if torch.distributed.get_rank() == 1:
-    for k, v in _MODULE_DEVICE_LOCATIONS.items():
-        print(f"{k}: {v}")
-
-
-target_step = 50
-# save_dir = None
-save_dir = "tmp3"
-if save_dir is not None:
-    os.makedirs(save_dir, exist_ok=True)
-
-    def save_output_hook(name, is_parallel):
-        def hook(module, inp, outp):
-            if name == "":
-                return
-
-            if is_parallel:
-                if isinstance(outp, types.GeneratorType):
-                    return
-                torch.cuda.synchronize()
-                torch.save(
-                    outp,
-                    f"{save_dir}/output_{name}_pp_tp_{torch.distributed.get_rank()}.pkl",
-                )
-            else:
-                torch.cuda.synchronize()
-                torch.save(outp, f"{save_dir}/output_{name}_no_pp_tp.pkl")
-
-        return hook
-
-    for name, m in wrapper_pp.named_modules():
-        m.register_forward_hook(save_output_hook(name, True))
-
-    for name, m in model_no_pp.named_modules():
-        m.register_forward_hook(save_output_hook(name, False))
+optimizer = Adam(model_no_pp.parameters(), lr=3e-4)
+optimizer_reversed = Adam(model_no_pp_reversed.parameters(), lr=3e-4)
 
 
 def run():
-    batch_size = 8 * num_micro_batches
+    batch_size = 2 * num_micro_batches
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.pad_token = tokenizer.eos_token
 
@@ -272,8 +199,8 @@ def run():
     datasets = [str(sample) for sample in datasets[:8192]]
     dataloader = DataLoader(datasets, batch_size=batch_size)
 
-    pp_losses = []
-    no_pp_losses = []
+    losses = []
+    reversed_losses = []
 
     step_count = 0
     with torch.enable_grad():
@@ -289,42 +216,8 @@ def run():
 
             inputs["input_ids"][inputs["input_ids"] == tokenizer.pad_token] = -100
 
-            if data_parallel_size > 1:
-                dp_rank = parallel_context.get_local_rank(ParallelMode.DATA)
-                new_inputs = dict()
-                for key, value in inputs.items():  # assumes HF
-                    new_inputs[key] = value.chunk(data_parallel_size)[dp_rank]
-                pp_inputs = new_inputs
-            else:
-                pp_inputs = inputs
-
-            optimizer_pp.zero_grad(set_to_none=True)
-            optimizer_no_pp.zero_grad(set_to_none=True)
-
-            cum_loss_pp = torch.zeros(1).cuda()
-            partial_loss_pp = [None for _ in range(num_micro_batches)]
-
-            for _, (ind, out_pp) in enumerate(
-                wrapper_pp(**pp_inputs, labels=pp_inputs["input_ids"])
-            ):
-
-                if out_pp is not None:
-                    loss_pp = out_pp.loss
-                    # loss is scaled in PP wrapper
-                    # loss_pp = loss_pp / num_micro_batches
-                    loss_pp.backward()
-
-                    _l = loss_pp.detach().item()
-                    cum_loss_pp += _l
-                    partial_loss_pp[ind] = _l
-
-                    # print(f"{cum_loss_pp=}")
-
-                else:
-                    pass
-
-            cum_loss_no_pp = torch.zeros(1).cuda()
-            partial_loss_no_pp = [None for _ in range(num_micro_batches)]
+            optimizer.zero_grad(set_to_none=True)
+            optimizer_reversed.zero_grad(set_to_none=True)
 
             new_inputs = [dict() for _ in range(num_micro_batches)]
             for key, value in inputs.items():
@@ -341,61 +234,39 @@ def run():
                     for ind in range(num_micro_batches):
                         new_inputs[ind][key] = value
 
-            for ind, inputs in enumerate(new_inputs):
+            cum_loss = torch.zeros(1).cuda()
+            for inputs in new_inputs:
                 out_no_pp = model_no_pp(**inputs, labels=inputs["input_ids"])
                 loss_no_pp = out_no_pp.loss / num_micro_batches
                 loss_no_pp.backward()
 
-                _l = loss_no_pp.detach().item()
-                cum_loss_no_pp += _l
-                partial_loss_no_pp[ind] = _l
+                cum_loss += loss_no_pp.detach().item()
 
-            if data_parallel_size > 1:
-                if dist.get_rank() == 4:  # TODO;
-                    dist.send(cum_loss_pp, 0)
-                elif dist.get_rank() == 0:
-                    cum_loss_pp_from_4 = torch.zeros(1).cuda()
-                    dist.recv(cum_loss_pp_from_4, 4)
-                    cum_loss_pp = (cum_loss_pp + cum_loss_pp_from_4) / 2.0
-                    print(f"{dist.get_rank()}, {cum_loss_pp}, {cum_loss_no_pp}")
-            else:
-                if dist.get_rank() == 0:
-                    print(f"{dist.get_rank()}, {cum_loss_pp}, {cum_loss_no_pp}")
+            cum_loss_reversed = torch.zeros(1).cuda()
+            for inputs in reversed(new_inputs):
+                out_reversed = model_no_pp_reversed(
+                    **inputs, labels=inputs["input_ids"]
+                )
+                loss_reversed = out_reversed.loss / num_micro_batches
+                loss_reversed.backward()
 
-            print(f"RANK {torch.distributed.get_rank()} | call step {step_count}")
+                cum_loss_reversed += loss_reversed.detach().item()
 
-            # TODO; split optimizer_pp? barrier?
+            optimizer.step()
+            optimizer_reversed.step()
 
-            if save_dir is not None and step_count == target_step:
-                for name, param in wrapper_pp.named_parameters():
-                    if param.grad is not None:
-                        torch.save(
-                            param.grad,
-                            f"{save_dir}/grad_{name}_pp_tp_{torch.distributed.get_rank()}.pkl",
-                        )
-
-                for name, param in model_no_pp.named_parameters():
-                    torch.save(param.grad, f"{save_dir}/grad_{name}_no_pp.pkl")
-
-                break
-
-            optimizer_pp.step()
-            optimizer_no_pp.step()
-
+            print(f"{cum_loss=}, {cum_loss_reversed=}")
             step_count += 1
 
-            pp_losses.append(cum_loss_pp.item())
-            no_pp_losses.append(cum_loss_no_pp.item())
+            losses.append(cum_loss.item())
+            reversed_losses.append(cum_loss_reversed.item())
 
-    torch.distributed.rpc.shutdown()
-
-    if dist.get_rank() == 0:
-        plt.figure(figsize=(32, 8))
-        plt.plot(pp_losses, label="PP")
-        plt.plot(no_pp_losses, label="no PP")
-        plt.legend()
-        plt.title(f"{model_name}")
-        plt.savefig(f"{model_name} pp_vs_no_pp.png")
+    plt.figure(figsize=(32, 8))
+    plt.plot(losses, label="Baseline")
+    plt.plot(reversed_losses, label="Input order reversed")
+    plt.legend()
+    plt.title(f"{model_name}")
+    plt.savefig(f"{model_name} reversed_input_order_test.png")
 
 
 if __name__ == "__main__":
