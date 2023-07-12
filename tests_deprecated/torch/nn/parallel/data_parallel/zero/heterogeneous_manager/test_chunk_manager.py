@@ -7,11 +7,6 @@ import torch.multiprocessing as mp
 from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
     ChunkManager,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.tensor import (
-    DistributedTensorSpec,
-    DistributedParameter,
-    DistributedTensor,
-)
 from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.utils import get_free_port
 
@@ -30,12 +25,7 @@ CPU_MEM = {True: {True: 0, False: 0}, False: {True: 512, False: 0}}
 
 def exam_chunk_memory(parallel_context, keep_gathered, pin_memory):
 
-    params = [
-        DistributedTensor(
-            torch.rand(8, 8), spec=DistributedTensorSpec(parallel_context)
-        )
-        for _ in range(3)
-    ]
+    params = [torch.rand(8, 8) for _ in range(3)]
     config = {2: dict(chunk_size=128, keep_gathered=keep_gathered)}
 
     chunk_manager = ChunkManager(config)
@@ -43,7 +33,9 @@ def exam_chunk_memory(parallel_context, keep_gathered, pin_memory):
     assert chunk_manager.total_mem["cuda"] == 0
 
     for p in params:
-        chunk_manager.register_tensor(p, "param", 2, pin_memory=pin_memory)
+        chunk_manager.register_tensor(
+            p, "param", 2, parallel_context=parallel_context, pin_memory=pin_memory
+        )
     chunk_manager.close_all_groups()
     assert chunk_manager.total_mem["cpu"] == CPU_MEM[keep_gathered][pin_memory]
     assert chunk_manager.total_mem["cuda"] == CUDA_MEM_0[keep_gathered]

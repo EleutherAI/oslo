@@ -10,7 +10,6 @@ from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
     TensorState,
     Chunk,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.tensor import DistributedParameter
 from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.utils import get_free_port
 from oslo.torch.nn.parallel.data_parallel.zero.utils import get_current_device
@@ -29,7 +28,7 @@ def dist_sum(x):
 
 
 def add_param(param_list, param_cp_list, *args, **kwargs):
-    param = DistributedParameter(torch.randn(*args, **kwargs))
+    param = torch.randn(*args, **kwargs)
     param_list.append(param)
     param_cp_list.append(param.clone())
 
