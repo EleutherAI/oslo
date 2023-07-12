@@ -18,16 +18,8 @@ from oslo.torch.nn.parallel.data_parallel._utils import (
     DistributedBackwardFunction,
 )
 
-from oslo.torch.nn.parallel.data_parallel.zero.fully_sharded_data_parallel import (
-    _FullyShardedDataParallel,
-)
-from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim import (
-    ZeroRedundancyOptimizer,
-    _HeterogeneousZeroOptimizer,
-)
-
 from enum import Enum, auto
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Any
 
 
 class ShardingStrategy(Enum):
@@ -36,12 +28,11 @@ class ShardingStrategy(Enum):
     FULL_SHARD = auto()
 
 
-# Type hint for DistributedDataParallel output
 def DistributedDataParallel(
     module: nn.Module,
     parallel_context: ParallelContext,
-    bucket_cap_mb: int = 25,
-    rebuild_bucket: bool = True,
+    model_wrapper_config: Optional[Dict[str, Any]] = None,
+    optimizer_wrapper_config: Optional[Dict[str, Any]] = None,
     sharding_strategy: Optional[ShardingStrategy] = None,
     optimizer: Optional[torch.optim.Optimizer] = None,
 ) -> Tuple[nn.Module, Optional[torch.optim.Optimizer]]:
@@ -49,13 +40,14 @@ def DistributedDataParallel(
         assert (
             optimizer is not None
         ), "optimizer must be provided when sharding_strategy is not None"
+        from oslo.torch.nn.parallel.data_parallel import zero
+
+    model_wrapper_config = model_wrapper_config or {}
+    optimizer_wrapper_config = optimizer_wrapper_config or {}
 
     def default_strategy():
         ddp = _DistributedDataParallel(
-            module=module,
-            parallel_context=parallel_context,
-            bucket_cap_mb=bucket_cap_mb,
-            rebuild_bucket=rebuild_bucket,
+            module=module, parallel_context=parallel_context, **model_wrapper_config
         )
         add_wrapper(
             module,
@@ -66,29 +58,35 @@ def DistributedDataParallel(
         return module
 
     def shard_state_op_strategy():
-        return module, ZeroRedundancyOptimizer(
+        optimizer_wrapper_config.pop("partition_grad", None)
+        return module, zero.ZeroRedundancyOptimizer(
             optimizer,
             parallel_context=parallel_context,
             partition_grad=False,
+            **optimizer_wrapper_config,
         )
 
     def shard_grad_op_strategy():
-        return module, ZeroRedundancyOptimizer(
+        optimizer_wrapper_config.pop("partition_grad", None)
+        return module, zero.ZeroRedundancyOptimizer(
             optimizer,
             parallel_context=parallel_context,
             partition_grad=True,
+            **optimizer_wrapper_config,
         )
 
     def full_shard_strategy():
-        fsdp = _FullyShardedDataParallel(
+        fsdp = zero._FullyShardedDataParallel(
             module=module,
             device=torch.device("cuda"),
             parallel_context=parallel_context,
             force_outputs_fp32=True,
+            **model_wrapper_config,
         )
-        opt = _HeterogeneousZeroOptimizer(
+        opt = zero._HeterogeneousZeroOptimizer(
             optimizer,
             module=fsdp,
+            **optimizer_wrapper_config,
         )
         add_wrapper(
             module,

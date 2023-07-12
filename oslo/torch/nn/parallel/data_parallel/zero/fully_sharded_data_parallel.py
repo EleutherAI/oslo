@@ -81,7 +81,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
         parallel_context: ParallelContext = None,
         placement_policy: str = "cuda",
         pin_memory: bool = False,
-        force_outputs_fp32: bool = False,
+        force_outputs_fp32: bool = True,
         search_range_mb: int = 32,
         hidden_dim: Optional[int] = None,
         min_chunk_size_mb: float = 32,
