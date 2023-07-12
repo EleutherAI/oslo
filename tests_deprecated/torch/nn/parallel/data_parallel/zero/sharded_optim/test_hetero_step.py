@@ -8,13 +8,16 @@ from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.nn.parallel.data_parallel.zero.fully_sharded_data_parallel import (
     _FullyShardedDataParallel,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim import _HeterogeneousZeroOptimizer
+from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim import (
+    _HeterogeneousZeroOptimizer,
+)
 import copy
 import pytest
 
 skip_if_dist_unavailable = pytest.mark.skipif(
     torch.cuda.device_count() < 2, reason="dist required"
 )
+
 
 class MlpModel(nn.Module):
     def __init__(self):
@@ -27,19 +30,22 @@ class MlpModel(nn.Module):
         x = self.linear2(x)
         return x
 
-def check_param(model: _FullyShardedDataParallel, torch_model: torch.nn.Module, dtype: torch.dtype, rtol: float = 1e-3, atol: float = 4e-3):
-    zero_dict = model.state_dict(only_rank_0=False, dtype=dtype)
+
+def check_param(
+    model: _FullyShardedDataParallel,
+    torch_model: torch.nn.Module,
+    rtol: float = 1e-3,
+    atol: float = 4e-3,
+):
+    zero_dict = model.state_dict(only_rank_0=False)
     torch_dict = torch_model.state_dict()
 
     for key, value in torch_dict.items():
-        key = key.replace('module.', '')
+        key = key.replace("module.", "")
         assert key in zero_dict, "{} not in ZeRO dictionary.".format(key)
         temp_zero_value = zero_dict[key].to(device=value.device)
-        torch.allclose(value.float(),
-                     temp_zero_value.float(),
-                     rtol=rtol,
-                     atol=atol,
-                     msg=lambda s: s + f'\n{key}\n{temp_zero_value.dtype}')
+        torch.allclose(value.float(), temp_zero_value.float(), rtol=rtol, atol=atol)
+
 
 def run_dist(rank, world_size):
     os.environ["RANK"] = str(rank)
@@ -79,7 +85,7 @@ def run_dist(rank, world_size):
     torch_optim.step()
     fsdp_optim.step()
 
-    check_param(fsdp_model, model, torch.float32)
+    check_param(fsdp_model, model)
     print(f"Test passed on rank {rank}!")
 
 

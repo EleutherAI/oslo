@@ -7,11 +7,6 @@ import torch.multiprocessing as mp
 from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
     ChunkManager,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.tensor import (
-    DistributedTensorSpec,
-    DistributedParameter,
-    DistributedTensor,
-)
 from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.utils import get_free_port
 
@@ -28,14 +23,9 @@ CUDA_MEM_1 = {False: 0, True: 1024}
 CPU_MEM = {True: {True: 0, False: 0}, False: {True: 512, False: 0}}
 
 
-def exam_chunk_memory(parallel_context, keep_gathered, pin_memory):
+def exam_chunk_memory(keep_gathered, pin_memory):
 
-    params = [
-        DistributedTensor(
-            torch.rand(8, 8), spec=DistributedTensorSpec(parallel_context)
-        )
-        for _ in range(3)
-    ]
+    params = [torch.rand(8, 8) for _ in range(3)]
     config = {2: dict(chunk_size=128, keep_gathered=keep_gathered)}
 
     chunk_manager = ChunkManager(config)
@@ -70,13 +60,13 @@ def exam_chunk_memory(parallel_context, keep_gathered, pin_memory):
 def run_dist(rank, world_size):
     os.environ["RANK"] = str(rank)
     os.environ["LOCAL_RANK"] = str(rank)
-    parallel_context = ParallelContext.from_torch(data_parallel_size=world_size)
+    ParallelContext.from_torch(data_parallel_size=world_size)
 
     keep_gathered = [True, False]
     pin_memory = [True, False]
 
     for args in itertools.product(keep_gathered, pin_memory):
-        exam_chunk_memory(parallel_context, *args)
+        exam_chunk_memory(*args)
 
 
 @skip_if_dist_unavailable

@@ -16,6 +16,7 @@ skip_if_dist_unavailable = pytest.mark.skipif(
     torch.cuda.device_count() < 2, reason="dist required"
 )
 
+
 class MlpModel(nn.Module):
     def __init__(self):
         super(MlpModel, self).__init__()

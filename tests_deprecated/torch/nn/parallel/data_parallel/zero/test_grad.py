@@ -15,6 +15,7 @@ skip_if_dist_unavailable = pytest.mark.skipif(
     torch.cuda.device_count() < 2, reason="dist required"
 )
 
+
 class MlpModel(nn.Module):
     def __init__(self):
         super(MlpModel, self).__init__()
@@ -35,7 +36,7 @@ def check_grad(model: _FullyShardedDataParallel, torch_model: torch.nn.Module):
         chunk_manager.access_chunk(chunk)
 
     for (p0, p1) in zip(model.parameters(), torch_model.parameters()):
-        torch.allclose(p0, p1.grad, rtol=1e-3, atol=5e-5)
+        torch.allclose(p0.float(), p1.grad, rtol=1e-3, atol=5e-5)
 
 
 def run_dist(rank, world_size):

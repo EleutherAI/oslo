@@ -15,6 +15,7 @@ skip_if_dist_unavailable = pytest.mark.skipif(
     torch.cuda.device_count() < 2, reason="dist required"
 )
 
+
 class MlpModel(nn.Module):
     def __init__(self):
         super(MlpModel, self).__init__()
@@ -26,6 +27,7 @@ class MlpModel(nn.Module):
         x = self.linear2(x)
         return x
 
+
 def run_dist(rank, world_size):
     os.environ["RANK"] = str(rank)
     os.environ["LOCAL_RANK"] = str(rank)
@@ -33,7 +35,7 @@ def run_dist(rank, world_size):
 
     device = torch.device(f"cuda:{rank}" if torch.cuda.is_available() else "cpu")
 
-    model = MlpModel()
+    model = MlpModel().to(device)
     fsdp_model = _FullyShardedDataParallel(
         MlpModel(),
         device,
@@ -47,7 +49,9 @@ def run_dist(rank, world_size):
 
     for key, value in torch_dict.items():
         assert key in zero_dict, "{} not in ZeRO dictionary.".format(key)
-        assert value.shape == zero_dict[key].shape, "{} shape mismatch {} vs {}".format(key, value.shape, zero_dict[key].shape)
+        assert value.shape == zero_dict[key].shape, "{} shape mismatch {} vs {}".format(
+            key, value.shape, zero_dict[key].shape
+        )
 
     fsdp_model.load_state_dict(torch_dict, strict=False)
 
