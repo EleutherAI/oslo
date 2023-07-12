@@ -16,8 +16,7 @@
 
 import math
 import warnings
-from enum import Enum
-from typing import Any, Dict, Set, Tuple
+from typing import Any, Dict, Set, Tuple, TYPE_CHECKING
 
 import torch
 import torch.distributed as dist
@@ -38,9 +37,11 @@ from oslo.torch.nn.parallel.data_parallel._utils import (
 )
 
 from oslo.torch.nn.parallel.data_parallel.zero.chunk import Chunk, ChunkManager
-from oslo.torch.nn.parallel.data_parallel.zero.fully_sharded_data_parallel import (
-    _FullyShardedDataParallel,
-)
+
+if TYPE_CHECKING:
+    from oslo.torch.nn.parallel.data_parallel.zero.fully_sharded_data_parallel import (
+        _FullyShardedDataParallel,
+    )
 
 import functools
 
@@ -87,7 +88,7 @@ class _HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
     def __init__(
         self,
         optim: Optimizer,
-        module: _FullyShardedDataParallel,
+        module: "_FullyShardedDataParallel",
         gpu_margin_mem_ratio: float = 0.0,
         clipping_norm: float = 0.0,
         norm_type: float = 2.0,
@@ -96,7 +97,6 @@ class _HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
         **kwargs: Any,
     ):
         super().__init__(optim)
-        assert isinstance(module, _FullyShardedDataParallel)
         self.module = module
         self.heterogeneous_manager = module.heterogeneous_manager
         self.chunk_manager: ChunkManager = self.heterogeneous_manager.chunk_manager
