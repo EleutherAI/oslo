@@ -47,6 +47,12 @@ try:
 except ImportError:
     print("You have to install `transformers` to use `oslo.transformers` modules")
 
+try:
+    from flash_attn.flash_attention import FlashAttention
+except ImportError:
+    raise ImportError('FlashAttention is not installed, please install with '
+                                  'pip install flash-attn')
+
 
 logger = logging.get_logger(__name__)
 
@@ -163,6 +169,7 @@ class BertEmbeddings(nn.Module):
         embeddings = self.LayerNorm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
+
 
 
 class BertSelfAttention(nn.Module):
@@ -347,13 +354,15 @@ class BertSelfOutput(nn.Module):
 
 
 class BertAttention(nn.Module):
-    def __init__(self, config, position_embedding_type=None, use_lightseq2=True):
+    def __init__(self, config, position_embedding_type=None, attn_mode="lightseq2"):
         super().__init__()
-        self.use_lightseq2 = use_lightseq2
+        self.attn_mode = attn_mode
 
-        if use_lightseq2:
+        if self.attn_mode == "lightseq2":
             self.layer = LSMultiheadAttentionLayer(config)
-        else:
+        elif self.attn_mode == "flash_attn":
+            self.layer = FlashAttention(attention_dropout=config.hidden_dropout_prob)
+        else: # self.attn_mode == "core_attn":
             self.self = BertSelfAttention(
                 config, position_embedding_type=position_embedding_type
             )
@@ -361,7 +370,7 @@ class BertAttention(nn.Module):
             self.pruned_heads = set()
 
     def prune_heads(self, heads):
-        if not self.use_lightseq2:
+        if self.attn_mode == "core_attn":
             if len(heads) == 0:
                 return
             heads, index = find_pruneable_heads_and_indices(
@@ -394,12 +403,23 @@ class BertAttention(nn.Module):
         past_key_value: Optional[Tuple[Tuple[torch.FloatTensor]]] = None,
         output_attentions: Optional[bool] = False,
     ) -> Tuple[torch.Tensor]:
-        if self.use_lightseq2:
+        if self.attn_mode == "lightseq2":
             # dimension체크 필요 -> lightseq2는 특정 dimension만 허용
             outputs = self.layer(hidden_states, attention_mask)
             # self.is_decoder에 대한 처리가 필요함
             # context_layer, attention_probs
             return outputs
+        elif self.attn_mode == "flash_attn":
+            # TODO: 2023. 07. 13.
+            # key_padding_mask는 float가 아닌 boolean타입을 요구
+            # 아래 변환에 대해서 동작 확인 필요
+            if attention_mask is not None:
+                key_padding_mask = attention_mask > 0
+            else:
+                key_padding_mask = None
+
+            output = self.layer(hidden_states, key_padding_mask=key_padding_mask)
+            return (output,)
         else:
             self_outputs = self.self(
                 hidden_states,
