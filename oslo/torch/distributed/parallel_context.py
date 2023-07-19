@@ -902,7 +902,7 @@ class ParallelContext(object):
             rank = self.get_global_rank()
             world_size = self.get_world_size(ParallelMode.GLOBAL)
 
-            options = rpc.TensorPipeRpcBackendOptions()
+            options = rpc.TensorPipeRpcBackendOptions(_transports=["uv"])
             for other in self.get_ranks_in_group(ParallelMode.GLOBAL):
                 if other == rank:
                     continue
