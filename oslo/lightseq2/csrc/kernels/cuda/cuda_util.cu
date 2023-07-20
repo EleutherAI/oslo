@@ -1,4 +1,5 @@
 #include <thrust/device_vector.h>
+#include <thrust/transform_reduce.h>
 #include <thrust/reduce.h>
 
 #include "cuda_util.h"
