@@ -59,10 +59,14 @@ class ModelPartitioner(object):
 
     @staticmethod
     def _set_attribute_without_param(element, node):
+
+        # TODO; how to find correct actual pp rank?
+        rank = dist.get_rank()
+
         if hasattr(element, "oslo_parallel"):
-            element.oslo_parallel[ParallelMode.PIPELINE] = dist.get_rank()
+            element.oslo_parallel[ParallelMode.PIPELINE] = rank
         else:
-            element.oslo_parallel = {ParallelMode.PIPELINE: dist.get_rank()}
+            element.oslo_parallel = {ParallelMode.PIPELINE: rank}
 
         if node.parent is None:
             setattr(element, "oslo_pp_parent_rank", node.device)
@@ -98,6 +102,7 @@ class ModelPartitioner(object):
         for node in post_order_traverse(self.root_node):
             for module in node.modules:
                 if len(self._get_parameters(module)) == 0:
+                    # if self._get_parameters_in_module(module) == 0:
                     self._set_attribute_without_param(module, node)
                 else:
                     self._set_attribute(module, node)
@@ -107,6 +112,20 @@ class ModelPartitioner(object):
                     for buffer in module.buffers():
                         if not hasattr(buffer, "oslo_pp_attr_set"):
                             self._set_attribute(buffer, node)
+
+        # # roll back root node's rank to zero
+        # for module in self.root_node.modules:
+        #     module.oslo_parallel[ParallelMode.PIPELINE] = 0
+        #     setattr(module, "oslo_actual_pp_rank", 0)
+        #     setattr(module, "oslo_pp_parent_rank", 0)
+
+    @staticmethod
+    def _get_parameters_in_module(module):
+        num_params = 0
+        for name, param in module.named_parameters():
+            if "." not in name:
+                num_params += 1
+        return num_params
 
     @staticmethod
     def _get_parameters(module, to_list=True):
