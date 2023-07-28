@@ -2,7 +2,6 @@ import os
 import glob
 
 import torch
-import einops
 
 
 save_dir = "tmp4"
@@ -10,7 +9,7 @@ save_dir = "tmp4"
 
 def main():
     file_names = os.listdir(f"{save_dir}/")
-    no_pp_names = sorted([fn for fn in file_names if "no_pp" in fn and "output_" in fn])
+    no_pp_names = sorted([fn for fn in file_names if "no_pp" in fn and "grad_" in fn])
 
     print(len(no_pp_names))
 
@@ -40,28 +39,7 @@ def main():
             print(f"pass {no_pp_path}")
             continue
 
-        print(f"{pp_tp_data[0].shape=}, {no_pp_data.shape=}")
-
-        if any([x in no_pp_name for x in [".attn_dropout"]]):
-            pp_tp_data = torch.cat(pp_tp_data, 1)
-
-        elif any([x in no_pp_name for x in [".mlp.act", ".mlp.c_fc"]]):
-            pp_tp_data = torch.cat(pp_tp_data, -1)
-
-        # qkv reshape
-        elif any([x in no_pp_name for x in [".c_attn"]]):
-            for i in range(len(pp_tp_data)):
-                pp_tp_data[i] = einops.rearrange(
-                    pp_tp_data[i], "b t (n d) -> b t n d", n=3
-                )
-            pp_tp_data = torch.stack(pp_tp_data, 0)
-            pp_tp_data = einops.rearrange(pp_tp_data, "m b t n d -> b t (n m d)")
-
-        # no split
-        else:
-            pp_tp_data = pp_tp_data[0]
-
-        print(f"{pp_tp_data.shape=}, {no_pp_data.shape=}")
+        pp_tp_data = pp_tp_data[0]
 
         if not torch.allclose(pp_tp_data, no_pp_data):
             print(f"   >>> diff: {torch.sum(torch.abs(pp_tp_data - no_pp_data))}")
@@ -70,7 +48,6 @@ def main():
             diff_cnt += 1
             diff_names.append(no_pp_name)
 
-            # break
         else:
             same_names.append(no_pp_name)
 

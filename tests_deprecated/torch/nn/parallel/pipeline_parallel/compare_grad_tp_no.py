@@ -79,7 +79,7 @@ def main():
                 tp_data = torch.cat(tp_data, 0)
 
         if any([x in no_tp_name for x in [".wpe", ".wte"]]):
-            tp_data = tp_data[:no_tp_data.size(0)]
+            tp_data = tp_data[: no_tp_data.size(0)]
 
         print(f"{tp_data.shape=}, {no_tp_data.shape=}")
 

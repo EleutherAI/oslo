@@ -54,6 +54,6 @@ def register_location_for_forward_counter(location):
 
 def make_unique_key(location, from_, to_):
     cnt = _NUM_FORWARD_USED_COUNTER[location]
-    unique_key = (location, cnt, from_, to_)
+    unique_key = (location, cnt, from_, to_, "request")
     _NUM_FORWARD_USED_COUNTER[location] += 1
     return unique_key

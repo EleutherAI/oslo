@@ -465,6 +465,7 @@ class _PipelineParallel(OsloParallelWrapper):
                         dst=module_device.index,
                     )
 
+                    unique_key = tuple(list(unique_key)[:-1] + ["response"])
                     tensors = apply_backward_job_enqueue(meta, unique_key, *tensors)
 
                 result, _ = unpack_tensor_stub(result_stub, tensors)

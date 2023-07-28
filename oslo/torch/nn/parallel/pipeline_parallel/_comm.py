@@ -111,17 +111,30 @@ def enqueue_data(data, recv_key):
     QUEUES.RECV_QUEUES[recv_key].put(data)
 
 
+def enqueue_activation(data, recv_key):
+    QUEUES.RECV_QUEUES[recv_key].put(data)
+
+
 def _send(
     data,
     src_rank,
     dst_rank,
     recv_key,
 ):
-    rpc.rpc_sync(
-        to=f"RPC_WORKER_{dst_rank}",
-        func=enqueue_data,
-        args=(data, recv_key),
-    )
+    is_forward = data[META_NAME]["is_forward"]
+
+    if is_forward:
+        rpc.rpc_sync(
+            to=f"RPC_WORKER_{dst_rank}",
+            func=enqueue_data,
+            args=(data, recv_key),
+        )
+    else:
+        rpc.rpc_sync(
+            to=f"RPC_WORKER_{dst_rank}",
+            func=enqueue_activation,
+            args=(data, recv_key),
+        )
 
 
 def _recv(recv_key):
@@ -138,6 +151,7 @@ def send_data(
     dst_rank: int,
 ):
     recv_key = data[KEY_NAME]
+
     q = Queue()
     QUEUES.HANDSHAKE_QUEUES[recv_key] = q
 
@@ -154,19 +168,26 @@ def send_data(
     r = q.get()
 
     # TODO; okay?
-    torch.cuda.set_device(torch.distributed.get_rank())
-    s = torch.cuda.Stream()
-    e = torch.cuda.Event()
-    with torch.cuda.stream(s):
-        _send(
-            data,
-            src_rank,
-            dst_rank,
-            recv_key=recv_key,
-        )
+    # torch.cuda.set_device(torch.distributed.get_rank())
+    # s = torch.cuda.Stream()
+    # e = torch.cuda.Event()
+    # with torch.cuda.stream(s):
+    #     _send(
+    #         data,
+    #         src_rank,
+    #         dst_rank,
+    #         recv_key=recv_key,
+    #     )
+    #
+    # e.record(s)
+    # e.synchronize()
 
-    e.record(s)
-    e.synchronize()
+    _send(
+        data,
+        src_rank,
+        dst_rank,
+        recv_key=recv_key,
+    )
 
     del QUEUES.HANDSHAKE_QUEUES[recv_key]
     del q
@@ -181,13 +202,15 @@ def recv_data(
 
     torch.cuda.set_device(torch.distributed.get_rank())
 
-    s = torch.cuda.Stream()
-    e = torch.cuda.Event()
-    with torch.cuda.stream(s):
-        data = _recv(recv_key)
+    # s = torch.cuda.Stream()
+    # e = torch.cuda.Event()
+    # with torch.cuda.stream(s):
+    #     data = _recv(recv_key)
+    #
+    # e.record(s)
+    # e.synchronize()
 
-    e.record(s)
-    e.synchronize()
+    data = _recv(recv_key)
 
     unique_key = data[KEY_NAME]
     value = data[VALUE_NAME]
@@ -213,6 +236,59 @@ def recv_data(
 
     # report to checker
     # TODO;
+
+    # register job
+    register_job(job)
+
+
+def recv_activation(
+    src_rank,
+    dst_rank,
+    recv_key,
+):
+    parallel_context = COMM_INFO.PARALLEL_CONTEXT
+
+    torch.cuda.set_device(torch.distributed.get_rank())
+
+    data = _recv(recv_key)
+
+    unique_key = data[KEY_NAME]
+    value = data[VALUE_NAME]
+    metadata = data[META_NAME]
+
+    # make a Job object
+    meta = Metadata(
+        is_request=metadata["is_request"],
+        is_forward=metadata["is_forward"],
+        is_training=metadata["is_training"],
+        is_grad_enabled=metadata["is_grad_enabled"],
+        is_fp16=metadata["is_fp16"],
+        func_name=metadata["func_name"],
+        src=metadata["src"],
+        dst=metadata["dst"],
+    )
+
+    job = Backward(
+        tensors=value,
+        unique_key=unique_key,
+        stub=None,
+        meta=meta,
+    )
+
+    parallel_context = COMM_INFO.PARALLEL_CONTEXT
+
+    if parallel_context.need_tensor_group_sync():
+        master_rank = min(parallel_context.get_ranks_in_group(ParallelMode.TENSOR))
+        # remove src and dst from key, because
+        #   those are rank local
+        sync_key = (unique_key[0], unique_key[1], master_rank)
+
+        # a queue for sync done notification
+        QUEUES.TENSOR_GROUP_NOTIFICATION_QUEUES[sync_key] = Queue()
+
+        # add a queue for synchronization
+        if parallel_context.is_first_rank(ParallelMode.TENSOR):
+            QUEUES.TENSOR_GROUP_SYNC_QUEUES[sync_key] = Queue()
 
     # register job
     register_job(job)

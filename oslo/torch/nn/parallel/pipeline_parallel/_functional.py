@@ -22,11 +22,13 @@ from oslo.torch.nn.parallel.pipeline_parallel._job import (
     Input,
     HandshakeRequest,
     HandshakeResponse,
+    HandshakeBackward,
     Metadata,
 )
 from oslo.torch.nn.parallel.pipeline_parallel._comm import (
     send_data,
     recv_data,
+    recv_activation,
     enqueue_handshake_resp,
     enqueue_backward_job,
     notify_last_backward_done,
@@ -149,7 +151,6 @@ def start_job(job):
                 data[KEY_NAME] = unique_key
                 data[META_NAME] = new_meta
 
-                # TODO; need a handshake?
                 # return; send to other device
                 send_results(
                     data=data,
@@ -158,8 +159,29 @@ def start_job(job):
                 )
 
             else:  # backward
+
+                print(f"{unique_key=}")
+
+                toc = time.time()
+                print(f"{toc=}")
+
                 activation = pop_activation(unique_key)
                 grad_outputs = tensors
+
+                if unique_key[0] == "module.lm_head":
+                    if unique_key[-1] == "request":
+                        filename = "saved_activation.pkl"
+                        torch.save(activation[0].cpu(), filename)
+
+                    if unique_key[-1] == "response":
+                        filename = "saved_grad.pkl"
+                        torch.save(grad_outputs[0].cpu(), filename)
+
+                    print(f"{len(activation)=}, {len(grad_outputs)=}")
+
+                    for x, y in zip(activation, grad_outputs):
+                        print(f"{x.shape=}")
+                        print(f"{y.shape=}")
 
                 new_act = []
                 new_grad = []
@@ -243,6 +265,8 @@ def start_job(job):
 
                 while not s.query():
                     sleep()
+
+                torch.cuda.synchronize()
 
                 parallel_context = COMM_INFO.PARALLEL_CONTEXT
                 if parallel_context.need_tensor_group_sync():
@@ -364,6 +388,29 @@ def start_job(job):
         q = QUEUES.HANDSHAKE_QUEUES[job.unique_key]
         q.put(f"okay - {job.unique_key}")
 
+    # TODO; make the code efficient
+    #    consider merge with `HandshakeRequest`
+    elif isinstance(job, HandshakeBackward):
+        # notify source rank
+        src = job.src
+        dst = job.dst
+
+        # create and register a queue for receive
+        q = Queue()
+        QUEUES.RECV_QUEUES[job.recv_key] = q
+
+        rpc.rpc_sync(
+            to=f"RPC_WORKER_{src}",
+            func=enqueue_handshake_resp,
+            args=(src, dst, job.unique_key),  # reverse
+        )
+
+        recv_activation(
+            src,
+            dst,
+            job.recv_key,
+        )
+
 
 def launch_forward(
     requested_from,
@@ -402,6 +449,7 @@ def launch_forward(
         any([t.requires_grad for t in tensors]) and is_training and is_grad_enabled
     )
     if need_activation_save:
+        unique_key = tuple(list(unique_key)[:-1] + ["response"])
         save_activation(unique_key, tensors)
 
     return result_stub, tensors
@@ -433,11 +481,50 @@ class _BackwardJobEnqueue(torch.autograd.Function):
         meta = ctx.meta
         unique_key = ctx.unique_key
 
-        rpc.rpc_sync(
-            to=meta.dst,
-            func=enqueue_backward_job,
-            args=(meta, unique_key, *grad_outputs),
-        )
+        torch.cuda.synchronize()
+
+        # rpc.rpc_sync(
+        #     to=meta.dst,
+        #     func=enqueue_backward_job,
+        #     args=(meta, unique_key, *grad_outputs),
+        # )
+
+        # make data
+        data = dict()
+        value = {
+            "stub": None,
+            "tensors": grad_outputs,
+        }
+        new_meta = {
+            "is_request": True,
+            "is_first": False,
+            "is_forward": False,
+            "is_training": meta.is_training,
+            "is_grad_enabled": meta.is_grad_enabled,
+            "is_fp16": meta.is_fp16,
+            "func_name": meta.func_name,
+            "src": meta.src,
+            "dst": meta.dst,
+        }
+
+        data[VALUE_NAME] = value
+        data[KEY_NAME] = unique_key
+        data[META_NAME] = new_meta
+
+        tic = time.time()
+
+        if unique_key[0] == "module.lm_head":
+            if unique_key[-1] == "response":
+                filename = "sent_grad.pkl"
+                torch.save(grad_outputs[0].cpu(), filename)
+
+        print(f"{tic=}")
+
+        send_data(data, meta.src, meta.dst)
+
+        toc = time.time()
+
+        print(f"{toc - tic}, {tic=}, {toc=}")
 
         return (None,) * ctx.num_nones
 

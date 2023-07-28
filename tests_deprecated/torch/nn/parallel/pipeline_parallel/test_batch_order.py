@@ -30,7 +30,10 @@ from transformers.modeling_outputs import (
 from oslo.torch.distributed import ParallelContext
 from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn.parallel import PipelineParallel
-from oslo.torch.nn.parallel.pipeline_parallel._sync import _JOBS, _NUM_FORWARD_USED_COUNTER
+from oslo.torch.nn.parallel.pipeline_parallel._sync import (
+    _JOBS,
+    _NUM_FORWARD_USED_COUNTER,
+)
 from oslo.torch.nn.parallel.pipeline_parallel._buffers import _MODULE_DEVICE_LOCATIONS
 from oslo.torch.nn.parallel.tensor_parallel.tensor_parallel import TensorParallel
 from oslo.torch.nn.parallel.utils import parallelize
@@ -211,7 +214,7 @@ def run():
                 max_length=128,
             ).to("cuda")
 
-            inputs['input_ids'][inputs['input_ids'] == tokenizer.pad_token] = -100
+            inputs["input_ids"][inputs["input_ids"] == tokenizer.pad_token] = -100
 
             optimizer.zero_grad(set_to_none=True)
             optimizer_reversed.zero_grad(set_to_none=True)
@@ -241,7 +244,9 @@ def run():
 
             cum_loss_reversed = torch.zeros(1).cuda()
             for inputs in reversed(new_inputs):
-                out_reversed = model_no_pp_reversed(**inputs, labels=inputs["input_ids"])
+                out_reversed = model_no_pp_reversed(
+                    **inputs, labels=inputs["input_ids"]
+                )
                 loss_reversed = out_reversed.loss / num_micro_batches
                 loss_reversed.backward()
 

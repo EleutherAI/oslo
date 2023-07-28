@@ -150,3 +150,10 @@ class HandshakeResponse(Handshake):
 
 
 _ORDERING[HandshakeResponse] = 0
+
+
+class HandshakeBackward(Handshake):
+    pass
+
+
+_ORDERING[HandshakeBackward] = -1

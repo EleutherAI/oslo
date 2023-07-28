@@ -33,5 +33,5 @@ def save_activation(key, activation):
 
 
 def pop_activation(key):
-    return _ACTIVATIONS.pop(key, [])  # TODO; okay?
-    # return _ACTIVATIONS.pop(key)
+    # return _ACTIVATIONS.pop(key, [])  # TODO; okay?
+    return _ACTIVATIONS.pop(key)

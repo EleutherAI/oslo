@@ -20,7 +20,10 @@ from transformers import (
     AutoTokenizer,
     GPT2Config,
     GPT2LMHeadModel,
+    T5Config,
     T5ForConditionalGeneration,
+    OpenAIGPTModel,
+    OpenAIGPTConfig,
     set_seed,
 )
 from transformers.modeling_outputs import (
@@ -169,8 +172,8 @@ set_seed(42)
 data_parallel_size = 1
 parallel_context = ParallelContext.from_torch(
     data_parallel_size=data_parallel_size,
-    pipeline_parallel_size=2,
-    tensor_parallel_size=2,
+    pipeline_parallel_size=4,
+    tensor_parallel_size=1,
 )
 
 current_device = torch.cuda.current_device()
@@ -191,6 +194,11 @@ model = GPT2LMHeadModel(config)
 # config.dropout_rate = 0.
 # model = BartForConditionalGeneration(config)
 
+# model_name = "openai-gpt"
+# config = OpenAIGPTConfig.from_pretrained(model_name)
+# config.dropout_rate = 0.0
+# model = OpenAIGPTModel(config)
+
 
 for n, m in model.named_modules():
     if isinstance(m, nn.Dropout):
@@ -199,7 +207,7 @@ for n, m in model.named_modules():
 model_no_pp = deepcopy(model)
 model_no_pp.cuda()
 
-model = TensorParallel(model, parallel_context=parallel_context)
+# model = TensorParallel(model, parallel_context=parallel_context)
 wrapper_pp = PipelineParallel(
     model,
     parallel_context=parallel_context,
@@ -231,9 +239,9 @@ if torch.distributed.get_rank() == 1:
         print(f"{k}: {v}")
 
 
-target_step = 50
-# save_dir = None
-save_dir = "tmp3"
+target_step = 2
+save_dir = None
+# save_dir = "tmp4"
 if save_dir is not None:
     os.makedirs(save_dir, exist_ok=True)
 
@@ -246,7 +254,10 @@ if save_dir is not None:
                 if isinstance(outp, types.GeneratorType):
                     return
                 torch.cuda.synchronize()
-                torch.save(outp, f"{save_dir}/output_{name}_pp_tp_{torch.distributed.get_rank()}.pkl")
+                torch.save(
+                    outp,
+                    f"{save_dir}/output_{name}_pp_tp_{torch.distributed.get_rank()}.pkl",
+                )
             else:
                 torch.cuda.synchronize()
                 torch.save(outp, f"{save_dir}/output_{name}_no_pp_tp.pkl")
@@ -261,9 +272,11 @@ if save_dir is not None:
 
 
 def run():
-    batch_size = 8 * num_micro_batches
+    batch_size = 128 * num_micro_batches
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.pad_token = tokenizer.eos_token
+
+    # tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 
     datasets = load_dataset("squad").data["train"]["context"]
     datasets = [str(sample) for sample in datasets[:8192]]
@@ -284,7 +297,7 @@ def run():
                 max_length=128,
             ).to("cuda")
 
-            inputs['input_ids'][inputs['input_ids'] == tokenizer.pad_token] = -100
+            inputs["input_ids"][inputs["input_ids"] == tokenizer.pad_token] = -100
 
             if data_parallel_size > 1:
                 dp_rank = parallel_context.get_local_rank(ParallelMode.DATA)
@@ -366,7 +379,10 @@ def run():
             if save_dir is not None and step_count == target_step:
                 for name, param in wrapper_pp.named_parameters():
                     if param.grad is not None:
-                        torch.save(param.grad, f"{save_dir}/grad_{name}_pp_tp_{torch.distributed.get_rank()}.pkl")
+                        torch.save(
+                            param.grad,
+                            f"{save_dir}/grad_{name}_pp_tp_{torch.distributed.get_rank()}.pkl",
+                        )
 
                 for name, param in model_no_pp.named_parameters():
                     torch.save(param.grad, f"{save_dir}/grad_{name}_no_pp.pkl")
