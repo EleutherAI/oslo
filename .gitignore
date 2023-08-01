@@ -404,7 +404,6 @@ wandb/
 **/nohup.out
 
 # tests
-gcc_install.sh
 tests/cache
 tests/ckpt
 tests/dataset_download.ipynb

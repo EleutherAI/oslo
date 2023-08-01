@@ -11,12 +11,12 @@ from transformers import (
 )
 
 import oslo
-from tests.util.oslo import initialize_oslo
+from tests.util.oslo import initialize_oslo, print_rank_0
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 parser = ArgumentParser()
-parser.add_argument("--local_rank", default=0, type=int)
+parser.add_argument("--local-rank", default=0, type=int)
 parser.add_argument("--task", required=True, type=str)
 parser.add_argument("--model", required=True, type=str)
 parser.add_argument("--tokenizer", default=None, type=str)
@@ -26,12 +26,16 @@ parser.add_argument("--data_parallel_size", default=1, type=int)
 parser.add_argument("--pipeline_parallel_size", default=1, type=int)
 parser.add_argument("--tensor_parallel_depth", default=1, type=int)
 parser.add_argument("--tensor_parallel_mode", default="1D", type=str)
+
 args = parser.parse_args()
 generation_task = args.task not in ["causal-lm", "seq2seq-lm"]
 args.tokenizer = args.tokenizer if args.tokenizer else args.model
 
 # 1. Create a tokenizer
 tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
+
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
 
 # 2. Define tasks and config
 TASKS = {
@@ -92,4 +96,4 @@ forward_fn = (
 output_after = forward_fn(**tokenizer(input, return_tensors="pt").to("cuda"))
 
 # 7. Print the results
-print(make_result(input, output_before, output_after))
+print_rank_0(make_result(input, output_before, output_after), parallel_context)

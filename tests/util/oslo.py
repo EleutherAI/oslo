@@ -36,4 +36,5 @@ def print_rank_0(message, pc):
     if pc is None:
         print(message)
     elif pc.get_global_rank() == 0:
+        print(f"Rank :{pc.get_global_rank()}")
         print(message)
