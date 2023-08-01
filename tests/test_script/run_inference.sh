@@ -2,7 +2,7 @@
 # EXAMPLE: ``sh ./tests/test_script/run_inference.sh 4 bert-base-cased masked-lm ``
 # EXAMPLE: ``sh ./tests/test_script/run_inference.sh 4 ishan/bert-base-uncased-mnli sequence-classification ``
 # EXAMPLE: ``sh ./tests/test_script/run_inference.sh 4 gpt2 causal-lm ``
-# EXAMPLE: ``sh ./tests/test_script/run_inference.sh 4 clibrain/Llama-2-ft-instruct-es causal-lm ``
+# EXAMPLE: ``sh ./tests/test_script/run_inference.sh 4 EleutherAI/gpt-neo-1.3B causal-lm ``
 # EXAMPLE: ``sh ./tests/test_script/run_inference.sh 4 t5-base seq2seq-lm ``
 
 NUM_GPUS=$1

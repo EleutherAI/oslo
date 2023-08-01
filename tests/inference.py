@@ -83,8 +83,14 @@ model = TASKS[args.task]["class"](args.model)
 input = args.input if args.input is not None else TASKS[args.task]["example"]
 forward_fn = model.forward if generation_task else partial(model.generate, num_beams=3)
 
+if args.task == "causal-lm":
+    input_data = tokenizer(input, return_tensors="pt")
+    del input_data["attention_mask"]
+else:
+    input_data = tokenizer(input, return_tensors="pt")
+
 # 4. Get result before parallelization
-output_before = forward_fn(**tokenizer(input, return_tensors="pt"))
+output_before = forward_fn(**input_data)
 
 # 5. Parallelize the model
 model_oslo, parallel_context = initialize_oslo(args, model)
@@ -93,7 +99,7 @@ forward_fn = (
 )
 
 # 6. Get result after parallelization
-output_after = forward_fn(**tokenizer(input, return_tensors="pt").to("cuda"))
+output_after = forward_fn(**input_data.to("cuda"))
 
 # 7. Print the results
 print_rank_0(make_result(input, output_before, output_after), parallel_context)
