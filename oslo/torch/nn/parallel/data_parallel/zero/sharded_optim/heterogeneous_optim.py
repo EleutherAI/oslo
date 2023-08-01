@@ -1,15 +1,29 @@
-# this code is inspired by the DeepSpeed library and implemented with our own design from scratch
+# Copyright 2021 HPC-AI Technology Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Modified by EleutherAI on 2023.
+
 import math
 import warnings
-from enum import Enum
-from typing import Any, Dict, Set, Tuple
+from typing import Any, Dict, Set, Tuple, TYPE_CHECKING
 
 import torch
 import torch.distributed as dist
 from torch.nn import Parameter
 from torch.optim import Optimizer
 
-from transformers.utils import logging
+from oslo.torch.utils.logging import DistributedLogger
 
 from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim._base_optim import (
     BaseOptimizerWrapper,
@@ -23,9 +37,11 @@ from oslo.torch.nn.parallel.data_parallel._utils import (
 )
 
 from oslo.torch.nn.parallel.data_parallel.zero.chunk import Chunk, ChunkManager
-from oslo.torch.nn.parallel.data_parallel.zero.fully_sharded_data_parallel import (
-    _FullyShardedDataParallel,
-)
+
+if TYPE_CHECKING:
+    from oslo.torch.nn.parallel.data_parallel.zero.fully_sharded_data_parallel import (
+        _FullyShardedDataParallel,
+    )
 
 import functools
 
@@ -72,7 +88,7 @@ class _HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
     def __init__(
         self,
         optim: Optimizer,
-        module: _FullyShardedDataParallel,
+        module: "_FullyShardedDataParallel",
         gpu_margin_mem_ratio: float = 0.0,
         clipping_norm: float = 0.0,
         norm_type: float = 2.0,
@@ -81,7 +97,6 @@ class _HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
         **kwargs: Any,
     ):
         super().__init__(optim)
-        assert isinstance(module, _FullyShardedDataParallel)
         self.module = module
         self.heterogeneous_manager = module.heterogeneous_manager
         self.chunk_manager: ChunkManager = self.heterogeneous_manager.chunk_manager
@@ -117,7 +132,7 @@ class _HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
         self._found_overflow: torch.Tensor = torch.zeros(
             1, dtype=torch.int64, device=get_current_device()
         )
-        self._logger = logging.get_logger(__name__)
+        self._logger = DistributedLogger.get_instance(__name__)
 
         self.gpu_margin_mem_ratio: float = float(gpu_margin_mem_ratio)
         assert (

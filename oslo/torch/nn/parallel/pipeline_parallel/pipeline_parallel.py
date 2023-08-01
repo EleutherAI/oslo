@@ -1,11 +1,12 @@
-import concurrent.futures
 import copy
-from threading import Lock
+import time
+from queue import Queue
 
 import torch
 import torch.nn as nn
 from torch.distributed import rpc
 from transformers.utils import ModelOutput
+from transformers.activations import ACT2FN
 
 from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.distributed.parallel_mode import ParallelMode
@@ -16,8 +17,8 @@ from oslo.torch.nn.parallel.pipeline_parallel._buffers import (
     save_activation,
 )
 from oslo.torch.nn.parallel.pipeline_parallel._functional import (
-    remote_module_forward,
-    apply_backward_redirection,
+    remote_request,
+    apply_backward_job_enqueue,
 )
 from oslo.torch.nn.parallel.pipeline_parallel._messages import (
     pack_tensor_stub,
@@ -25,12 +26,20 @@ from oslo.torch.nn.parallel.pipeline_parallel._messages import (
 )
 from oslo.torch.nn.parallel.pipeline_parallel._model_partitioner import ModelPartitioner
 from oslo.torch.nn.parallel.pipeline_parallel._sync import (
-    wait_other_ranks,
+    sleep,
     make_unique_key,
-    reset_forward_used_counter,
-    set_result,
-    get_result,
+    initialize_job,
+    NOTIFICATIONS,
 )
+from oslo.torch.nn.parallel.pipeline_parallel._comm import (
+    enqueue_forward_ready_notice,
+    enqueue_forward_start_notice,
+    enqueue_forward_finished_notice,
+    enqueue_batch_finished_notice,
+    enqueue_result,
+    COMM_INFO,
+)
+from oslo.torch.nn.parallel.pipeline_parallel._job import Metadata
 from oslo.torch.nn.parallel.utils import (
     get_parallel_context,
     add_wrapper,
@@ -61,15 +70,8 @@ def PipelineParallel(
     return module
 
 
-# function to launch self.module. needs this
-# function because torch.set_grad_enabled() is
-# thread local.
-def launch(fn, is_grad_enabled, *args, **kwargs):
-    with torch.set_grad_enabled(is_grad_enabled):
-        result = fn(*args, **kwargs)
-    return result
-
-
+# TODO; check whether the module has it's own parameter or not, and
+#  use that to decide whether to save the activation
 class _PipelineParallel(OsloParallelWrapper):
     """
     Pipeline parallel module
@@ -111,8 +113,8 @@ class _PipelineParallel(OsloParallelWrapper):
 
     @torch.no_grad()
     def parallelize(self):
-        # print(f"ranK : {torch.distributed.get_rank()}",self.parallel_context.get_group(ParallelMode.PIPELINE))
-        # print(adfasfd)
+        # copy activations for partitioning
+        self._recursive_replace_act(self.module)
         self.partitioner = ModelPartitioner(
             module=self.module,
             process_group=self.parallel_context.get_group(ParallelMode.PIPELINE),
@@ -125,13 +127,33 @@ class _PipelineParallel(OsloParallelWrapper):
         self.oslo_parallel = self.module.oslo_parallel
 
         self._recursive_wrap(self, "")
-        self._lock = Lock()
-        self.local_rank = self.parallel_context.get_local_rank(ParallelMode.PIPELINE)
 
-        # set up worker for inputs
-        self.producer = None
-        if self.local_rank == 0:
-            self.producer = concurrent.futures.ThreadPoolExecutor()
+        self.global_rank = self.parallel_context.get_local_rank(ParallelMode.GLOBAL)
+        self.pipe_rank = self.parallel_context.get_local_rank(ParallelMode.PIPELINE)
+        self.tensor_rank = self.parallel_context.get_local_rank(ParallelMode.TENSOR)
+
+        # initialize queues for rpc
+        self._initialize_sync_queue()
+
+        # add parallel context to communication functions
+        COMM_INFO.initialize(self.parallel_context)
+
+    def _initialize_sync_queue(self):
+        self.out_queue = Queue()
+        self.last_backward_notice = Queue()
+        self.batch_finished_notice = Queue()
+        self.forward_finished_notice = Queue()
+        self.forward_ready_notice = Queue()
+        self.forward_start_notice = Queue()
+
+        NOTIFICATIONS.initialize(
+            self.forward_ready_notice,
+            self.forward_start_notice,
+            self.forward_finished_notice,
+            self.last_backward_notice,
+            self.batch_finished_notice,
+            self.out_queue,
+        )
 
     def forward(self, *args, **kwargs):
         assert len(args) == 0, (
@@ -146,15 +168,55 @@ class _PipelineParallel(OsloParallelWrapper):
                 "Please set ``return_dict=True``."
             )
 
-        # set forward counter to zero
-        reset_forward_used_counter()
+        # forward ready sync
+        if torch.distributed.get_rank() == 0:
+            ranks_ready = set()
 
-        # to ensure optimizer's step is done for all processes
-        torch.distributed.barrier(
-            self.parallel_context.get_group(ParallelMode.PIPELINE)
-        )
+            # self ready notice
+            enqueue_forward_ready_notice(0)
 
-        if self.local_rank == 0:
+            while True:
+                while self.forward_ready_notice.empty():
+                    sleep()
+
+                r = self.forward_ready_notice.get()
+                ranks_ready.add(r)
+
+                if len(ranks_ready) == self.parallel_context.get_world_size(
+                    ParallelMode.GLOBAL
+                ):
+                    break
+
+            for dst_rank in range(
+                1, self.parallel_context.get_world_size(ParallelMode.GLOBAL)
+            ):
+                rpc.rpc_sync(
+                    to=f"RPC_WORKER_{dst_rank}",
+                    func=enqueue_forward_start_notice,
+                )
+
+        else:
+            # notice to master
+            src_rank = torch.distributed.get_rank()
+            dst_rank = 0
+            rpc.rpc_sync(
+                to=f"RPC_WORKER_{dst_rank}",
+                func=enqueue_forward_ready_notice,
+                args=(src_rank,),
+            )
+
+            # wait for a sign
+            while self.forward_start_notice.empty():
+                sleep()
+
+            _ = self.forward_start_notice.get()
+        # end sync
+
+        # TODO; seems like this is not necessary?
+        torch.cuda.empty_cache()
+
+        # micro-batch forward
+        if self.parallel_context.is_first_rank(ParallelMode.PIPELINE):
             new_kwargs = [dict() for _ in range(self.num_micro_batches)]
             for k, v in kwargs.items():
                 if k in BATCH_DIMENSIONS_PP:
@@ -170,67 +232,142 @@ class _PipelineParallel(OsloParallelWrapper):
                     for i in range(self.num_micro_batches):
                         new_kwargs[i][k] = v
 
-            futures = []
-            # TODO; implement warm-up phase?
-            # warm-up
-            # ind = 0
-            # while ind < self.num_micro_batches:
-            #     args_ = new_args[ind]
-            #     kwargs_ = new_kwargs[ind]
-            #     future = self.producer.submit(self.module, *args_, **kwargs_)
-            #     futures.append(future)
-            #     ind += 1
-
+            # enqueue jobs
             is_grad_enabled = torch.is_grad_enabled()
-            for ind, kwargs_ in enumerate(new_kwargs):
-                future = self.producer.submit(
-                    launch, self.module_forward, is_grad_enabled, **kwargs_
+
+            num_concurrent = 16  # TODO; make as an argument
+
+            for ind, kwargs_ in enumerate(new_kwargs[:num_concurrent]):
+                initialize_job(
+                    fn=self.module_forward,
+                    is_grad_enabled=is_grad_enabled,
+                    unique_key=ind,
+                    out_queue=self.out_queue,
+                    **kwargs_,
                 )
-                futures.append(future)
 
-            for i, done in enumerate(concurrent.futures.as_completed(futures)):
-                result = done.result()
-                set_result(i, result)
+            for ri in range(self.num_micro_batches):
+                while self.out_queue.empty():
+                    sleep()
 
+                # TODO; order?
+                ind, result = self.out_queue.get()
+
+                # scale loss
                 if (
                     isinstance(result, ModelOutput)
                     and result.get("loss", None) is not None
                 ):
                     result.loss = result.loss / self.num_micro_batches
 
-                yield result
+                torch.cuda.synchronize()
 
+                yield ind, result  # TODO;
+
+                # pass result to PIPELINE groups
+                colleague = self.parallel_context.get_ranks_in_group(
+                    ParallelMode.PIPELINE
+                )
+                for dst_rank in colleague:
+                    if dst_rank == self.global_rank:
+                        continue
+
+                    rpc.rpc_sync(
+                        to=f"RPC_WORKER_{dst_rank}",
+                        func=enqueue_result,
+                        args=(
+                            ind,
+                            result,
+                        ),
+                    )
+
+                if ri < self.num_micro_batches - num_concurrent:
+                    ind = ri + num_concurrent
+                    kwargs_ = new_kwargs[ind]
+
+                    initialize_job(
+                        fn=self.module_forward,
+                        is_grad_enabled=is_grad_enabled,
+                        unique_key=ind,
+                        out_queue=self.out_queue,
+                        **kwargs_,
+                    )
+
+        # not a master of PIPELINE group
         else:
-            # TODO; the code block below does not make
-            #  same number with rank 0. However, since
-            #  this result is a dummy, it does not cause
-            #  an error.
-            # forward pass end, wait results from master
-            for i in range(self.num_micro_batches):
-                rpc_dst = self.parallel_context.get_pipeline_rpc_worker_name(
-                    self.parallel_context.pipeline_local_master_rank
+            for _ in range(self.num_micro_batches):
+                while self.out_queue.empty():
+                    sleep()
+
+                ind, result = self.out_queue.get()
+
+                yield ind, result
+        # end forward
+
+        # forward finish sync
+        if self.parallel_context.is_first_rank(ParallelMode.GLOBAL):
+            # barrier for last backward
+            while self.last_backward_notice.empty():
+                sleep()
+
+            _ = self.last_backward_notice.get()
+
+            ranks_done = set()
+            ranks_done.add(0)  # TODO; is 0 always a master of GLOBAL group?
+
+            while True:
+                while self.batch_finished_notice.empty():
+                    sleep()
+
+                r = self.batch_finished_notice.get()
+                ranks_done.add(r)
+
+                if len(ranks_done) == self.parallel_context.get_world_size(
+                    ParallelMode.GLOBAL
+                ):
+                    break
+
+            # notice other ranks
+            # TODO; how to find dst_rank?
+            # TODO; do this like tree?
+            for dst_rank in range(
+                1, self.parallel_context.get_world_size(ParallelMode.GLOBAL)
+            ):
+                rpc.rpc_sync(
+                    to=f"RPC_WORKER_{dst_rank}",
+                    func=enqueue_forward_finished_notice,
                 )
-                result = rpc.rpc_sync(
-                    to=rpc_dst,
-                    func=get_result,
-                    args=(i,),
-                )
 
-                # remove gradient of non-master result.
-                # without this, the users need to consider rank
-                # when calling loss.backward()
-                result, tensors = pack_tensor_stub(result, [])
-                for i_tensor in range(len(tensors)):
-                    tensors[i_tensor].grad = None
-                result, _ = unpack_tensor_stub(result, tensors)
+        # not a master of GLOBAL group
+        else:
+            # barrier for last backward
+            while self.last_backward_notice.empty():
+                sleep()
 
-                yield result
+            _ = self.last_backward_notice.get()
 
-        # barrier; wait for all rank
-        wait_other_ranks(self.local_rank, self.parallel_context)
+            # notice to master
+            src_rank = self.global_rank
+            dst_rank = 0  # TODO; is 0 always a master of GLOBAL group?
+            rpc.rpc_sync(
+                to=f"RPC_WORKER_{dst_rank}",
+                func=enqueue_batch_finished_notice,
+                args=(src_rank,),
+            )
 
-        # TODO; seems like this is not necessary?
-        torch.cuda.empty_cache()
+            # barrier
+            while self.forward_finished_notice.empty():
+                sleep()
+
+            _ = self.forward_finished_notice.get()
+        # end sync
+
+    def _recursive_replace_act(self, module):
+        for name, m in module.named_children():
+            if m in ACT2FN.values():
+                setattr(module, name, copy.deepcopy(m))
+
+            self._recursive_replace_act(m)
 
     def _recursive_wrap(self, module, prefix):
         if not hasattr(module, "oslo_pp_location"):  # prevent infinite loop
@@ -259,56 +396,75 @@ class _PipelineParallel(OsloParallelWrapper):
             is_same = module_device == current_device
 
             if is_same:
+                # ensure communication sync
+                COMM_INFO.LOCK.acquire()
+
                 forward_fn = get_original_forward_function(location)
                 result = forward_fn(*args, **kwargs)
 
+                COMM_INFO.LOCK.release()
+
             else:
+
                 (args_stub, kwargs_stub), tensors = pack_tensor_stub([args, kwargs], [])
+
                 tensors = tuple(tensors)
 
                 # does not save activation if the module is in eval mode
                 is_grad_enabled = torch.is_grad_enabled()
                 is_training = self.training
                 need_activation_save = any([t.requires_grad for t in tensors])
-                with self._lock:
-                    unique_key = make_unique_key(location, self.local_rank)
+
+                COMM_INFO.LOCK.acquire()
+
+                unique_key = make_unique_key(
+                    location, current_device.index, module_device.index
+                )
 
                 if need_activation_save and is_training and is_grad_enabled:
                     # prepare backward
                     save_activation(unique_key, tensors)
 
-                caller = self.parallel_context.get_pipeline_rpc_worker_name(
-                    current_device.index
-                )
-                callee = self.parallel_context.get_pipeline_rpc_worker_name(
-                    module_device.index
+                queue_recv = Queue()
+
+                remote_request(
+                    src=current_device.index,
+                    dst=module_device.index,  # global rank
+                    unique_key=unique_key,
+                    queue=queue_recv,
+                    args_stub=args_stub,
+                    kwargs_stub=kwargs_stub,
+                    is_forward=True,
+                    is_grad_enabled=is_grad_enabled,
+                    is_training=is_training,
+                    is_fp16=False,  # TODO;
+                    func_name=location,
+                    tensors=tensors,
                 )
 
-                # request forward
-                fut = rpc.rpc_async(
-                    to=callee,
-                    func=remote_module_forward,
-                    args=(
-                        caller,
-                        location,
-                        unique_key,
-                        args_stub,
-                        kwargs_stub,
-                        need_activation_save,
-                        is_training,
-                        is_grad_enabled,
-                    )
-                    + tensors,
-                )
-                # receive result as stub
-                result_stub, tensors, requires_redirection = fut.wait()
+                COMM_INFO.LOCK.release()
 
-                if requires_redirection and is_training and is_grad_enabled:
-                    tensors = apply_backward_redirection(
-                        callee,
-                        unique_key,
-                        *tensors,
+                # wait for return
+                while queue_recv.empty():
+                    sleep()
+
+                result_stub, tensors = queue_recv.get()
+                del queue_recv
+
+                need_activation_save = any([t.requires_grad for t in tensors])
+                if need_activation_save and is_training and is_grad_enabled:
+                    meta = Metadata(
+                        is_request=True,
+                        is_forward=False,
+                        is_training=is_training,
+                        is_grad_enabled=is_grad_enabled,
+                        is_fp16=False,  # TODO;
+                        func_name="",  # dummy
+                        src=current_device.index,
+                        dst=module_device.index,
                     )
+
+                    tensors = apply_backward_job_enqueue(meta, unique_key, *tensors)
 
                 result, _ = unpack_tensor_stub(result_stub, tensors)
 

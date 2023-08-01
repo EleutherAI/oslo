@@ -59,7 +59,7 @@ class DistributedLogger:
         path: Union[str, Path],
         mode: str = "a",
         level: str = "INFO",
-        suffix: str = None,
+        suffix: Optional[str] = None,
     ) -> None:
         """Attach a file handler to the logger.
 

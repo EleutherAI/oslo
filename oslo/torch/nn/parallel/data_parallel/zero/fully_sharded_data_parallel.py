@@ -1,3 +1,19 @@
+# Copyright 2021 HPC-AI Technology Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Modified by EleutherAI on 2023.
+
 import itertools
 from collections import OrderedDict
 from functools import partial
@@ -6,7 +22,7 @@ from typing import Dict, List, Optional
 import torch
 import torch.distributed as dist
 import torch.nn as nn
-from transformers.utils import logging
+from oslo.torch.utils.logging import DistributedLogger
 
 from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.distributed.parallel_mode import ParallelMode
@@ -81,7 +97,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
         parallel_context: ParallelContext = None,
         placement_policy: str = "cuda",
         pin_memory: bool = False,
-        force_outputs_fp32: bool = False,
+        force_outputs_fp32: bool = True,
         search_range_mb: int = 32,
         hidden_dim: Optional[int] = None,
         min_chunk_size_mb: float = 32,
@@ -108,7 +124,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
         self.name2param: Dict[str, nn.Parameter] = dict()
 
         self._cast_buffers()
-        self._logger = logging.get_logger(__name__)
+        self._logger = DistributedLogger.get_instance(__name__)
 
         if self.heterogeneous_manager._premade_memstats_:
             # build chunk in param runtime visited order.
