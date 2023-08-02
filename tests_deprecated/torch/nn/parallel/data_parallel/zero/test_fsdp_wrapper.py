@@ -5,8 +5,8 @@ import torch.multiprocessing as mp
 
 from oslo.torch.utils import get_free_port
 from oslo.torch.distributed.parallel_context import ParallelContext
-from oslo.torch.nn.parallel.data_parallel.zero.fully_sharded_data_parallel import (
-    _FullyShardedDataParallel,
+from oslo.torch.nn.parallel.data_parallel.zero import (
+    _HeteroDataParallel,
 )
 import copy
 from unittest.mock import MagicMock
@@ -37,7 +37,7 @@ def run_dist(rank, world_size):
     device = torch.device(f"cuda:{rank}" if torch.cuda.is_available() else "cpu")
 
     model = MlpModel()
-    fsdp_model = _FullyShardedDataParallel(
+    fsdp_model = _HeteroDataParallel(
         copy.deepcopy(model),
         device,
         parallel_context,

@@ -20,7 +20,7 @@ import torch
 import torch.distributed as dist
 from torch import nn
 
-from oslo.torch.nn.parallel.data_parallel.zero.chunk.manager import (
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.chunk.manager import (
     ChunkManager,
 )
 
@@ -34,7 +34,7 @@ import torch.nn as nn
 from oslo.torch.nn.parallel.data_parallel._utils import (
     is_ddp_ignored,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.memory_tracer import (
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.memory_tracer import (
     MemStats,
     OrderedParamGenerator,
 )

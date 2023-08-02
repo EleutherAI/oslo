@@ -28,29 +28,29 @@ from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.nn.parallel.data_parallel._utils import is_ddp_ignored
 from oslo.torch.nn.parallel.data_parallel.data_parallel import _DistributedDataParallel
-from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.chunk import (
     Chunk,
     ChunkManager,
     TensorState,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager import (
-    HeterogeneousMemoryManager,
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.memory_manager import (
+    HeteroMemoryManager,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.memory_tracer.param_runtime_order import (
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.memory_tracer.param_runtime_order import (
     OrderedParamGenerator,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.utils import (
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.utils import (
     get_current_device,
     get_temp_total_chunk_on_cuda,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_hook import (
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.hook import (
     HeterogeneousZeROHook,
 )
 
-from oslo.torch.nn.parallel.data_parallel.zero.memory_tracer import (
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.memory_tracer import (
     MemStats,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.chunk import (
     init_chunk_manager,
 )
 
@@ -70,7 +70,7 @@ def _cast_float(args, dtype: torch.dtype):
     return args
 
 
-class _FullyShardedDataParallel(_DistributedDataParallel):
+class _HeteroDataParallel(_DistributedDataParallel):
     """Fully sharded data parallel.
     Warning: Nested FullyShardedDataParallel is not supported now.
     It is designed to be used with ChunkManager and HeterogeneousMemoryManager.
@@ -111,11 +111,11 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             search_range_mb=search_range_mb,
             min_chunk_size_mb=min_chunk_size_mb,
         )
-        self.heterogeneous_manager = HeterogeneousMemoryManager(
+        self.hetero_memory_manager = HeteroMemoryManager(
             placement_policy, self.chunk_manager, memstats
         )
         self.force_outputs_fp32 = force_outputs_fp32
-        self.param_op_hook = HeterogeneousZeROHook(self.heterogeneous_manager)
+        self.param_op_hook = HeterogeneousZeROHook(self.hetero_memory_manager)
         self.fp32_params: List[torch.Tensor] = list()
         self.fp16_params: List[torch.Tensor] = list()
         self.overflow_counter = 0
@@ -126,9 +126,9 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
         self._cast_buffers()
         self._logger = DistributedLogger.get_instance(__name__)
 
-        if self.heterogeneous_manager._premade_memstats_:
+        if self.hetero_memory_manager._premade_memstats_:
             # build chunk in param runtime visited order.
-            param_order = self.heterogeneous_manager.memstats()._param_runtime_order
+            param_order = self.hetero_memory_manager.memstats()._param_runtime_order
         else:
             # build chunk in param initialized order.
             # Note: in this way, it can not get filter unused params during runtime.
@@ -138,7 +138,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
 
         self._init_chunks(
             param_order=param_order,
-            cpu_offload=self.heterogeneous_manager.policy_name != "cuda",
+            cpu_offload=self.hetero_memory_manager.policy_name != "cuda",
             pin_memory=pin_memory,
         )
 
@@ -163,20 +163,20 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             self.chunk_manager.move_chunk(chunk, self.grads_device[first_param])
         assert self.chunk_manager.accessed_mem == 0
         # reset all recorded attributes
-        self.heterogeneous_manager.reset_attributes()
+        self.hetero_memory_manager.reset_attributes()
 
     def forward(self, *args, **kwargs):
         # check whether we are in a inference mode
         grad_flag = torch.is_grad_enabled()
         if not grad_flag:
             assert (
-                not self.heterogeneous_manager.need_warmup
-                or not self.heterogeneous_manager.is_warmup()
+                not self.hetero_memory_manager.need_warmup
+                or not self.hetero_memory_manager.is_warmup()
             ), "You should run a completed iteration as your warmup iter"
 
         args, kwargs = _cast_float(args, torch.half), _cast_float(kwargs, torch.half)
 
-        self.heterogeneous_manager.pre_iter(*args)
+        self.hetero_memory_manager.pre_iter(*args)
         self.param_op_hook.pre_forward(self.fp16_params)
         outputs = super().forward(*args, **kwargs)
         self.param_op_hook.post_forward(self.fp16_params)
@@ -225,9 +225,9 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
             )
         self._setup_grads_ptr()
         self._logger.debug(
-            f"comp cuda demand time: {self.heterogeneous_manager._comp_cuda_demand_time}, layout time: {self.heterogeneous_manager._layout_time}, evict time: {self.heterogeneous_manager._evict_time}, CPU->CUDA vol: {self.heterogeneous_manager._h2d_volume}B, CUDA->CPU vol: {self.heterogeneous_manager._d2h_volume}"
+            f"comp cuda demand time: {self.hetero_memory_manager._comp_cuda_demand_time}, layout time: {self.hetero_memory_manager._layout_time}, evict time: {self.hetero_memory_manager._evict_time}, CPU->CUDA vol: {self.hetero_memory_manager._h2d_volume}B, CUDA->CPU vol: {self.hetero_memory_manager._d2h_volume}"
         )
-        self.heterogeneous_manager.post_iter()
+        self.hetero_memory_manager.post_iter()
 
     def grad_handle(self, p, grad):
         self.param_op_hook.post_backward([p])
@@ -645,7 +645,7 @@ class _FullyShardedDataParallel(_DistributedDataParallel):
 
             self.fp16_params.append(p)
             self.fp32_params.append(fp32_p)
-            self.grads_device[p] = self.heterogeneous_manager.default_device
+            self.grads_device[p] = self.hetero_memory_manager.default_device
 
         self.chunk_manager.close_all_groups()
 

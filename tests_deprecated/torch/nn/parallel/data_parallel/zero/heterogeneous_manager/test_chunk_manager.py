@@ -4,7 +4,7 @@ import pytest
 import torch
 import torch.multiprocessing as mp
 
-from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.chunk import (
     ChunkManager,
 )
 from oslo.torch.distributed.parallel_context import ParallelContext

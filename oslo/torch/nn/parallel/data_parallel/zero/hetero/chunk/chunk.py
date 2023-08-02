@@ -24,7 +24,7 @@ import torch.distributed as dist
 from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.distributed.parallel_context import ParallelContext
 
-from oslo.torch.nn.parallel.data_parallel.zero.utils import get_current_device
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.utils import get_current_device
 
 
 class TensorState(Enum):

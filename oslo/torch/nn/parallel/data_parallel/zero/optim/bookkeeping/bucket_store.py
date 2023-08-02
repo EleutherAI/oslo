@@ -17,7 +17,7 @@
 from torch import Tensor
 from torch.distributed import ProcessGroup
 from typing import List
-from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim.bookkeeping._base_store import (
+from oslo.torch.nn.parallel.data_parallel.zero.optim.bookkeeping._base_store import (
     BaseStore,
 )
 

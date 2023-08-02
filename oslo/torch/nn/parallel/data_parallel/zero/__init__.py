@@ -1,15 +1,15 @@
-from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim.sharded_optim import (
+from oslo.torch.nn.parallel.data_parallel.zero.optim.optim import (
     ZeroRedundancyOptimizer,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.fully_sharded_data_parallel import (
-    _FullyShardedDataParallel,
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.data_parallel import (
+    _HeteroDataParallel,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim.heterogeneous_optim import (
-    _HeterogeneousZeroOptimizer,
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.optim import (
+    _HeteroOptimizer,
 )
 
 __ALL__ = [
     "ZeroRedundancyOptimizer",
-    "_FullyShardedDataParallel",
-    "_HeterogeneousZeroOptimizer",
+    "_HeteroDataParallel",
+    "_HeteroOptimizer",
 ]
