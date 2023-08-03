@@ -71,8 +71,8 @@ def _cast_float(args, dtype: torch.dtype):
 
 
 class _HeteroDataParallel(_DistributedDataParallel):
-    """Fully sharded data parallel.
-    Warning: Nested FullyShardedDataParallel is not supported now.
+    """Heterogeneous sharded data parallel.
+    Warning: Nested HeteroDataParallel is not supported now.
     It is designed to be used with ChunkManager and HeterogeneousMemoryManager.
     For more details, see the API reference of ``ChunkManager`` and ``HeterogeneousMemoryManager``.
 
