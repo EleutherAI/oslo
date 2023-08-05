@@ -103,6 +103,7 @@ class _PipelineParallel(OsloParallelWrapper):
         parallel_context: ParallelContext,
         memory_computation_balance: float = 1.0,
         num_micro_batches: int = 1,
+        num_concurrent: int = 16,
     ):
         super().__init__(parallelism_priority=99)
         self.module = module
@@ -110,6 +111,7 @@ class _PipelineParallel(OsloParallelWrapper):
         self.parallel_context = get_parallel_context(module, parallel_context)
         self.memory_computation_balance = memory_computation_balance
         self.num_micro_batches = num_micro_batches
+        self.num_concurrent = num_concurrent
 
     @torch.no_grad()
     def parallelize(self):
@@ -236,9 +238,7 @@ class _PipelineParallel(OsloParallelWrapper):
             # enqueue jobs
             is_grad_enabled = torch.is_grad_enabled()
 
-            num_concurrent = 16  # TODO; make as an argument
-
-            for ind, kwargs_ in enumerate(new_kwargs[:num_concurrent]):
+            for ind, kwargs_ in enumerate(new_kwargs[: self.num_concurrent]):
                 initialize_job(
                     fn=self.module_forward,
                     is_grad_enabled=is_grad_enabled,
@@ -282,8 +282,8 @@ class _PipelineParallel(OsloParallelWrapper):
                         ),
                     )
 
-                if ri < self.num_micro_batches - num_concurrent:
-                    ind = ri + num_concurrent
+                if ri < self.num_micro_batches - self.num_concurrent:
+                    ind = ri + self.num_concurrent
                     kwargs_ = new_kwargs[ind]
 
                     initialize_job(
