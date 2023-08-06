@@ -402,3 +402,10 @@ wandb/
 
 # ignore run log files
 **/nohup.out
+
+# auto test
+tests/cache
+tests/ckpt
+.ipynb_checkpoints
+tests/dataset_download
+"core.python"

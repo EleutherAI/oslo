@@ -18,6 +18,12 @@ Be careful that the ‘core’ is in the PyPI project name.
 pip install oslo-core
 ```
 
+## CentOS OS case install
+```console
+# sh gcc_install.sh
+# pip install oslo-core
+```
+
 ## Administrative Notes
 
 ### Citing OSLO
