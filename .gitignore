@@ -409,3 +409,4 @@ tests/ckpt
 .ipynb_checkpoints
 tests/dataset_download
 "core.python"
+tests/dataset_download.ipynb
