@@ -9,3 +9,4 @@ pybind11
 scipy
 torch >= 1.11.0
 transformers
+wandb
