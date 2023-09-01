@@ -44,7 +44,7 @@ from oslo.torch.nn.parallel.data_parallel.zero.hetero.utils import (
     get_temp_total_chunk_on_cuda,
 )
 from oslo.torch.nn.parallel.data_parallel.zero.hetero.hook import (
-    HeterogeneousZeROHook,
+    HeteroHook,
 )
 
 from oslo.torch.nn.parallel.data_parallel.zero.hetero.memory_tracer import (
@@ -115,7 +115,7 @@ class _HeteroDataParallel(_DistributedDataParallel):
             placement_policy, self.chunk_manager, memstats
         )
         self.force_outputs_fp32 = force_outputs_fp32
-        self.param_op_hook = HeterogeneousZeROHook(self.hetero_memory_manager)
+        self.param_op_hook = HeteroHook(self.hetero_memory_manager)
         self.fp32_params: List[torch.Tensor] = list()
         self.fp16_params: List[torch.Tensor] = list()
         self.overflow_counter = 0

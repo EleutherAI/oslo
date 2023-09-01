@@ -33,7 +33,7 @@ class TrainingPhase(Enum):
     BACKWARD = 1
 
 
-class HeterogeneousZeROHook:
+class HeteroHook:
     def __init__(self, hetero_memory_manager: HeteroMemoryManager) -> None:
         super().__init__()
         self._hetero_memory_manager = hetero_memory_manager
