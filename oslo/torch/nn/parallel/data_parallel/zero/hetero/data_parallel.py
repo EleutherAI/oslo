@@ -72,9 +72,24 @@ def _cast_float(args, dtype: torch.dtype):
 
 class _HeteroDataParallel(_DistributedDataParallel):
     """Heterogeneous sharded data parallel.
-    Warning: Nested HeteroDataParallel is not supported now.
-    It is designed to be used with ChunkManager and HeterogeneousMemoryManager.
-    For more details, see the API reference of ``ChunkManager`` and ``HeterogeneousMemoryManager``.
+
+    Inspired by the PatrickStar system introduced in "PatrickStar: Parallel
+    Training of Pre-trained Models via Chunk-based Dynamic Memory Management"
+    by Jiarui Fang, Zilin Zhu, et al. from Tencent Inc:
+
+    - PatrickStar uses a CPU-GPU heterogeneous memory space to store model data,
+        organized in memory chunks.
+    - Chunks are dynamically distributed across the heterogeneous memory,
+        guided by runtime memory statistics from a warm-up iteration.
+    - This approach reduces CPU-GPU data transmission volume and optimizes
+        bandwidth utilization.
+    - In tandem with the Zero Redundancy Optimizer, PatrickStar can efficiently
+        scale to multiple GPUs across multiple nodes.
+
+    Note:
+        Nested HeteroDataParallel is not supported now. It is designed to be
+        used with ChunkManager and HeterogeneousMemoryManager. For more details,
+        see the API reference of ``ChunkManager`` and ``HeteroMemoryManager``.
 
     Args:
         module (torch.nn.Module): Module to apply ZeRO-DP.
@@ -82,10 +97,11 @@ class _HeteroDataParallel(_DistributedDataParallel):
         parallel_context (ParallelContext): process group object.
         placement_policy (str): Placement policy for the chunks.
         pin_memory (bool): Chunks on CPU Memory use pin-memory.
-        force_outputs_fp32 (bool): If set to True, outputs will be fp32. Otherwise, outputs will be fp16.
-            Defaults to False.
+        force_outputs_fp32 (bool): If set to True, outputs will be fp32.
+            Otherwise, outputs will be fp16. Defaults to False.
         search_range_mb (int): Search range for the chunk size. Defaults to 32.
-        hidden_dim (int): Hidden dimension for the chunk size search. Defaults to None.
+        hidden_dim (int): Hidden dimension for the chunk size search.
+            Defaults to None.
         min_chunk_size_mb (int): Minimum chunk size in MB. Defaults to 32.
         memstats (MemStats): Memory statistics. Defaults to None.
     """

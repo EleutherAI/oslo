@@ -62,27 +62,36 @@ def _disposable(func: Callable) -> Callable:
 
 
 class _HeteroOptimizer(BaseOptimizerWrapper):
-    """A wrapper for optimizer. ``_FullyShardedDataParallel`` and ``_HeterogeneousZeroOptimizer`` implement Zero Redundancy Optimizer (ZeRO state-3).
+    """A wrapper for optimizer.
+
+    ``_HeteroDataParallel`` and ``_HeteroOptimizer`` implement the principles
+    of PatrickStar, which dynamically adjusts the memory distribution per chunk
+    across CPU-GPU heterogeneous memory spaces.
 
     Note:
-        You must use ``_FullyShardedDataParallel`` with ``_HeterogeneousZeroOptimizer``.
+        You must use ``_HeteroDataParallel`` with ``_HeteroOptimizer``.
 
     Note:
-        Make sure you set ``placement_policy`` of ``heterogeneousManager`` to `"auto"`,
+        Make sure you set ``placement_policy`` of ``heteroManager`` to `"auto"`,
         if you set ``gpu_margin_mem_ratio > 0``.
 
     Args:
         optim (Optimizer): An Optimizer instance.
         module (ZeroDDP): A ``ZeroDDP`` instance.
-        gpu_margin_mem_ratio (float, optional): The ratio of GPU remaining memory (after the first forward-backward)
-            which will be used when using hybrid CPU optimizer.
-            This argument is meaningless when `placement_policy` of `heterogeneousManager` is not "auto".
+        gpu_margin_mem_ratio (float, optional): The ratio of GPU remaining
+            memory (after the first forward-backward) which will be used when
+            using hybrid CPU optimizer. This argument is meaningless when
+            `placement_policy` of `heterogeneousManager` is not "auto".
             Defaults to 0.0.
-        clipping_norm (float, optional): The norm value used to clip gradient. Defaults to 0.0.
-        norm_type (float, optional): The type of norm used for gradient clipping. Currently, only L2-norm (norm_type=2.0)
-            is supported in ZeroOptimizer. Defaults to 2.0.
-        num_fp32_shards_per_param (int, optional): The number of fp32 shards per param. Defaults to 0.
-        verbose (bool, optional): Whether to print verbose information, including grad overflow info. Defaults to False.
+        clipping_norm (float, optional): The norm value used to clip gradient.
+            Defaults to 0.0.
+        norm_type (float, optional): The type of norm used for gradient clipping.
+            Currently, only L2-norm (norm_type=2.0) is supported in ZeroOptimizer.
+            Defaults to 2.0.
+        num_fp32_shards_per_param (int, optional): The number of fp32 shards per param.
+            Defaults to 0.
+        verbose (bool, optional): Whether to print verbose information,
+            including grad overflow info. Defaults to False.
     """
 
     def __init__(
