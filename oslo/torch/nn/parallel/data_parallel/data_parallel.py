@@ -23,9 +23,9 @@ from typing import Optional, Tuple, Dict, Any
 
 
 class ShardingStrategy(Enum):
-    SHARD_OP = auto()
-    SHARD_GRAD_OP = auto()
-    FULL_SHARD = auto()
+    SHARD_PARAM = auto()
+    SHARD_GRAD_PARAM = auto()
+    HETERO_SHARD = auto()
 
 
 def DistributedDataParallel(
@@ -45,18 +45,18 @@ def DistributedDataParallel(
 
     Supported sharding strategies are:
     - None: No sharding is used. This is the default strategy, where each GPU maintains a full replica of the model.
-    - SHARD_OP: The optimizer states are sharded across GPUs. Each GPU maintains only a portion of the optimizer state.
-    - SHARD_GRAD_OP: In addition to sharding the optimizer states, the gradients are also sharded across GPUs.
-    - FULL_SHARD: The model parameters, optimizer states, and gradients are all sharded across GPUs.
+    - SHARD_PARAM: Shards the model parameters across GPUs.
+    - SHARD_GRAD_PARAM: Shards the gradient as well as the model parameters across GPUs.
+    - HETERO_SHARD: Use the CPU-GPU heterogeneous memory space to store the model data, inspired from PatrickStar.
 
-    For the SHARD_OP, SHARD_GRAD_OP, and FULL_SHARD strategies, it is mandatory to provide an optimizer.
+    For the SHARD_PARAM, SHARD_GRAD_PARAM, and HETERO_SHARD strategies, it is mandatory to provide an optimizer.
 
     Args:
         module (nn.Module): PyTorch module object to be wrapped.
         parallel_context (ParallelContext): Process group object for distributed training.
         model_wrapper_config (Optional[Dict[str, Any]]): Additional configuration parameters for the model wrapper.
         optimizer_wrapper_config (Optional[Dict[str, Any]]): Additional configuration parameters for the optimizer wrapper.
-        sharding_strategy (Optional[ShardingStrategy]): The strategy for sharding. Options include None, SHARD_OP, SHARD_GRAD_OP, and FULL_SHARD.
+        sharding_strategy (Optional[ShardingStrategy]): The strategy for sharding. Options include None, SHARD_PARAM, SHARD_GRAD_PARAM, and HETERO_SHARD.
         optimizer (Optional[torch.optim.Optimizer]): PyTorch optimizer object to be wrapped if a sharding strategy is specified.
 
     Returns:
@@ -86,7 +86,7 @@ def DistributedDataParallel(
         )
         return module
 
-    def SHARD_OP_strategy():
+    def shard_param_strategy():
         optimizer_wrapper_config.pop("partition_grad", None)
         return module, zero.ZeroRedundancyOptimizer(
             optimizer,
@@ -95,7 +95,7 @@ def DistributedDataParallel(
             **optimizer_wrapper_config,
         )
 
-    def shard_grad_op_strategy():
+    def shard_grad_param_strategy():
         optimizer_wrapper_config.pop("partition_grad", None)
         return module, zero.ZeroRedundancyOptimizer(
             optimizer,
@@ -104,15 +104,15 @@ def DistributedDataParallel(
             **optimizer_wrapper_config,
         )
 
-    def full_shard_strategy():
-        fsdp = zero._FullyShardedDataParallel(
+    def hetero_shard_strategy():
+        fsdp = zero._HeteroDataParallel(
             module=module,
             device=torch.device("cuda"),
             parallel_context=parallel_context,
             force_outputs_fp32=True,
             **model_wrapper_config,
         )
-        opt = zero._HeterogeneousZeroOptimizer(
+        opt = zero._HeteroOptimizer(
             optimizer,
             module=fsdp,
             **optimizer_wrapper_config,
@@ -127,9 +127,9 @@ def DistributedDataParallel(
 
     strategy_map = {
         None: default_strategy,
-        ShardingStrategy.SHARD_OP: SHARD_OP_strategy,
-        ShardingStrategy.SHARD_GRAD_OP: shard_grad_op_strategy,
-        ShardingStrategy.FULL_SHARD: full_shard_strategy,
+        ShardingStrategy.SHARD_PARAM: shard_param_strategy,
+        ShardingStrategy.SHARD_GRAD_PARAM: shard_grad_param_strategy,
+        ShardingStrategy.HETERO_SHARD: hetero_shard_strategy,
     }
 
     strategy = strategy_map.get(sharding_strategy)

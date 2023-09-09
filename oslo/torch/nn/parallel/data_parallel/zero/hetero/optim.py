@@ -25,22 +25,22 @@ from torch.optim import Optimizer
 
 from oslo.torch.utils.logging import DistributedLogger
 
-from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim._base_optim import (
+from oslo.torch.nn.parallel.data_parallel.zero._optim_interface import (
     BaseOptimizerWrapper,
 )
 
 
-from oslo.torch.nn.parallel.data_parallel.zero.utils import get_current_device
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.utils import get_current_device
 
 from oslo.torch.nn.parallel.data_parallel._utils import (
     is_ddp_ignored,
 )
 
-from oslo.torch.nn.parallel.data_parallel.zero.chunk import Chunk, ChunkManager
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.chunk import Chunk, ChunkManager
 
 if TYPE_CHECKING:
-    from oslo.torch.nn.parallel.data_parallel.zero.fully_sharded_data_parallel import (
-        _FullyShardedDataParallel,
+    from oslo.torch.nn.parallel.data_parallel.zero.hetero.data_parallel import (
+        _HeteroDataParallel,
     )
 
 import functools
@@ -61,34 +61,43 @@ def _disposable(func: Callable) -> Callable:
     return wrapper
 
 
-class _HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
-    """A wrapper for optimizer. ``_FullyShardedDataParallel`` and ``_HeterogeneousZeroOptimizer`` implement Zero Redundancy Optimizer (ZeRO state-3).
+class _HeteroOptimizer(BaseOptimizerWrapper):
+    """A wrapper for optimizer.
+
+    ``_HeteroDataParallel`` and ``_HeteroOptimizer`` implement the principles
+    of PatrickStar, which dynamically adjusts the memory distribution per chunk
+    across CPU-GPU heterogeneous memory spaces.
 
     Note:
-        You must use ``_FullyShardedDataParallel`` with ``_HeterogeneousZeroOptimizer``.
+        You must use ``_HeteroDataParallel`` with ``_HeteroOptimizer``.
 
     Note:
-        Make sure you set ``placement_policy`` of ``heterogeneousManager`` to `"auto"`,
+        Make sure you set ``placement_policy`` of ``heteroManager`` to `"auto"`,
         if you set ``gpu_margin_mem_ratio > 0``.
 
     Args:
         optim (Optimizer): An Optimizer instance.
         module (ZeroDDP): A ``ZeroDDP`` instance.
-        gpu_margin_mem_ratio (float, optional): The ratio of GPU remaining memory (after the first forward-backward)
-            which will be used when using hybrid CPU optimizer.
-            This argument is meaningless when `placement_policy` of `heterogeneousManager` is not "auto".
+        gpu_margin_mem_ratio (float, optional): The ratio of GPU remaining
+            memory (after the first forward-backward) which will be used when
+            using hybrid CPU optimizer. This argument is meaningless when
+            `placement_policy` of `heterogeneousManager` is not "auto".
             Defaults to 0.0.
-        clipping_norm (float, optional): The norm value used to clip gradient. Defaults to 0.0.
-        norm_type (float, optional): The type of norm used for gradient clipping. Currently, only L2-norm (norm_type=2.0)
-            is supported in ZeroOptimizer. Defaults to 2.0.
-        num_fp32_shards_per_param (int, optional): The number of fp32 shards per param. Defaults to 0.
-        verbose (bool, optional): Whether to print verbose information, including grad overflow info. Defaults to False.
+        clipping_norm (float, optional): The norm value used to clip gradient.
+            Defaults to 0.0.
+        norm_type (float, optional): The type of norm used for gradient clipping.
+            Currently, only L2-norm (norm_type=2.0) is supported in ZeroOptimizer.
+            Defaults to 2.0.
+        num_fp32_shards_per_param (int, optional): The number of fp32 shards per param.
+            Defaults to 0.
+        verbose (bool, optional): Whether to print verbose information,
+            including grad overflow info. Defaults to False.
     """
 
     def __init__(
         self,
         optim: Optimizer,
-        module: "_FullyShardedDataParallel",
+        module: "_HeteroDataParallel",
         gpu_margin_mem_ratio: float = 0.0,
         clipping_norm: float = 0.0,
         norm_type: float = 2.0,
@@ -98,8 +107,8 @@ class _HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
     ):
         super().__init__(optim)
         self.module = module
-        self.heterogeneous_manager = module.heterogeneous_manager
-        self.chunk_manager: ChunkManager = self.heterogeneous_manager.chunk_manager
+        self.hetero_memory_manager = module.hetero_memory_manager
+        self.chunk_manager: ChunkManager = self.hetero_memory_manager.chunk_manager
         self.param_to_range: Dict[Parameter, Tuple[int, int]] = dict()
         self.param_to_chunk32: Dict[Parameter, Chunk] = dict()
         self.chunk16_set: Set[Chunk] = set()
@@ -140,13 +149,13 @@ class _HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
         ), f"gpu_margin_mem_ratio must >=0.0 and <=1.0"
 
         self._should_move_fp32_params_h2d: bool = (
-            self.heterogeneous_manager.is_cuda_margin_mem_avail
+            self.hetero_memory_manager.is_cuda_margin_mem_avail
             and self.gpu_margin_mem_ratio > 0.0
             and num_fp32_shards_per_param >= 2
         )
         if (
             self.gpu_margin_mem_ratio > 0.0
-            and not self.heterogeneous_manager.is_cuda_margin_mem_avail
+            and not self.hetero_memory_manager.is_cuda_margin_mem_avail
         ):
             self._logger.warning(
                 f'gpu_margin_mem_ratio is meaningless when placement_policy is not "auto"'
@@ -252,7 +261,7 @@ class _HeterogeneousZeroOptimizer(BaseOptimizerWrapper):
         if self._should_move_fp32_params_h2d:
             self._should_move_fp32_params_h2d = False
             available_cuda_margin_mem = (
-                self.heterogeneous_manager.cuda_margin_mem * self.gpu_margin_mem_ratio
+                self.hetero_memory_manager.cuda_margin_mem * self.gpu_margin_mem_ratio
             )
             fp32_params_available_cuda_margin_mem = (
                 available_cuda_margin_mem / self.optim.num_fp32_shards_per_param

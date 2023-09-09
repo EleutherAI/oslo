@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from oslo.torch.nn.parallel.data_parallel.zero.memory_tracer.memory_monitor import (
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.memory_tracer.memory_monitor import (
     SyncCudaMemoryMonitor,
 )
 

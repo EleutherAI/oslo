@@ -5,11 +5,11 @@ import torch.multiprocessing as mp
 
 from oslo.torch.utils import get_free_port
 from oslo.torch.distributed.parallel_context import ParallelContext
-from oslo.torch.nn.parallel.data_parallel.zero.fully_sharded_data_parallel import (
-    _FullyShardedDataParallel,
+from oslo.torch.nn.parallel.data_parallel.zero import (
+    _HeteroDataParallel,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim import (
-    _HeterogeneousZeroOptimizer,
+from oslo.torch.nn.parallel.data_parallel.zero import (
+    _HeteroOptimizer,
 )
 import copy
 import pytest
@@ -32,7 +32,7 @@ class MlpModel(nn.Module):
 
 
 def check_param(
-    model: _FullyShardedDataParallel,
+    model: _HeteroDataParallel,
     torch_model: torch.nn.Module,
     rtol: float = 1e-3,
     atol: float = 4e-3,
@@ -55,7 +55,7 @@ def run_dist(rank, world_size):
     device = torch.device(f"cuda:{rank}" if torch.cuda.is_available() else "cpu")
 
     model = MlpModel()
-    fsdp_model = _FullyShardedDataParallel(
+    fsdp_model = _HeteroDataParallel(
         copy.deepcopy(model),
         device,
         parallel_context,
@@ -65,7 +65,7 @@ def run_dist(rank, world_size):
     model = model.to(device)
 
     torch_optim = torch.optim.SGD(model.parameters(), lr=0.01)
-    fsdp_optim = _HeterogeneousZeroOptimizer(
+    fsdp_optim = _HeteroOptimizer(
         torch.optim.SGD(fsdp_model.parameters(), lr=0.01),
         fsdp_model,
     )

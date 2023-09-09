@@ -4,7 +4,7 @@ import torch.distributed as dist
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from oslo.torch.nn.parallel.data_parallel.zero.chunk import Chunk
+    from oslo.torch.nn.parallel.data_parallel.zero.hetero.chunk import Chunk
 
 
 def get_current_device() -> torch.device:

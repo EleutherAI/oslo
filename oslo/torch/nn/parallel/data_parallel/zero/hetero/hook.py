@@ -19,11 +19,11 @@ from typing import List
 
 import torch
 
-from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.chunk import (
     TensorState,
 )
-from oslo.torch.nn.parallel.data_parallel.zero.heterogeneous_manager import (
-    HeterogeneousMemoryManager,
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.memory_manager import (
+    HeteroMemoryManager,
 )
 from oslo.torch.nn.parallel.data_parallel._utils import is_ddp_ignored
 
@@ -33,11 +33,11 @@ class TrainingPhase(Enum):
     BACKWARD = 1
 
 
-class HeterogeneousZeROHook:
-    def __init__(self, heterogeneous_manager: HeterogeneousMemoryManager) -> None:
+class HeteroHook:
+    def __init__(self, hetero_memory_manager: HeteroMemoryManager) -> None:
         super().__init__()
-        self._heterogeneous_manager = heterogeneous_manager
-        self._chunk_manager = heterogeneous_manager.chunk_manager
+        self._hetero_memory_manager = hetero_memory_manager
+        self._chunk_manager = hetero_memory_manager.chunk_manager
         self._training_phase = TrainingPhase.FORWARD
 
     def pre_op(self, params):
@@ -45,13 +45,13 @@ class HeterogeneousZeROHook:
         chunks = self._chunk_manager.get_chunks(params)
         for p in params:
             self._chunk_manager.trans_tensor_state(p, TensorState.COMPUTE)
-        self._heterogeneous_manager.sample_overall_data()
-        self._heterogeneous_manager.adjust_layout(chunks)
+        self._hetero_memory_manager.sample_overall_data()
+        self._hetero_memory_manager.adjust_layout(chunks)
         for chunk in chunks:
             self._chunk_manager.access_chunk(chunk)
 
         # record cuda model data of the current OP
-        self._heterogeneous_manager.record_model_data_volume()
+        self._hetero_memory_manager.record_model_data_volume()
 
     def post_op(self, params):
         params = [p for p in params if not is_ddp_ignored(p)]

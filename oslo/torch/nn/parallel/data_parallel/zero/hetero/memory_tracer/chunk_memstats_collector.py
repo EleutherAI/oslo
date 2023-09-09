@@ -19,14 +19,16 @@ from typing import Optional, List
 
 from .memory_monitor import SyncCudaMemoryMonitor
 
-from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.chunk import (
     ChunkManager,
 )
 
 from .memory_stats import MemStats
 
-from oslo.torch.nn.parallel.data_parallel.zero.utils import get_current_device
-from .utils import get_device_memory_capacity
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.utils import get_current_device
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.memory_tracer.utils import (
+    get_device_memory_capacity,
+)
 
 
 class ChunkMemStatsCollector:

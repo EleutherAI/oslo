@@ -6,13 +6,13 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import os
 
-from oslo.torch.nn.parallel.data_parallel.zero.chunk import (
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.chunk import (
     TensorState,
     Chunk,
 )
 from oslo.torch.distributed.parallel_context import ParallelContext
 from oslo.torch.utils import get_free_port
-from oslo.torch.nn.parallel.data_parallel.zero.utils import get_current_device
+from oslo.torch.nn.parallel.data_parallel.zero.hetero.utils import get_current_device
 
 import itertools
 

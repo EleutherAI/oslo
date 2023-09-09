@@ -24,7 +24,7 @@ from torch.optim import Optimizer
 from oslo.torch.distributed.parallel_mode import ParallelMode
 from oslo.torch.distributed.parallel_context import ParallelContext
 
-from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim._utils import (
+from oslo.torch.nn.parallel.data_parallel.zero.optim._utils import (
     calculate_global_norm_from_list,
     compute_norm,
     flatten,
@@ -35,7 +35,7 @@ from oslo.torch.nn.parallel.data_parallel.zero.sharded_optim._utils import (
     sync_param,
 )
 
-from ._base_optim import BaseOptimizerWrapper
+from .._optim_interface import BaseOptimizerWrapper
 from .bookkeeping import BucketStore, GradientStore, ParameterStore, TensorBucket
 
 
